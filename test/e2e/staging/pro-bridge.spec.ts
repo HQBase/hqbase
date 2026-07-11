@@ -6,11 +6,29 @@ const run = promisify(execFile);
 const email = required("HQBASE_PRO_STAGING_OWNER_EMAIL");
 const password = required("HQBASE_PRO_STAGING_OWNER_PASSWORD");
 const sender = required("HQBASE_PRO_STAGING_SENDER");
+const domain = required("HQBASE_PRO_STAGING_EMAIL_DOMAIN");
 const bridgeToken = required("HQBASE_PRO_STAGING_BRIDGE_TOKEN");
 const bridgeHost = required("HQBASE_PRO_STAGING_BRIDGE_HOST");
 const acceptanceBinary = required("HQBASE_BRIDGE_ACCEPTANCE_BIN");
 
 test("Pro app password works through real IMAPS and SMTPS", async ({ request }) => {
+  const status = await request.get("/api/setup/status");
+  expect(status.ok()).toBeTruthy();
+  const setup = (await status.json()) as { isComplete: boolean };
+  if (!setup.isComplete) {
+    const bootstrap = await request.post("/api/setup/bootstrap", {
+      data: {
+        checklistAcknowledged: true,
+        mailboxes: [{ address: sender, displayName: "HQBase Pro E2E" }],
+        ownerEmail: email,
+        ownerName: "HQBase Pro E2E Owner",
+        ownerPassword: password,
+        primaryDomain: domain
+      }
+    });
+    expect(bootstrap.status()).toBe(201);
+  }
+
   const login = await request.post("/api/auth/sign-in/email", {
     data: { email, password, rememberMe: false }
   });

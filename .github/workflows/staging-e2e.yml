@@ -1,0 +1,71 @@
+name: Staging E2E
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: hqbase-pro-staging-e2e
+  cancel-in-progress: false
+
+jobs:
+  fresh-install-and-bridge:
+    runs-on: ubuntu-latest
+    environment: hqbase-staging
+    timeout-minutes: 30
+    env:
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.HQBASE_E2E_CLOUDFLARE_ACCOUNT_ID }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.HQBASE_E2E_CLOUDFLARE_API_TOKEN }}
+      HQBASE_PRO_STAGING_ACCESS_CLIENT_ID: ${{ secrets.HQBASE_E2E_ACCESS_CLIENT_ID }}
+      HQBASE_PRO_STAGING_ACCESS_CLIENT_SECRET: ${{ secrets.HQBASE_E2E_ACCESS_CLIENT_SECRET }}
+      HQBASE_PRO_STAGING_EMAIL_DOMAIN: ${{ secrets.HQBASE_E2E_EMAIL_DOMAIN }}
+      HQBASE_PRO_STAGING_OWNER_EMAIL: owner@${{ secrets.HQBASE_E2E_EMAIL_DOMAIN }}
+      HQBASE_PRO_STAGING_OWNER_PASSWORD: ${{ secrets.HQBASE_E2E_OWNER_PASSWORD }}
+      HQBASE_PRO_STAGING_SENDER: hello@${{ secrets.HQBASE_E2E_EMAIL_DOMAIN }}
+      HQBASE_PRO_STAGING_URL: https://${{ secrets.HQBASE_E2E_APP_HOSTNAME }}
+      HQBASE_PRO_STAGING_BRIDGE_TOKEN: ${{ secrets.HQBASE_PRO_E2E_BRIDGE_TOKEN }}
+      HQBASE_PRO_STAGING_BRIDGE_HOST: ${{ secrets.HQBASE_PRO_E2E_BRIDGE_HOST }}
+      HQBASE_BRIDGE_ACCEPTANCE_BIN: /tmp/hqbase-bridge-acceptance
+      DEPLOYMENT_NAME: e2e-${{ github.run_id }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.7.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.26.x"
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
+      - name: Check out the pinned bridge implementation
+        uses: actions/checkout@v4
+        with:
+          repository: HQBase/hqbase-mail-bridge
+          path: .staging/bridge
+          ssh-key: ${{ secrets.HQBASE_BRIDGE_REPO_DEPLOY_KEY }}
+      - name: Build the headless IMAPS/SMTPS acceptance client
+        working-directory: .staging/bridge
+        run: go build -o "$HQBASE_BRIDGE_ACCEPTANCE_BIN" ./cmd/acceptance
+      - name: Deploy disposable Pro installation
+        run: >-
+          pnpm hqbase-pro install
+          --name "$DEPLOYMENT_NAME"
+          --worker-name hqbase-pro-e2e-staging
+          --domain "$HQBASE_PRO_STAGING_EMAIL_DOMAIN"
+          --no-email
+          --app-domain "${HQBASE_PRO_STAGING_URL#https://}"
+          --bridge-token "$HQBASE_PRO_STAGING_BRIDGE_TOKEN"
+      - name: Exercise Pro app passwords through real IMAPS and SMTPS
+        run: pnpm test:e2e:staging
+      - name: Preserve Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report
+      - name: Destroy disposable Pro installation
+        if: always()
+        run: pnpm hqbase-pro destroy --name "$DEPLOYMENT_NAME" --scope all --yes
