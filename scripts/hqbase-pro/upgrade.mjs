@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { spawnSync } from "node:child_process";
-import { mkdirSync } from "node:fs";
+import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 
 import { optionalBoolean, optionalString, parseArgs, requireString } from "./args.mjs";
@@ -124,6 +124,41 @@ function backupPath(options) {
   return resolve(rootDir, ".hqbase-pro", "backups", `${options.database}-${stamp}.sql`);
 }
 
+function remoteMigrationConfig(database) {
+  const output = executeWrangler(["d1", "list", "--json"], { quiet: true });
+  const databases = JSON.parse(output);
+  const match = databases.find(
+    (candidate) => candidate.name === database || candidate.uuid === database
+  );
+  if (!match) {
+    throw new Error(`Remote D1 database "${database}" was not found.`);
+  }
+
+  const directory = resolve(rootDir, ".hqbase-pro", "upgrades", String(match.uuid));
+  const config = resolve(directory, "wrangler.jsonc");
+  mkdirSync(directory, { recursive: true });
+  writeFileSync(
+    config,
+    `${JSON.stringify(
+      {
+        name: "hqbase-pro-upgrade",
+        compatibility_date: "2026-06-28",
+        d1_databases: [
+          {
+            binding: "DB",
+            database_name: match.name,
+            database_id: match.uuid,
+            migrations_dir: resolve(rootDir, "migrations")
+          }
+        ]
+      },
+      null,
+      2
+    )}\n`
+  );
+  return { config, directory };
+}
+
 export function runUpgrade(options) {
   console.log(`HQBase Community -> Pro (${options.local ? "local" : "remote"})`);
   assertCommunitySchema(readTables(options));
@@ -142,7 +177,24 @@ export function runUpgrade(options) {
     console.log(`Backup: ${output}`);
   }
 
-  executeWrangler(["d1", "migrations", "apply", options.database, targetFlag(options)]);
+  if (options.remote) {
+    const generated = remoteMigrationConfig(options.database);
+    try {
+      executeWrangler([
+        "d1",
+        "migrations",
+        "apply",
+        "DB",
+        "--remote",
+        "--config",
+        generated.config
+      ]);
+    } finally {
+      rmSync(generated.directory, { recursive: true, force: true });
+    }
+  } else {
+    executeWrangler(["d1", "migrations", "apply", options.database, "--local"]);
+  }
   assertProSchema(readTables(options));
   console.log("Upgrade complete: Pro schema verified and Community data retained.");
 }
