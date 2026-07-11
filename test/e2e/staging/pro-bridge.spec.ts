@@ -12,6 +12,19 @@ const bridgeHost = required("HQBASE_PRO_STAGING_BRIDGE_HOST");
 const acceptanceBinary = required("HQBASE_BRIDGE_ACCEPTANCE_BIN");
 
 test("Pro app password works through real IMAPS and SMTPS", async ({ request }) => {
+  await expect
+    .poll(
+      async () => {
+        try {
+          return (await request.get("/api/health")).status();
+        } catch {
+          return 0;
+        }
+      },
+      { timeout: 60_000 }
+    )
+    .toBe(200);
+
   const status = await request.get("/api/setup/status");
   expect(status.ok()).toBeTruthy();
   const setup = (await status.json()) as { isComplete: boolean };
