@@ -64,8 +64,9 @@ export function writeWranglerConfig(manifest, options = {}) {
   if (manifest.authUrl) {
     config.vars = { BETTER_AUTH_URL: manifest.authUrl };
   }
-  if (manifest.appDomain) {
-    config.routes = [{ pattern: manifest.appDomain, custom_domain: true }];
+  const customDomains = [manifest.appDomain, manifest.serviceDomain].filter(Boolean);
+  if (customDomains.length > 0) {
+    config.routes = customDomains.map((pattern) => ({ pattern, custom_domain: true }));
   }
 
   fs.writeFileSync(configPath(manifest.name), `${JSON.stringify(config, null, 2)}\n`);

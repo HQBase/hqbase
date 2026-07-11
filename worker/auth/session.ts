@@ -10,7 +10,8 @@ import { createAuth } from "./auth";
 const betterSessionSchema = z.object({
   session: z.object({
     id: z.string(),
-    userId: z.string()
+    userId: z.string(),
+    createdAt: z.coerce.date()
   }),
   user: z.object({
     id: z.string(),
@@ -24,6 +25,7 @@ export type AuthContext = {
   session: {
     id: string;
     userId: string;
+    createdAt: Date;
   };
   user: {
     id: string;
@@ -73,5 +75,15 @@ export function requireRole(
 ): void {
   if (!allowed.includes(authContext.user.role)) {
     throw new AppError("FORBIDDEN", message, 403);
+  }
+}
+
+export function requireRecentSession(authContext: AuthContext, maxAgeMs = 10 * 60 * 1000): void {
+  if (Date.now() - authContext.session.createdAt.getTime() > maxAgeMs) {
+    throw new AppError(
+      "RECENT_AUTH_REQUIRED",
+      "Sign in again before changing workspace infrastructure.",
+      403
+    );
   }
 }

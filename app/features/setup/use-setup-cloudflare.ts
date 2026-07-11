@@ -2,14 +2,11 @@ import * as React from "react";
 import { toast } from "sonner";
 
 import { configureCloudflareDomain, listCloudflareZones, verifyCloudflareToken } from "./api";
-import {
-  buildAppHostname,
-  connectionFingerprint,
-  customDomainSucceeded,
-  inferWorkerName
-} from "./setup-helpers";
+import { buildAppHostname, customDomainSucceeded, inferWorkerName } from "./setup-helpers";
 import { hasErrors, validateDomain, validateToken } from "./setup-validation";
 import type { CloudflareConfigureResult, CloudflareTokenStatus, CloudflareZone } from "./types";
+
+export type ConfiguredDomain = { zone: CloudflareZone; result: CloudflareConfigureResult };
 
 export function useSetupCloudflare(callbacks: {
   onConnectionInvalidated: () => void;
@@ -22,27 +19,40 @@ export function useSetupCloudflare(callbacks: {
   const [tokenStatus, setTokenStatus] = React.useState<CloudflareTokenStatus | null>(null);
   const [tokenError, setTokenError] = React.useState<string | null>(null);
   const [zones, setZones] = React.useState<CloudflareZone[]>([]);
-  const [selectedZoneId, setSelectedZoneId] = React.useState("");
+  const [selectedZoneIds, setSelectedZoneIds] = React.useState<string[]>([]);
+  const [portalZoneId, setPortalZoneId] = React.useState("");
   const workerName = React.useMemo(() => inferWorkerName(), []);
   const [appSubdomain, setAppSubdomain] = React.useState("hqbase");
+  const [serviceSubdomain, setServiceSubdomain] = React.useState("hqbase-api");
   const [domainAttempted, setDomainAttempted] = React.useState(false);
   const [connectionError, setConnectionError] = React.useState<string | null>(null);
-  const [result, setResult] = React.useState<CloudflareConfigureResult | null>(null);
+  const [results, setResults] = React.useState<ConfiguredDomain[]>([]);
   const [configuredKey, setConfiguredKey] = React.useState<string | null>(null);
   const [isLoading, setIsLoading] = React.useState(false);
 
-  const selectedZone = zones.find((zone) => zone.id === selectedZoneId) ?? null;
-  const primaryDomain = selectedZone?.name ?? "";
-  const appHostname = selectedZone ? buildAppHostname(appSubdomain, selectedZone.name) : "";
-  const currentConnectionKey = connectionFingerprint({
+  const selectedZones = zones.filter((zone) => selectedZoneIds.includes(zone.id));
+  const portalZone = zones.find((zone) => zone.id === portalZoneId) ?? null;
+  const primaryDomain = selectedZones[0]?.name ?? "";
+  const appHostname = portalZone ? buildAppHostname(appSubdomain, portalZone.name) : "";
+  const serviceHostname = portalZone ? buildAppHostname(serviceSubdomain, portalZone.name) : "";
+  const currentConnectionKey = [
+    ...selectedZoneIds.slice().sort(),
+    portalZoneId,
     appHostname,
-    workerName,
-    zoneId: selectedZoneId
-  });
+    serviceHostname,
+    workerName
+  ].join(":");
   const domainConnected = Boolean(
-    configuredKey === currentConnectionKey && result?.status.ready && customDomainSucceeded(result)
+    configuredKey === currentConnectionKey &&
+      results.length === selectedZones.length &&
+      results.every(
+        ({ result, zone }) =>
+          result.status.ready && (zone.id !== portalZoneId || customDomainSucceeded(result))
+      )
   );
-  const domainErrors = domainAttempted ? validateDomain({ appSubdomain, selectedZone }) : {};
+  const domainErrors = domainAttempted
+    ? validateDomain({ appSubdomain, portalZone, selectedZones, serviceSubdomain })
+    : {};
 
   async function handleTokenNext() {
     const validationError = validateToken(apiToken);
@@ -73,33 +83,38 @@ export function useSetupCloudflare(callbacks: {
 
   async function handleDomainConnect() {
     setDomainAttempted(true);
-    const errors = validateDomain({ appSubdomain, selectedZone });
-    if (hasErrors(errors) || !selectedZone) return;
-    if (domainConnected) {
-      callbacks.onDomainConnected();
-      return;
-    }
+    const errors = validateDomain({ appSubdomain, portalZone, selectedZones, serviceSubdomain });
+    if (hasErrors(errors) || !portalZone) return;
+    if (domainConnected) return callbacks.onDomainConnected();
     setConnectionError(null);
     setIsLoading(true);
     try {
-      const nextResult = await configureCloudflareDomain({
-        appHostname,
-        attachCustomDomain: true,
-        apiToken,
-        enableSending: true,
-        workerName: workerName.trim(),
-        zoneId: selectedZone.id
-      });
-      setResult(nextResult);
-      const ready = nextResult.status.ready && customDomainSucceeded(nextResult);
+      const configured: ConfiguredDomain[] = [];
+      for (const zone of selectedZones) {
+        const isPortal = zone.id === portalZone.id;
+        const result = await configureCloudflareDomain({
+          ...(isPortal ? { appHostname, serviceHostname } : {}),
+          attachCustomDomain: isPortal,
+          apiToken,
+          enableSending: true,
+          workerName: workerName.trim(),
+          zoneId: zone.id
+        });
+        configured.push({ result, zone });
+      }
+      setResults(configured);
+      const ready = configured.every(
+        ({ result, zone }) =>
+          result.status.ready && (zone.id !== portalZone.id || customDomainSucceeded(result))
+      );
       if (!ready) {
-        setConnectionError(
-          "Cloudflare needs attention on one or more checks below. Fix the indicated permission or setting, then try again."
-        );
+        setConnectionError("Cloudflare needs attention on one or more checks below.");
         return;
       }
       setConfiguredKey(currentConnectionKey);
-      toast.success(`${selectedZone.name} is connected.`);
+      toast.success(
+        `${configured.length} email ${configured.length === 1 ? "domain" : "domains"} connected.`
+      );
       callbacks.onDomainConnected();
     } catch (error) {
       setConnectionError(error instanceof Error ? error.message : "Cloudflare setup failed.");
@@ -108,41 +123,40 @@ export function useSetupCloudflare(callbacks: {
     }
   }
 
-  function handleTokenChange(value: string) {
-    setApiToken(value);
-    setTokenStatus(null);
-    setTokenError(null);
-    setZones([]);
-    setSelectedZoneId("");
-    invalidateConnection();
-    callbacks.onTokenChanged();
-  }
-
-  function handleDomainSelect(zoneId: string) {
-    const previousDomain = primaryDomain;
-    const zone = zones.find((item) => item.id === zoneId) ?? null;
-    setSelectedZoneId(zoneId);
-    if (zone) callbacks.onDomainChanged(previousDomain, zone.name);
-    invalidateConnection();
-  }
-
-  function updateConnectionInput(update: () => void) {
-    update();
-    invalidateConnection();
-  }
-
   function invalidateConnection() {
-    setResult(null);
+    setResults([]);
     setConfiguredKey(null);
     setConnectionError(null);
     callbacks.onConnectionInvalidated();
   }
 
-  function requireConnection(message = "Connect the domain before continuing.") {
-    setDomainAttempted(true);
-    setConnectionError(message);
+  function handleTokenChange(value: string) {
+    setApiToken(value);
+    setTokenStatus(null);
+    setTokenError(null);
+    setZones([]);
+    setSelectedZoneIds([]);
+    setPortalZoneId("");
+    invalidateConnection();
+    callbacks.onTokenChanged();
   }
 
+  function toggleZone(zoneId: string, selected: boolean) {
+    const previousDomain = primaryDomain;
+    const next = selected
+      ? [...selectedZoneIds, zoneId]
+      : selectedZoneIds.filter((id) => id !== zoneId);
+    setSelectedZoneIds(next);
+    const nextPrimary = zones.find((zone) => zone.id === next[0])?.name ?? "";
+    if (nextPrimary !== previousDomain) callbacks.onDomainChanged(previousDomain, nextPrimary);
+    if (!next.includes(portalZoneId)) setPortalZoneId(next[0] ?? "");
+    invalidateConnection();
+  }
+
+  const update = (action: () => void) => {
+    action();
+    invalidateConnection();
+  };
   return {
     access: {
       apiToken,
@@ -157,17 +171,29 @@ export function useSetupCloudflare(callbacks: {
       connectionError,
       errors: domainErrors,
       isLoading,
-      result,
-      selectedZone,
-      selectedZoneId,
-      setAppSubdomain: (value: string) => updateConnectionInput(() => setAppSubdomain(value)),
+      portalZone,
+      portalZoneId,
+      results,
+      selectedZoneIds,
+      selectedZones,
+      serviceHostname,
+      serviceSubdomain,
       zones,
       onConnect: () => void handleDomainConnect(),
-      onSelect: handleDomainSelect
+      onToggleZone: toggleZone,
+      setAppSubdomain: (value: string) => update(() => setAppSubdomain(value)),
+      setPortalZoneId: (value: string) => update(() => setPortalZoneId(value)),
+      setServiceSubdomain: (value: string) => update(() => setServiceSubdomain(value))
     },
     domainConnected,
+    emailDomains: selectedZones.map(({ accountId, id, name }) => ({ accountId, name, zoneId: id })),
     primaryDomain,
-    requireConnection,
+    portalHostname: appHostname,
+    requireConnection(message = "Connect the domains before continuing.") {
+      setDomainAttempted(true);
+      setConnectionError(message);
+    },
+    serviceHostname,
     tokenReady: tokenStatus?.active === true
   };
 }

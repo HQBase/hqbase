@@ -5,6 +5,8 @@ import initialMigration from "../../../migrations/0001_initial.sql?raw";
 import proMigration from "../../../migrations/0002_pro_mail_bridge.sql?raw";
 import bridgeV2Migration from "../../../migrations/0003_mail_bridge_v2.sql?raw";
 import track1Migration from "../../../migrations/0004_track1_operations.sql?raw";
+import multiDomainMigration from "../../../migrations/0005_multi_domain.sql?raw";
+import composerMigration from "../../../migrations/0006_composer.sql?raw";
 import { appPasswordHash } from "../../../worker/features/app-passwords/crypto";
 import {
   insertAppPassword,
@@ -12,10 +14,17 @@ import {
   revokeAppPassword,
   verifyAppPassword
 } from "../../../worker/features/app-passwords/queries";
+import { upsertMailDomain } from "../../../worker/features/domains/queries";
+import { getDraft, saveDraft } from "../../../worker/features/drafts/queries";
 import {
   revokeMailboxGrant,
   setMailboxGrant
 } from "../../../worker/features/mailbox-access/queries";
+import {
+  findMailboxByAddress,
+  findMailboxForSending,
+  insertMailboxAddress
+} from "../../../worker/features/mailboxes/queries";
 import { processJob } from "../../../worker/jobs/consumer";
 
 const userId = "usr_integration";
@@ -53,6 +62,8 @@ beforeAll(async () => {
     ).bind(timestamp, timestamp)
   ]);
   await applyMigration(track1Migration);
+  await applyMigration(multiDomainMigration);
+  await applyMigration(composerMigration);
 });
 
 beforeEach(async () => {
@@ -85,7 +96,65 @@ describe("Community to Pro migration", () => {
   });
 });
 
+describe("multi-domain mailbox identities", () => {
+  it("routes an alias to one mailbox while enforcing its send switch", async () => {
+    const domain = await upsertMailDomain(env.DB, {
+      name: "second.example",
+      receivingStatus: "ready",
+      sendingStatus: "ready",
+      dnsStatus: "ready"
+    });
+    const alias = await insertMailboxAddress(env.DB, "mbx_existing", domain.id, {
+      address: "support@second.example",
+      displayName: "Support alias",
+      sendEnabled: false
+    });
+    await expect(findMailboxByAddress(env.DB, alias.address)).resolves.toMatchObject({
+      id: "mbx_existing"
+    });
+    await expect(findMailboxForSending(env.DB, alias.address)).resolves.toBeNull();
+  });
+});
+
+describe("durable composer drafts", () => {
+  it("persists drafts and rejects stale concurrent updates", async () => {
+    const created = await saveDraft(env.DB, userId, {
+      mailboxId: "mbx_existing",
+      replyToMessageId: null,
+      from: "existing@example.com",
+      to: ["recipient@example.net"],
+      cc: [],
+      bcc: [],
+      subject: "Saved subject",
+      text: "Saved body",
+      html: "<p>Saved body</p>"
+    });
+    const updated = await saveDraft(env.DB, userId, {
+      ...created,
+      subject: "Updated subject"
+    });
+    await expect(getDraft(env.DB, userId, created.id)).resolves.toMatchObject({
+      subject: "Updated subject",
+      version: updated.version
+    });
+    await expect(
+      saveDraft(env.DB, userId, { ...created, subject: "Stale update" })
+    ).rejects.toMatchObject({ code: "DRAFT_CONFLICT", status: 409 });
+  });
+});
+
 describe("mail bridge authentication", () => {
+  it("reports deep bridge readiness", async () => {
+    const response = await SELF.fetch("https://hqbase.test/api/pro/mail-bridge/v2/ready", {
+      headers: { authorization: "Bearer integration-bridge-token" }
+    });
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      ready: true,
+      checks: { database: true, schema: true, entitlement: true, storage: true }
+    });
+  });
+
   it("creates, verifies, lists, and revokes a one-time app password", async () => {
     const created = await insertAppPassword(
       env.DB,

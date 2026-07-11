@@ -30,7 +30,12 @@ const PRO_TABLES = [
   "pro_mailbox_grants",
   "pro_audit_events",
   "pro_operation_runs",
-  "pro_schema_state"
+  "pro_schema_state",
+  "mail_domains",
+  "mailbox_addresses",
+  "workspace_hosts",
+  "pro_drafts",
+  "pro_draft_attachments"
 ];
 
 export function validateUpgradeOptions(flags) {

@@ -13,7 +13,7 @@ import {
   TableHeader,
   TableRow
 } from "@/components/ui/table";
-import { createMailbox, updateMailbox } from "./api";
+import { addMailboxAddress, createMailbox, removeMailboxAddress, updateMailbox } from "./api";
 import type { Mailbox } from "./types";
 
 type MailboxSettingsProps = {
@@ -45,6 +45,21 @@ export function MailboxSettings({
 
   async function handleToggle(mailbox: Mailbox) {
     await updateMailbox(mailbox.id, { isActive: !mailbox.isActive });
+    onChanged();
+  }
+  async function handleAlias(mailbox: Mailbox) {
+    const address = window.prompt("Alias address");
+    if (!address) return;
+    try {
+      await addMailboxAddress(mailbox.id, { address, displayName: mailbox.displayName });
+      toast.success("Alias added.");
+      onChanged();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Alias creation failed.");
+    }
+  }
+  async function handleRemoveAlias(mailbox: Mailbox, addressId: string) {
+    await removeMailboxAddress(mailbox.id, addressId);
     onChanged();
   }
 
@@ -93,7 +108,29 @@ export function MailboxSettings({
           <TableBody>
             {mailboxes.map((mailbox) => (
               <TableRow className="hover:bg-muted/35" key={mailbox.id}>
-                <TableCell className="max-w-36 truncate">{mailbox.address}</TableCell>
+                <TableCell className="max-w-52">
+                  <span className="block truncate">{mailbox.address}</span>
+                  {mailbox.addresses
+                    ?.filter((item) => !item.isPrimary)
+                    .map((item) => (
+                      <span
+                        className="mt-1 flex items-center gap-1 text-xs text-muted-foreground"
+                        key={item.id}
+                      >
+                        {item.address}
+                        {canManage ? (
+                          <Button
+                            className="h-5 px-1"
+                            type="button"
+                            variant="ghost"
+                            onClick={() => void handleRemoveAlias(mailbox, item.id)}
+                          >
+                            Remove
+                          </Button>
+                        ) : null}
+                      </span>
+                    ))}
+                </TableCell>
                 <TableCell className="hidden sm:table-cell">{mailbox.displayName}</TableCell>
                 <TableCell>
                   <Badge variant={mailbox.isActive ? "secondary" : "outline"}>
@@ -102,6 +139,15 @@ export function MailboxSettings({
                 </TableCell>
                 {canManage && (
                   <TableCell className="pl-1 text-right">
+                    <Button
+                      className="mr-2 px-2"
+                      size="sm"
+                      type="button"
+                      variant="ghost"
+                      onClick={() => void handleAlias(mailbox)}
+                    >
+                      Add alias
+                    </Button>
                     <Button
                       className="px-2"
                       size="sm"

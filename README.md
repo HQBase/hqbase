@@ -7,7 +7,10 @@ Pro supports two first-class lifecycles:
 - Fresh installation into empty Cloudflare resources.
 - Upgrade from an explicitly supported HQBase Community schema.
 
-It includes the Pro web application, Worker, migrations, app-password management, persistent IMAP identity, bridge API, and staging E2E orchestration. The Fly-hosted `hqbase-mail-bridge` connects through authenticated HTTPS and never receives Cloudflare credentials.
+It includes the Pro web application, multi-domain mail identities, private durable drafts, a rich
+attachment-aware composer, migrations, app-password management, persistent IMAP identity, bridge
+API, and staging E2E orchestration. The Fly-hosted `hqbase-mail-bridge` connects through
+authenticated HTTPS and never receives Cloudflare credentials.
 
 ## Local development
 

@@ -10,6 +10,22 @@ export default {
       return apiRoutes.fetch(request, env, ctx);
     }
 
+    const portal = request.headers.get("accept")?.includes("text/html")
+      ? await env.DB.prepare(
+          `SELECT current.is_canonical, canonical.hostname AS canonical_hostname
+       FROM workspace_hosts current
+       JOIN workspace_hosts canonical ON canonical.kind = 'portal' AND canonical.is_canonical = 1
+       WHERE current.kind = 'portal' AND current.hostname = ?`
+        )
+          .bind(url.hostname.toLowerCase())
+          .first<{ is_canonical: number; canonical_hostname: string }>()
+          .catch(() => null)
+      : null;
+    if (portal && portal.is_canonical !== 1) {
+      url.hostname = portal.canonical_hostname;
+      return Response.redirect(url.toString(), 308);
+    }
+
     return env.ASSETS.fetch(request);
   },
 

@@ -16,17 +16,32 @@ export const bootstrapSetupSchema = z
     ownerName: z.string().trim().min(1).max(100),
     ownerEmail: emailAddressSchema,
     ownerPassword: z.string().min(8).max(128),
-    primaryDomain: domainSchema,
+    primaryDomain: domainSchema.optional(),
+    portalHostname: domainSchema.optional(),
+    serviceHostname: domainSchema.optional(),
+    emailDomains: z
+      .array(
+        z.object({
+          name: domainSchema,
+          zoneId: z.string().trim().min(1).max(64).nullable().optional(),
+          accountId: z.string().trim().min(1).max(64).nullable().optional()
+        })
+      )
+      .min(1)
+      .max(50)
+      .optional(),
     checklistAcknowledged: z.literal(true),
     mailboxes: z.array(createMailboxSchema).min(1).max(20)
   })
   .superRefine((input, context) => {
-    const ownerDomain = input.ownerEmail.split("@")[1];
-    if (ownerDomain !== input.primaryDomain) {
+    const domains =
+      input.emailDomains?.map((domain) => domain.name) ??
+      (input.primaryDomain ? [input.primaryDomain] : []);
+    if (domains.length === 0) {
       context.addIssue({
         code: "custom",
-        message: `Owner sign-in address must use ${input.primaryDomain}.`,
-        path: ["ownerEmail"]
+        message: "Choose at least one email domain.",
+        path: ["emailDomains"]
       });
     }
 
@@ -36,6 +51,14 @@ export const bootstrapSetupSchema = z
         context.addIssue({
           code: "custom",
           message: "Mailbox addresses must be unique.",
+          path: ["mailboxes", index, "address"]
+        });
+      }
+      const mailboxDomain = mailbox.address.split("@")[1];
+      if (!mailboxDomain || !domains.includes(mailboxDomain)) {
+        context.addIssue({
+          code: "custom",
+          message: "Mailbox address must use one of the selected email domains.",
           path: ["mailboxes", index, "address"]
         });
       }
@@ -59,8 +82,14 @@ export const inspectCloudflareDomainSchema = z.object({
   zoneId: z.string().trim().min(1).max(64)
 });
 
-export const configureCloudflareDomainSchema = inspectCloudflareDomainSchema.extend({
-  appHostname: domainSchema,
-  attachCustomDomain: z.literal(true).default(true),
-  enableSending: z.boolean().default(true)
-});
+export const configureCloudflareDomainSchema = inspectCloudflareDomainSchema
+  .extend({
+    appHostname: domainSchema.optional(),
+    serviceHostname: domainSchema.optional(),
+    attachCustomDomain: z.boolean().default(true),
+    enableSending: z.boolean().default(true)
+  })
+  .refine((input) => !input.attachCustomDomain || Boolean(input.appHostname), {
+    message: "Choose the workspace hostname.",
+    path: ["appHostname"]
+  });

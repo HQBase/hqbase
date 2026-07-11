@@ -27,6 +27,7 @@ export function install(flags) {
 
   const manifest = createManifest(name, {
     appDomain: optionalString(flags, "app-domain"),
+    serviceDomain: optionalString(flags, "service-domain"),
     authUrl: optionalString(flags, "auth-url"),
     domain,
     workerName: optionalString(flags, "worker-name"),
@@ -133,6 +134,7 @@ function createManifest(name, input) {
     r2: { bucket: r2Bucket, created: false },
     queue: { name: queueName, deadLetterName: `${queueName}-dlq`, created: false },
     appDomain: input.appDomain,
+    serviceDomain: input.serviceDomain,
     authUrl: input.authUrl,
     email: input.domain
       ? {

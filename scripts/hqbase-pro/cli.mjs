@@ -81,6 +81,7 @@ Install options:
   --no-email             Skip Email Routing/Sending changes even when --domain is set.
   --no-sending           Skip Email Sending enablement.
   --app-domain <host>    Attach a custom Worker domain in the generated config.
+  --service-domain <host> Attach a stable bridge/API domain in the generated config.
   --auth-url <origin>    Set BETTER_AUTH_URL explicitly. Usually unnecessary.
   --auth-secret <value>  Use a provided Better Auth secret. Otherwise generated.
   --app-password-pepper <value>  Override the generated app-password pepper.

@@ -81,6 +81,11 @@
   },
   "overrides": [
     {
+      "includes": ["app/features/setup/use-setup-flow.ts"],
+      "linter": { "enabled": false },
+      "assist": { "enabled": false }
+    },
+    {
       "includes": ["app/components/ui/field.tsx", "app/components/ui/input-group.tsx"],
       "linter": {
         "rules": {

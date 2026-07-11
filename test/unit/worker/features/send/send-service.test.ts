@@ -6,7 +6,10 @@ vi.mock("@worker/db/client", () => ({
 }));
 
 vi.mock("@worker/features/mailboxes/queries", () => ({
-  findMailboxByAddress: vi.fn()
+  findMailboxForSending: vi.fn()
+}));
+vi.mock("@worker/features/mailboxes/address-queries", () => ({
+  findAddressIdentity: vi.fn().mockResolvedValue(null)
 }));
 
 vi.mock("@worker/features/messages/queries", () => ({
@@ -15,12 +18,13 @@ vi.mock("@worker/features/messages/queries", () => ({
   insertMessage: vi.fn()
 }));
 
-import { findMailboxByAddress } from "@worker/features/mailboxes/queries";
+import { findMailboxForSending } from "@worker/features/mailboxes/queries";
 import { ensureThread, getMessageDetail, insertMessage } from "@worker/features/messages/queries";
 import { replyToMessage, sendNewMessage } from "@worker/features/send/service";
 import type { WorkerEnv } from "@worker/lib/env";
 
 const mailbox = {
+  addresses: [],
   address: "support@example.com",
   createdAt: "2026-07-10T00:00:00.000Z",
   displayName: "Support",
@@ -64,7 +68,7 @@ describe("send service", () => {
 
   beforeEach(() => {
     vi.resetAllMocks();
-    vi.mocked(findMailboxByAddress).mockResolvedValue(mailbox);
+    vi.mocked(findMailboxForSending).mockResolvedValue(mailbox);
     vi.mocked(ensureThread).mockResolvedValue("thread-1");
     vi.mocked(insertMessage).mockResolvedValue(sentSummary);
   });
@@ -73,6 +77,7 @@ describe("send service", () => {
     send.mockResolvedValue({ messageId: "<cloudflare-new@example.com>" });
 
     await sendNewMessage(env, {
+      attachmentIds: [],
       bcc: [],
       cc: [],
       from: mailbox.address,
@@ -111,6 +116,7 @@ describe("send service", () => {
     send.mockResolvedValue({ messageId: "<cloudflare-reply@example.com>" });
 
     await replyToMessage(env, {
+      attachmentIds: [],
       from: mailbox.address,
       messageId: "message-1",
       text: "Reply"

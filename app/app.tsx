@@ -6,7 +6,6 @@ import { Toaster } from "@/components/ui/sonner";
 import { getCurrentUser } from "@/features/auth/api";
 import { LoginPage } from "@/features/auth/login-page";
 import type { CurrentUser } from "@/features/auth/types";
-import { ComposeDialog } from "@/features/compose/compose-dialog";
 import { InboxPage } from "@/features/inbox/inbox-page";
 import { listMailboxes } from "@/features/mailboxes/api";
 import type { Mailbox } from "@/features/mailboxes/types";
@@ -19,6 +18,10 @@ import type { SetupStatus } from "@/features/setup/types";
 import { listUsers } from "@/features/users/api";
 import type { WorkspaceUser } from "@/features/users/types";
 import type { FolderId } from "@/lib/routes";
+
+const ComposeDialog = React.lazy(() =>
+  import("@/features/compose/compose-dialog").then((module) => ({ default: module.ComposeDialog }))
+);
 
 export function App(): React.ReactElement {
   const [setup, setSetup] = React.useState<SetupStatus | null>(null);
@@ -172,13 +175,17 @@ export function App(): React.ReactElement {
           />
         )}
       </AppShell>
-      <ComposeDialog
-        mailboxes={contentMailboxes}
-        open={composeOpen}
-        replyTo={replyTo}
-        onOpenChange={setComposeOpen}
-        onSent={() => void reloadMessages()}
-      />
+      {composeOpen ? (
+        <React.Suspense fallback={null}>
+          <ComposeDialog
+            mailboxes={contentMailboxes}
+            open={composeOpen}
+            replyTo={replyTo}
+            onOpenChange={setComposeOpen}
+            onSent={() => void reloadMessages()}
+          />
+        </React.Suspense>
+      ) : null}
       <Toaster />
     </>
   );

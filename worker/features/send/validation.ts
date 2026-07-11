@@ -14,7 +14,9 @@ export const sendMessageSchema = z
     bcc: optionalRecipientListSchema,
     subject: z.string().trim().min(1).max(200),
     text: z.string().trim().min(1).max(100_000),
-    html: z.string().trim().max(200_000).optional()
+    html: z.string().trim().max(200_000).optional(),
+    attachmentIds: z.array(z.string().min(1).max(100)).max(20).default([]),
+    draftId: z.string().min(1).max(100).optional()
   })
   .superRefine((message, context) => {
     const recipientCount = message.to.length + message.cc.length + message.bcc.length;
@@ -31,7 +33,9 @@ export const replyMessageSchema = z.object({
   messageId: z.string().min(1),
   from: emailAddressSchema,
   text: z.string().trim().min(1).max(100_000),
-  html: z.string().trim().max(200_000).optional()
+  html: z.string().trim().max(200_000).optional(),
+  attachmentIds: z.array(z.string().min(1).max(100)).max(20).default([]),
+  draftId: z.string().min(1).max(100).optional()
 });
 
 export type SendMessageInput = z.infer<typeof sendMessageSchema>;

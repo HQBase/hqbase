@@ -3,6 +3,7 @@ import type * as React from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AppPasswordSettings } from "@/features/app-passwords/app-password-settings";
+import { DomainSettings } from "@/features/domains/domain-settings";
 import { MailboxAccessSettings } from "@/features/mailbox-access/mailbox-access-settings";
 import { MailboxSettings } from "@/features/mailboxes/mailbox-settings";
 import type { Mailbox } from "@/features/mailboxes/types";
@@ -37,6 +38,7 @@ export function SettingsPage({
           <TabsList className="h-auto w-full justify-start rounded-none border-b bg-transparent p-0">
             <SettingsTab value="mailboxes">Mailboxes</SettingsTab>
             <SettingsTab value="users">Users</SettingsTab>
+            {canManage ? <SettingsTab value="domains">Domains</SettingsTab> : null}
             {canManage ? <SettingsTab value="access">Access</SettingsTab> : null}
             <SettingsTab value="mail-clients">Mail clients</SettingsTab>
             <SettingsTab value="general">General</SettingsTab>
@@ -47,6 +49,11 @@ export function SettingsPage({
           <TabsContent className="mt-5" value="users">
             {canManage ? <UserSettings users={users} onChanged={onRefresh} /> : <NoUserAccess />}
           </TabsContent>
+          {canManage ? (
+            <TabsContent className="mt-5" value="domains">
+              <DomainSettings portalHostname={setup.portalHostname} onChanged={onRefresh} />
+            </TabsContent>
+          ) : null}
           {canManage ? (
             <TabsContent className="mt-5" value="access">
               <MailboxAccessSettings mailboxes={mailboxes} users={users} />

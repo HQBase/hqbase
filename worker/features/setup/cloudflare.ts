@@ -22,6 +22,7 @@ type CloudflareZoneInput = CloudflareInput & {
 
 type CloudflareConfigureInput = CloudflareZoneInput & {
   appHostname?: string | undefined;
+  serviceHostname?: string | undefined;
   attachCustomDomain?: boolean | undefined;
   enableSending: boolean;
 };
@@ -157,32 +158,26 @@ export async function configureCloudflareDomain(
   }
 
   const steps: CloudflareStep[] = [];
-  const appHostname = input.appHostname;
-  if (input.attachCustomDomain && appHostname) {
-    await recordStep(steps, "custom-domain", "Attach app URL", async () => {
-      if (!zone.accountId) {
-        throw new AppError(
-          "CLOUDFLARE_ZONE_ACCOUNT_MISSING",
-          "Cloudflare did not return the zone account ID needed to attach a Worker domain.",
-          400
-        );
-      }
-      const domain = await cloudflareRequestResult(
-        input.apiToken,
-        `/accounts/${zone.accountId}/workers/domains`,
-        workerDomainSchema,
-        {
-          body: JSON.stringify({
-            hostname: appHostname,
-            service: workerName,
-            zone_id: zone.id,
-            zone_name: zone.name
-          }),
-          method: "PUT"
+  const hostnames = [input.appHostname, input.serviceHostname].filter(
+    (hostname): hostname is string => Boolean(hostname)
+  );
+  if (input.attachCustomDomain && hostnames.length > 0) {
+    for (const [index, hostname] of hostnames.entries()) {
+      await recordStep(
+        steps,
+        index === 0 ? "custom-domain" : "service-domain",
+        index === 0 ? "Attach app URL" : "Attach service URL",
+        async () => {
+          const domain = await attachWorkerCustomDomain({
+            apiToken: input.apiToken,
+            hostname,
+            workerName,
+            zone
+          });
+          return `${domain.hostname} now routes to Worker ${domain.service}.`;
         }
       );
-      return `${domain.hostname} now routes to Worker ${domain.service}.`;
-    });
+    }
   } else {
     steps.push({
       id: "custom-domain",
@@ -257,6 +252,35 @@ export async function configureCloudflareDomain(
     }),
     steps
   };
+}
+
+export async function attachWorkerCustomDomain(input: {
+  apiToken: string;
+  hostname: string;
+  workerName: string;
+  zone: CloudflareZone;
+}): Promise<z.infer<typeof workerDomainSchema>> {
+  if (!input.zone.accountId) {
+    throw new AppError(
+      "CLOUDFLARE_ZONE_ACCOUNT_MISSING",
+      "Cloudflare did not return the zone account ID needed to attach a Worker domain.",
+      400
+    );
+  }
+  return cloudflareRequestResult(
+    input.apiToken,
+    `/accounts/${input.zone.accountId}/workers/domains`,
+    workerDomainSchema,
+    {
+      body: JSON.stringify({
+        hostname: input.hostname,
+        service: input.workerName,
+        zone_id: input.zone.id,
+        zone_name: input.zone.name
+      }),
+      method: "PUT"
+    }
+  );
 }
 
 function mapZone(zone: z.infer<typeof cloudflareZoneSchema>): CloudflareZone {

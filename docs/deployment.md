@@ -1,7 +1,7 @@
 # Deployment
 
-HQBase is designed for self-hosting in the deployer's Cloudflare account with a
-Cloudflare-managed primary domain.
+HQBase is designed for self-hosting in the deployer's Cloudflare account with one or more
+Cloudflare-managed email domains.
 
 ## Deploy Button
 
@@ -15,10 +15,9 @@ Cloudflare's deploy flow clones the repository, prompts for configured secrets a
 
 The default `wrangler.jsonc` does not set `BETTER_AUTH_URL`; the Worker derives the deployed request origin. Only set `BETTER_AUTH_URL` explicitly when you need to pin auth to a specific custom origin.
 
-HQBase requires the primary domain to use Cloudflare authoritative DNS. If the
-domain is not on Cloudflare yet, add it to Cloudflare, review the imported DNS
-records, update nameservers at the registrar, and wait until Cloudflare marks the
-domain Active before completing `/setup`.
+Every email domain must use Cloudflare authoritative DNS. Add missing domains to Cloudflare,
+review imported DNS records, update nameservers at the registrar, and wait until each selected
+zone is Active before completing `/setup`.
 
 ### Deploy Form Guidance
 
@@ -72,6 +71,9 @@ entire deployment.
 
 Add `--domain example.com` to `hqbase-pro:install` to enable Cloudflare Email Routing/Sending and point the catch-all route at the deployed Worker. The domain must already be active on Cloudflare DNS.
 
+Use `--app-domain mail.example.com --service-domain hqbase-api.example.com` to attach a mutable
+human-facing portal and a separate stable origin for the bridge and automation.
+
 The operator writes `.hqbase-pro/deployments/<name>/manifest.json` and a generated Wrangler config. The manifest is intentionally ignored by Git because it can contain deployment-specific resource names and secret file paths.
 
 ## Required Bindings
@@ -103,10 +105,10 @@ then add `/setup`.
 
 1. Visit `/setup`.
 2. Create and verify the temporary Cloudflare API token described in the table.
-3. Select the primary domain, then click `Connect domain and continue` to run
-   the required Cloudflare configuration and readiness checks.
-4. Choose the local part of the owner sign-in address—the selected domain is
-   fixed—then create at least one shared mailbox.
+3. Select every email domain, choose which domain hosts the portal, and connect them. Setup also
+   creates the separate stable service origin.
+4. Enter the owner's full sign-in email. Authentication does not have to use an email domain.
+5. Create shared mailboxes using any connected domain.
 
 The temporary token needs Account / Email Sending / Edit, Account / Workers
 Scripts / Edit, Zone / Zone / Read, Zone / Zone Settings / Edit, and Zone / Email

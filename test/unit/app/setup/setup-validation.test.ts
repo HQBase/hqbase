@@ -27,37 +27,29 @@ describe("setup form validation", () => {
   });
 
   it("blocks invalid owner details before the mailbox step", () => {
-    expect(
-      validateOwner({ email: "not-an-email", name: "", password: "short" }, "example.com")
-    ).toEqual({
-      email: "Choose a valid address before @example.com.",
+    expect(validateOwner({ email: "not-an-email", name: "", password: "short" })).toEqual({
+      email: "Enter a valid login email.",
       name: "Enter your name.",
       password: "Use at least 8 characters."
     });
   });
 
-  it("requires the owner sign-in address to use the selected domain", () => {
+  it("allows the owner sign-in address to use a separate domain", () => {
     expect(
-      validateOwner(
-        {
-          email: "owner@gmail.com",
-          name: "Workspace Owner",
-          password: "a-secure-password"
-        },
-        "example.com"
-      )
-    ).toEqual({ email: "Choose a valid address before @example.com." });
+      validateOwner({
+        email: "owner@gmail.com",
+        name: "Workspace Owner",
+        password: "a-secure-password"
+      })
+    ).toEqual({});
 
     expect(
       hasErrors(
-        validateOwner(
-          {
-            email: "owner@example.com",
-            name: "Workspace Owner",
-            password: "a-secure-password"
-          },
-          "example.com"
-        )
+        validateOwner({
+          email: "owner@example.com",
+          name: "Workspace Owner",
+          password: "a-secure-password"
+        })
       )
     ).toBe(false);
   });
@@ -66,18 +58,24 @@ describe("setup form validation", () => {
     expect(
       validateDomain({
         appSubdomain: "bad subdomain",
-        selectedZone: null
+        serviceSubdomain: "bad service",
+        selectedZones: [],
+        portalZone: null
       })
     ).toEqual({
       appSubdomain: "Use one DNS label, such as hqbase or inbox.",
-      selectedZoneId: "Choose the domain that will receive your shared email."
+      serviceSubdomain: "Use one DNS label, such as hqbase-api.",
+      selectedZoneIds: "Choose at least one email domain.",
+      portalZoneId: "Choose which selected domain hosts the workspace portal."
     });
 
     expect(
       hasErrors(
         validateDomain({
           appSubdomain: "hqbase",
-          selectedZone: activeZone
+          serviceSubdomain: "hqbase-api",
+          selectedZones: [activeZone],
+          portalZone: activeZone
         })
       )
     ).toBe(false);
@@ -96,12 +94,12 @@ describe("setup form validation", () => {
         { address: "hello@example.com", displayName: "Hello" },
         { address: "HELLO@example.com", displayName: "Duplicate" }
       ],
-      "example.com"
+      ["example.com"]
     );
 
     expect(errors.rows).toEqual([
       {
-        address: "Use an address ending in @example.com.",
+        address: "Use one of the connected email domains.",
         displayName: "Enter a display name."
       },
       { address: "Each mailbox address must be unique." },
@@ -118,7 +116,7 @@ describe("setup form validation", () => {
             { address: "support@example.com", displayName: "Support" },
             { address: "privacy@example.com", displayName: "Privacy" }
           ],
-          "example.com"
+          ["example.com"]
         )
       )
     ).toBe(false);

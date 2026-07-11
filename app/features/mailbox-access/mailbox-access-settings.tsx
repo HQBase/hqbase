@@ -1,6 +1,6 @@
 import * as React from "react";
 import { toast } from "sonner";
-
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Select,
@@ -33,6 +33,9 @@ export function MailboxAccessSettings({
 }): React.ReactElement {
   const [grants, setGrants] = React.useState<MailboxGrant[]>([]);
   const [busy, setBusy] = React.useState<string | null>(null);
+  const [bulkUserId, setBulkUserId] = React.useState("");
+  const [bulkDomain, setBulkDomain] = React.useState("");
+  const [bulkLevel, setBulkLevel] = React.useState<MailboxAccessLevel>("read");
 
   const reload = React.useCallback(async () => setGrants(await listMailboxGrants()), []);
   React.useEffect(() => {
@@ -57,6 +60,39 @@ export function MailboxAccessSettings({
   }
 
   const managedUsers = users.filter((user) => user.role !== "owner");
+  const domains = Array.from(
+    new Set(
+      mailboxes.flatMap((mailbox) =>
+        (mailbox.addresses?.length ? mailbox.addresses : [{ address: mailbox.address }]).map(
+          (identity) => identity.address.split("@")[1] ?? ""
+        )
+      )
+    )
+  )
+    .filter(Boolean)
+    .sort();
+  async function applyDomainGrants() {
+    const targets = mailboxes.filter((mailbox) =>
+      (mailbox.addresses?.length ? mailbox.addresses : [{ address: mailbox.address }]).some(
+        (identity) => identity.address.endsWith(`@${bulkDomain}`)
+      )
+    );
+    if (!bulkUserId || !bulkDomain || targets.length === 0) return;
+    setBusy("bulk");
+    try {
+      await Promise.all(
+        targets.map((mailbox) =>
+          setMailboxGrant({ mailboxId: mailbox.id, userId: bulkUserId, accessLevel: bulkLevel })
+        )
+      );
+      await reload();
+      toast.success(`Explicit grants written for ${targets.length} mailboxes.`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not apply domain access.");
+    } finally {
+      setBusy(null);
+    }
+  }
   return (
     <Card className="bg-card/70 shadow-none">
       <CardHeader>
@@ -66,7 +102,57 @@ export function MailboxAccessSettings({
           mailbox.
         </CardDescription>
       </CardHeader>
-      <CardContent>
+      <CardContent className="grid gap-5">
+        <div className="grid gap-2 rounded-md border bg-background/50 p-3 md:grid-cols-[1fr_1fr_1fr_auto]">
+          <Select value={bulkUserId} onValueChange={setBulkUserId}>
+            <SelectTrigger>
+              <SelectValue placeholder="User" />
+            </SelectTrigger>
+            <SelectContent>
+              {managedUsers.map((user) => (
+                <SelectItem key={user.id} value={user.id}>
+                  {user.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select value={bulkDomain} onValueChange={setBulkDomain}>
+            <SelectTrigger>
+              <SelectValue placeholder="Domain" />
+            </SelectTrigger>
+            <SelectContent>
+              {domains.map((domain) => (
+                <SelectItem key={domain} value={domain}>
+                  {domain}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select
+            value={bulkLevel}
+            onValueChange={(value) => setBulkLevel(value as MailboxAccessLevel)}
+          >
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="read">Read</SelectItem>
+              <SelectItem value="agent">Agent</SelectItem>
+              <SelectItem value="manager">Manager</SelectItem>
+            </SelectContent>
+          </Select>
+          <Button
+            disabled={busy === "bulk" || !bulkUserId || !bulkDomain}
+            type="button"
+            onClick={() => void applyDomainGrants()}
+          >
+            Apply to domain
+          </Button>
+          <p className="text-xs text-muted-foreground md:col-span-4">
+            This is a bulk action. It writes explicit mailbox grants and does not grant future
+            mailboxes automatically.
+          </p>
+        </div>
         <Table className="overflow-hidden rounded-md border">
           <TableHeader>
             <TableRow>

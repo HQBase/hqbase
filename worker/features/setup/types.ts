@@ -1,11 +1,25 @@
+import type { MailDomain } from "../domains/types";
 import type { Mailbox } from "../mailboxes/types";
 
 export type SetupStatus = {
   isComplete: boolean;
   primaryDomain: string | null;
+  portalHostname: string | null;
+  serviceHostname: string | null;
+  domains: MailDomain[];
   userCount: number;
   mailboxCount: number;
   checklistAcknowledged: boolean;
+};
+
+export type WorkspaceHost = {
+  id: string;
+  hostname: string;
+  zoneId: string | null;
+  kind: "portal" | "service";
+  isCanonical: boolean;
+  status: "pending" | "ready" | "degraded" | "disabled";
+  verifiedAt: string | null;
 };
 
 export type BootstrapResult = {

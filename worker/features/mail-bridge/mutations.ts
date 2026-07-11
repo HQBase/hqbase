@@ -141,10 +141,14 @@ async function copyMessages(
     const cloneId = newId("msg");
     await env.DB.prepare(
       `INSERT INTO messages
+       (id, thread_id, mailbox_id, direction, folder, from_address, to_json, cc_json, bcc_json,
+        subject, snippet, text_body, html_r2_key, raw_r2_key, message_id, dedupe_key, in_reply_to,
+        references_json, received_at, sent_at, read_at, starred_at, archived_at, trashed_at,
+        has_attachments, created_at, updated_at, delivered_to_address_id, sent_from_address_id)
        SELECT ?, thread_id, mailbox_id, direction, ?, from_address, to_json, cc_json, bcc_json,
               subject, snippet, text_body, html_r2_key, raw_r2_key, message_id, NULL, in_reply_to,
               references_json, received_at, sent_at, read_at, starred_at, archived_at, trashed_at,
-              has_attachments, ?, ?
+              has_attachments, ?, ?, delivered_to_address_id, sent_from_address_id
        FROM messages WHERE id = ?`
     )
       .bind(cloneId, destination.source_folder, timestamp, timestamp, source.message_id)

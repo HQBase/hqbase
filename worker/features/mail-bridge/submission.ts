@@ -3,7 +3,7 @@ import { newId, nowIso } from "../../db/client";
 import { parseRawEmail } from "../../email/parse-email";
 import type { WorkerEnv } from "../../lib/env";
 import { AppError } from "../../lib/errors";
-import { findMailboxByAddress } from "../mailboxes/queries";
+import { findMailboxForSending } from "../mailboxes/queries";
 import { sendNewMessage } from "../send/service";
 import { decodeBase64 } from "./codec";
 import type { MailSessionContext } from "./session";
@@ -26,7 +26,7 @@ export async function submitMessage(
     .bind(input.idempotencyKey, session.userId)
     .first();
   if (duplicate) return;
-  const mailbox = await findMailboxByAddress(env.DB, input.mailFrom.toLowerCase());
+  const mailbox = await findMailboxForSending(env.DB, input.mailFrom.toLowerCase());
   if (!mailbox?.isActive) {
     throw new AppError("SENDER_NOT_ALLOWED", "Sender is not an active mailbox.", 403);
   }
@@ -34,7 +34,8 @@ export async function submitMessage(
   const raw = decodeBase64(input.raw);
   const parsed = await parseRawEmail(raw);
   const sent = await sendNewMessage(env, {
-    from: mailbox.address,
+    from: input.mailFrom.toLowerCase(),
+    attachmentIds: [],
     to: input.recipients,
     cc: [],
     bcc: [],

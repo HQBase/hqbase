@@ -32,8 +32,8 @@ describe("setup API validation", () => {
     ).toThrow();
   });
 
-  it("requires the owner sign-in address to use the primary domain", () => {
-    expect(() =>
+  it("allows the owner sign-in address to use a separate domain", () => {
+    expect(
       bootstrapSetupSchema.parse({
         ownerName: "Owner",
         ownerEmail: "owner@gmail.com",
@@ -42,7 +42,7 @@ describe("setup API validation", () => {
         checklistAcknowledged: true,
         mailboxes: [{ address: "hello@example.com", displayName: "Hello" }]
       })
-    ).toThrow("Owner sign-in address must use example.com.");
+    ).toMatchObject({ ownerEmail: "owner@gmail.com" });
   });
 
   it("rejects duplicate bootstrap mailboxes", () => {
@@ -93,7 +93,7 @@ describe("setup API validation", () => {
     });
   });
 
-  it("requires the app custom domain during Cloudflare configuration", () => {
+  it("requires the app custom domain only when attaching it", () => {
     expect(() =>
       configureCloudflareDomainSchema.parse({
         apiToken: "a".repeat(40),
@@ -102,7 +102,7 @@ describe("setup API validation", () => {
       })
     ).toThrow();
 
-    expect(() =>
+    expect(
       configureCloudflareDomainSchema.parse({
         appHostname: "hqbase.example.com",
         apiToken: "a".repeat(40),
@@ -110,6 +110,6 @@ describe("setup API validation", () => {
         workerName: "hqbase",
         zoneId: "zone-1"
       })
-    ).toThrow();
+    ).toMatchObject({ attachCustomDomain: false });
   });
 });

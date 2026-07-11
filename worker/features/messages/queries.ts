@@ -65,8 +65,8 @@ export async function insertMessage(
         id, thread_id, mailbox_id, direction, folder, from_address, to_json, cc_json, bcc_json,
         subject, snippet, text_body, html_r2_key, raw_r2_key, message_id, dedupe_key,
         in_reply_to, references_json, received_at, sent_at, read_at, has_attachments,
-        created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        created_at, updated_at, delivered_to_address_id, sent_from_address_id
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
     .bind(
       id,
@@ -92,7 +92,9 @@ export async function insertMessage(
       input.readAt,
       input.hasAttachments ? 1 : 0,
       timestamp,
-      timestamp
+      timestamp,
+      input.deliveredToAddressId ?? null,
+      input.sentFromAddressId ?? null
     )
     .run();
 

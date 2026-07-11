@@ -8,7 +8,7 @@ import { readJson } from "../../lib/json";
 import { parseWith } from "../../lib/validation";
 import { enforceRateLimit } from "../../security/rate-limit";
 import { recordAudit } from "../audit/service";
-import { findMailboxByAddress } from "../mailboxes/queries";
+import { findMailboxForSending } from "../mailboxes/queries";
 import { getMessageMailboxId } from "../messages/queries";
 
 import { replyToMessage, sendNewMessage } from "./service";
@@ -25,7 +25,7 @@ sendRoutes.post("/send", async (c) => {
     windowSeconds: 60
   });
   const input = parseWith(sendMessageSchema, await readJson(c.req.raw));
-  const mailbox = await findMailboxByAddress(c.env.DB, input.from);
+  const mailbox = await findMailboxForSending(c.env.DB, input.from);
   if (!mailbox) throw new AppError("MAILBOX_NOT_FOUND", "Sending mailbox not found.", 404);
   await requireMailboxAccess(
     c.env.DB,
@@ -34,7 +34,7 @@ sendRoutes.post("/send", async (c) => {
     mailbox.id,
     "agent"
   );
-  const sent = await sendNewMessage(c.env, input);
+  const sent = await sendNewMessage(c.env, input, authContext.user.id);
   await recordAudit(c.env.DB, {
     correlationId: c.get("correlationId"),
     actorType: "user",
@@ -63,7 +63,7 @@ sendRoutes.post("/reply", async (c) => {
     await getMessageMailboxId(c.env.DB, input.messageId),
     "agent"
   );
-  const mailbox = await findMailboxByAddress(c.env.DB, input.from);
+  const mailbox = await findMailboxForSending(c.env.DB, input.from);
   if (!mailbox) throw new AppError("MAILBOX_NOT_FOUND", "Sending mailbox not found.", 404);
   await requireMailboxAccess(
     c.env.DB,
@@ -72,7 +72,7 @@ sendRoutes.post("/reply", async (c) => {
     mailbox.id,
     "agent"
   );
-  const sent = await replyToMessage(c.env, input);
+  const sent = await replyToMessage(c.env, input, authContext.user.id);
   await recordAudit(c.env.DB, {
     correlationId: c.get("correlationId"),
     actorType: "user",

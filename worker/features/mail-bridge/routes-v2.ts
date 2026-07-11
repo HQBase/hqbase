@@ -11,6 +11,7 @@ import { listMailboxesForUser } from "../mailboxes/queries";
 import { currentCursor } from "./cursor";
 import { applyMutation } from "./mutations";
 import { rawMessageResponse } from "./raw";
+import { inspectBridgeReadiness } from "./readiness";
 import { createMailSession, requireMailSession, verifyBridgeToken } from "./session";
 import { submitMessage } from "./submission";
 import { ensureMailboxesV2, listChanges, listMailboxMessages } from "./sync";
@@ -60,6 +61,11 @@ mailBridgeV2Routes.use("*", async (c, next) => {
   await next();
 });
 
+mailBridgeV2Routes.get("/ready", async (c) => {
+  const readiness = await inspectBridgeReadiness(c.env);
+  return c.json(readiness, readiness.ready ? 200 : 503);
+});
+
 mailBridgeV2Routes.post("/authenticate", async (c) => {
   const input = parseWith(authenticateSchema, await readJson(c.req.raw));
   await Promise.all([
@@ -98,7 +104,13 @@ mailBridgeV2Routes.post("/authenticate", async (c) => {
         (mailbox) =>
           mailbox.isActive && (mailbox.accessLevel === "agent" || mailbox.accessLevel === "manager")
       )
-      .map((mailbox) => mailbox.address),
+      .flatMap((mailbox) =>
+        mailbox.addresses.length
+          ? mailbox.addresses
+              .filter((address) => address.sendEnabled)
+              .map((address) => address.address)
+          : [mailbox.address]
+      ),
     cursor,
     mailboxes: imapMailboxes.map((mailbox) => ({
       id: mailbox.id,

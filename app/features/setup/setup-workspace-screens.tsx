@@ -5,12 +5,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import {
-  InputGroup,
-  InputGroupAddon,
-  InputGroupInput,
-  InputGroupText
-} from "@/components/ui/input-group";
 import type { MailboxDraft, MailboxErrors, OwnerErrors } from "./setup-validation";
 import { WizardActions, WizardPanel } from "./setup-wizard-parts";
 
@@ -21,11 +15,9 @@ export function OwnerStep({
   onBack,
   onNext,
   ownerEmail,
-  ownerEmailLocalPart,
   ownerName,
   ownerPassword,
-  primaryDomain,
-  setOwnerEmailLocalPart,
+  setOwnerEmail,
   setOwnerName,
   setOwnerPassword
 }: {
@@ -33,18 +25,16 @@ export function OwnerStep({
   onBack: () => void;
   onNext: () => void;
   ownerEmail: string;
-  ownerEmailLocalPart: string;
   ownerName: string;
   ownerPassword: string;
-  primaryDomain: string;
-  setOwnerEmailLocalPart: (value: string) => void;
+  setOwnerEmail: (value: string) => void;
   setOwnerName: (value: string) => void;
   setOwnerPassword: (value: string) => void;
 }): React.ReactElement {
   return (
     <WizardPanel
       actions={<WizardActions nextLabel="Continue" onBack={onBack} onNext={onNext} />}
-      description={`First admin. Login uses @${primaryDomain}.`}
+      description="The first workspace administrator. Login email can be on any domain."
       eyebrow="Owner"
       title="Create your login"
     >
@@ -63,22 +53,20 @@ export function OwnerStep({
         </Field>
 
         <Field data-invalid={Boolean(errors.email)}>
-          <FieldLabel htmlFor="owner-email-local-part">Login address</FieldLabel>
-          <InputGroup data-invalid={Boolean(errors.email)}>
-            <InputGroupInput
-              aria-invalid={Boolean(errors.email)}
-              autoCapitalize="none"
-              autoComplete="off"
-              id="owner-email-local-part"
-              placeholder="oleg"
-              value={ownerEmailLocalPart}
-              onChange={(event) => setOwnerEmailLocalPart(event.target.value)}
-            />
-            <InputGroupAddon align="inline-end">
-              <InputGroupText>@{primaryDomain}</InputGroupText>
-            </InputGroupAddon>
-          </InputGroup>
-          <FieldDescription>Login: {ownerEmail || `your-name@${primaryDomain}`}</FieldDescription>
+          <FieldLabel htmlFor="owner-email">Login address</FieldLabel>
+          <Input
+            aria-invalid={Boolean(errors.email)}
+            autoCapitalize="none"
+            autoComplete="email"
+            id="owner-email"
+            placeholder="you@example.com"
+            type="email"
+            value={ownerEmail}
+            onChange={(event) => setOwnerEmail(event.target.value)}
+          />
+          <FieldDescription>
+            This address is for authentication, not mailbox routing.
+          </FieldDescription>
           {errors.email ? <FieldError>{errors.email}</FieldError> : null}
         </Field>
 

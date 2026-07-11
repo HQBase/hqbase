@@ -25,7 +25,9 @@ export type MailboxErrors = {
 
 export type DomainErrors = {
   appSubdomain?: string;
-  selectedZoneId?: string;
+  serviceSubdomain?: string;
+  selectedZoneIds?: string;
+  portalZoneId?: string;
 };
 
 const emailSchema = z.string().trim().email().max(254);
@@ -40,42 +42,44 @@ export function validateToken(apiToken: string): string | null {
 
 export function validateDomain(input: {
   appSubdomain: string;
-  selectedZone: CloudflareZone | null;
+  serviceSubdomain: string;
+  selectedZones: CloudflareZone[];
+  portalZone: CloudflareZone | null;
 }): DomainErrors {
   const errors: DomainErrors = {};
 
-  if (!input.selectedZone) {
-    errors.selectedZoneId = "Choose the domain that will receive your shared email.";
-  } else if (input.selectedZone.status !== "active") {
-    errors.selectedZoneId = "Choose an active Cloudflare domain before continuing.";
+  if (input.selectedZones.length === 0) {
+    errors.selectedZoneIds = "Choose at least one email domain.";
+  } else if (input.selectedZones.some((zone) => zone.status !== "active")) {
+    errors.selectedZoneIds = "Every selected email domain must be active.";
+  }
+  if (!input.portalZone || !input.selectedZones.some((zone) => zone.id === input.portalZone?.id)) {
+    errors.portalZoneId = "Choose which selected domain hosts the workspace portal.";
   }
 
   const subdomain = input.appSubdomain.trim().toLowerCase();
   if (!appSubdomainPattern.test(subdomain)) {
     errors.appSubdomain = "Use one DNS label, such as hqbase or inbox.";
   }
+  const serviceSubdomain = input.serviceSubdomain.trim().toLowerCase();
+  if (!appSubdomainPattern.test(serviceSubdomain)) {
+    errors.serviceSubdomain = "Use one DNS label, such as hqbase-api.";
+  } else if (serviceSubdomain === subdomain) {
+    errors.serviceSubdomain = "The stable service origin must differ from the portal address.";
+  }
 
   return errors;
 }
 
-export function validateOwner(owner: OwnerDraft, primaryDomain: string): OwnerErrors {
+export function validateOwner(owner: OwnerDraft): OwnerErrors {
   const errors: OwnerErrors = {};
   const name = owner.name.trim();
 
   if (!name) errors.name = "Enter your name.";
   else if (name.length > 100) errors.name = "Name must be 100 characters or fewer.";
 
-  const normalizedDomain = primaryDomain.trim().toLowerCase();
   const normalizedEmail = owner.email.trim().toLowerCase();
-  if (
-    !normalizedDomain ||
-    !emailSchema.safeParse(normalizedEmail).success ||
-    !normalizedEmail.endsWith(`@${normalizedDomain}`)
-  ) {
-    errors.email = normalizedDomain
-      ? `Choose a valid address before @${normalizedDomain}.`
-      : "Choose the Cloudflare domain before creating the owner.";
-  }
+  if (!emailSchema.safeParse(normalizedEmail).success) errors.email = "Enter a valid login email.";
 
   if (owner.password.length < 8) {
     errors.password = "Use at least 8 characters.";
@@ -86,7 +90,10 @@ export function validateOwner(owner: OwnerDraft, primaryDomain: string): OwnerEr
   return errors;
 }
 
-export function validateMailboxes(mailboxes: MailboxDraft[], primaryDomain: string): MailboxErrors {
+export function validateMailboxes(
+  mailboxes: MailboxDraft[],
+  emailDomains: string[]
+): MailboxErrors {
   const rows: MailboxErrors["rows"] = mailboxes.map(() => ({}));
   const seen = new Map<string, number>();
   let form: string | undefined;
@@ -100,10 +107,10 @@ export function validateMailboxes(mailboxes: MailboxDraft[], primaryDomain: stri
 
     if (!emailSchema.safeParse(address).success) {
       rows[index] = { ...rows[index], address: "Enter a valid email address." };
-    } else if (!address.endsWith(`@${primaryDomain.toLowerCase()}`)) {
+    } else if (!emailDomains.includes(address.split("@")[1] ?? "")) {
       rows[index] = {
         ...rows[index],
-        address: `Use an address ending in @${primaryDomain}.`
+        address: "Use one of the connected email domains."
       };
     } else {
       const previousIndex = seen.get(address);

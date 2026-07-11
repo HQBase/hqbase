@@ -1,4 +1,5 @@
 import { newId, nowIso } from "../db/client";
+import { findAddressIdentity } from "../features/mailboxes/address-queries";
 import { findMailboxByAddress } from "../features/mailboxes/queries";
 import {
   ensureThread,
@@ -50,6 +51,7 @@ export async function storeInboundEmail(
   }
 
   const mailbox = await findMailboxByAddress(db, recipient);
+  const receivingIdentity = await findAddressIdentity(db, recipient, "receive");
   const plan = planInboundStorage({
     envelopeRecipient: recipient,
     mailboxId: mailbox?.id ?? null,
@@ -77,7 +79,8 @@ export async function storeInboundEmail(
     receivedAt: timestamp,
     sentAt: null,
     readAt: null,
-    hasAttachments: input.parsed.attachments.length > 0
+    hasAttachments: input.parsed.attachments.length > 0,
+    deliveredToAddressId: receivingIdentity?.address.id ?? null
   });
 
   for (const attachment of input.parsed.attachments) {
