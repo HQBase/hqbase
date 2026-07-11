@@ -126,16 +126,29 @@ jobs:
           --no-email
           --app-domain "${HQBASE_PRO_STAGING_URL#https://}"
           --bridge-token "$HQBASE_PRO_STAGING_BRIDGE_TOKEN"
+      - name: Wait for the disposable Pro custom domain
+        run: |
+          for attempt in $(seq 1 150); do
+            if curl --fail --silent --show-error \
+              -H "CF-Access-Client-Id: $HQBASE_PRO_STAGING_ACCESS_CLIENT_ID" \
+              -H "CF-Access-Client-Secret: $HQBASE_PRO_STAGING_ACCESS_CLIENT_SECRET" \
+              "$HQBASE_PRO_STAGING_URL/api/health" >/dev/null; then
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "Disposable Pro custom domain was not healthy within 300 seconds"
+          exit 1
       - name: Verify the Fly bridge can reach Pro
         run: |
-          for attempt in $(seq 1 60); do
+          for attempt in $(seq 1 150); do
             if curl --fail --silent --show-error \
               "https://$HQBASE_PRO_STAGING_BRIDGE_HOST/ready" >/dev/null; then
               exit 0
             fi
             sleep 2
           done
-          echo "Fly bridge could not reach Pro within 120 seconds"
+          echo "Fly bridge could not reach Pro within 300 seconds"
           exit 1
       - name: Exercise Pro app passwords through real IMAPS and SMTPS
         run: pnpm test:e2e:staging
