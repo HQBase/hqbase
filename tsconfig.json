@@ -1,0 +1,40 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "useDefineForClassFields": true,
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "allowJs": false,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "noImplicitOverride": true,
+    "noFallthroughCasesInSwitch": true,
+    "forceConsistentCasingInFileNames": true,
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "jsx": "react-jsx",
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["app/*"],
+      "@worker/*": ["worker/*"]
+    },
+    "types": ["@cloudflare/vitest-pool-workers/types", "vite/client", "vitest/globals", "node"]
+  },
+  "include": [
+    "app",
+    "worker",
+    "test",
+    "worker-configuration.d.ts",
+    "vite.config.ts",
+    "vitest.config.ts",
+    "vitest.worker.config.ts",
+    "playwright.config.ts",
+    "tailwind.config.ts"
+  ]
+}

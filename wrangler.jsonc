@@ -1,0 +1,43 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "hqbase-pro",
+  "main": "worker/index.ts",
+  "compatibility_date": "2026-06-28",
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application"
+  },
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1
+  },
+  "secrets": {
+    "required": [
+      "BETTER_AUTH_SECRET",
+      "PRO_APP_PASSWORD_PEPPER",
+      "PRO_BRIDGE_TOKEN",
+      "PRO_SESSION_SECRET"
+    ]
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "hqbase-pro",
+      "database_id": "00000000-0000-0000-0000-000000000000",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "MAIL_OBJECTS",
+      "bucket_name": "hqbase-pro-mail"
+    }
+  ],
+  "send_email": [
+    {
+      "name": "MAIL_SENDER"
+    }
+  ]
+}

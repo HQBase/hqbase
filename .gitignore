@@ -1,0 +1,12 @@
+node_modules
+dist
+.wrangler
+.dev.vars
+.env
+*.local
+coverage
+playwright-report
+test-results
+.DS_Store
+.hqbase-pro/deployments/*
+!.hqbase-pro/deployments/.gitkeep

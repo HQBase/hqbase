@@ -1,0 +1,11 @@
+From: Customer <customer@example.net>
+To: Hello <hello@example.com>
+Subject: Re: Welcome
+Message-ID: <reply-2@example.net>
+In-Reply-To: <welcome-1@example.com>
+References: <welcome-1@example.com>
+Date: Tue, 24 Jun 2026 12:00:00 -0400
+Content-Type: text/plain; charset=utf-8
+
+Thanks for the quick reply.
+
