@@ -25,7 +25,13 @@ export function writeWranglerConfig(manifest, options = {}) {
       head_sampling_rate: 1
     },
     secrets: {
-      required: ["BETTER_AUTH_SECRET"]
+      required: [
+        "BETTER_AUTH_SECRET",
+        "PRO_APP_PASSWORD_PEPPER",
+        "PRO_BRIDGE_TOKEN",
+        "PRO_SESSION_SECRET",
+        "PRO_ENTITLEMENT_SECRET"
+      ]
     },
     d1_databases: [
       {
@@ -61,8 +67,12 @@ export function writeWranglerConfig(manifest, options = {}) {
     ]
   };
 
-  if (manifest.authUrl) {
-    config.vars = { BETTER_AUTH_URL: manifest.authUrl };
+  config.vars = {
+    HQBASE_BILLING_URL: "https://billing.hqbase.io",
+    ...(manifest.authUrl ? { BETTER_AUTH_URL: manifest.authUrl } : {})
+  };
+  if (manifest.billingService) {
+    config.services = [{ binding: "BILLING", service: manifest.billingService }];
   }
   const customDomains = [manifest.appDomain, manifest.serviceDomain].filter(Boolean);
   if (customDomains.length > 0) {

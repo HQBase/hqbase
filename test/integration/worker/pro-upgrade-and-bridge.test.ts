@@ -7,6 +7,7 @@ import bridgeV2Migration from "../../../migrations/0003_mail_bridge_v2.sql?raw";
 import track1Migration from "../../../migrations/0004_track1_operations.sql?raw";
 import multiDomainMigration from "../../../migrations/0005_multi_domain.sql?raw";
 import composerMigration from "../../../migrations/0006_composer.sql?raw";
+import billingMigration from "../../../migrations/0007_billing.sql?raw";
 import { appPasswordHash } from "../../../worker/features/app-passwords/crypto";
 import {
   insertAppPassword,
@@ -14,6 +15,8 @@ import {
   revokeAppPassword,
   verifyAppPassword
 } from "../../../worker/features/app-passwords/queries";
+import { getEntitlementRow } from "../../../worker/features/billing/queries";
+import { activateWorkspace } from "../../../worker/features/billing/service";
 import { upsertMailDomain } from "../../../worker/features/domains/queries";
 import { getDraft, saveDraft } from "../../../worker/features/drafts/queries";
 import {
@@ -26,6 +29,7 @@ import {
   insertMailboxAddress
 } from "../../../worker/features/mailboxes/queries";
 import { processJob } from "../../../worker/jobs/consumer";
+import type { WorkerEnv } from "../../../worker/lib/env";
 
 const userId = "usr_integration";
 const appPasswordId = "apw_00000000-0000-4000-8000-000000000001";
@@ -64,6 +68,7 @@ beforeAll(async () => {
   await applyMigration(track1Migration);
   await applyMigration(multiDomainMigration);
   await applyMigration(composerMigration);
+  await applyMigration(billingMigration);
 });
 
 beforeEach(async () => {
@@ -93,6 +98,60 @@ describe("Community to Pro migration", () => {
         "SELECT access_level FROM pro_mailbox_grants WHERE user_id = 'usr_existing' AND mailbox_id = 'mbx_existing'"
       ).first()
     ).resolves.toMatchObject({ access_level: "agent" });
+  });
+});
+
+describe("billing entitlement lifecycle", () => {
+  it("activates a license through the vendor service and stores only encrypted key material", async () => {
+    const checkedAt = new Date().toISOString();
+    const status = await activateWorkspace(
+      env,
+      { licenseKey: "HQB_INTEGRATION_LICENSE", hostname: "mail.example.com" },
+      async () =>
+        Response.json({
+          state: "active",
+          canConfigure: true,
+          activationId: "00000000-0000-4000-8000-000000000010",
+          displayKey: "HQB_••••CENSE",
+          currentPeriodEnd: "2026-08-11T00:00:00.000Z",
+          checkedAt
+        })
+    );
+    expect(status).toMatchObject({ state: "active", canConfigure: true });
+    const row = await getEntitlementRow(env.DB);
+    expect(row?.encrypted_license_key).toBeTruthy();
+    expect(row?.encrypted_license_key).not.toContain("HQB_INTEGRATION_LICENSE");
+  });
+
+  it("prefers a same-account service binding over the public billing origin", async () => {
+    const requests: Request[] = [];
+    const boundEnv = {
+      ...env,
+      BILLING: {
+        fetch: async (request: Request) => {
+          requests.push(request);
+          return Response.json({
+            state: "active",
+            canConfigure: true,
+            activationId: "00000000-0000-4000-8000-000000000011",
+            displayKey: "HQB_••••BOUND",
+            currentPeriodEnd: "2026-08-11T00:00:00.000Z",
+            checkedAt: new Date().toISOString()
+          });
+        }
+      } as Fetcher
+    } as WorkerEnv;
+
+    await activateWorkspace(
+      boundEnv,
+      { licenseKey: "HQB_SERVICE_BINDING", hostname: "staging.example.com" },
+      async () => {
+        throw new Error("public fetch must not be used");
+      }
+    );
+
+    expect(requests).toHaveLength(1);
+    expect(requests[0]?.url).toBe("https://billing.internal/v1/entitlements/activate");
   });
 });
 

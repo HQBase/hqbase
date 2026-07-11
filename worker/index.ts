@@ -1,4 +1,5 @@
 import { handleInboundEmail } from "./email/inbound";
+import { refreshWorkspaceEntitlement } from "./features/billing/service";
 import { consumeJobs } from "./jobs/consumer";
 import type { WorkerEnv } from "./lib/env";
 import { apiRoutes } from "./routes";
@@ -38,6 +39,7 @@ export default {
   },
 
   async scheduled(_controller: ScheduledController, env: WorkerEnv): Promise<void> {
+    await refreshWorkspaceEntitlement(env);
     if (!env.PRO_JOBS) throw new Error("PRO_JOBS binding is required.");
     const requestedAt = new Date().toISOString();
     await env.PRO_JOBS.send({

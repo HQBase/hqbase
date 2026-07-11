@@ -74,6 +74,10 @@ Add `--domain example.com` to `hqbase-pro:install` to enable Cloudflare Email Ro
 Use `--app-domain mail.example.com --service-domain hqbase-api.example.com` to attach a mutable
 human-facing portal and a separate stable origin for the bridge and automation.
 
+Vendor staging that shares the billing Worker's Cloudflare account should add
+`--billing-service hqbase-billing`. Customer deployments use `https://billing.hqbase.io` and do
+not need this same-account service binding.
+
 The operator writes `.hqbase-pro/deployments/<name>/manifest.json` and a generated Wrangler config. The manifest is intentionally ignored by Git because it can contain deployment-specific resource names and secret file paths.
 
 ## Required Bindings

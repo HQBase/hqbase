@@ -18,7 +18,8 @@
       "BETTER_AUTH_SECRET",
       "PRO_APP_PASSWORD_PEPPER",
       "PRO_BRIDGE_TOKEN",
-      "PRO_SESSION_SECRET"
+      "PRO_SESSION_SECRET",
+      "PRO_ENTITLEMENT_SECRET"
     ]
   },
   "d1_databases": [
@@ -48,6 +49,9 @@
     ]
   },
   "triggers": { "crons": ["17 3 * * *"] },
+  "vars": {
+    "HQBASE_BILLING_URL": "https://billing.hqbase.io"
+  },
   "send_email": [
     {
       "name": "MAIL_SENDER"

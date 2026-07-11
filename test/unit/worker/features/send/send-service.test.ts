@@ -58,10 +58,12 @@ describe("send service", () => {
     ASSETS: {} as Fetcher,
     BETTER_AUTH_SECRET: "test-secret",
     DB: {} as D1Database,
+    HQBASE_BILLING_URL: "https://billing.hqbase.io",
     MAIL_OBJECTS: { put } as unknown as R2Bucket,
     MAIL_SENDER: { send } as unknown as SendEmail,
     PRO_APP_PASSWORD_PEPPER: "test-app-password-pepper",
     PRO_BRIDGE_TOKEN: "test-bridge-token",
+    PRO_ENTITLEMENT_SECRET: "test-entitlement-secret",
     PRO_JOBS: {} as Queue,
     PRO_SESSION_SECRET: "test-session-secret"
   } satisfies WorkerEnv;

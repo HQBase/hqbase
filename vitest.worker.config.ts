@@ -12,7 +12,8 @@ export default defineConfig({
           BETTER_AUTH_SECRET: "integration-auth-secret",
           PRO_APP_PASSWORD_PEPPER: "integration-app-password-pepper",
           PRO_BRIDGE_TOKEN: "integration-bridge-token",
-          PRO_SESSION_SECRET: "integration-session-secret"
+          PRO_SESSION_SECRET: "integration-session-secret",
+          PRO_ENTITLEMENT_SECRET: "integration-entitlement-secret"
         },
         serviceBindings: {
           ASSETS: async () => new Response("Not found", { status: 404 })

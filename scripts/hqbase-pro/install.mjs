@@ -29,6 +29,7 @@ export function install(flags) {
     appDomain: optionalString(flags, "app-domain"),
     serviceDomain: optionalString(flags, "service-domain"),
     authUrl: optionalString(flags, "auth-url"),
+    billingService: optionalString(flags, "billing-service"),
     domain,
     workerName: optionalString(flags, "worker-name"),
     d1Name: optionalString(flags, "d1-name"),
@@ -69,6 +70,7 @@ export function install(flags) {
       authSecret: optionalString(flags, "auth-secret"),
       appPasswordPepper: optionalString(flags, "app-password-pepper"),
       bridgeToken: optionalString(flags, "bridge-token"),
+      entitlementSecret: optionalString(flags, "entitlement-secret"),
       sessionSecret: optionalString(flags, "session-secret")
     },
     { dryRun }
@@ -136,6 +138,7 @@ function createManifest(name, input) {
     appDomain: input.appDomain,
     serviceDomain: input.serviceDomain,
     authUrl: input.authUrl,
+    billingService: input.billingService,
     email: input.domain
       ? {
           domain: input.domain,
@@ -157,6 +160,8 @@ function writeSecretFile(name, provided, options = {}) {
     PRO_APP_PASSWORD_PEPPER:
       provided.appPasswordPepper ?? crypto.randomBytes(32).toString("base64url"),
     PRO_BRIDGE_TOKEN: provided.bridgeToken ?? crypto.randomBytes(32).toString("base64url"),
+    PRO_ENTITLEMENT_SECRET:
+      provided.entitlementSecret ?? crypto.randomBytes(32).toString("base64url"),
     PRO_SESSION_SECRET: provided.sessionSecret ?? crypto.randomBytes(32).toString("base64url")
   };
   fs.writeFileSync(secretsPath(name), `${JSON.stringify(secrets, null, 2)}\n`, { mode: 0o600 });

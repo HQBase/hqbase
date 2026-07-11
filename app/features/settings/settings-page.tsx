@@ -3,6 +3,8 @@ import type * as React from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AppPasswordSettings } from "@/features/app-passwords/app-password-settings";
+import { BillingSettings } from "@/features/billing/billing-settings";
+import type { EntitlementStatus } from "@/features/billing/types";
 import { DomainSettings } from "@/features/domains/domain-settings";
 import { MailboxAccessSettings } from "@/features/mailbox-access/mailbox-access-settings";
 import { MailboxSettings } from "@/features/mailboxes/mailbox-settings";
@@ -17,6 +19,8 @@ type SettingsPageProps = {
   mailboxes: Mailbox[];
   setup: SetupStatus;
   users: WorkspaceUser[];
+  entitlement: EntitlementStatus | null;
+  onEntitlementChanged: (status: EntitlementStatus) => void;
   onRefresh: () => void;
 };
 
@@ -25,6 +29,8 @@ export function SettingsPage({
   mailboxes,
   setup,
   users,
+  entitlement,
+  onEntitlementChanged,
   onRefresh
 }: SettingsPageProps): React.ReactElement {
   return (
@@ -41,6 +47,7 @@ export function SettingsPage({
             {canManage ? <SettingsTab value="domains">Domains</SettingsTab> : null}
             {canManage ? <SettingsTab value="access">Access</SettingsTab> : null}
             <SettingsTab value="mail-clients">Mail clients</SettingsTab>
+            {canManage && entitlement ? <SettingsTab value="billing">Billing</SettingsTab> : null}
             <SettingsTab value="general">General</SettingsTab>
           </TabsList>
           <TabsContent className="mt-5" value="mailboxes">
@@ -65,6 +72,11 @@ export function SettingsPage({
           <TabsContent className="mt-5" value="mail-clients">
             <AppPasswordSettings />
           </TabsContent>
+          {canManage && entitlement ? (
+            <TabsContent className="mt-5" value="billing">
+              <BillingSettings status={entitlement} onChanged={onEntitlementChanged} />
+            </TabsContent>
+          ) : null}
         </Tabs>
       </div>
     </div>

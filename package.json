@@ -47,6 +47,9 @@
       "PRO_SESSION_SECRET": {
         "description": "Secret HMAC key for short-lived mail-bridge sessions."
       },
+      "PRO_ENTITLEMENT_SECRET": {
+        "description": "Deployment-scoped AES key material used to encrypt the Polar license key stored in D1."
+      },
       "DB": {
         "description": "Cloudflare D1 database used for Better Auth, setup state, mailboxes, threads, and message metadata."
       },

@@ -83,6 +83,7 @@ Install options:
   --app-domain <host>    Attach a custom Worker domain in the generated config.
   --service-domain <host> Attach a stable bridge/API domain in the generated config.
   --auth-url <origin>    Set BETTER_AUTH_URL explicitly. Usually unnecessary.
+  --billing-service <worker>  Use a same-account billing Worker service binding (staging only).
   --auth-secret <value>  Use a provided Better Auth secret. Otherwise generated.
   --app-password-pepper <value>  Override the generated app-password pepper.
   --bridge-token <value>         Set the deployment token shared with the bridge.

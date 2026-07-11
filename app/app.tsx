@@ -6,6 +6,9 @@ import { Toaster } from "@/components/ui/sonner";
 import { getCurrentUser } from "@/features/auth/api";
 import { LoginPage } from "@/features/auth/login-page";
 import type { CurrentUser } from "@/features/auth/types";
+import { getEntitlementStatus } from "@/features/billing/api";
+import { BillingBanner } from "@/features/billing/billing-banner";
+import type { EntitlementStatus } from "@/features/billing/types";
 import { InboxPage } from "@/features/inbox/inbox-page";
 import { listMailboxes } from "@/features/mailboxes/api";
 import type { Mailbox } from "@/features/mailboxes/types";
@@ -28,6 +31,7 @@ export function App(): React.ReactElement {
   const [user, setUser] = React.useState<CurrentUser | null>(null);
   const [mailboxes, setMailboxes] = React.useState<Mailbox[]>([]);
   const [users, setUsers] = React.useState<WorkspaceUser[]>([]);
+  const [entitlement, setEntitlement] = React.useState<EntitlementStatus | null>(null);
   const [messages, setMessages] = React.useState<MessageSummary[]>([]);
   const [activeFolder, setActiveFolder] = React.useState<FolderId>("inbox");
   const [mailboxId, setMailboxId] = React.useState("all");
@@ -43,9 +47,12 @@ export function App(): React.ReactElement {
     setMailboxes(nextMailboxes);
 
     if (currentUser.role === "owner" || currentUser.role === "admin") {
-      setUsers(await listUsers());
+      const [nextUsers, nextEntitlement] = await Promise.all([listUsers(), getEntitlementStatus()]);
+      setUsers(nextUsers);
+      setEntitlement(nextEntitlement);
     } else {
       setUsers([]);
+      setEntitlement(null);
     }
   }, []);
 
@@ -154,26 +161,33 @@ export function App(): React.ReactElement {
           setMessages([]);
         }}
       >
-        {activeFolder === "settings" ? (
-          <SettingsPage
-            canManage={user.role === "owner" || user.role === "admin"}
-            mailboxes={mailboxes}
-            setup={setup}
-            users={users}
-            onRefresh={() => void reload()}
-          />
-        ) : (
-          <InboxPage
-            messages={messages}
-            selectedId={selectedId}
-            onRefresh={() => void reloadMessages()}
-            onReply={(message) => {
-              setReplyTo(message);
-              setComposeOpen(true);
-            }}
-            onSelect={setSelectedId}
-          />
-        )}
+        <div className="flex h-full flex-col">
+          {entitlement ? <BillingBanner status={entitlement} /> : null}
+          <div className="min-h-0 flex-1">
+            {activeFolder === "settings" ? (
+              <SettingsPage
+                canManage={user.role === "owner" || user.role === "admin"}
+                entitlement={entitlement}
+                mailboxes={mailboxes}
+                setup={setup}
+                users={users}
+                onEntitlementChanged={setEntitlement}
+                onRefresh={() => void reload()}
+              />
+            ) : (
+              <InboxPage
+                messages={messages}
+                selectedId={selectedId}
+                onRefresh={() => void reloadMessages()}
+                onReply={(message) => {
+                  setReplyTo(message);
+                  setComposeOpen(true);
+                }}
+                onSelect={setSelectedId}
+              />
+            )}
+          </div>
+        </div>
       </AppShell>
       {composeOpen ? (
         <React.Suspense fallback={null}>
