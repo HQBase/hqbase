@@ -22,7 +22,7 @@ export function parseTimeTravelBookmark(output) {
 }
 
 export function parseWorkerVersion(output) {
-  const version = findString(JSON.parse(output), new Set(["id", "version_id", "versionId"]));
+  const version = findString(JSON.parse(output), new Set(["version_id", "versionId"]));
   if (!version) throw new Error("Worker deployment status did not return a version ID.");
   return version;
 }

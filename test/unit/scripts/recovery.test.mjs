@@ -11,9 +11,11 @@ describe("operator recovery manifests", () => {
     expect(parseTimeTravelBookmark(JSON.stringify({ result: { bookmark: "bk-123" } }))).toBe(
       "bk-123"
     );
-    expect(parseWorkerVersion(JSON.stringify({ deployment: { version_id: "ver-456" } }))).toBe(
-      "ver-456"
-    );
+    expect(
+      parseWorkerVersion(
+        JSON.stringify({ id: "deployment-ignored", versions: [{ version_id: "ver-456" }] })
+      )
+    ).toBe("ver-456");
   });
 
   it("rejects malformed and cross-deployment restores", () => {
