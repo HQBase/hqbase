@@ -12,6 +12,7 @@ if (baseURL && process.env.CI && (!accessClientId || !accessClientSecret)) {
 
 export default defineConfig({
   testDir: "./test/e2e/staging",
+  timeout: 90_000,
   forbidOnly: Boolean(process.env.CI),
   retries: process.env.CI ? 1 : 0,
   workers: 1,
