@@ -26,6 +26,8 @@ export default defineConfig({
             "CF-Access-Client-Secret": accessClientSecret
           }
         : undefined,
-    trace: "retain-on-failure"
+    screenshot: "only-on-failure",
+    trace: "off",
+    video: "off"
   }
 });

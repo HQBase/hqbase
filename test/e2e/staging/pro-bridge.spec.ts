@@ -10,6 +10,7 @@ const domain = required("HQBASE_PRO_STAGING_EMAIL_DOMAIN");
 const bridgeToken = required("HQBASE_PRO_STAGING_BRIDGE_TOKEN");
 const bridgeHost = required("HQBASE_PRO_STAGING_BRIDGE_HOST");
 const acceptanceBinary = required("HQBASE_BRIDGE_ACCEPTANCE_BIN");
+const stagingUrl = required("HQBASE_PRO_STAGING_URL");
 
 test("Pro app password works through real IMAPS and SMTPS", async ({ request }) => {
   await expect
@@ -43,7 +44,8 @@ test("Pro app password works through real IMAPS and SMTPS", async ({ request }) 
   }
 
   const login = await request.post("/api/auth/sign-in/email", {
-    data: { email, password, rememberMe: false }
+    data: { email, password, rememberMe: false },
+    headers: { origin: stagingUrl }
   });
   expect(login.ok()).toBeTruthy();
   const createdResponse = await request.post("/api/pro/app-passwords", {

@@ -60,12 +60,6 @@ jobs:
           --bridge-token "$HQBASE_PRO_STAGING_BRIDGE_TOKEN"
       - name: Exercise Pro app passwords through real IMAPS and SMTPS
         run: pnpm test:e2e:staging
-      - name: Preserve Playwright report
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: playwright-report
-          path: playwright-report
       - name: Destroy disposable Pro installation
         if: always()
         run: pnpm hqbase-pro destroy --name "$DEPLOYMENT_NAME" --scope all --yes
