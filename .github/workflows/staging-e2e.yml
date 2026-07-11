@@ -126,6 +126,19 @@ jobs:
           --no-email
           --app-domain "${HQBASE_PRO_STAGING_URL#https://}"
           --bridge-token "$HQBASE_PRO_STAGING_BRIDGE_TOKEN"
+      - name: Exercise remote backup and restore
+        run: |
+          config=".hqbase-pro/deployments/$DEPLOYMENT_NAME/wrangler.jsonc"
+          database="hqbase-pro-$DEPLOYMENT_NAME"
+          pnpm exec wrangler d1 execute "$database" --remote --config "$config" \
+            --command "INSERT INTO app_settings (key, value_json, created_at, updated_at) VALUES ('track1-restore-probe', '{\"state\":\"before\"}', datetime('now'), datetime('now'))"
+          pnpm hqbase-pro backup --name "$DEPLOYMENT_NAME" --output /tmp/track1-backup.json
+          pnpm exec wrangler d1 execute "$database" --remote --config "$config" \
+            --command "UPDATE app_settings SET value_json = '{\"state\":\"after\"}', updated_at = datetime('now') WHERE key = 'track1-restore-probe'"
+          pnpm hqbase-pro restore --name "$DEPLOYMENT_NAME" --backup /tmp/track1-backup.json --yes
+          result=$(pnpm exec wrangler d1 execute "$database" --remote --config "$config" --json \
+            --command "SELECT value_json FROM app_settings WHERE key = 'track1-restore-probe'")
+          jq -e '.[0].results[0].value_json == "{\"state\":\"before\"}"' <<<"$result"
       - name: Verify the Fly bridge can reach Pro
         run: |
           for attempt in $(seq 1 60); do
