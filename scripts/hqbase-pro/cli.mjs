@@ -67,7 +67,7 @@ Usage:
   pnpm hqbase-pro backup --name dev-01 [--output backup.json]
   pnpm hqbase-pro restore --name dev-01 --backup backup.json --yes
   pnpm hqbase-pro reset --name dev-01 --scope data|storage|domain|all
-  pnpm hqbase-pro destroy --name dev-01 --scope worker|data|storage|domain|all --yes
+  pnpm hqbase-pro destroy --name dev-01 --scope worker|data|storage|state|domain|all --yes
   pnpm hqbase-pro postdeploy
   pnpm hqbase-pro upgrade --from-community --database <name> --local --dry-run
   pnpm hqbase-pro upgrade --from-community --database <name> --remote --dry-run

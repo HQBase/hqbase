@@ -61,8 +61,14 @@ For repeated development installs and teardowns, use named operator deployments:
 pnpm hqbase-pro:install --name dev-01
 pnpm hqbase-pro:doctor --name dev-01
 pnpm hqbase-pro:reset --name dev-01 --scope data
+pnpm hqbase-pro:destroy --name dev-01 --scope state --yes
 pnpm hqbase-pro:destroy --name dev-01 --scope all --yes
 ```
+
+`destroy --scope state` removes D1, R2, and both lifecycle queues while keeping the Worker and
+custom domain. Staging E2E uses this scope so its data plane is disposable without repeatedly
+removing and recreating the stable HTTPS endpoint. Use `--scope all` only when retiring the
+entire deployment.
 
 Add `--domain example.com` to `hqbase-pro:install` to enable Cloudflare Email Routing/Sending and point the catch-all route at the deployed Worker. The domain must already be active on Cloudflare DNS.
 

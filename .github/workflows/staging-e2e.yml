@@ -171,4 +171,6 @@ jobs:
             "$HQBASE_PRO_STAGING_URL/api/health" >/dev/null
       - name: Destroy disposable Pro installation
         if: always()
-        run: pnpm hqbase-pro destroy --name "$DEPLOYMENT_NAME" --scope all --yes
+        # Keep the Worker and custom domain stable. Recreating the custom domain on
+        # every run can leave recursive DNS caches holding NXDOMAIN during the test.
+        run: pnpm hqbase-pro destroy --name "$DEPLOYMENT_NAME" --scope state --yes
