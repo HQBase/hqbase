@@ -43,6 +43,18 @@ export function restore(flags) {
   run("pnpm", [
     "exec",
     "wrangler",
+    "versions",
+    "deploy",
+    `${target.worker.version}@100%`,
+    "--name",
+    manifest.worker.name,
+    "--yes",
+    "--config",
+    configPath(name)
+  ]);
+  run("pnpm", [
+    "exec",
+    "wrangler",
     "d1",
     "execute",
     manifest.d1.name,
@@ -52,7 +64,5 @@ export function restore(flags) {
     "--config",
     configPath(name)
   ]);
-  console.log(
-    `Database restored. Worker rollback if needed: pnpm exec wrangler rollback ${target.worker.version}`
-  );
+  console.log(`Database and Worker version ${target.worker.version} restored and verified.`);
 }

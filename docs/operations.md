@@ -19,8 +19,8 @@ pnpm hqbase-pro restore --name <deployment> --backup <manifest.json> --yes
 ```
 
 Restore refuses a malformed or cross-deployment manifest. It first creates a new safety backup,
-restores D1 by bookmark, and runs integrity and schema checks. The command prints the exact Worker
-rollback command recorded by the target backup.
+restores D1 by bookmark, sends 100% of traffic to the exact Worker version recorded by the target
+backup, and runs schema and referential checks.
 
 ## Background work
 
