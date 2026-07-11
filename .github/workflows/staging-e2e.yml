@@ -44,7 +44,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: HQBase/hqbase-mail-bridge
-          ref: 45de1dd4cafbbc3b33d4d7965d824ca2fcab98b6
+          ref: 0a81074ed1e2ff15bdfab1a898ffe91e3d31589f
           path: .staging/bridge
           ssh-key: ${{ secrets.HQBASE_BRIDGE_REPO_DEPLOY_KEY }}
       - name: Build the headless IMAPS/SMTPS acceptance client
@@ -59,6 +59,17 @@ jobs:
           --no-email
           --app-domain "${HQBASE_PRO_STAGING_URL#https://}"
           --bridge-token "$HQBASE_PRO_STAGING_BRIDGE_TOKEN"
+      - name: Verify the Fly bridge can reach Pro
+        run: |
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent --show-error \
+              "https://$HQBASE_PRO_STAGING_BRIDGE_HOST/ready" >/dev/null; then
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "Fly bridge could not reach Pro within 60 seconds"
+          exit 1
       - name: Exercise Pro app passwords through real IMAPS and SMTPS
         run: pnpm test:e2e:staging
       - name: Destroy disposable Pro installation
