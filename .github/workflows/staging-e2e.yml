@@ -8,6 +8,73 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  community-upgrade-migration:
+    runs-on: ubuntu-latest
+    environment: hqbase-staging
+    timeout-minutes: 20
+    env:
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.HQBASE_E2E_CLOUDFLARE_ACCOUNT_ID }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.HQBASE_E2E_CLOUDFLARE_API_TOKEN }}
+      DEPLOYMENT_NAME: upgrade-${{ github.run_id }}
+      D1_NAME: hqbase-upgrade-${{ github.run_id }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.7.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Check out Community
+        uses: actions/checkout@v4
+        with:
+          repository: HQBase/hqbase
+          path: .staging/community
+      - name: Install Community operator dependencies
+        working-directory: .staging/community
+        run: pnpm install --frozen-lockfile
+      - name: Create remote Community data resources
+        working-directory: .staging/community
+        run: >-
+          pnpm hqbase install
+          --name "$DEPLOYMENT_NAME"
+          --d1-name "$D1_NAME"
+          --skip-build
+          --skip-deploy
+      - name: Seed Community retention marker
+        working-directory: .staging/community
+        run: >-
+          pnpm exec wrangler d1 execute "$D1_NAME"
+          --remote
+          --command
+          "INSERT INTO app_settings (key, value_json, created_at, updated_at)
+          VALUES ('e2e-upgrade-probe', '{\"retained\":true}', datetime('now'), datetime('now'))"
+      - name: Preflight Community to Pro migration
+        run: >-
+          pnpm hqbase-pro upgrade
+          --from-community
+          --database "$D1_NAME"
+          --remote
+          --dry-run
+      - name: Apply backed-up Community to Pro migration
+        run: >-
+          pnpm hqbase-pro upgrade
+          --from-community
+          --database "$D1_NAME"
+          --remote
+          --yes
+      - name: Verify Community data retention
+        run: |
+          result=$(pnpm exec wrangler d1 execute "$D1_NAME" --remote --json \
+            --command "SELECT value_json FROM app_settings WHERE key = 'e2e-upgrade-probe'")
+          jq -e '.[0].results[0].value_json == "{\"retained\":true}"' <<<"$result"
+      - name: Destroy Community upgrade resources
+        if: always()
+        working-directory: .staging/community
+        run: pnpm hqbase destroy --name "$DEPLOYMENT_NAME" --scope all --yes
+
   fresh-install-and-bridge:
     runs-on: ubuntu-latest
     environment: hqbase-staging
