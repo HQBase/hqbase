@@ -84,6 +84,7 @@ export async function verifyAppPassword(
     .prepare(
       `SELECT p.* FROM pro_app_passwords p
        JOIN "user" u ON u.id = p.user_id
+       JOIN pro_entitlements e ON e.key = 'mail_bridge' AND e.enabled = 1
        WHERE p.id = ? AND lower(u.email) = lower(?) AND p.revoked_at IS NULL
        AND (p.expires_at IS NULL OR p.expires_at > ?)`
     )

@@ -111,7 +111,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: HQBase/hqbase-mail-bridge
-          ref: 0a81074ed1e2ff15bdfab1a898ffe91e3d31589f
+          ref: d7b2f8c93db42e8b74e7c96ae4017688a6c7234a
           path: .staging/bridge
           ssh-key: ${{ secrets.HQBASE_BRIDGE_REPO_DEPLOY_KEY }}
       - name: Build the headless IMAPS/SMTPS acceptance client

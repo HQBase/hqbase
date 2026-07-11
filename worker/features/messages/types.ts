@@ -1,4 +1,4 @@
-export const messageFolders = ["inbox", "sent", "archived", "trash", "catchall"] as const;
+export const messageFolders = ["inbox", "sent", "drafts", "archived", "trash", "catchall"] as const;
 export const messageDirections = ["inbound", "outbound"] as const;
 
 export type MessageFolder = (typeof messageFolders)[number];
