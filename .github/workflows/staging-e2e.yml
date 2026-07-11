@@ -61,14 +61,14 @@ jobs:
           --bridge-token "$HQBASE_PRO_STAGING_BRIDGE_TOKEN"
       - name: Verify the Fly bridge can reach Pro
         run: |
-          for attempt in $(seq 1 30); do
+          for attempt in $(seq 1 60); do
             if curl --fail --silent --show-error \
               "https://$HQBASE_PRO_STAGING_BRIDGE_HOST/ready" >/dev/null; then
               exit 0
             fi
             sleep 2
           done
-          echo "Fly bridge could not reach Pro within 60 seconds"
+          echo "Fly bridge could not reach Pro within 120 seconds"
           exit 1
       - name: Exercise Pro app passwords through real IMAPS and SMTPS
         run: pnpm test:e2e:staging
