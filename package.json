@@ -53,6 +53,9 @@
       "MAIL_OBJECTS": {
         "description": "Cloudflare R2 bucket used for raw emails, HTML bodies, and attachments."
       },
+      "PRO_JOBS": {
+        "description": "Queue used for bounded Pro maintenance and integrity jobs with a dead-letter queue."
+      },
       "MAIL_SENDER": {
         "description": "Cloudflare Email Sending binding. The sending domain must be onboarded in Cloudflare Email Service."
       },

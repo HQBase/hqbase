@@ -1,69 +1,21 @@
 import { newId, nowIso } from "../../db/client";
 import type { WorkerEnv } from "../../lib/env";
 import { AppError } from "../../lib/errors";
+import type { WorkspaceRole } from "../../lib/validation";
 import { decodeCursor, encodeCursor } from "./cursor";
+import {
+  fallbackRaw,
+  flagsFor,
+  type MailboxRow,
+  type MessageRow,
+  mailboxDefinitions
+} from "./sync-format";
 
-type SourceFolder = "inbox" | "sent" | "drafts" | "archived" | "trash" | "catchall";
-type MailboxRow = {
-  id: string;
-  name: string;
-  special_use: string | null;
-  source_folder: SourceFolder | null;
-  uid_validity: number;
-  uid_next: number;
-  backfill_created_at: string | null;
-  backfill_message_id: string | null;
-  backfill_complete: number;
-};
-type MessageRow = {
-  id: string;
-  folder: SourceFolder;
-  read_at: string | null;
-  starred_at: string | null;
-  created_at: string;
-  received_at: string | null;
-  sent_at: string | null;
-  raw_r2_key: string | null;
-  from_address: string;
-  to_json: string;
-  subject: string;
-  text_body: string;
-  message_id: string | null;
-};
-
-const mailboxDefinitions: Array<{
-  name: string;
-  specialUse?: string;
-  sourceFolder?: SourceFolder;
-}> = [
-  { name: "INBOX", sourceFolder: "inbox" },
-  { name: "Sent", specialUse: "sent", sourceFolder: "sent" },
-  { name: "Drafts", specialUse: "drafts", sourceFolder: "drafts" },
-  { name: "Archive", specialUse: "archive", sourceFolder: "archived" },
-  { name: "Trash", specialUse: "trash", sourceFolder: "trash" },
-  { name: "Catch-all", sourceFolder: "catchall" }
-];
-
-const encoder = new TextEncoder();
-
-function flagsFor(message: Pick<MessageRow, "folder" | "read_at" | "starred_at">): string[] {
-  return [
-    message.read_at ? "\\Seen" : null,
-    message.starred_at ? "\\Flagged" : null,
-    message.folder === "drafts" ? "\\Draft" : null
-  ].filter((value): value is string => value !== null);
-}
-
-function fallbackRaw(message: MessageRow): Uint8Array {
-  const recipients = (JSON.parse(message.to_json) as string[]).join(", ");
-  return encoder.encode(
-    `From: ${message.from_address}\r\nTo: ${recipients}\r\nSubject: ${message.subject}\r\n` +
-      `Message-ID: ${message.message_id ?? `<${message.id}@hqbase.local>`}\r\n\r\n` +
-      `${message.text_body}\r\n`
-  );
-}
-
-export async function ensureMailboxesV2(db: D1Database, userId: string): Promise<MailboxRow[]> {
+export async function ensureMailboxesV2(
+  db: D1Database,
+  userId: string,
+  role: WorkspaceRole
+): Promise<MailboxRow[]> {
   const timestamp = nowIso();
   for (const definition of mailboxDefinitions) {
     await db
@@ -97,6 +49,21 @@ export async function ensureMailboxesV2(db: D1Database, userId: string): Promise
       )
       .run();
   }
+  if (role !== "owner") {
+    await db
+      .prepare(
+        `DELETE FROM pro_imap_messages
+         WHERE mailbox_id IN (SELECT id FROM pro_imap_mailboxes WHERE user_id = ?)
+         AND message_id IN (
+           SELECT id FROM messages
+           WHERE mailbox_id IS NULL OR mailbox_id NOT IN (
+             SELECT mailbox_id FROM pro_mailbox_grants WHERE user_id = ?
+           )
+         )`
+      )
+      .bind(userId, userId)
+      .run();
+  }
   const result = await db
     .prepare(
       `SELECT id, name, special_use, source_folder, uid_validity, uid_next,
@@ -128,6 +95,7 @@ async function allocateUID(db: D1Database, mailboxId: string): Promise<number> {
 async function backfillMailbox(
   env: WorkerEnv,
   userId: string,
+  role: WorkspaceRole,
   mailbox: MailboxRow,
   limit: number
 ): Promise<void> {
@@ -143,11 +111,17 @@ async function backfillMailbox(
     `SELECT id, folder, read_at, starred_at, created_at, received_at, sent_at, raw_r2_key,
             from_address, to_json, subject, text_body, message_id
      FROM messages
-     WHERE folder = ? AND (created_at > ? OR (created_at = ? AND id > ?))
+     WHERE folder = ?
+       AND (? = 'owner' OR mailbox_id IN (
+         SELECT mailbox_id FROM pro_mailbox_grants WHERE user_id = ?
+       ))
+       AND (created_at > ? OR (created_at = ? AND id > ?))
      ORDER BY created_at, id LIMIT ?`
   )
     .bind(
       mailbox.source_folder,
+      role,
+      userId,
       mailbox.backfill_created_at ?? "",
       mailbox.backfill_created_at ?? "",
       mailbox.backfill_message_id ?? "",
@@ -205,6 +179,7 @@ async function backfillMailbox(
 export async function listMailboxMessages(
   env: WorkerEnv,
   userId: string,
+  role: WorkspaceRole,
   mailboxId: string,
   afterUid: number,
   limit: number
@@ -217,7 +192,7 @@ export async function listMailboxMessages(
     .bind(mailboxId, userId)
     .first<MailboxRow>();
   if (!mailbox) throw new AppError("MAILBOX_NOT_FOUND", "IMAP mailbox not found.", 404);
-  await backfillMailbox(env, userId, mailbox, limit);
+  await backfillMailbox(env, userId, role, mailbox, limit);
   const refreshed = await env.DB.prepare(
     "SELECT backfill_complete FROM pro_imap_mailboxes WHERE id = ?"
   )
@@ -246,6 +221,7 @@ export async function listMailboxMessages(
 async function reconcileChange(
   env: WorkerEnv,
   userId: string,
+  role: WorkspaceRole,
   sourceSeq: number,
   messageId: string
 ): Promise<void> {
@@ -258,11 +234,14 @@ async function reconcileChange(
   const message = await env.DB.prepare(
     `SELECT id, folder, read_at, starred_at, created_at, received_at, sent_at, raw_r2_key,
             from_address, to_json, subject, text_body, message_id
-     FROM messages WHERE id = ?`
+     FROM messages WHERE id = ?
+       AND (? = 'owner' OR mailbox_id IN (
+         SELECT mailbox_id FROM pro_mailbox_grants WHERE user_id = ?
+       ))`
   )
-    .bind(messageId)
+    .bind(messageId, role, userId)
     .first<MessageRow>();
-  const mailboxes = await ensureMailboxesV2(env.DB, userId);
+  const mailboxes = await ensureMailboxesV2(env.DB, userId, role);
   const desired = message
     ? mailboxes.find((mailbox) => mailbox.source_folder === message.folder)
     : null;
@@ -333,8 +312,24 @@ async function reconcileChange(
   ]);
 }
 
-export async function listChanges(env: WorkerEnv, userId: string, cursor: string, limit: number) {
+export async function listChanges(
+  env: WorkerEnv,
+  userId: string,
+  role: WorkspaceRole,
+  cursor: string,
+  limit: number
+) {
   const after = await decodeCursor(cursor, env.PRO_SESSION_SECRET);
+  const minimum = await env.DB.prepare(
+    "SELECT COALESCE(MIN(seq), 0) AS seq FROM pro_message_changes"
+  ).first<{ seq: number }>();
+  if ((minimum?.seq ?? 0) > 0 && after < (minimum?.seq ?? 0) - 1) {
+    throw new AppError(
+      "CURSOR_EXPIRED",
+      "Synchronization history expired. Perform a full mailbox resynchronization.",
+      409
+    );
+  }
   const maximum = await env.DB.prepare(
     "SELECT COALESCE(MAX(seq), 0) AS seq FROM pro_message_changes"
   ).first<{
@@ -349,9 +344,17 @@ export async function listChanges(env: WorkerEnv, userId: string, cursor: string
     .bind(after, limit)
     .all<{ seq: number; message_id: string | null }>();
   for (const change of changes.results) {
-    if (change.message_id) await reconcileChange(env, userId, change.seq, change.message_id);
+    if (change.message_id) {
+      await reconcileChange(env, userId, role, change.seq, change.message_id);
+    }
   }
   const lastSeq = changes.results.at(-1)?.seq ?? after;
+  await env.DB.prepare(
+    `UPDATE pro_mail_sessions SET last_change_seq = ?
+     WHERE user_id = ? AND revoked_at IS NULL AND last_change_seq < ?`
+  )
+    .bind(lastSeq, userId, lastSeq)
+    .run();
   const events = await env.DB.prepare(
     `SELECT source_seq, kind, mailbox_id, uid, flags_json, internal_date, size_bytes
      FROM pro_imap_events WHERE user_id = ? AND source_seq > ? AND source_seq <= ?

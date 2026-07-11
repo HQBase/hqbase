@@ -21,7 +21,7 @@ export function run(command, args = [], options = {}) {
 
   const stdout = result.stdout ?? "";
   const stderr = result.stderr ?? "";
-  if (stdout.trim()) {
+  if (stdout.trim() && !options.quiet) {
     console.log(stdout.trim());
   }
   if (stderr.trim()) {

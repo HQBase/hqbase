@@ -4,6 +4,7 @@ import { beforeAll, beforeEach, describe, expect, it } from "vitest";
 import initialMigration from "../../../migrations/0001_initial.sql?raw";
 import proMigration from "../../../migrations/0002_pro_mail_bridge.sql?raw";
 import bridgeV2Migration from "../../../migrations/0003_mail_bridge_v2.sql?raw";
+import track1Migration from "../../../migrations/0004_track1_operations.sql?raw";
 import { appPasswordHash } from "../../../worker/features/app-passwords/crypto";
 import {
   insertAppPassword,
@@ -11,6 +12,11 @@ import {
   revokeAppPassword,
   verifyAppPassword
 } from "../../../worker/features/app-passwords/queries";
+import {
+  revokeMailboxGrant,
+  setMailboxGrant
+} from "../../../worker/features/mailbox-access/queries";
+import { processJob } from "../../../worker/jobs/consumer";
 
 const userId = "usr_integration";
 const appPasswordId = "apw_00000000-0000-4000-8000-000000000001";
@@ -29,6 +35,24 @@ beforeAll(async () => {
   await applyMigration(initialMigration);
   await applyMigration(proMigration);
   await applyMigration(bridgeV2Migration);
+  const timestamp = new Date().toISOString();
+  await env.DB.batch([
+    env.DB.prepare(
+      `INSERT INTO "user"
+       (id, name, email, emailVerified, createdAt, updatedAt, role, banned)
+       VALUES (?, 'Owner', 'owner@example.com', 1, ?, ?, 'owner', 0)`
+    ).bind(userId, timestamp, timestamp),
+    env.DB.prepare(
+      `INSERT INTO "user"
+       (id, name, email, emailVerified, createdAt, updatedAt, role, banned)
+       VALUES ('usr_existing', 'Existing', 'existing@example.com', 1, ?, ?, 'member', 0)`
+    ).bind(timestamp, timestamp),
+    env.DB.prepare(
+      `INSERT INTO mailboxes (id, address, display_name, is_active, created_at, updated_at)
+       VALUES ('mbx_existing', 'existing@example.com', 'Existing', 1, ?, ?)`
+    ).bind(timestamp, timestamp)
+  ]);
+  await applyMigration(track1Migration);
 });
 
 beforeEach(async () => {
@@ -53,6 +77,11 @@ describe("Community to Pro migration", () => {
     ).resolves.toMatchObject({
       value: "pro"
     });
+    await expect(
+      env.DB.prepare(
+        "SELECT access_level FROM pro_mailbox_grants WHERE user_id = 'usr_existing' AND mailbox_id = 'mbx_existing'"
+      ).first()
+    ).resolves.toMatchObject({ access_level: "agent" });
   });
 });
 
@@ -91,7 +120,7 @@ describe("mail bridge authentication", () => {
       .bind(new Date().toISOString(), new Date().toISOString())
       .run();
 
-    const response = await SELF.fetch("https://hqbase.test/api/pro/mail-bridge/v1/authenticate", {
+    const response = await SELF.fetch("https://hqbase.test/api/pro/mail-bridge/v2/authenticate", {
       method: "POST",
       headers: {
         authorization: "Bearer integration-bridge-token",
@@ -103,11 +132,11 @@ describe("mail bridge authentication", () => {
     const body = await response.json<{
       accessToken: string;
       allowedFrom: string[];
-      snapshot: { mailboxes: { name: string }[] };
+      mailboxes: { name: string }[];
     }>();
     expect(body.accessToken).toMatch(/^mss_/);
-    expect(body.allowedFrom).toEqual(["owner@example.com"]);
-    expect(body.snapshot.mailboxes.map((mailbox) => mailbox.name)).toEqual([
+    expect(body.allowedFrom).toContain("owner@example.com");
+    expect(body.mailboxes.map((mailbox) => mailbox.name)).toEqual([
       "INBOX",
       "Sent",
       "Drafts",
@@ -115,6 +144,96 @@ describe("mail bridge authentication", () => {
       "Trash",
       "Catch-all"
     ]);
+  });
+
+  it("limits a read-only member to the granted mailbox across bridge reads and mutations", async () => {
+    const timestamp = new Date().toISOString();
+    const kirillId = "usr_kirill";
+    const kirillPasswordId = "apw_00000000-0000-4000-8000-000000000099";
+    const kirillPassword = `hqp_${kirillPasswordId}.${"K".repeat(32)}`;
+    const kirillHash = await appPasswordHash(kirillPassword, "integration-app-password-pepper");
+    await env.DB.batch([
+      env.DB.prepare(
+        `INSERT OR REPLACE INTO "user"
+         (id, name, email, emailVerified, createdAt, updatedAt, role, banned)
+         VALUES (?, 'Kirill', 'kirill@example.com', 1, ?, ?, 'member', 0)`
+      ).bind(kirillId, timestamp, timestamp),
+      env.DB.prepare(
+        `INSERT OR REPLACE INTO pro_app_passwords
+         (id, user_id, name, secret_hash, created_at, last_used_at, expires_at, revoked_at)
+         VALUES (?, ?, 'Kirill client', ?, ?, NULL, NULL, NULL)`
+      ).bind(kirillPasswordId, kirillId, kirillHash, timestamp),
+      env.DB.prepare(
+        `INSERT OR REPLACE INTO mailboxes
+         (id, address, display_name, is_active, created_at, updated_at)
+         VALUES ('mbx_support', 'support@example.com', 'Support', 1, ?, ?),
+                ('mbx_privacy', 'privacy@example.com', 'Privacy', 1, ?, ?)`
+      ).bind(timestamp, timestamp, timestamp, timestamp),
+      env.DB.prepare(
+        `INSERT OR REPLACE INTO threads
+         (id, subject_normalized, last_message_at, created_at, updated_at)
+         VALUES ('thr_support', 'support', ?, ?, ?), ('thr_privacy', 'privacy', ?, ?, ?)`
+      ).bind(timestamp, timestamp, timestamp, timestamp, timestamp, timestamp),
+      env.DB.prepare(
+        `INSERT OR REPLACE INTO messages
+         (id, thread_id, mailbox_id, direction, folder, from_address, to_json, cc_json, bcc_json,
+          subject, snippet, text_body, references_json, received_at, has_attachments, created_at, updated_at)
+         VALUES ('msg_support', 'thr_support', 'mbx_support', 'inbound', 'inbox', 'a@example.com',
+          '["support@example.com"]', '[]', '[]', 'Support', 'one', 'one', '[]', ?, 0, ?, ?),
+          ('msg_privacy', 'thr_privacy', 'mbx_privacy', 'inbound', 'inbox', 'b@example.com',
+          '["privacy@example.com"]', '[]', '[]', 'Privacy', 'two', 'two', '[]', ?, 0, ?, ?)`
+      ).bind(timestamp, timestamp, timestamp, timestamp, timestamp, timestamp)
+    ]);
+    await setMailboxGrant(env.DB, "mbx_support", kirillId, "read", userId);
+
+    const authResponse = await SELF.fetch(
+      "https://hqbase.test/api/pro/mail-bridge/v2/authenticate",
+      {
+        method: "POST",
+        headers: {
+          authorization: "Bearer integration-bridge-token",
+          "content-type": "application/json"
+        },
+        body: JSON.stringify({ username: "kirill@example.com", password: kirillPassword })
+      }
+    );
+    expect(authResponse.status).toBe(200);
+    const auth = await authResponse.json<{
+      accessToken: string;
+      allowedFrom: string[];
+      mailboxes: Array<{ id: string; name: string }>;
+    }>();
+    expect(auth.allowedFrom).toEqual([]);
+    const inbox = auth.mailboxes.find((mailbox) => mailbox.name === "INBOX");
+    const headers = {
+      authorization: "Bearer integration-bridge-token",
+      "x-hqbase-mail-session": auth.accessToken
+    };
+    const page = await SELF.fetch(
+      `https://hqbase.test/api/pro/mail-bridge/v2/mailboxes/${inbox?.id}/messages?limit=10`,
+      { headers }
+    );
+    const listed = await page.json<{ messages: Array<{ uid: number }> }>();
+    expect(listed.messages).toHaveLength(1);
+    const mutation = await SELF.fetch("https://hqbase.test/api/pro/mail-bridge/v2/mutations", {
+      method: "POST",
+      headers: { ...headers, "content-type": "application/json" },
+      body: JSON.stringify({
+        idempotencyKey: "kirill-read-only-mutation",
+        operation: "store-flags",
+        mailbox: "INBOX",
+        target: String(listed.messages[0]?.uid),
+        flags: ["\\Seen"]
+      })
+    });
+    expect(mutation.status).toBe(403);
+
+    expect(await revokeMailboxGrant(env.DB, "mbx_support", kirillId)).toBe(true);
+    const staleSession = await SELF.fetch(
+      `https://hqbase.test/api/pro/mail-bridge/v2/mailboxes/${inbox?.id}/messages?limit=10`,
+      { headers }
+    );
+    expect(staleSession.status).toBe(401);
   });
 
   it("pages metadata, streams raw MIME, and replays cursor changes", async () => {
@@ -186,9 +305,9 @@ describe("mail bridge authentication", () => {
     );
     expect(pageResponse.status).toBe(200);
     const page = await pageResponse.json<{ messages: Array<{ uid: number; size: number }> }>();
-    expect(page.messages).toHaveLength(1);
-    expect(page.messages[0]?.size).toBe(raw.length);
-    const uid = page.messages[0]?.uid;
+    const target = page.messages.find((message) => message.size === raw.length);
+    expect(target).toBeDefined();
+    const uid = target?.uid;
     const rawResponse = await SELF.fetch(
       `https://hqbase.test/api/pro/mail-bridge/v2/mailboxes/${inbox?.id}/messages/${uid}/raw`,
       { headers: { ...headers, range: "bytes=0-3" } }
@@ -292,5 +411,25 @@ describe("mail bridge authentication", () => {
     const draftPage = await draftPageResponse.json<{ messages: Array<{ flags: string[] }> }>();
     expect(draftPage.messages).toHaveLength(1);
     expect(draftPage.messages[0]?.flags).toContain("\\Draft");
+  });
+});
+
+describe("Track 1 operations", () => {
+  it("runs maintenance idempotently and records content-free counters", async () => {
+    const job = {
+      id: "maintenance:integration",
+      kind: "maintenance" as const,
+      requestedAt: new Date().toISOString()
+    };
+    await processJob(env, job);
+    await processJob(env, job);
+    const rows = await env.DB.prepare(
+      "SELECT status, counters_json FROM pro_operation_runs WHERE id = ?"
+    )
+      .bind(job.id)
+      .all<{ status: string; counters_json: string }>();
+    expect(rows.results).toHaveLength(1);
+    expect(rows.results[0]?.status).toBe("succeeded");
+    expect(JSON.parse(rows.results[0]?.counters_json ?? "{}")).toHaveProperty("sessions");
   });
 });

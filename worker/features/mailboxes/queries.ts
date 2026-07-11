@@ -1,4 +1,6 @@
+import type { MailboxAccessLevel } from "../../auth/mailbox-access";
 import { newId, nowIso } from "../../db/client";
+import type { WorkspaceRole } from "../../lib/validation";
 
 import type { CreateMailboxInput, Mailbox, MailboxRow, UpdateMailboxInput } from "./types";
 
@@ -19,6 +21,27 @@ export async function listMailboxes(db: D1Database): Promise<Mailbox[]> {
     .all<MailboxRow>();
 
   return result.results.map(mapMailbox);
+}
+
+export async function listMailboxesForUser(
+  db: D1Database,
+  userId: string,
+  role: WorkspaceRole
+): Promise<Array<Mailbox & { accessLevel: MailboxAccessLevel | null }>> {
+  if (role === "owner") {
+    return (await listMailboxes(db)).map((mailbox) => ({ ...mailbox, accessLevel: "manager" }));
+  }
+  const includeWithoutGrant = role === "admin";
+  const result = await db
+    .prepare(
+      `SELECT m.*, g.access_level FROM mailboxes m
+       LEFT JOIN pro_mailbox_grants g ON g.mailbox_id = m.id AND g.user_id = ?
+       WHERE ? = 1 OR g.access_level IS NOT NULL
+       ORDER BY m.is_active DESC, m.address ASC`
+    )
+    .bind(userId, includeWithoutGrant ? 1 : 0)
+    .all<MailboxRow & { access_level: MailboxAccessLevel | null }>();
+  return result.results.map((row) => ({ ...mapMailbox(row), accessLevel: row.access_level }));
 }
 
 export async function countMailboxes(db: D1Database): Promise<number> {

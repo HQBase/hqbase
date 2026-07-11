@@ -36,6 +36,11 @@ pnpm hqbase-pro upgrade --from-community --database <d1-name-or-id> --remote --d
 Only documented Community schema versions are accepted. Unknown schemas fail before mutation.
 See `docs/community-upgrade.md` for the current cutover boundary and `docs/mail-bridge.md` for bridge preview limits.
 
+## Production operations
+
+- `docs/access-control.md`: mailbox grant matrix and enforcement boundary.
+- `docs/operations.md`: doctor, backup, restore, queues, retention, and incident order.
+
 ## License
 
 Source-available under PolyForm Noncommercial 1.0.0. Commercial use requires a separate written license. See `LICENSE.md`, `LICENSING.md`, and `PROVENANCE.md`.

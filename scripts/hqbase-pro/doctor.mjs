@@ -7,12 +7,33 @@ export function doctor(flags) {
   const manifest = loadManifest(name);
 
   run("pnpm", ["exec", "wrangler", "deploy", "--dry-run", "--config", configPath(name)]);
-  run("pnpm", ["exec", "wrangler", "d1", "info", manifest.d1.name, "--config", configPath(name)], {
-    allowFailure: true
-  });
-  run("pnpm", ["exec", "wrangler", "r2", "bucket", "info", manifest.r2.bucket], {
-    allowFailure: true
-  });
+  run("pnpm", ["exec", "wrangler", "d1", "info", manifest.d1.name, "--config", configPath(name)]);
+  run("pnpm", [
+    "exec",
+    "wrangler",
+    "d1",
+    "execute",
+    manifest.d1.name,
+    "--remote",
+    "--command",
+    "PRAGMA integrity_check; SELECT value FROM pro_schema_state WHERE key = 'track1_operations'; SELECT COUNT(*) AS broken_imap_refs FROM pro_imap_messages im LEFT JOIN messages m ON m.id = im.message_id WHERE m.id IS NULL;",
+    "--config",
+    configPath(name)
+  ]);
+  run("pnpm", ["exec", "wrangler", "r2", "bucket", "info", manifest.r2.bucket, "--json"]);
+  if (manifest.queue) {
+    run("pnpm", ["exec", "wrangler", "queues", "info", manifest.queue.name]);
+    run("pnpm", ["exec", "wrangler", "queues", "info", manifest.queue.deadLetterName]);
+  }
+  run("pnpm", [
+    "exec",
+    "wrangler",
+    "deployments",
+    "status",
+    "--name",
+    manifest.worker.name,
+    "--json"
+  ]);
 
   if (manifest.email?.domain) {
     run("pnpm", ["exec", "wrangler", "email", "routing", "settings", manifest.email.domain], {

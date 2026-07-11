@@ -18,6 +18,7 @@ export type ListMessageFilters = {
   folder?: string | undefined;
   mailboxId?: string | undefined;
   search?: string | undefined;
+  mailboxIds?: string[] | undefined;
 };
 
 export async function ensureThread(
@@ -147,6 +148,12 @@ export async function listMessages(
   const where: string[] = [];
   const params: Array<string | number> = [];
 
+  if (filters.mailboxIds) {
+    if (filters.mailboxIds.length === 0) return [];
+    where.push(`mailbox_id IN (${filters.mailboxIds.map(() => "?").join(", ")})`);
+    params.push(...filters.mailboxIds);
+  }
+
   if (filters.folder) {
     where.push("folder = ?");
     params.push(filters.folder);
@@ -238,6 +245,25 @@ export async function findAttachment(db: D1Database, id: string): Promise<Stored
     .first<AttachmentRow>();
 
   return row ? mapAttachment(row) : null;
+}
+
+export async function getMessageMailboxId(db: D1Database, id: string): Promise<string | null> {
+  const row = await db
+    .prepare("SELECT mailbox_id FROM messages WHERE id = ?")
+    .bind(id)
+    .first<{ mailbox_id: string | null }>();
+  return row?.mailbox_id ?? null;
+}
+
+export async function getAttachmentMailboxId(db: D1Database, id: string): Promise<string | null> {
+  const row = await db
+    .prepare(
+      `SELECT m.mailbox_id FROM message_attachments a
+       JOIN messages m ON m.id = a.message_id WHERE a.id = ?`
+    )
+    .bind(id)
+    .first<{ mailbox_id: string | null }>();
+  return row?.mailbox_id ?? null;
 }
 
 async function getMessageRow(db: D1Database, id: string): Promise<MessageRow | null> {

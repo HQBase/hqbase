@@ -126,12 +126,14 @@ export function App(): React.ReactElement {
     );
   }
 
+  const contentMailboxes = mailboxes.filter((mailbox) => mailbox.accessLevel !== null);
+
   return (
     <>
       <AppShell
         activeFolder={activeFolder}
         mailboxId={mailboxId}
-        mailboxes={mailboxes}
+        mailboxes={contentMailboxes}
         search={search}
         user={user}
         onCompose={() => {
@@ -171,7 +173,7 @@ export function App(): React.ReactElement {
         )}
       </AppShell>
       <ComposeDialog
-        mailboxes={mailboxes}
+        mailboxes={contentMailboxes}
         open={composeOpen}
         replyTo={replyTo}
         onOpenChange={setComposeOpen}

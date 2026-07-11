@@ -58,6 +58,7 @@ describe("send service", () => {
     MAIL_SENDER: { send } as unknown as SendEmail,
     PRO_APP_PASSWORD_PEPPER: "test-app-password-pepper",
     PRO_BRIDGE_TOKEN: "test-bridge-token",
+    PRO_JOBS: {} as Queue,
     PRO_SESSION_SECRET: "test-session-secret"
   } satisfies WorkerEnv;
 

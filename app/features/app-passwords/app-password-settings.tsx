@@ -7,6 +7,13 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from "@/components/ui/select";
+import {
   Table,
   TableBody,
   TableCell,
@@ -21,6 +28,7 @@ export function AppPasswordSettings(): React.ReactElement {
   const [items, setItems] = React.useState<AppPassword[]>([]);
   const [name, setName] = React.useState("");
   const [createdPassword, setCreatedPassword] = React.useState<string | null>(null);
+  const [expiry, setExpiry] = React.useState("90");
   const [pending, setPending] = React.useState(false);
 
   const refresh = React.useCallback(async () => setItems(await listAppPasswords()), []);
@@ -30,7 +38,10 @@ export function AppPasswordSettings(): React.ReactElement {
     event.preventDefault();
     setPending(true);
     try {
-      const created = await createAppPassword(name);
+      const created = await createAppPassword(
+        name,
+        expiry === "never" ? undefined : Number(expiry)
+      );
       setCreatedPassword(created.password);
       setName("");
       await refresh();
@@ -60,7 +71,10 @@ export function AppPasswordSettings(): React.ReactElement {
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-5">
-        <form className="flex gap-2" onSubmit={(event) => void handleCreate(event)}>
+        <form
+          className="grid gap-2 sm:grid-cols-[1fr_150px_auto]"
+          onSubmit={(event) => void handleCreate(event)}
+        >
           <Input
             aria-label="Password name"
             maxLength={80}
@@ -69,6 +83,17 @@ export function AppPasswordSettings(): React.ReactElement {
             value={name}
             onChange={(event) => setName(event.target.value)}
           />
+          <Select value={expiry} onValueChange={setExpiry}>
+            <SelectTrigger aria-label="Password expiry">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="30">30 days</SelectItem>
+              <SelectItem value="90">90 days</SelectItem>
+              <SelectItem value="365">1 year</SelectItem>
+              <SelectItem value="never">No expiry</SelectItem>
+            </SelectContent>
+          </Select>
           <Button disabled={pending} type="submit">
             <KeyRound />
             Create
@@ -107,6 +132,7 @@ export function AppPasswordSettings(): React.ReactElement {
               <TableHead>Name</TableHead>
               <TableHead>Created</TableHead>
               <TableHead>Last used</TableHead>
+              <TableHead>Expires</TableHead>
               <TableHead />
             </TableRow>
           </TableHeader>
@@ -120,6 +146,9 @@ export function AppPasswordSettings(): React.ReactElement {
                 <TableCell>{new Date(item.createdAt).toLocaleDateString()}</TableCell>
                 <TableCell>
                   {item.lastUsedAt ? new Date(item.lastUsedAt).toLocaleString() : "Never"}
+                </TableCell>
+                <TableCell>
+                  {item.expiresAt ? new Date(item.expiresAt).toLocaleDateString() : "Never"}
                 </TableCell>
                 <TableCell className="text-right">
                   <Button

@@ -5,8 +5,9 @@ import type { HonoApp } from "../../lib/env";
 import { AppError } from "../../lib/errors";
 import { readJson } from "../../lib/json";
 import { parseWith } from "../../lib/validation";
+import { enforceRateLimit } from "../../security/rate-limit";
 import { verifyAppPassword } from "../app-passwords/queries";
-import { listMailboxes } from "../mailboxes/queries";
+import { listMailboxesForUser } from "../mailboxes/queries";
 import { currentCursor } from "./cursor";
 import { applyMutation } from "./mutations";
 import { rawMessageResponse } from "./raw";
@@ -43,11 +44,11 @@ const mutationSchema = z.object({
 });
 
 async function requireSession(c: Context<HonoApp>) {
-  const userId = await requireMailSession(c.env, c.req.raw);
-  if (!userId) {
+  const session = await requireMailSession(c.env, c.req.raw);
+  if (!session) {
     throw new AppError("MAIL_SESSION_INVALID", "Mail session is invalid or expired.", 401);
   }
-  return userId;
+  return session;
 }
 
 export const mailBridgeV2Routes = new Hono<HonoApp>();
@@ -61,6 +62,20 @@ mailBridgeV2Routes.use("*", async (c, next) => {
 
 mailBridgeV2Routes.post("/authenticate", async (c) => {
   const input = parseWith(authenticateSchema, await readJson(c.req.raw));
+  await Promise.all([
+    enforceRateLimit(c.env.DB, c.env.PRO_SESSION_SECRET, {
+      scope: "bridge.auth.username",
+      subject: input.username,
+      limit: 10,
+      windowSeconds: 15 * 60
+    }),
+    enforceRateLimit(c.env.DB, c.env.PRO_SESSION_SECRET, {
+      scope: "bridge.auth.ip",
+      subject: c.req.header("cf-connecting-ip") ?? "unknown",
+      limit: 60,
+      windowSeconds: 15 * 60
+    })
+  ]);
   const verified = await verifyAppPassword(
     c.env.DB,
     input.username,
@@ -70,15 +85,20 @@ mailBridgeV2Routes.post("/authenticate", async (c) => {
   if (!verified) throw new AppError("AUTHENTICATION_FAILED", "Authentication failed.", 401);
   const [accessToken, mailboxes, imapMailboxes, cursor] = await Promise.all([
     createMailSession(c.env, verified.userId, verified.appPasswordId),
-    listMailboxes(c.env.DB),
-    ensureMailboxesV2(c.env.DB, verified.userId),
+    listMailboxesForUser(c.env.DB, verified.userId, verified.role),
+    ensureMailboxesV2(c.env.DB, verified.userId, verified.role),
     currentCursor(c.env)
   ]);
   return c.json({
     accessToken,
     subject: verified.userId,
     username: input.username,
-    allowedFrom: mailboxes.filter((mailbox) => mailbox.isActive).map((mailbox) => mailbox.address),
+    allowedFrom: mailboxes
+      .filter(
+        (mailbox) =>
+          mailbox.isActive && (mailbox.accessLevel === "agent" || mailbox.accessLevel === "manager")
+      )
+      .map((mailbox) => mailbox.address),
     cursor,
     mailboxes: imapMailboxes.map((mailbox) => ({
       id: mailbox.id,
@@ -91,25 +111,32 @@ mailBridgeV2Routes.post("/authenticate", async (c) => {
 });
 
 mailBridgeV2Routes.get("/mailboxes/:mailboxId/messages", async (c) => {
-  const userId = await requireSession(c);
+  const session = await requireSession(c);
   const input = parseWith(pageSchema, c.req.query());
   return c.json(
-    await listMailboxMessages(c.env, userId, c.req.param("mailboxId"), input.afterUid, input.limit)
+    await listMailboxMessages(
+      c.env,
+      session.userId,
+      session.role,
+      c.req.param("mailboxId"),
+      input.afterUid,
+      input.limit
+    )
   );
 });
 
 mailBridgeV2Routes.get("/changes", async (c) => {
-  const userId = await requireSession(c);
+  const session = await requireSession(c);
   const input = parseWith(changesSchema, c.req.query());
-  return c.json(await listChanges(c.env, userId, input.cursor, input.limit));
+  return c.json(await listChanges(c.env, session.userId, session.role, input.cursor, input.limit));
 });
 
 mailBridgeV2Routes.get("/mailboxes/:mailboxId/messages/:uid/raw", async (c) => {
-  const userId = await requireSession(c);
+  const session = await requireSession(c);
   const uid = z.coerce.number().int().positive().parse(c.req.param("uid"));
   return rawMessageResponse(
     c.env,
-    userId,
+    session.userId,
     c.req.param("mailboxId"),
     uid,
     c.req.header("range") ?? null
@@ -117,13 +144,25 @@ mailBridgeV2Routes.get("/mailboxes/:mailboxId/messages/:uid/raw", async (c) => {
 });
 
 mailBridgeV2Routes.post("/submit", async (c) => {
-  const userId = await requireSession(c);
-  await submitMessage(c.env, userId, parseWith(submissionSchema, await readJson(c.req.raw)));
+  const session = await requireSession(c);
+  await enforceRateLimit(c.env.DB, c.env.PRO_SESSION_SECRET, {
+    scope: "bridge.submit",
+    subject: session.userId,
+    limit: 60,
+    windowSeconds: 60
+  });
+  await submitMessage(c.env, session, parseWith(submissionSchema, await readJson(c.req.raw)));
   return c.body(null, 204);
 });
 
 mailBridgeV2Routes.post("/mutations", async (c) => {
-  const userId = await requireSession(c);
-  await applyMutation(c.env, userId, parseWith(mutationSchema, await readJson(c.req.raw)));
+  const session = await requireSession(c);
+  await enforceRateLimit(c.env.DB, c.env.PRO_SESSION_SECRET, {
+    scope: "bridge.mutation",
+    subject: session.userId,
+    limit: 240,
+    windowSeconds: 60
+  });
+  await applyMutation(c.env, session, parseWith(mutationSchema, await readJson(c.req.raw)));
   return c.body(null, 204);
 });

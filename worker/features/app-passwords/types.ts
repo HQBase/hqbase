@@ -14,5 +14,6 @@ export type AppPassword = {
   name: string;
   createdAt: string;
   lastUsedAt: string | null;
+  expiresAt: string | null;
   revokedAt: string | null;
 };

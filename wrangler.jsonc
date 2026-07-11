@@ -2,7 +2,7 @@
   "$schema": "./node_modules/wrangler/config-schema.json",
   "name": "hqbase-pro",
   "main": "worker/index.ts",
-  "compatibility_date": "2026-06-28",
+  "compatibility_date": "2026-07-11",
   "compatibility_flags": ["nodejs_compat"],
   "assets": {
     "directory": "./dist",
@@ -35,6 +35,19 @@
       "bucket_name": "hqbase-pro-mail"
     }
   ],
+  "queues": {
+    "producers": [{ "binding": "PRO_JOBS", "queue": "hqbase-pro-jobs" }],
+    "consumers": [
+      {
+        "queue": "hqbase-pro-jobs",
+        "dead_letter_queue": "hqbase-pro-jobs-dlq",
+        "max_batch_size": 10,
+        "max_batch_timeout": 5,
+        "max_retries": 3
+      }
+    ]
+  },
+  "triggers": { "crons": ["17 3 * * *"] },
   "send_email": [
     {
       "name": "MAIL_SENDER"

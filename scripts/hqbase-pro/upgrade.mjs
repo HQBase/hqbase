@@ -5,6 +5,7 @@ import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 
 import { optionalBoolean, optionalString, parseArgs, requireString } from "./args.mjs";
+import { parseTimeTravelBookmark } from "./backup.mjs";
 import { rootDir } from "./paths.mjs";
 
 const COMMUNITY_TABLES = [
@@ -26,6 +27,9 @@ const PRO_TABLES = [
   "pro_imap_mailboxes",
   "pro_imap_messages",
   "pro_mail_sessions",
+  "pro_mailbox_grants",
+  "pro_audit_events",
+  "pro_operation_runs",
   "pro_schema_state"
 ];
 
@@ -142,7 +146,7 @@ function remoteMigrationConfig(database) {
     `${JSON.stringify(
       {
         name: "hqbase-pro-upgrade",
-        compatibility_date: "2026-06-28",
+        compatibility_date: "2026-07-11",
         d1_databases: [
           {
             binding: "DB",
@@ -171,6 +175,15 @@ export function runUpgrade(options) {
   }
 
   if (options.remote) {
+    const bookmark = parseTimeTravelBookmark(
+      executeWrangler(["d1", "time-travel", "info", options.database, "--json"], {
+        quiet: true
+      })
+    );
+    console.log(`Pre-upgrade D1 bookmark: ${bookmark}`);
+    console.log(
+      `Database rollback: pnpm exec wrangler d1 time-travel restore ${options.database} --bookmark ${bookmark}`
+    );
     const output = backupPath(options);
     mkdirSync(dirname(output), { recursive: true });
     executeWrangler(["d1", "export", options.database, "--remote", "--output", output]);

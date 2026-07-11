@@ -1,12 +1,14 @@
 #!/usr/bin/env node
 
 import { optionalBoolean, optionalString, parseArgs } from "./args.mjs";
+import { backup } from "./backup.mjs";
 import { updateDeployButton } from "./button.mjs";
 import { destroy } from "./destroy.mjs";
 import { doctor } from "./doctor.mjs";
 import { install } from "./install.mjs";
 import { printPostDeploy } from "./postdeploy.mjs";
 import { reset } from "./reset.mjs";
+import { restore } from "./restore.mjs";
 import { runUpgrade, validateUpgradeOptions } from "./upgrade.mjs";
 
 const [command, ...rest] = process.argv.slice(2);
@@ -24,6 +26,12 @@ try {
       break;
     case "doctor":
       doctor(flags);
+      break;
+    case "backup":
+      backup(flags);
+      break;
+    case "restore":
+      restore(flags);
       break;
     case "reset":
       reset(flags);
@@ -56,6 +64,8 @@ Usage:
   pnpm hqbase-pro button --repo-url https://github.com/OWNER/REPO
   pnpm hqbase-pro install --name dev-01 [--domain example.com]
   pnpm hqbase-pro doctor --name dev-01
+  pnpm hqbase-pro backup --name dev-01 [--output backup.json]
+  pnpm hqbase-pro restore --name dev-01 --backup backup.json --yes
   pnpm hqbase-pro reset --name dev-01 --scope data|storage|domain|all
   pnpm hqbase-pro destroy --name dev-01 --scope worker|data|storage|domain|all --yes
   pnpm hqbase-pro postdeploy
@@ -66,6 +76,7 @@ Install options:
   --worker-name <name>   Override Worker name. Defaults to hqbase-pro-<name>.
   --d1-name <name>       Override D1 database name. Defaults to hqbase-pro-<name>.
   --r2-bucket <name>     Override R2 bucket name. Defaults to hqbase-pro-<name>-mail.
+  --queue-name <name>    Override lifecycle queue name. Defaults to hqbase-pro-<name>-jobs.
   --domain <domain>      Configure Cloudflare Email Routing/Sending for the domain.
   --no-email             Skip Email Routing/Sending changes even when --domain is set.
   --no-sending           Skip Email Sending enablement.

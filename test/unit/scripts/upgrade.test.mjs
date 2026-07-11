@@ -57,6 +57,9 @@ describe("Community to Pro upgrade", () => {
         "pro_imap_mailboxes",
         "pro_imap_messages",
         "pro_mail_sessions",
+        "pro_mailbox_grants",
+        "pro_audit_events",
+        "pro_operation_runs",
         "pro_schema_state"
       ])
     ).not.toThrow();

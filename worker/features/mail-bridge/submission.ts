@@ -1,3 +1,4 @@
+import { requireMailboxAccess } from "../../auth/mailbox-access";
 import { newId, nowIso } from "../../db/client";
 import { parseRawEmail } from "../../email/parse-email";
 import type { WorkerEnv } from "../../lib/env";
@@ -5,6 +6,7 @@ import { AppError } from "../../lib/errors";
 import { findMailboxByAddress } from "../mailboxes/queries";
 import { sendNewMessage } from "../send/service";
 import { decodeBase64 } from "./codec";
+import type { MailSessionContext } from "./session";
 
 export type BridgeSubmission = {
   idempotencyKey: string;
@@ -13,17 +15,22 @@ export type BridgeSubmission = {
   raw: string;
 };
 
-export async function submitMessage(env: WorkerEnv, userId: string, input: BridgeSubmission) {
+export async function submitMessage(
+  env: WorkerEnv,
+  session: MailSessionContext,
+  input: BridgeSubmission
+) {
   const duplicate = await env.DB.prepare(
     "SELECT 1 FROM pro_bridge_submissions WHERE idempotency_key = ? AND user_id = ?"
   )
-    .bind(input.idempotencyKey, userId)
+    .bind(input.idempotencyKey, session.userId)
     .first();
   if (duplicate) return;
   const mailbox = await findMailboxByAddress(env.DB, input.mailFrom.toLowerCase());
   if (!mailbox?.isActive) {
     throw new AppError("SENDER_NOT_ALLOWED", "Sender is not an active mailbox.", 403);
   }
+  await requireMailboxAccess(env.DB, session.userId, session.role, mailbox.id, "agent");
   const raw = decodeBase64(input.raw);
   const parsed = await parseRawEmail(raw);
   const sent = await sendNewMessage(env, {
@@ -45,6 +52,6 @@ export async function submitMessage(env: WorkerEnv, userId: string, input: Bridg
     ),
     env.DB.prepare(
       "INSERT INTO pro_bridge_submissions (idempotency_key, user_id, message_id, created_at) VALUES (?, ?, ?, ?)"
-    ).bind(input.idempotencyKey, userId, sent.id, nowIso())
+    ).bind(input.idempotencyKey, session.userId, sent.id, nowIso())
   ]);
 }

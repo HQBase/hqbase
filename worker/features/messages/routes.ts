@@ -1,29 +1,45 @@
 import { Hono } from "hono";
-
+import { accessibleMailboxIds, requireMailboxAccess } from "../../auth/mailbox-access";
 import { requireAuthContext } from "../../auth/session";
 import type { HonoApp } from "../../lib/env";
 import { AppError } from "../../lib/errors";
 
 import type { MessageAction } from "./actions";
-import { findAttachment, getMessageDetail, listMessages, updateMessageAction } from "./queries";
+import {
+  findAttachment,
+  getAttachmentMailboxId,
+  getMessageDetail,
+  getMessageMailboxId,
+  listMessages,
+  updateMessageAction
+} from "./queries";
 
 export const messageRoutes = new Hono<HonoApp>();
 
 const actions: readonly MessageAction[] = ["read", "unread", "star", "unstar", "archive", "trash"];
 
 messageRoutes.get("/", async (c) => {
-  await requireAuthContext(c.env, c.req.raw);
+  const auth = await requireAuthContext(c.env, c.req.raw);
+  const mailboxIds = await accessibleMailboxIds(c.env.DB, auth.user.id, auth.user.role, "read");
   return c.json(
     await listMessages(c.env.DB, {
       folder: c.req.query("folder"),
       mailboxId: c.req.query("mailboxId"),
-      search: c.req.query("search")
+      search: c.req.query("search"),
+      mailboxIds
     })
   );
 });
 
 messageRoutes.get("/:id", async (c) => {
-  await requireAuthContext(c.env, c.req.raw);
+  const auth = await requireAuthContext(c.env, c.req.raw);
+  await requireMailboxAccess(
+    c.env.DB,
+    auth.user.id,
+    auth.user.role,
+    await getMessageMailboxId(c.env.DB, c.req.param("id")),
+    "read"
+  );
   const message = await getMessageDetail(c.env.DB, c.req.param("id"));
   if (!message) {
     throw new AppError("MESSAGE_NOT_FOUND", "Message not found.", 404);
@@ -33,7 +49,14 @@ messageRoutes.get("/:id", async (c) => {
 
 for (const action of actions) {
   messageRoutes.post(`/:id/${action}`, async (c) => {
-    await requireAuthContext(c.env, c.req.raw);
+    const auth = await requireAuthContext(c.env, c.req.raw);
+    await requireMailboxAccess(
+      c.env.DB,
+      auth.user.id,
+      auth.user.role,
+      await getMessageMailboxId(c.env.DB, c.req.param("id")),
+      "agent"
+    );
     return c.json(await updateMessageAction(c.env.DB, c.req.param("id"), action));
   });
 }
@@ -41,7 +64,14 @@ for (const action of actions) {
 export const attachmentRoutes = new Hono<HonoApp>();
 
 attachmentRoutes.get("/:id", async (c) => {
-  await requireAuthContext(c.env, c.req.raw);
+  const auth = await requireAuthContext(c.env, c.req.raw);
+  await requireMailboxAccess(
+    c.env.DB,
+    auth.user.id,
+    auth.user.role,
+    await getAttachmentMailboxId(c.env.DB, c.req.param("id")),
+    "read"
+  );
   const attachment = await findAttachment(c.env.DB, c.req.param("id"));
   if (!attachment) {
     throw new AppError("ATTACHMENT_NOT_FOUND", "Attachment not found.", 404);

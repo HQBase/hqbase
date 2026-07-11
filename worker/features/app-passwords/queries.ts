@@ -1,4 +1,5 @@
 import { newId, nowIso } from "../../db/client";
+import type { WorkspaceRole } from "../../lib/validation";
 import { appPasswordHash, appPasswordId, createAppPassword, secureHashEqual } from "./crypto";
 import type { AppPassword, AppPasswordRow } from "./types";
 
@@ -8,6 +9,7 @@ function publicPassword(row: AppPasswordRow): AppPassword {
     name: row.name,
     createdAt: row.created_at,
     lastUsedAt: row.last_used_at,
+    expiresAt: row.expires_at,
     revokedAt: row.revoked_at
   };
 }
@@ -24,7 +26,8 @@ export async function insertAppPassword(
   db: D1Database,
   userId: string,
   name: string,
-  pepper: string
+  pepper: string,
+  expiresAt: string | null = null
 ): Promise<{ appPassword: AppPassword; password: string }> {
   const id = newId("apw");
   const password = createAppPassword(id);
@@ -37,16 +40,16 @@ export async function insertAppPassword(
     secret_hash: hash,
     created_at: timestamp,
     last_used_at: null,
-    expires_at: null,
+    expires_at: expiresAt,
     revoked_at: null
   };
   await db
     .prepare(
       `INSERT INTO pro_app_passwords
        (id, user_id, name, secret_hash, created_at, last_used_at, expires_at, revoked_at)
-       VALUES (?, ?, ?, ?, ?, NULL, NULL, NULL)`
+       VALUES (?, ?, ?, ?, ?, NULL, ?, NULL)`
     )
-    .bind(id, userId, name, hash, timestamp)
+    .bind(id, userId, name, hash, timestamp, expiresAt)
     .run();
   return { appPassword: publicPassword(row), password };
 }
@@ -77,19 +80,19 @@ export async function verifyAppPassword(
   email: string,
   password: string,
   pepper: string
-): Promise<{ appPasswordId: string; userId: string } | null> {
+): Promise<{ appPasswordId: string; userId: string; role: WorkspaceRole } | null> {
   const id = appPasswordId(password);
   if (!id) return null;
   const row = await db
     .prepare(
-      `SELECT p.* FROM pro_app_passwords p
+      `SELECT p.*, u.role AS user_role FROM pro_app_passwords p
        JOIN "user" u ON u.id = p.user_id
        JOIN pro_entitlements e ON e.key = 'mail_bridge' AND e.enabled = 1
        WHERE p.id = ? AND lower(u.email) = lower(?) AND p.revoked_at IS NULL
        AND (p.expires_at IS NULL OR p.expires_at > ?)`
     )
     .bind(id, email, nowIso())
-    .first<AppPasswordRow>();
+    .first<AppPasswordRow & { user_role: WorkspaceRole }>();
   if (!row) return null;
   const expected = await appPasswordHash(password, pepper);
   if (!secureHashEqual(expected, row.secret_hash)) return null;
@@ -97,5 +100,5 @@ export async function verifyAppPassword(
     .prepare("UPDATE pro_app_passwords SET last_used_at = ? WHERE id = ?")
     .bind(nowIso(), id)
     .run();
-  return { appPasswordId: id, userId: row.user_id };
+  return { appPasswordId: id, userId: row.user_id, role: row.user_role };
 }

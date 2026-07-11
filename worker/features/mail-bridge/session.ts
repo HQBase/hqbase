@@ -1,5 +1,6 @@
 import { newId, nowIso } from "../../db/client";
 import type { WorkerEnv } from "../../lib/env";
+import type { WorkspaceRole } from "../../lib/validation";
 import { appPasswordHash } from "../app-passwords/crypto";
 
 const encoder = new TextEncoder();
@@ -42,13 +43,18 @@ export async function createMailSession(
   return token;
 }
 
-export async function requireMailSession(env: WorkerEnv, request: Request): Promise<string | null> {
+export type MailSessionContext = { userId: string; role: WorkspaceRole };
+
+export async function requireMailSession(
+  env: WorkerEnv,
+  request: Request
+): Promise<MailSessionContext | null> {
   const token = request.headers.get("x-hqbase-mail-session") ?? "";
   if (!token) return null;
   const hash = await appPasswordHash(token, env.PRO_SESSION_SECRET);
   const timestamp = nowIso();
   const row = await env.DB.prepare(
-    `SELECT s.id, s.user_id, s.expires_at FROM pro_mail_sessions s
+    `SELECT s.id, s.user_id, s.expires_at, u.role FROM pro_mail_sessions s
        JOIN pro_app_passwords p ON p.id = s.app_password_id
        JOIN "user" u ON u.id = s.user_id
        JOIN pro_entitlements e ON e.key = 'mail_bridge' AND e.enabled = 1
@@ -57,12 +63,12 @@ export async function requireMailSession(env: WorkerEnv, request: Request): Prom
        AND COALESCE(u.banned, 0) = 0`
   )
     .bind(hash, timestamp, timestamp)
-    .first<{ id: string; user_id: string; expires_at: string }>();
+    .first<{ id: string; user_id: string; expires_at: string; role: WorkspaceRole }>();
   if (!row) return null;
   if (new Date(row.expires_at).getTime() < Date.now() + sessionRefreshWindowMs) {
     await env.DB.prepare("UPDATE pro_mail_sessions SET expires_at = ? WHERE id = ?")
       .bind(new Date(Date.now() + sessionLifetimeMs).toISOString(), row.id)
       .run();
   }
-  return row.user_id;
+  return { userId: row.user_id, role: row.role };
 }

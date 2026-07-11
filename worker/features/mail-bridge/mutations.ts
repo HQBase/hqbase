@@ -1,10 +1,13 @@
+import { requireMailboxAccess } from "../../auth/mailbox-access";
 import { newId, nowIso } from "../../db/client";
 import { parseRawEmail } from "../../email/parse-email";
 import type { WorkerEnv } from "../../lib/env";
 import { AppError } from "../../lib/errors";
+import { findMailboxByAddress } from "../mailboxes/queries";
 import { ensureThread, insertMessage } from "../messages/queries";
 import { recordMessageChange } from "./change-log";
 import { decodeBase64 } from "./codec";
+import type { MailSessionContext } from "./session";
 
 export type BridgeMutation = {
   idempotencyKey: string;
@@ -36,11 +39,15 @@ export function parseUIDs(target: string): number[] {
   return [...values];
 }
 
-export async function applyMutation(env: WorkerEnv, userId: string, input: BridgeMutation) {
+export async function applyMutation(
+  env: WorkerEnv,
+  session: MailSessionContext,
+  input: BridgeMutation
+) {
   const duplicate = await env.DB.prepare(
     "SELECT 1 FROM pro_bridge_mutations WHERE idempotency_key = ? AND user_id = ?"
   )
-    .bind(input.idempotencyKey, userId)
+    .bind(input.idempotencyKey, session.userId)
     .first();
   if (duplicate) return;
   if (!input.mailbox || (input.operation !== "append" && !input.target)) {
@@ -49,27 +56,30 @@ export async function applyMutation(env: WorkerEnv, userId: string, input: Bridg
   const mailbox = await env.DB.prepare(
     "SELECT id FROM pro_imap_mailboxes WHERE user_id = ? AND name = ?"
   )
-    .bind(userId, input.mailbox)
+    .bind(session.userId, input.mailbox)
     .first<{ id: string }>();
   if (!mailbox) throw new AppError("MAILBOX_NOT_FOUND", "IMAP mailbox not found.", 404);
   const timestamp = nowIso();
+  if (input.operation !== "append") {
+    await requireMappedMessageAccess(env, session, mailbox.id, parseUIDs(input.target ?? ""));
+  }
   if (input.operation === "expunge") {
     await expungeMessages(env, mailbox.id, parseUIDs(input.target ?? ""));
   } else if (input.operation === "store-flags") {
     await storeFlags(
       env,
-      userId,
+      session.userId,
       mailbox.id,
       parseUIDs(input.target ?? ""),
       input.flags ?? [],
       timestamp
     );
   } else if (input.operation === "append" && input.raw) {
-    await appendMessage(env, mailbox.id, input.raw, input.flags ?? [], timestamp);
+    await appendMessage(env, session, mailbox.id, input.raw, input.flags ?? [], timestamp);
   } else if (input.operation === "copy" && input.target && input.destination) {
     await copyMessages(
       env,
-      userId,
+      session.userId,
       mailbox.id,
       input.destination,
       parseUIDs(input.target),
@@ -81,8 +91,28 @@ export async function applyMutation(env: WorkerEnv, userId: string, input: Bridg
   await env.DB.prepare(
     "INSERT INTO pro_bridge_mutations (idempotency_key, user_id, created_at) VALUES (?, ?, ?)"
   )
-    .bind(input.idempotencyKey, userId, timestamp)
+    .bind(input.idempotencyKey, session.userId, timestamp)
     .run();
+}
+
+async function requireMappedMessageAccess(
+  env: WorkerEnv,
+  session: MailSessionContext,
+  mailboxId: string,
+  uids: number[]
+): Promise<void> {
+  for (const uid of uids) {
+    const row = await env.DB.prepare(
+      `SELECT m.mailbox_id FROM pro_imap_messages im
+       JOIN messages m ON m.id = im.message_id
+       WHERE im.mailbox_id = ? AND im.uid = ?`
+    )
+      .bind(mailboxId, uid)
+      .first<{ mailbox_id: string | null }>();
+    if (row) {
+      await requireMailboxAccess(env.DB, session.userId, session.role, row.mailbox_id, "agent");
+    }
+  }
 }
 
 async function copyMessages(
@@ -154,6 +184,7 @@ async function copyMessages(
 
 async function appendMessage(
   env: WorkerEnv,
+  session: MailSessionContext,
   mailboxId: string,
   encodedRaw: string,
   flags: string[],
@@ -170,6 +201,11 @@ async function appendMessage(
     throw new AppError("MESSAGE_TOO_LARGE", "Message exceeds the 25 MiB limit.", 413);
   }
   const parsed = await parseRawEmail(raw);
+  const physicalMailbox = await findMailboxByAddress(env.DB, parsed.fromAddress.toLowerCase());
+  if (!physicalMailbox?.isActive) {
+    throw new AppError("SENDER_NOT_ALLOWED", "Message From must be an active mailbox.", 403);
+  }
+  await requireMailboxAccess(env.DB, session.userId, session.role, physicalMailbox.id, "agent");
   const rawKey = `imap/${timestamp.slice(0, 10)}/${newId("raw")}.eml`;
   await env.MAIL_OBJECTS.put(rawKey, raw, { httpMetadata: { contentType: "message/rfc822" } });
   const threadId = await ensureThread(env.DB, parsed.subject, timestamp);
@@ -183,7 +219,7 @@ async function appendMessage(
   const outbound = folder === "sent" || folder === "drafts";
   await insertMessage(env.DB, {
     threadId,
-    mailboxId: null,
+    mailboxId: physicalMailbox.id,
     direction: outbound ? "outbound" : "inbound",
     folder,
     fromAddress: parsed.fromAddress,
@@ -292,8 +328,15 @@ async function expungeMessages(env: WorkerEnv, mailboxId: string, uids: number[]
         .first();
       if (!reference) await env.MAIL_OBJECTS.delete(mapping.raw_r2_key);
     }
-    if (attachments.results.length) {
-      await env.MAIL_OBJECTS.delete(attachments.results.map((attachment) => attachment.r2_key));
+    const unreferencedAttachments: string[] = [];
+    for (const attachment of attachments.results) {
+      const reference = await env.DB.prepare(
+        "SELECT 1 FROM message_attachments WHERE r2_key = ? LIMIT 1"
+      )
+        .bind(attachment.r2_key)
+        .first();
+      if (!reference) unreferencedAttachments.push(attachment.r2_key);
     }
+    if (unreferencedAttachments.length) await env.MAIL_OBJECTS.delete(unreferencedAttachments);
   }
 }

@@ -31,7 +31,8 @@ export function install(flags) {
     domain,
     workerName: optionalString(flags, "worker-name"),
     d1Name: optionalString(flags, "d1-name"),
-    r2Bucket: optionalString(flags, "r2-bucket")
+    r2Bucket: optionalString(flags, "r2-bucket"),
+    queueName: optionalString(flags, "queue-name")
   });
 
   if (!dryRun) {
@@ -52,6 +53,13 @@ export function install(flags) {
 
   run("pnpm", ["exec", "wrangler", "r2", "bucket", "create", manifest.r2.bucket], { dryRun });
   manifest.r2.created = true;
+  writeManifest(manifest, { dryRun });
+
+  run("pnpm", ["exec", "wrangler", "queues", "create", manifest.queue.name], { dryRun });
+  run("pnpm", ["exec", "wrangler", "queues", "create", manifest.queue.deadLetterName], {
+    dryRun
+  });
+  manifest.queue.created = true;
   writeManifest(manifest, { dryRun });
 
   writeSecretFile(
@@ -112,6 +120,7 @@ function createManifest(name, input) {
   const workerName = input.workerName ?? `hqbase-pro-${name}`;
   const d1Name = input.d1Name ?? `hqbase-pro-${name}`;
   const r2Bucket = input.r2Bucket ?? `hqbase-pro-${name}-mail`;
+  const queueName = input.queueName ?? `hqbase-pro-${name}-jobs`;
 
   validateBucketName(r2Bucket);
 
@@ -122,6 +131,7 @@ function createManifest(name, input) {
     worker: { name: workerName, deployed: false },
     d1: { name: d1Name, id: "00000000-0000-0000-0000-000000000000", created: false },
     r2: { bucket: r2Bucket, created: false },
+    queue: { name: queueName, deadLetterName: `${queueName}-dlq`, created: false },
     appDomain: input.appDomain,
     authUrl: input.authUrl,
     email: input.domain

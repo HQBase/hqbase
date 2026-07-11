@@ -42,6 +42,16 @@ export function destroy(flags) {
       allowFailure: true
     });
   }
+  if (scope === "all" && manifest.queue) {
+    run("pnpm", ["exec", "wrangler", "queues", "delete", manifest.queue.name], {
+      dryRun,
+      allowFailure: true
+    });
+    run("pnpm", ["exec", "wrangler", "queues", "delete", manifest.queue.deadLetterName], {
+      dryRun,
+      allowFailure: true
+    });
+  }
 
   if (scope === "all" && !dryRun) {
     fs.rmSync(deploymentDir(name), { recursive: true, force: true });

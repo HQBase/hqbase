@@ -13,7 +13,7 @@ export function writeWranglerConfig(manifest, options = {}) {
     $schema: `${rootFromDeployment}/node_modules/wrangler/config-schema.json`,
     name: manifest.worker.name,
     main: `${rootFromDeployment}/worker/index.ts`,
-    compatibility_date: "2026-06-28",
+    compatibility_date: "2026-07-11",
     compatibility_flags: ["nodejs_compat"],
     assets: {
       directory: `${rootFromDeployment}/dist`,
@@ -41,6 +41,19 @@ export function writeWranglerConfig(manifest, options = {}) {
         bucket_name: manifest.r2.bucket
       }
     ],
+    queues: {
+      producers: [{ binding: "PRO_JOBS", queue: manifest.queue.name }],
+      consumers: [
+        {
+          queue: manifest.queue.name,
+          dead_letter_queue: manifest.queue.deadLetterName,
+          max_batch_size: 10,
+          max_batch_timeout: 5,
+          max_retries: 3
+        }
+      ]
+    },
+    triggers: { crons: ["17 3 * * *"] },
     send_email: [
       {
         name: "MAIL_SENDER"

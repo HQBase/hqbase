@@ -39,7 +39,11 @@ export function ComposeDialog({
   onSent
 }: ComposeDialogProps): React.ReactElement {
   const activeMailboxes = React.useMemo(
-    () => mailboxes.filter((mailbox) => mailbox.isActive),
+    () =>
+      mailboxes.filter(
+        (mailbox) =>
+          mailbox.isActive && (mailbox.accessLevel === "agent" || mailbox.accessLevel === "manager")
+      ),
     [mailboxes]
   );
   const [from, setFrom] = React.useState("");
