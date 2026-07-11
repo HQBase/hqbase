@@ -1,6 +1,6 @@
 # HQBase Pro
 
-Private development repository for the complete HQBase Pro product.
+Source-available repository for the complete HQBase Pro product.
 
 Pro supports two first-class lifecycles:
 
@@ -38,4 +38,4 @@ See `docs/community-upgrade.md` for the current cutover boundary and `docs/mail-
 
 ## License
 
-Private proprietary development code pending final HQBase source-available terms. See `LICENSE.md` and `PROVENANCE.md`.
+Source-available under PolyForm Noncommercial 1.0.0. Commercial use requires a separate written license. See `LICENSE.md`, `LICENSING.md`, and `PROVENANCE.md`.

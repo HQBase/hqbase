@@ -1,6 +1,6 @@
 # HQBase Pro Guide
 
-Complete, independently evolving HQBase Pro product. Private during initial development.
+Complete, independently evolving HQBase Pro product. Source-available under PolyForm Noncommercial 1.0.0.
 
 ## Boundaries
 
