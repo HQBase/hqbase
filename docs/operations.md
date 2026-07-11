@@ -7,7 +7,7 @@ pnpm hqbase-pro doctor --name <deployment>
 pnpm hqbase-pro backup --name <deployment>
 ```
 
-`doctor` verifies the generated deployment, D1 integrity and Track 1 schema marker, broken IMAP
+`doctor` verifies the generated deployment, the Track 1 schema marker, broken IMAP
 references, R2 availability, both queues, and the current Worker deployment. `backup` writes a
 mode-`0600` JSON manifest with the D1 Time Travel bookmark, deployed Worker version, and R2 bucket
 inventory. It does not download mail.

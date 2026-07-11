@@ -16,7 +16,7 @@ export function doctor(flags) {
     manifest.d1.name,
     "--remote",
     "--command",
-    "PRAGMA integrity_check; SELECT value FROM pro_schema_state WHERE key = 'track1_operations'; SELECT COUNT(*) AS broken_imap_refs FROM pro_imap_messages im LEFT JOIN messages m ON m.id = im.message_id WHERE m.id IS NULL;",
+    "SELECT value FROM pro_schema_state WHERE key = 'track1_operations'; SELECT COUNT(*) AS broken_imap_refs FROM pro_imap_messages im LEFT JOIN messages m ON m.id = im.message_id WHERE m.id IS NULL;",
     "--config",
     configPath(name)
   ]);
