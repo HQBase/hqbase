@@ -54,16 +54,19 @@ export function App(): React.ReactElement {
     setMailboxes(nextMailboxes);
 
     if (currentUser.role === "owner" || currentUser.role === "admin") {
-      const [nextUsers, nextEntitlement, nextUpgrade, nextUpdate] = await Promise.all([
+      const [nextUsers, nextEntitlement, nextUpgrade] = await Promise.all([
         listUsers(),
         getEntitlementStatus(),
-        getUpgradeLifecycle(),
-        getUpdateStatus().catch(() => null)
+        getUpgradeLifecycle()
       ]);
       setUsers(nextUsers);
       setEntitlement(nextEntitlement);
       setUpgrade(nextUpgrade);
-      setUpdateStatus(nextUpdate);
+      void getUpdateStatus()
+        .then(setUpdateStatus)
+        .catch(() => {
+          // Update discovery never delays workspace startup.
+        });
     } else {
       setUsers([]);
       setEntitlement(null);

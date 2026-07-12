@@ -32,7 +32,7 @@ export async function getUpdateStatus(
   const installedVersion = env.HQBASE_APP_VERSION ?? "0.1.0";
   const response = await fetcher(
     `${env.HQBASE_RELEASES_URL ?? defaultReleaseUrl}/${edition}/stable`,
-    { headers: { accept: "application/json" } }
+    { headers: { accept: "application/json" }, signal: AbortSignal.timeout(5_000) }
   );
   if (!response.ok)
     throw new AppError("UPDATE_CHECK_FAILED", "Update service is unavailable.", 503);
