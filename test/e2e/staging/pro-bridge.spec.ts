@@ -49,7 +49,15 @@ test("Pro app password works through real IMAPS and SMTPS", async ({ page, reque
   });
   expect(login.ok()).toBeTruthy();
   await page.goto("/");
-  await expect(page.getByRole("button", { name: "Compose" })).toBeVisible();
+  const compose = page.getByRole("button", { name: "Compose" });
+  const loginEmail = page.getByLabel("Email");
+  await expect(loginEmail.or(compose)).toBeVisible();
+  if (await loginEmail.isVisible()) {
+    await loginEmail.fill(email);
+    await page.getByLabel("Password").fill(password);
+    await page.getByRole("button", { name: "Continue" }).click();
+  }
+  await expect(compose).toBeVisible();
   const expectedUpdate = process.env.HQBASE_PRO_STAGING_EXPECT_UPDATE_VERSION;
   if (expectedUpdate) {
     await expect(page.getByText("Update available", { exact: true })).toBeVisible();
@@ -105,8 +113,9 @@ test("Track 1 enforces read-only mailbox access and exposes operator diagnostics
   const createUser = await request.post("/api/users", {
     data: { email: memberEmail, name: "Kirill Track 1", password: memberPassword, role: "member" }
   });
-  expect(createUser.status()).toBe(201);
-  const member = (await createUser.json()) as { id: string };
+  const member = (await createUser.json()) as { id?: string; error?: unknown };
+  expect(createUser.status(), JSON.stringify(member)).toBe(201);
+  expect(member.id).toBeTruthy();
   const grant = await request.put("/api/pro/mailbox-grants", {
     data: { mailboxId: mailbox?.id, userId: member.id, accessLevel: "read" }
   });
