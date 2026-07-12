@@ -12,7 +12,7 @@ const bridgeHost = required("HQBASE_PRO_STAGING_BRIDGE_HOST");
 const acceptanceBinary = required("HQBASE_BRIDGE_ACCEPTANCE_BIN");
 const stagingUrl = required("HQBASE_PRO_STAGING_URL");
 
-test("Pro app password works through real IMAPS and SMTPS", async ({ request }) => {
+test("Pro app password works through real IMAPS and SMTPS", async ({ page, request }) => {
   await expect
     .poll(
       async () => {
@@ -48,6 +48,13 @@ test("Pro app password works through real IMAPS and SMTPS", async ({ request }) 
     headers: { origin: stagingUrl }
   });
   expect(login.ok()).toBeTruthy();
+  await page.goto("/");
+  await expect(page.getByRole("button", { name: "Compose" })).toBeVisible();
+  const expectedUpdate = process.env.HQBASE_PRO_STAGING_EXPECT_UPDATE_VERSION;
+  if (expectedUpdate) {
+    await expect(page.getByText("Update available", { exact: true })).toBeVisible();
+    await expect(page.getByText(`HQBase ${expectedUpdate}`, { exact: false })).toBeVisible();
+  }
   const createdResponse = await request.post("/api/pro/app-passwords", {
     data: { name: `staging-e2e-${Date.now()}` }
   });

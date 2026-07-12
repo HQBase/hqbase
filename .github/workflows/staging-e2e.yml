@@ -139,6 +139,20 @@ jobs:
           done
           echo "Disposable Pro custom domain was not healthy within 300 seconds"
           exit 1
+      - name: Prepare an N-1 Pro installation
+        run: |
+          config=".hqbase-pro/deployments/$DEPLOYMENT_NAME/wrangler.jsonc"
+          secrets=".hqbase-pro/deployments/$DEPLOYMENT_NAME/secrets.json"
+          node --input-type=module -e '
+            import fs from "node:fs";
+            const path = process.argv[1];
+            const config = JSON.parse(fs.readFileSync(path, "utf8"));
+            config.vars.HQBASE_APP_VERSION = "0.1.0";
+            fs.writeFileSync(path, `${JSON.stringify(config, null, 2)}\n`);
+          ' "$config"
+          pnpm exec wrangler d1 execute DB --remote --config "$config" \
+            --command "UPDATE pro_release_state SET installed_version = '0.1.0', updated_at = datetime('now') WHERE singleton = 1"
+          pnpm exec wrangler deploy --config "$config" --secrets-file "$secrets"
       - name: Verify the Fly bridge can reach Pro
         run: |
           for attempt in $(seq 1 150); do
@@ -151,12 +165,30 @@ jobs:
           echo "Fly bridge could not reach Pro within 300 seconds"
           exit 1
       - name: Exercise Pro app passwords through real IMAPS and SMTPS
+        env:
+          HQBASE_PRO_STAGING_EXPECT_UPDATE_VERSION: 0.1.1
         run: pnpm test:e2e:staging
-      - name: Redeploy Pro while the bridge remains running
+      - name: Apply the guarded Pro N-1 update while the bridge remains running
         run: |
           config=".hqbase-pro/deployments/$DEPLOYMENT_NAME/wrangler.jsonc"
+          node --input-type=module -e '
+            import fs from "node:fs";
+            const path = process.argv[1];
+            const config = JSON.parse(fs.readFileSync(path, "utf8"));
+            config.vars.HQBASE_APP_VERSION = "0.1.1";
+            fs.writeFileSync(path, `${JSON.stringify(config, null, 2)}\n`);
+          ' "$config"
           pnpm build
-          pnpm exec wrangler deploy --config "$config" --secrets-file ".hqbase-pro/deployments/$DEPLOYMENT_NAME/secrets.json"
+          HQBASE_TARGET_VERSION=0.1.1 CONFIG_FILE="$config" node --input-type=module -e '
+            import { runDeployLifecycle } from "./scripts/hqbase-pro/deploy.mjs";
+            runDeployLifecycle({ configFile: process.env.CONFIG_FILE });
+          '
+          release=$(pnpm exec wrangler d1 execute DB --remote --config "$config" --json \
+            --command "SELECT installed_version FROM pro_release_state WHERE singleton = 1")
+          history=$(pnpm exec wrangler d1 execute DB --remote --config "$config" --json \
+            --command "SELECT from_version, to_version, state FROM pro_update_history ORDER BY started_at DESC LIMIT 1")
+          jq -e '.[0].results[0].installed_version == "0.1.1"' <<<"$release"
+          jq -e '.[0].results[0] == {"from_version":"0.1.0","to_version":"0.1.1","state":"verified"}' <<<"$history"
       - name: Verify deep readiness after redeploy
         run: |
           curl --fail --silent --show-error \

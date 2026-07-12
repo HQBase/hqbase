@@ -1,8 +1,11 @@
 import fs from "node:fs";
 
 import { configPath } from "./manifest.mjs";
+import { rootDir } from "./paths.mjs";
 
 const rootFromDeployment = "../../..";
+const appVersion = JSON.parse(fs.readFileSync(`${rootDir}/package.json`, "utf8")).version;
+const releasePublicKey = "MCowBQYDK2VwAyEAsVwKniCvpHDwbbnjTPP0SuIIG97cRL+iFBQvay9OrU4=";
 
 export function writeWranglerConfig(manifest, options = {}) {
   if (options.dryRun) {
@@ -68,7 +71,10 @@ export function writeWranglerConfig(manifest, options = {}) {
   };
 
   config.vars = {
+    HQBASE_APP_VERSION: appVersion,
     HQBASE_BILLING_URL: "https://billing.hqbase.io",
+    HQBASE_RELEASE_PUBLIC_KEY: releasePublicKey,
+    HQBASE_RELEASES_URL: "https://billing.hqbase.io/v1/releases",
     HQBASE_WORKER_NAME: manifest.worker.name,
     ...(manifest.authUrl ? { BETTER_AUTH_URL: manifest.authUrl } : {})
   };
