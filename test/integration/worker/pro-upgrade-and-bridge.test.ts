@@ -108,7 +108,7 @@ describe("Community to Pro migration", () => {
       env.DB.prepare(
         "SELECT installed_version, installed_schema_version FROM app_release_state"
       ).first()
-    ).resolves.toMatchObject({ installed_version: "0.1.0", installed_schema_version: 9 });
+    ).resolves.toMatchObject({ installed_version: "0.1.1", installed_schema_version: 9 });
     await expect(
       env.DB.prepare(
         "SELECT access_level FROM pro_mailbox_grants WHERE user_id = 'usr_existing' AND mailbox_id = 'mbx_existing'"

@@ -37,7 +37,7 @@ export async function activateWorkspace(
       licenseKey: normalizedKey,
       installationId: entitlement.installation_id,
       hostname: input.hostname,
-      appVersion: "0.1.0"
+      appVersion: env.HQBASE_APP_VERSION ?? "0.1.1"
     },
     fetcher
   );

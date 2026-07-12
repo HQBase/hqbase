@@ -18,7 +18,7 @@ describe("Pro updates", () => {
     );
     expect(status).toMatchObject({
       edition: "pro",
-      installedVersion: "0.1.0",
+      installedVersion: "0.1.1",
       available: false,
       compatible: true
     });

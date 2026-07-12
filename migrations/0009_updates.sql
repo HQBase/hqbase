@@ -11,7 +11,7 @@ CREATE TABLE app_release_state (
 
 INSERT INTO app_release_state
   (singleton, edition, installed_version, installed_schema_version, channel, updated_at)
-VALUES (1, 'pro', '0.1.0', 9, 'stable', datetime('now'));
+VALUES (1, 'pro', '0.1.1', 9, 'stable', datetime('now'));
 
 CREATE TABLE app_update_history (
   id TEXT PRIMARY KEY,

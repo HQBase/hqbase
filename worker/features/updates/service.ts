@@ -29,7 +29,7 @@ export async function getUpdateStatus(
   env: WorkerEnv,
   fetcher: typeof fetch = fetch
 ): Promise<UpdateStatus> {
-  const installedVersion = env.HQBASE_APP_VERSION ?? "0.1.0";
+  const installedVersion = env.HQBASE_APP_VERSION ?? "0.1.1";
   const response = await fetcher(
     `${env.HQBASE_RELEASES_URL ?? defaultReleaseUrl}/${edition}/stable`,
     { headers: { accept: "application/json" }, signal: AbortSignal.timeout(5_000) }
