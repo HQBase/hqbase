@@ -290,6 +290,9 @@ export async function attachWorkerCustomDomain(input: {
     {
       body: JSON.stringify({
         hostname: input.hostname,
+        ...(existing && existing.service === input.replaceWorkerName
+          ? { override_existing_origin: true }
+          : {}),
         service: input.workerName,
         zone_id: input.zone.id,
         zone_name: input.zone.name

@@ -398,7 +398,15 @@ describe("Cloudflare setup API", () => {
         }
       })
     ).resolves.toMatchObject({ service: "hqbase-pro" });
-    expect(fetchMock.mock.calls.some(([, init]) => init?.method === "PUT")).toBe(true);
+    expect(fetchMock.mock.calls.find(([, init]) => init?.method === "PUT")?.[1]?.body).toBe(
+      JSON.stringify({
+        hostname: "hqbase.example.com",
+        override_existing_origin: true,
+        service: "hqbase-pro",
+        zone_id: "zone-1",
+        zone_name: "example.com"
+      })
+    );
   });
 
   it("does not take over a portal from an unrelated Worker", async () => {
