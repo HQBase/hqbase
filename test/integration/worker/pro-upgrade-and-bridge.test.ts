@@ -126,13 +126,16 @@ describe("Community to Pro migration", () => {
     ).resolves.toMatchObject({ value: "0008" });
     await expect(
       env.DB.prepare(
-        "SELECT edition, installed_version, installed_schema_version FROM app_release_state"
+        "SELECT edition, installed_version, installed_schema_version FROM pro_release_state"
       ).first()
     ).resolves.toMatchObject({
       edition: "pro",
       installed_version: "0.1.1",
       installed_schema_version: 9
     });
+    await expect(
+      env.DB.prepare("SELECT edition FROM app_release_state WHERE singleton = 1").first()
+    ).resolves.toMatchObject({ edition: "community" });
     await expect(
       env.DB.prepare(
         "SELECT access_level FROM pro_mailbox_grants WHERE user_id = 'usr_existing' AND mailbox_id = 'mbx_existing'"

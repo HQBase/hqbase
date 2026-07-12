@@ -186,7 +186,7 @@ export function runDeployLifecycle(options = {}) {
         "DB",
         "--remote",
         "--command",
-        `INSERT INTO app_update_history (id, from_version, to_version, checkpoint_bookmark, worker_version, state, started_at) SELECT ${sqlValue(crypto.randomUUID())}, installed_version, ${sqlValue(process.env.HQBASE_TARGET_VERSION)}, ${sqlValue(updateRecovery.bookmark)}, ${sqlValue(updateRecovery.workerVersion)}, 'started', datetime('now') FROM app_release_state WHERE singleton = 1`
+        `INSERT INTO pro_update_history (id, from_version, to_version, checkpoint_bookmark, worker_version, state, started_at) SELECT ${sqlValue(crypto.randomUUID())}, installed_version, ${sqlValue(process.env.HQBASE_TARGET_VERSION)}, ${sqlValue(updateRecovery.bookmark)}, ${sqlValue(updateRecovery.workerVersion)}, 'started', datetime('now') FROM pro_release_state WHERE singleton = 1`
       ]);
     }
 
@@ -207,7 +207,7 @@ export function runDeployLifecycle(options = {}) {
         "DB",
         "--remote",
         "--command",
-        `UPDATE app_release_state SET installed_version = ${sqlValue(process.env.HQBASE_TARGET_VERSION)}, installed_schema_version = 9, updated_at = datetime('now') WHERE singleton = 1; UPDATE app_update_history SET state = 'verified', completed_at = datetime('now') WHERE state = 'started' AND to_version = ${sqlValue(process.env.HQBASE_TARGET_VERSION)}`
+        `UPDATE pro_release_state SET installed_version = ${sqlValue(process.env.HQBASE_TARGET_VERSION)}, installed_schema_version = 9, updated_at = datetime('now') WHERE singleton = 1; UPDATE pro_update_history SET state = 'verified', completed_at = datetime('now') WHERE state = 'started' AND to_version = ${sqlValue(process.env.HQBASE_TARGET_VERSION)}`
       ]);
     }
 
