@@ -1,6 +1,6 @@
 # Contributing
 
-HQBase Pro is source-available under PolyForm Noncommercial 1.0.0. Contributions are not accepted until HQBase adopts contributor terms that preserve its ability to offer commercial licenses. Changes must keep both fresh installation and supported Community upgrades working.
+HQBase Pro is source-available under the HQBase Commercial Source License 1.0. Contributions are not accepted until HQBase adopts contributor terms that preserve its ability to offer commercial licenses. Changes must keep both fresh installation and supported Community upgrades working.
 
 ```sh
 pnpm install

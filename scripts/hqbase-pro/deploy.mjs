@@ -4,7 +4,7 @@ import { spawnSync } from "node:child_process";
 import { mkdirSync, readFileSync, rmSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 
-import { parseTimeTravelBookmark } from "./backup.mjs";
+import { parseTimeTravelBookmark, parseWorkerVersion } from "./backup.mjs";
 import { rootDir } from "./paths.mjs";
 import { assertCommunitySchema, assertProSchema } from "./upgrade.mjs";
 
@@ -96,69 +96,133 @@ export function runDeployLifecycle(options = {}) {
   const initialTables = readTables(command);
   const source = classifyDatabaseTables(initialTables);
   console.log(`Database preflight: ${source}.`);
+  let updateRecovery = null;
 
-  if (source === "community") {
-    const startedAt = now().toISOString();
-    const stamp = startedAt.replaceAll(":", "-");
-    const backupR2Key = `_hqbase/backups/community-to-pro-${stamp}.sql`;
-    const backupFile = resolve(rootDir, ".hqbase-pro", "deploy-backups", `${stamp}.sql`);
-    mkdirSync(dirname(backupFile), { recursive: true });
-
+  if (source === "pro") {
     const bookmark = parseTimeTravelBookmark(
       command(["d1", "time-travel", "info", "DB", "--json"], { quiet: true })
     );
-    console.log(`Pre-upgrade D1 bookmark: ${bookmark}`);
-    console.log(
-      `Rollback checkpoint: pnpm exec wrangler d1 time-travel restore DB --bookmark ${bookmark} --config ${configFile}`
+    const workerVersion = parseWorkerVersion(
+      command(["deployments", "status", "--name", identity.targetWorkerName, "--json"], {
+        quiet: true
+      })
     );
+    updateRecovery = { bookmark, workerVersion };
+    console.log(`Pre-update D1 bookmark: ${bookmark}`);
+    console.log(
+      `D1 recovery: pnpm exec wrangler d1 time-travel restore DB --bookmark ${bookmark} --config ${configFile}`
+    );
+    console.log(
+      `Worker recovery: pnpm exec wrangler versions deploy ${workerVersion}@100% --name ${identity.targetWorkerName} --config ${configFile}`
+    );
+  }
 
-    try {
-      command(["d1", "export", "DB", "--remote", "--output", backupFile]);
-      command(["r2", "object", "put", `${identity.bucket}/${backupR2Key}`, "--file", backupFile]);
-    } finally {
-      rmSync(backupFile, { force: true });
+  try {
+    if (source === "community") {
+      const startedAt = now().toISOString();
+      const stamp = startedAt.replaceAll(":", "-");
+      const backupR2Key = `_hqbase/backups/community-to-pro-${stamp}.sql`;
+      const backupFile = resolve(rootDir, ".hqbase-pro", "deploy-backups", `${stamp}.sql`);
+      mkdirSync(dirname(backupFile), { recursive: true });
+
+      const bookmark = parseTimeTravelBookmark(
+        command(["d1", "time-travel", "info", "DB", "--json"], { quiet: true })
+      );
+      console.log(`Pre-upgrade D1 bookmark: ${bookmark}`);
+      console.log(
+        `Rollback checkpoint: pnpm exec wrangler d1 time-travel restore DB --bookmark ${bookmark} --config ${configFile}`
+      );
+
+      try {
+        command(["d1", "export", "DB", "--remote", "--output", backupFile]);
+        command(["r2", "object", "put", `${identity.bucket}/${backupR2Key}`, "--file", backupFile]);
+      } finally {
+        rmSync(backupFile, { force: true });
+      }
+      console.log(`Customer-owned SQL backup: r2://${identity.bucket}/${backupR2Key}`);
+
+      command(["d1", "migrations", "apply", "DB", "--remote"]);
+      assertProSchema(readTables(command));
+      const migratedAt = now().toISOString();
+      command([
+        "d1",
+        "execute",
+        "DB",
+        "--remote",
+        "--command",
+        upgradeRecordSql({
+          backupR2Key,
+          bookmark,
+          migratedAt,
+          sourceWorkerName: identity.sourceWorkerName,
+          startedAt,
+          targetWorkerName: identity.targetWorkerName
+        })
+      ]);
+      console.log(
+        "Community data migrated and verified. The Community Worker has not been removed."
+      );
+    } else {
+      command(["d1", "migrations", "apply", "DB", "--remote"]);
+      assertProSchema(readTables(command));
+      console.log("Pro schema verified.");
     }
-    console.log(`Customer-owned SQL backup: r2://${identity.bucket}/${backupR2Key}`);
 
-    command(["d1", "migrations", "apply", "DB", "--remote"]);
-    assertProSchema(readTables(command));
-    const migratedAt = now().toISOString();
+    if (process.env.HQBASE_INSTALLATION_ID) {
+      command([
+        "d1",
+        "execute",
+        "DB",
+        "--remote",
+        "--command",
+        `INSERT OR IGNORE INTO pro_entitlement (singleton, installation_id, state, can_configure, created_at, updated_at) VALUES (1, ${sqlValue(process.env.HQBASE_INSTALLATION_ID)}, 'unlicensed', 1, datetime('now'), datetime('now'))`
+      ]);
+    }
+
+    if (updateRecovery && process.env.HQBASE_TARGET_VERSION) {
+      command([
+        "d1",
+        "execute",
+        "DB",
+        "--remote",
+        "--command",
+        `INSERT INTO app_update_history (id, from_version, to_version, checkpoint_bookmark, worker_version, state, started_at) SELECT ${sqlValue(crypto.randomUUID())}, installed_version, ${sqlValue(process.env.HQBASE_TARGET_VERSION)}, ${sqlValue(updateRecovery.bookmark)}, ${sqlValue(updateRecovery.workerVersion)}, 'started', datetime('now') FROM app_release_state WHERE singleton = 1`
+      ]);
+    }
+
+    command(["deploy"]);
     command([
       "d1",
       "execute",
       "DB",
       "--remote",
       "--command",
-      upgradeRecordSql({
-        backupR2Key,
-        bookmark,
-        migratedAt,
-        sourceWorkerName: identity.sourceWorkerName,
-        startedAt,
-        targetWorkerName: identity.targetWorkerName
-      })
+      "UPDATE pro_upgrade_lifecycle SET state = 'deployed', deployed_at = datetime('now'), updated_at = datetime('now') WHERE singleton = 1 AND state = 'migrated'"
     ]);
-    console.log("Community data migrated and verified. The Community Worker has not been removed.");
-  } else {
-    command(["d1", "migrations", "apply", "DB", "--remote"]);
-    assertProSchema(readTables(command));
-    console.log("Pro schema verified.");
+
+    if (process.env.HQBASE_TARGET_VERSION) {
+      command([
+        "d1",
+        "execute",
+        "DB",
+        "--remote",
+        "--command",
+        `UPDATE app_release_state SET installed_version = ${sqlValue(process.env.HQBASE_TARGET_VERSION)}, installed_schema_version = 9, updated_at = datetime('now') WHERE singleton = 1; UPDATE app_update_history SET state = 'verified', completed_at = datetime('now') WHERE state = 'started' AND to_version = ${sqlValue(process.env.HQBASE_TARGET_VERSION)}`
+      ]);
+    }
+
+    console.log(
+      "HQBase Pro deployed. Activate the license, cut over domains, and verify mail before retiring Community."
+    );
+    return { source };
+  } catch (error) {
+    if (updateRecovery) {
+      console.error(
+        `Update failed. D1 bookmark: ${updateRecovery.bookmark}. Worker version: ${updateRecovery.workerVersion}.`
+      );
+    }
+    throw error;
   }
-
-  command(["deploy"]);
-  command([
-    "d1",
-    "execute",
-    "DB",
-    "--remote",
-    "--command",
-    "UPDATE pro_upgrade_lifecycle SET state = 'deployed', deployed_at = datetime('now'), updated_at = datetime('now') WHERE singleton = 1 AND state = 'migrated'"
-  ]);
-
-  console.log(
-    "HQBase Pro deployed. Activate the license, cut over domains, and verify mail before retiring Community."
-  );
-  return { source };
 }
 
 function readTables(command) {

@@ -18,6 +18,8 @@ import { SettingsPage } from "@/features/settings/settings-page";
 import { getSetupStatus } from "@/features/setup/api";
 import { SetupPage } from "@/features/setup/setup-page";
 import type { SetupStatus } from "@/features/setup/types";
+import { getUpdateStatus } from "@/features/updates/api";
+import type { UpdateStatus } from "@/features/updates/types";
 import { getUpgradeLifecycle } from "@/features/upgrades/api";
 import type { UpgradeLifecycle } from "@/features/upgrades/types";
 import { listUsers } from "@/features/users/api";
@@ -43,6 +45,8 @@ export function App(): React.ReactElement {
   const [composeOpen, setComposeOpen] = React.useState(false);
   const [replyTo, setReplyTo] = React.useState<MessageDetail | null>(null);
   const [isLoading, setIsLoading] = React.useState(true);
+  const [updateStatus, setUpdateStatus] = React.useState<UpdateStatus | null>(null);
+  const [settingsTab, setSettingsTab] = React.useState("mailboxes");
 
   const loadWorkspace = React.useCallback(async (currentUser: CurrentUser) => {
     const [nextSetup, nextMailboxes] = await Promise.all([getSetupStatus(), listMailboxes()]);
@@ -50,18 +54,21 @@ export function App(): React.ReactElement {
     setMailboxes(nextMailboxes);
 
     if (currentUser.role === "owner" || currentUser.role === "admin") {
-      const [nextUsers, nextEntitlement, nextUpgrade] = await Promise.all([
+      const [nextUsers, nextEntitlement, nextUpgrade, nextUpdate] = await Promise.all([
         listUsers(),
         getEntitlementStatus(),
-        getUpgradeLifecycle()
+        getUpgradeLifecycle(),
+        getUpdateStatus().catch(() => null)
       ]);
       setUsers(nextUsers);
       setEntitlement(nextEntitlement);
       setUpgrade(nextUpgrade);
+      setUpdateStatus(nextUpdate);
     } else {
       setUsers([]);
       setEntitlement(null);
       setUpgrade(null);
+      setUpdateStatus(null);
     }
   }, []);
 
@@ -112,6 +119,21 @@ export function App(): React.ReactElement {
   }, [reloadMessages]);
 
   React.useEffect(() => {
+    if (!user || (user.role !== "owner" && user.role !== "admin")) return;
+    const interval = window.setInterval(
+      () => {
+        void getUpdateStatus()
+          .then(setUpdateStatus)
+          .catch(() => {
+            // Update discovery must never interrupt mail work.
+          });
+      },
+      6 * 60 * 60 * 1000
+    );
+    return () => window.clearInterval(interval);
+  }, [user]);
+
+  React.useEffect(() => {
     if (!user || activeFolder === "settings") return;
 
     const interval = window.setInterval(() => {
@@ -155,6 +177,11 @@ export function App(): React.ReactElement {
         mailboxes={contentMailboxes}
         search={search}
         user={user}
+        updateStatus={updateStatus}
+        onOpenUpdates={() => {
+          setSettingsTab("updates");
+          setActiveFolder("settings");
+        }}
         onCompose={() => {
           setReplyTo(null);
           setComposeOpen(true);
@@ -175,6 +202,7 @@ export function App(): React.ReactElement {
           <div className="min-h-0 flex-1">
             {activeFolder === "settings" ? (
               <SettingsPage
+                key={settingsTab}
                 canManage={user.role === "owner" || user.role === "admin"}
                 entitlement={entitlement}
                 upgrade={upgrade}
@@ -184,6 +212,8 @@ export function App(): React.ReactElement {
                 onEntitlementChanged={setEntitlement}
                 onUpgradeChanged={setUpgrade}
                 onRefresh={() => void reload()}
+                defaultTab={settingsTab}
+                updateStatus={updateStatus}
               />
             ) : (
               <InboxPage

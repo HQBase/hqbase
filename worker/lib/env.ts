@@ -6,6 +6,10 @@ export type WorkerEnv = Cloudflare.Env & {
   ENVIRONMENT?: string;
   HQBASE_BILLING_URL?: string;
   HQBASE_WORKER_NAME?: string;
+  HQBASE_APP_VERSION?: string;
+  HQBASE_RELEASES_URL?: string;
+  HQBASE_RELEASE_PUBLIC_KEY?: string;
+  PRO_LICENSE_KEY?: string;
   PRO_JOBS?: Queue;
 };
 

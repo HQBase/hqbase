@@ -15,6 +15,7 @@ import { operationRoutes } from "../features/operations/routes";
 import { sendRoutes } from "../features/send/routes";
 import { sessionControlRoutes } from "../features/sessions/routes";
 import { setupRoutes } from "../features/setup/routes";
+import { updateRoutes } from "../features/updates/routes";
 import { upgradeRoutes } from "../features/upgrades/routes";
 import { userRoutes } from "../features/users/routes";
 import type { HonoApp } from "../lib/env";
@@ -75,6 +76,7 @@ apiRoutes.route("/api/mailboxes", mailboxRoutes);
 apiRoutes.route("/api/messages", messageRoutes);
 apiRoutes.route("/api/attachments", attachmentRoutes);
 apiRoutes.route("/api/users", userRoutes);
+apiRoutes.route("/api/updates", updateRoutes);
 apiRoutes.route("/api", sendRoutes);
 
 apiRoutes.all("/api/auth/*", async (c) => {

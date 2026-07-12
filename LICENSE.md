@@ -1,73 +1,91 @@
-# PolyForm Noncommercial License 1.0.0
+# HQBase Commercial Source License 1.0
 
-<https://polyformproject.org/licenses/noncommercial/1.0.0>
+Copyright 2026 HQBase. All rights reserved.
 
-## Acceptance
+This license applies to the HQBase software accompanied by this file (the **Software**). By
+accessing, copying, installing, or using the Software, you agree to these terms.
 
-In order to get any license under these terms, you must agree to them as both strict obligations and conditions to all your licenses.
+## 1. License grant
 
-## Copyright License
+Subject to a valid written order, subscription, or other commercial agreement issued by HQBase
+(the **Commercial Agreement**) and your continued compliance with it and this license, HQBase
+grants you a limited, non-exclusive, non-transferable, non-sublicensable license to:
 
-The licensor grants you a copyright license for the software to do everything you might do with the software that would otherwise infringe the licensor's copyright in it for any permitted purpose.  However, you may only distribute the software according to [Distribution License](#distribution-license) and make changes or new works based on the software according to [Changes and New Works License](#changes-and-new-works-license).
+1. install and run the Software solely for your own internal business operations, within the
+   workspace and activation limits in the Commercial Agreement;
+2. inspect the source code;
+3. make private modifications solely for your own internal business operations; and
+4. make a reasonable number of archival and disaster-recovery copies.
 
-## Distribution License
+You may allow your employees and contractors to exercise these rights for you only when they are
+bound by confidentiality and use restrictions at least as protective as these terms. You remain
+responsible for their conduct.
 
-The licensor grants you an additional copyright license to distribute copies of the software.  Your license to distribute covers distributing the software with changes and new works permitted by [Changes and New Works License](#changes-and-new-works-license).
+## 2. Restrictions
 
-## Notices
+Except where applicable law does not allow a restriction, you must not, and must not permit anyone
+else to:
 
-You must ensure that anyone who gets a copy of any part of the software from you also gets a copy of these terms or the URL for them above, as well as copies of any plain-text lines beginning with `Required Notice:` that the licensor provided with the software.  For example:
+1. publish, distribute, disclose, transfer, provide, or otherwise make the Software or source code
+   available to any third party, including any modified version;
+2. sublicense, sell, resell, rent, lease, lend, or commercially exploit the Software or any right
+   granted under this license;
+3. offer the Software or a derivative as a hosted, managed, bureau, outsourcing, service-provider,
+   or software-as-a-service offering for third parties;
+4. use the Software or its source code to create or operate a competing product or service;
+5. bypass, disable, tamper with, obscure, or circumvent license, entitlement, activation, usage,
+   update-download, or access-control enforcement;
+6. remove, alter, or conceal copyright, trademark, attribution, license, provenance, or other
+   proprietary notices; or
+7. use HQBase names, logos, or marks except to truthfully identify the Software.
 
-> Required Notice: Copyright Yoyodyne, Inc. (http://example.com)
+No right to redistribute original or modified source code is granted. Possession of source code,
+payment, repository access, or technical ability does not create rights beyond this license and the
+Commercial Agreement.
 
-## Changes and New Works License
+## 3. Ownership and feedback
 
-The licensor grants you an additional copyright license to make changes and new works based on the software for any permitted purpose.
+HQBase and its licensors retain all right, title, and interest in the Software. No implied license
+is granted. If you voluntarily provide feedback, you grant HQBase a perpetual, worldwide,
+irrevocable, royalty-free right to use it without restriction or attribution.
 
-## Patent License
+Third-party components remain governed by their respective license terms. This license does not
+reduce rights those licenses grant to those components.
 
-The licensor grants you a patent license for the software that covers patent claims the licensor can license, or becomes able to license, that you would infringe by using the software.
+## 4. Term and termination
 
-## Noncommercial Purposes
+This license begins when you first access the Software. It ends automatically if the Commercial
+Agreement ends or you materially breach these terms. On termination you must stop using and delete
+the Software and source code, except for copies retained solely where law requires and subject to
+continuing confidentiality. Sections 2 through 7 survive termination.
 
-Any noncommercial purpose is a permitted purpose.
+HQBase may provide a written cure period in the Commercial Agreement. A technical grace period or
+continued mail availability is an operational safety measure and does not extend the license term.
 
-## Personal Uses
+## 5. No warranty
 
-Personal use for research, experiment, and testing for the benefit of public knowledge, personal study, private entertainment, hobby projects, amateur pursuits, or religious observance, without any anticipated commercial application, is use for a permitted purpose.
+TO THE MAXIMUM EXTENT PERMITTED BY LAW, THE SOFTWARE IS PROVIDED **AS IS** AND **AS AVAILABLE**,
+WITH ALL FAULTS. HQBASE DISCLAIMS ALL EXPRESS, IMPLIED, AND STATUTORY WARRANTIES, INCLUDING
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, TITLE, NON-INFRINGEMENT, ACCURACY, SECURITY,
+AVAILABILITY, AND THAT DATA WILL NOT BE LOST. YOU ARE RESPONSIBLE FOR BACKUPS, CONFIGURATION,
+SECURITY, LEGAL COMPLIANCE, AND WHETHER THE SOFTWARE IS SUITABLE FOR YOUR USE.
 
-## Noncommercial Organizations
+## 6. Limitation of liability
 
-Use by any charitable organization, educational institution, public research organization, public safety or health organization, environmental protection organization, or government institution is use for a permitted purpose regardless of the source of funding or obligations resulting from the funding.
+TO THE MAXIMUM EXTENT PERMITTED BY LAW, HQBASE AND ITS SUPPLIERS WILL NOT BE LIABLE FOR ANY
+INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, PUNITIVE, OR CONSEQUENTIAL DAMAGES, OR FOR LOST PROFITS,
+REVENUE, BUSINESS, GOODWILL, USE, OR DATA, UNDER ANY THEORY OF LIABILITY. HQBASE'S TOTAL AGGREGATE
+LIABILITY ARISING OUT OF THE SOFTWARE OR THESE TERMS WILL NOT EXCEED THE AMOUNT YOU PAID HQBASE FOR
+THE SOFTWARE DURING THE TWELVE MONTHS BEFORE THE EVENT GIVING RISE TO THE CLAIM. THESE LIMITS APPLY
+EVEN IF A REMEDY FAILS OF ITS ESSENTIAL PURPOSE OR HQBASE WAS ADVISED OF THE POSSIBILITY OF DAMAGE.
 
-## Fair Use
+## 7. General
 
-You may have "fair use" rights for the software under the law. These terms do not limit them.
+The Commercial Agreement controls if it expressly conflicts with this license. Otherwise, these
+terms are the entire agreement about source-code access and use. You may not assign these terms
+without HQBase's prior written consent. If a provision is unenforceable, it will be modified only
+as much as necessary and the rest remains effective. A waiver must be in writing and is not a
+continuing waiver. You must comply with applicable export-control, sanctions, privacy, and other
+laws.
 
-## No Other Rights
-
-These terms do not allow you to sublicense or transfer any of your licenses to anyone else, or prevent the licensor from granting licenses to anyone else.  These terms do not imply any other licenses.
-
-## Patent Defense
-
-If you make any written claim that the software infringes or contributes to infringement of any patent, your patent license for the software granted under these terms ends immediately. If your company makes such a claim, your patent license ends immediately for work on behalf of your company.
-
-## Violations
-
-The first time you are notified in writing that you have violated any of these terms, or done anything with the software not covered by your licenses, your licenses can nonetheless continue if you come into full compliance with these terms, and take practical steps to correct past violations, within 32 days of receiving notice.  Otherwise, all your licenses end immediately.
-
-## No Liability
-
-***As far as the law allows, the software comes as is, without any warranty or condition, and the licensor will not be liable to you for any damages arising out of these terms or the use or nature of the software, under any kind of legal claim.***
-
-## Definitions
-
-The **licensor** is the individual or entity offering these terms, and the **software** is the software the licensor makes available under these terms.
-
-**You** refers to the individual or entity agreeing to these terms.
-
-**Your company** is any legal entity, sole proprietorship, or other kind of organization that you work for, plus all organizations that have control over, are under the control of, or are under common control with that organization.  **Control** means ownership of substantially all the assets of an entity, or the power to direct its management and policies by vote, contract, or otherwise.  Control can be direct or indirect.
-
-**Your licenses** are all the licenses granted to you for the software under these terms.
-
-**Use** means anything you do with the software requiring one of your licenses.
+Contact HQBase for rights not expressly granted here.

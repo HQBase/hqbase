@@ -8,7 +8,7 @@ export default defineConfig({
     }
   },
   test: {
-    include: ["test/unit/**/*.test.{ts,mjs}", "test/migrations/**/*.test.ts"],
+    include: ["test/unit/**/*.test.{ts,tsx,mjs}", "test/migrations/**/*.test.ts"],
     coverage: {
       provider: "v8",
       reporter: ["text", "json-summary"],

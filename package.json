@@ -31,7 +31,8 @@
     "hqbase-pro:reset": "node scripts/hqbase-pro/cli.mjs reset",
     "hqbase-pro:destroy": "node scripts/hqbase-pro/cli.mjs destroy",
     "hqbase-pro:upgrade": "node scripts/hqbase-pro/upgrade.mjs",
-    "cf:typegen": "wrangler types"
+    "cf:typegen": "wrangler types",
+    "release:package": "node scripts/release/package.mjs"
   },
   "cloudflare": {
     "bindings": {

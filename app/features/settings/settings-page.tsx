@@ -11,6 +11,8 @@ import { MailboxSettings } from "@/features/mailboxes/mailbox-settings";
 import type { Mailbox } from "@/features/mailboxes/types";
 import { GeneralSettings } from "@/features/settings/general-settings";
 import type { SetupStatus } from "@/features/setup/types";
+import type { UpdateStatus } from "@/features/updates/types";
+import { UpdateSettings } from "@/features/updates/update-settings";
 import type { UpgradeLifecycle } from "@/features/upgrades/types";
 import { UpgradeSettings } from "@/features/upgrades/upgrade-settings";
 import type { WorkspaceUser } from "@/features/users/types";
@@ -26,6 +28,8 @@ type SettingsPageProps = {
   onEntitlementChanged: (status: EntitlementStatus) => void;
   onUpgradeChanged: (upgrade: UpgradeLifecycle) => void;
   onRefresh: () => void;
+  defaultTab?: string;
+  updateStatus: UpdateStatus | null;
 };
 
 export function SettingsPage({
@@ -37,7 +41,9 @@ export function SettingsPage({
   upgrade,
   onEntitlementChanged,
   onUpgradeChanged,
-  onRefresh
+  onRefresh,
+  defaultTab = "mailboxes",
+  updateStatus
 }: SettingsPageProps): React.ReactElement {
   return (
     <div className="h-full overflow-auto">
@@ -46,7 +52,7 @@ export function SettingsPage({
           <h1 className="text-xl font-medium tracking-tight">Settings</h1>
           <p className="mt-1 text-xs text-muted-foreground">Workspace and access</p>
         </div>
-        <Tabs defaultValue="mailboxes">
+        <Tabs defaultValue={defaultTab}>
           <TabsList className="h-auto w-full justify-start rounded-none border-b bg-transparent p-0">
             <SettingsTab value="mailboxes">Mailboxes</SettingsTab>
             <SettingsTab value="users">Users</SettingsTab>
@@ -58,6 +64,7 @@ export function SettingsPage({
               <SettingsTab value="upgrade">Upgrade</SettingsTab>
             ) : null}
             <SettingsTab value="general">General</SettingsTab>
+            {canManage ? <SettingsTab value="updates">Updates</SettingsTab> : null}
           </TabsList>
           <TabsContent className="mt-5" value="mailboxes">
             <MailboxSettings canManage={canManage} mailboxes={mailboxes} onChanged={onRefresh} />
@@ -93,6 +100,11 @@ export function SettingsPage({
                 lifecycle={upgrade}
                 onChanged={onUpgradeChanged}
               />
+            </TabsContent>
+          ) : null}
+          {canManage ? (
+            <TabsContent className="mt-5" value="updates">
+              <UpdateSettings initialStatus={updateStatus} />
             </TabsContent>
           ) : null}
         </Tabs>

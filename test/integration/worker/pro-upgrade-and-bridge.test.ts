@@ -9,6 +9,7 @@ import multiDomainMigration from "../../../migrations/0005_multi_domain.sql?raw"
 import composerMigration from "../../../migrations/0006_composer.sql?raw";
 import billingMigration from "../../../migrations/0007_billing.sql?raw";
 import upgradeLifecycleMigration from "../../../migrations/0008_upgrade_lifecycle.sql?raw";
+import updatesMigration from "../../../migrations/0009_updates.sql?raw";
 import { appPasswordHash } from "../../../worker/features/app-passwords/crypto";
 import {
   insertAppPassword,
@@ -75,6 +76,7 @@ beforeAll(async () => {
   await applyMigration(composerMigration);
   await applyMigration(billingMigration);
   await applyMigration(upgradeLifecycleMigration);
+  await applyMigration(updatesMigration);
 });
 
 beforeEach(async () => {
@@ -102,6 +104,11 @@ describe("Community to Pro migration", () => {
     await expect(
       env.DB.prepare("SELECT value FROM pro_schema_state WHERE key = 'upgrade_lifecycle'").first()
     ).resolves.toMatchObject({ value: "0008" });
+    await expect(
+      env.DB.prepare(
+        "SELECT installed_version, installed_schema_version FROM app_release_state"
+      ).first()
+    ).resolves.toMatchObject({ installed_version: "0.1.0", installed_schema_version: 9 });
     await expect(
       env.DB.prepare(
         "SELECT access_level FROM pro_mailbox_grants WHERE user_id = 'usr_existing' AND mailbox_id = 'mbx_existing'"

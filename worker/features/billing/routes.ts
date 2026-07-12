@@ -17,7 +17,20 @@ export const billingRoutes = new Hono<HonoApp>();
 billingRoutes.get("/", async (c) => {
   const auth = await requireAuthContext(c.env, c.req.raw);
   requireRole(auth, ["owner", "admin"]);
-  return c.json(await getEntitlementStatus(c.env.DB));
+  const status = await getEntitlementStatus(c.env.DB);
+  if (status.state === "unlicensed" && c.env.PRO_LICENSE_KEY) {
+    try {
+      return c.json(
+        await activateWorkspace(c.env, {
+          licenseKey: c.env.PRO_LICENSE_KEY,
+          hostname: new URL(c.req.url).hostname
+        })
+      );
+    } catch {
+      // Installation stays usable and Billing can retry after a control-plane outage.
+    }
+  }
+  return c.json(status);
 });
 
 billingRoutes.post("/activate", async (c) => {

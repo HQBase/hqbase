@@ -9,6 +9,8 @@ import {
 } from "@/components/ui/select";
 import type { CurrentUser } from "@/features/auth/types";
 import type { Mailbox } from "@/features/mailboxes/types";
+import type { UpdateStatus } from "@/features/updates/types";
+import { UpdateBanner } from "@/features/updates/update-banner";
 import type { FolderId } from "@/lib/routes";
 import { folders } from "@/lib/routes";
 import { Sidebar } from "./sidebar";
@@ -21,11 +23,13 @@ type AppShellProps = {
   mailboxes: Mailbox[];
   search: string;
   user: CurrentUser;
+  updateStatus: UpdateStatus | null;
   onCompose: () => void;
   onFolderChange: (folder: FolderId) => void;
   onMailboxChange: (mailboxId: string) => void;
   onSearchChange: (search: string) => void;
   onSignedOut: () => void;
+  onOpenUpdates: () => void;
 };
 
 export function AppShell(props: AppShellProps): React.ReactElement {
@@ -43,6 +47,7 @@ export function AppShell(props: AppShellProps): React.ReactElement {
           onSearchChange={props.onSearchChange}
           onSignedOut={props.onSignedOut}
         />
+        <UpdateBanner status={props.updateStatus} onOpen={props.onOpenUpdates} />
         <div className="flex h-11 items-center border-b px-3 md:hidden">
           <Select
             value={props.activeFolder}

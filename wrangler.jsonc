@@ -50,6 +50,9 @@
   },
   "triggers": { "crons": ["17 3 * * *"] },
   "vars": {
+    "HQBASE_APP_VERSION": "0.1.0",
+    "HQBASE_RELEASE_PUBLIC_KEY": "MCowBQYDK2VwAyEAsVwKniCvpHDwbbnjTPP0SuIIG97cRL+iFBQvay9OrU4=",
+    "HQBASE_RELEASES_URL": "https://billing.hqbase.io/v1/releases",
     "HQBASE_BILLING_URL": "https://billing.hqbase.io",
     "HQBASE_COMMUNITY_WORKER_NAME": "hqbase",
     "HQBASE_WORKER_NAME": "hqbase-pro"

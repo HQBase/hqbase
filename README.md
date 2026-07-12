@@ -1,8 +1,8 @@
 # HQBase Pro
 
-Source-available repository for the complete HQBase Pro product.
+Private source repository for the complete HQBase Pro product.
 
-[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https%3A%2F%2Fgithub.com%2FHQBase%2Fhqbase-pro)
+[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https%3A%2F%2Fgithub.com%2FHQBase%2Fhqbase-pro-deploy)
 
 Pro supports two first-class lifecycles:
 
@@ -58,7 +58,9 @@ See `docs/community-upgrade.md` for the current cutover boundary and `docs/mail-
 
 - `docs/access-control.md`: mailbox grant matrix and enforcement boundary.
 - `docs/operations.md`: doctor, backup, restore, queues, retention, and incident order.
+- `docs/updates.md`: signed releases, licensed downloads, notification, and recovery.
 
 ## License
 
-Source-available under PolyForm Noncommercial 1.0.0. Commercial use requires a separate written license. See `LICENSE.md`, `LICENSING.md`, and `PROVENANCE.md`.
+Source-available under the HQBase Commercial Source License 1.0. See `LICENSE.md`, `LICENSING.md`,
+and `PROVENANCE.md`.
