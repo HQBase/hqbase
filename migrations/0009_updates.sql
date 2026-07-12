@@ -1,6 +1,6 @@
 PRAGMA foreign_keys = ON;
 
-CREATE TABLE app_release_state (
+CREATE TABLE IF NOT EXISTS app_release_state (
   singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
   edition TEXT NOT NULL CHECK (edition = 'pro'),
   installed_version TEXT NOT NULL,
@@ -11,9 +11,15 @@ CREATE TABLE app_release_state (
 
 INSERT INTO app_release_state
   (singleton, edition, installed_version, installed_schema_version, channel, updated_at)
-VALUES (1, 'pro', '0.1.1', 9, 'stable', datetime('now'));
+VALUES (1, 'pro', '0.1.1', 9, 'stable', datetime('now'))
+ON CONFLICT(singleton) DO UPDATE SET
+  edition = excluded.edition,
+  installed_version = excluded.installed_version,
+  installed_schema_version = excluded.installed_schema_version,
+  channel = excluded.channel,
+  updated_at = excluded.updated_at;
 
-CREATE TABLE app_update_history (
+CREATE TABLE IF NOT EXISTS app_update_history (
   id TEXT PRIMARY KEY,
   from_version TEXT NOT NULL,
   to_version TEXT NOT NULL,

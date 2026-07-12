@@ -76,6 +76,26 @@ beforeAll(async () => {
   await applyMigration(composerMigration);
   await applyMigration(billingMigration);
   await applyMigration(upgradeLifecycleMigration);
+  await env.DB.prepare(
+    `CREATE TABLE app_release_state (
+       singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
+       edition TEXT NOT NULL,
+       installed_version TEXT NOT NULL,
+       installed_schema_version INTEGER NOT NULL,
+       channel TEXT NOT NULL,
+       updated_at TEXT NOT NULL
+     )`
+  ).run();
+  await env.DB.prepare(
+    "INSERT INTO app_release_state VALUES (1, 'community', '0.1.1', 2, 'stable', datetime('now'))"
+  ).run();
+  await env.DB.prepare(
+    `CREATE TABLE app_update_history (
+       id TEXT PRIMARY KEY, from_version TEXT NOT NULL, to_version TEXT NOT NULL,
+       checkpoint_bookmark TEXT NOT NULL, worker_version TEXT NOT NULL,
+       state TEXT NOT NULL, error_code TEXT, started_at TEXT NOT NULL, completed_at TEXT
+     )`
+  ).run();
   await applyMigration(updatesMigration);
 });
 
@@ -106,9 +126,13 @@ describe("Community to Pro migration", () => {
     ).resolves.toMatchObject({ value: "0008" });
     await expect(
       env.DB.prepare(
-        "SELECT installed_version, installed_schema_version FROM app_release_state"
+        "SELECT edition, installed_version, installed_schema_version FROM app_release_state"
       ).first()
-    ).resolves.toMatchObject({ installed_version: "0.1.1", installed_schema_version: 9 });
+    ).resolves.toMatchObject({
+      edition: "pro",
+      installed_version: "0.1.1",
+      installed_schema_version: 9
+    });
     await expect(
       env.DB.prepare(
         "SELECT access_level FROM pro_mailbox_grants WHERE user_id = 'usr_existing' AND mailbox_id = 'mbx_existing'"
