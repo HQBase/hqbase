@@ -38,12 +38,22 @@ setupRoutes.post("/cloudflare/token", async (c) => {
 
 setupRoutes.post("/cloudflare/inspect", async (c) => {
   const input = parseWith(inspectCloudflareDomainSchema, await readJson(c.req.raw));
-  return c.json(await inspectCloudflareDomain(input));
+  return c.json(
+    await inspectCloudflareDomain({
+      ...input,
+      workerName: c.env.HQBASE_WORKER_NAME ?? input.workerName
+    })
+  );
 });
 
 setupRoutes.post("/cloudflare/configure", async (c) => {
   const input = parseWith(configureCloudflareDomainSchema, await readJson(c.req.raw));
-  return c.json(await configureCloudflareDomain(input));
+  return c.json(
+    await configureCloudflareDomain({
+      ...input,
+      workerName: c.env.HQBASE_WORKER_NAME ?? input.workerName
+    })
+  );
 });
 
 setupRoutes.post("/bootstrap", async (c) => {

@@ -53,7 +53,7 @@ domainRoutes.post("/provision", async (c) => {
   const result = await configureCloudflareDomain({
     apiToken: input.apiToken,
     zoneId: input.zoneId,
-    workerName: input.workerName,
+    workerName: c.env.HQBASE_WORKER_NAME ?? input.workerName,
     attachCustomDomain: false,
     enableSending: input.enableSending
   });
@@ -85,7 +85,7 @@ domainRoutes.put("/portal", async (c) => {
   const input = parseWith(changePortalHostnameSchema, await readJson(c.req.raw));
   const inspected = await inspectCloudflareDomain({
     apiToken: input.apiToken,
-    workerName: input.workerName,
+    workerName: c.env.HQBASE_WORKER_NAME ?? input.workerName,
     zoneId: input.zoneId
   });
   await attachWorkerCustomDomain({

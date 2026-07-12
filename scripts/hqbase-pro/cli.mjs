@@ -76,6 +76,8 @@ Install options:
   --worker-name <name>   Override Worker name. Defaults to hqbase-pro-<name>.
   --d1-name <name>       Override D1 database name. Defaults to hqbase-pro-<name>.
   --r2-bucket <name>     Override R2 bucket name. Defaults to hqbase-pro-<name>-mail.
+  --reuse-d1-id <uuid>   Deploy over an existing Community D1 database.
+  --reuse-r2-bucket <name>  Deploy over an existing Community mail bucket.
   --queue-name <name>    Override lifecycle queue name. Defaults to hqbase-pro-<name>-jobs.
   --domain <domain>      Configure Cloudflare Email Routing/Sending for the domain.
   --no-email             Skip Email Routing/Sending changes even when --domain is set.
@@ -84,7 +86,8 @@ Install options:
   --service-domain <host> Attach a stable bridge/API domain in the generated config.
   --auth-url <origin>    Set BETTER_AUTH_URL explicitly. Usually unnecessary.
   --billing-service <worker>  Use a same-account billing Worker service binding (staging only).
-  --auth-secret <value>  Use a provided Better Auth secret. Otherwise generated.
+  HQBASE_AUTH_SECRET     Preserve an existing Better Auth secret without exposing it in argv.
+  --auth-secret <value>  Compatibility fallback. Prefer HQBASE_AUTH_SECRET.
   --app-password-pepper <value>  Override the generated app-password pepper.
   --bridge-token <value>         Set the deployment token shared with the bridge.
   --session-secret <value>       Override the generated mail-session secret.

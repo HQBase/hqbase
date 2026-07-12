@@ -12,8 +12,12 @@ const cloudflareEnvelopeSchema = z.object({
         message: z.string()
       })
     )
-    .default([]),
-  messages: z.array(z.unknown()).default([]),
+    .nullish()
+    .transform((value) => value ?? []),
+  messages: z
+    .array(z.unknown())
+    .nullish()
+    .transform((value) => value ?? []),
   result: z.unknown().nullable().optional(),
   result_info: z
     .object({

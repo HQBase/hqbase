@@ -4,7 +4,7 @@ export const listDomains = () => apiGet<MailDomain[]>("/api/pro/domains");
 export const provisionDomain = (input: {
   apiToken: string;
   zoneId: string;
-  workerName: string;
+  workerName?: string;
   name: string;
   enableSending: boolean;
 }) => apiPost<{ domain: MailDomain }>("/api/pro/domains/provision", input);
@@ -19,6 +19,6 @@ export const updateDomain = (
 export const changePortal = (input: {
   apiToken: string;
   zoneId: string;
-  workerName: string;
+  workerName?: string;
   hostname: string;
 }) => apiPut<{ hostname: string }>("/api/pro/domains/portal", input);

@@ -59,6 +59,8 @@ describe("send service", () => {
     BETTER_AUTH_SECRET: "test-secret",
     DB: {} as D1Database,
     HQBASE_BILLING_URL: "https://billing.hqbase.io",
+    HQBASE_COMMUNITY_WORKER_NAME: "hqbase",
+    HQBASE_WORKER_NAME: "hqbase-pro",
     MAIL_OBJECTS: { put } as unknown as R2Bucket,
     MAIL_SENDER: { send } as unknown as SendEmail,
     PRO_APP_PASSWORD_PEPPER: "test-app-password-pepper",

@@ -20,6 +20,8 @@ export function install(flags) {
   const noEmail = flags.email === false;
   const skipDeploy = optionalBoolean(flags, "skip-deploy");
   const skipBuild = optionalBoolean(flags, "skip-build");
+  const reuseD1Id = optionalString(flags, "reuse-d1-id");
+  const reuseR2Bucket = optionalString(flags, "reuse-r2-bucket");
 
   if (manifestExists(name) && !force) {
     throw new Error(`Deployment "${name}" already exists. Use --force to overwrite metadata.`);
@@ -34,7 +36,9 @@ export function install(flags) {
     workerName: optionalString(flags, "worker-name"),
     d1Name: optionalString(flags, "d1-name"),
     r2Bucket: optionalString(flags, "r2-bucket"),
-    queueName: optionalString(flags, "queue-name")
+    queueName: optionalString(flags, "queue-name"),
+    reuseD1Id,
+    reuseR2Bucket
   });
 
   if (!dryRun) {
@@ -46,16 +50,24 @@ export function install(flags) {
     run("pnpm", ["build"], { dryRun });
   }
 
-  const d1Output = run("pnpm", ["exec", "wrangler", "d1", "create", manifest.d1.name], { dryRun });
-  if (!dryRun) {
-    manifest.d1.id = parseD1DatabaseId(d1Output);
-    manifest.d1.created = true;
-    writeManifest(manifest);
+  if (!manifest.d1.reused) {
+    const d1Output = run("pnpm", ["exec", "wrangler", "d1", "create", manifest.d1.name], {
+      dryRun
+    });
+    if (!dryRun) {
+      manifest.d1.id = parseD1DatabaseId(d1Output);
+      manifest.d1.created = true;
+      writeManifest(manifest);
+    }
   }
 
-  run("pnpm", ["exec", "wrangler", "r2", "bucket", "create", manifest.r2.bucket], { dryRun });
-  manifest.r2.created = true;
-  writeManifest(manifest, { dryRun });
+  if (!manifest.r2.reused) {
+    run("pnpm", ["exec", "wrangler", "r2", "bucket", "create", manifest.r2.bucket], {
+      dryRun
+    });
+    manifest.r2.created = true;
+    writeManifest(manifest, { dryRun });
+  }
 
   run("pnpm", ["exec", "wrangler", "queues", "create", manifest.queue.name], { dryRun });
   run("pnpm", ["exec", "wrangler", "queues", "create", manifest.queue.deadLetterName], {
@@ -67,7 +79,7 @@ export function install(flags) {
   writeSecretFile(
     name,
     {
-      authSecret: optionalString(flags, "auth-secret"),
+      authSecret: optionalString(flags, "auth-secret") ?? process.env.HQBASE_AUTH_SECRET,
       appPasswordPepper: optionalString(flags, "app-password-pepper"),
       bridgeToken: optionalString(flags, "bridge-token"),
       entitlementSecret: optionalString(flags, "entitlement-secret"),
@@ -119,7 +131,7 @@ export function install(flags) {
   console.log(`HQBase deployment "${name}" is ready.`);
 }
 
-function createManifest(name, input) {
+export function createManifest(name, input) {
   const workerName = input.workerName ?? `hqbase-pro-${name}`;
   const d1Name = input.d1Name ?? `hqbase-pro-${name}`;
   const r2Bucket = input.r2Bucket ?? `hqbase-pro-${name}-mail`;
@@ -132,8 +144,17 @@ function createManifest(name, input) {
     name,
     createdAt: new Date().toISOString(),
     worker: { name: workerName, deployed: false },
-    d1: { name: d1Name, id: "00000000-0000-0000-0000-000000000000", created: false },
-    r2: { bucket: r2Bucket, created: false },
+    d1: {
+      name: d1Name,
+      id: input.reuseD1Id ?? "00000000-0000-0000-0000-000000000000",
+      created: Boolean(input.reuseD1Id),
+      reused: Boolean(input.reuseD1Id)
+    },
+    r2: {
+      bucket: input.reuseR2Bucket ?? r2Bucket,
+      created: Boolean(input.reuseR2Bucket),
+      reused: Boolean(input.reuseR2Bucket)
+    },
     queue: { name: queueName, deadLetterName: `${queueName}-dlq`, created: false },
     appDomain: input.appDomain,
     serviceDomain: input.serviceDomain,

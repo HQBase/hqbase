@@ -5,6 +5,7 @@ export type WorkerEnv = Cloudflare.Env & {
   BILLING?: Fetcher;
   ENVIRONMENT?: string;
   HQBASE_BILLING_URL?: string;
+  HQBASE_WORKER_NAME?: string;
   PRO_JOBS?: Queue;
 };
 

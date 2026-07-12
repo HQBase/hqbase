@@ -69,6 +69,7 @@ export function writeWranglerConfig(manifest, options = {}) {
 
   config.vars = {
     HQBASE_BILLING_URL: "https://billing.hqbase.io",
+    HQBASE_WORKER_NAME: manifest.worker.name,
     ...(manifest.authUrl ? { BETTER_AUTH_URL: manifest.authUrl } : {})
   };
   if (manifest.billingService) {

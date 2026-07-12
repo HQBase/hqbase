@@ -223,69 +223,75 @@ export function ComposeDialog({
                 : "Draft saved"}
           </DialogDescription>
         </DialogHeader>
-        <form className="flex min-h-0 flex-1 flex-col" onSubmit={(e) => void handleSubmit(e)}>
-          <ComposeFields
-            identities={identities}
-            replyTo={replyTo}
-            from={from}
-            to={to}
-            cc={cc}
-            bcc={bcc}
-            subject={subject}
-            setFrom={setFrom}
-            setTo={setTo}
-            setCc={setCc}
-            setBcc={setBcc}
-            setSubject={setSubject}
-          />
-          <RichEmailEditor
-            html={html}
-            onFiles={handleEditorFiles}
-            onChange={(nextHtml, nextText) => {
-              setHtml(nextHtml);
-              setText(nextText);
-            }}
-          />
-          <AttachmentList
-            attachments={attachments}
-            onRemove={(item) => void removeAttachment(item)}
-          />
-          <DialogFooter className="justify-between border-t bg-background/50 px-5 py-3 sm:justify-between">
-            <div className="flex gap-2">
+        {!draft || !initialized.current ? (
+          <div className="grid min-h-60 place-items-center text-sm text-muted-foreground">
+            Opening draft…
+          </div>
+        ) : (
+          <form className="flex min-h-0 flex-1 flex-col" onSubmit={(e) => void handleSubmit(e)}>
+            <ComposeFields
+              identities={identities}
+              replyTo={replyTo}
+              from={from}
+              to={to}
+              cc={cc}
+              bcc={bcc}
+              subject={subject}
+              setFrom={setFrom}
+              setTo={setTo}
+              setCc={setCc}
+              setBcc={setBcc}
+              setSubject={setSubject}
+            />
+            <RichEmailEditor
+              html={html}
+              onFiles={handleEditorFiles}
+              onChange={(nextHtml, nextText) => {
+                setHtml(nextHtml);
+                setText(nextText);
+              }}
+            />
+            <AttachmentList
+              attachments={attachments}
+              onRemove={(item) => void removeAttachment(item)}
+            />
+            <DialogFooter className="justify-between border-t bg-background/50 px-5 py-3 sm:justify-between">
+              <div className="flex gap-2">
+                <Button
+                  disabled={
+                    isPending || isUploading || !draft || identities.length === 0 || !text.trim()
+                  }
+                  type="submit"
+                >
+                  {isPending ? "Sending" : "Send"}
+                </Button>
+                <Button asChild size="icon" type="button" variant="ghost">
+                  <label aria-label="Add attachment" className="cursor-pointer">
+                    <Paperclip />
+                    <input
+                      className="sr-only"
+                      multiple
+                      type="file"
+                      onChange={(e) => {
+                        void upload(Array.from(e.target.files ?? []));
+                        e.currentTarget.value = "";
+                      }}
+                    />
+                  </label>
+                </Button>
+              </div>
               <Button
-                disabled={
-                  isPending || isUploading || !draft || identities.length === 0 || !text.trim()
-                }
-                type="submit"
+                aria-label="Discard draft"
+                size="icon"
+                type="button"
+                variant="ghost"
+                onClick={() => void discard()}
               >
-                {isPending ? "Sending" : "Send"}
+                <Trash2 />
               </Button>
-              <Button asChild size="icon" type="button" variant="ghost">
-                <label aria-label="Add attachment" className="cursor-pointer">
-                  <Paperclip />
-                  <input
-                    className="sr-only"
-                    multiple
-                    type="file"
-                    onChange={(e) => {
-                      void upload(Array.from(e.target.files ?? []));
-                      e.currentTarget.value = "";
-                    }}
-                  />
-                </label>
-              </Button>
-            </div>
-            <Button
-              aria-label="Discard draft"
-              size="icon"
-              type="button"
-              variant="ghost"
-              onClick={() => void discard()}
-            >
-              <Trash2 />
-            </Button>
-          </DialogFooter>
-        </form>
+            </DialogFooter>
+          </form>
+        )}
       </DialogContent>
     </Dialog>
   );

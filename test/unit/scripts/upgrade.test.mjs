@@ -65,7 +65,8 @@ describe("Community to Pro upgrade", () => {
         "mailbox_addresses",
         "workspace_hosts",
         "pro_drafts",
-        "pro_draft_attachments"
+        "pro_draft_attachments",
+        "pro_upgrade_lifecycle"
       ])
     ).not.toThrow();
   });

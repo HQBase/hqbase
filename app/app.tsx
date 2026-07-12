@@ -18,6 +18,8 @@ import { SettingsPage } from "@/features/settings/settings-page";
 import { getSetupStatus } from "@/features/setup/api";
 import { SetupPage } from "@/features/setup/setup-page";
 import type { SetupStatus } from "@/features/setup/types";
+import { getUpgradeLifecycle } from "@/features/upgrades/api";
+import type { UpgradeLifecycle } from "@/features/upgrades/types";
 import { listUsers } from "@/features/users/api";
 import type { WorkspaceUser } from "@/features/users/types";
 import type { FolderId } from "@/lib/routes";
@@ -32,6 +34,7 @@ export function App(): React.ReactElement {
   const [mailboxes, setMailboxes] = React.useState<Mailbox[]>([]);
   const [users, setUsers] = React.useState<WorkspaceUser[]>([]);
   const [entitlement, setEntitlement] = React.useState<EntitlementStatus | null>(null);
+  const [upgrade, setUpgrade] = React.useState<UpgradeLifecycle | null>(null);
   const [messages, setMessages] = React.useState<MessageSummary[]>([]);
   const [activeFolder, setActiveFolder] = React.useState<FolderId>("inbox");
   const [mailboxId, setMailboxId] = React.useState("all");
@@ -47,12 +50,18 @@ export function App(): React.ReactElement {
     setMailboxes(nextMailboxes);
 
     if (currentUser.role === "owner" || currentUser.role === "admin") {
-      const [nextUsers, nextEntitlement] = await Promise.all([listUsers(), getEntitlementStatus()]);
+      const [nextUsers, nextEntitlement, nextUpgrade] = await Promise.all([
+        listUsers(),
+        getEntitlementStatus(),
+        getUpgradeLifecycle()
+      ]);
       setUsers(nextUsers);
       setEntitlement(nextEntitlement);
+      setUpgrade(nextUpgrade);
     } else {
       setUsers([]);
       setEntitlement(null);
+      setUpgrade(null);
     }
   }, []);
 
@@ -168,10 +177,12 @@ export function App(): React.ReactElement {
               <SettingsPage
                 canManage={user.role === "owner" || user.role === "admin"}
                 entitlement={entitlement}
+                upgrade={upgrade}
                 mailboxes={mailboxes}
                 setup={setup}
                 users={users}
                 onEntitlementChanged={setEntitlement}
+                onUpgradeChanged={setUpgrade}
                 onRefresh={() => void reload()}
               />
             ) : (

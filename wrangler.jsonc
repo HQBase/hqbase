@@ -50,7 +50,9 @@
   },
   "triggers": { "crons": ["17 3 * * *"] },
   "vars": {
-    "HQBASE_BILLING_URL": "https://billing.hqbase.io"
+    "HQBASE_BILLING_URL": "https://billing.hqbase.io",
+    "HQBASE_COMMUNITY_WORKER_NAME": "hqbase",
+    "HQBASE_WORKER_NAME": "hqbase-pro"
   },
   "send_email": [
     {

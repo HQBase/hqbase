@@ -1,4 +1,3 @@
-import Link from "@tiptap/extension-link";
 import Placeholder from "@tiptap/extension-placeholder";
 import { EditorContent, useEditor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
@@ -24,11 +23,16 @@ export function RichEmailEditor({
   onChange: (html: string, text: string) => void;
   onFiles: (files: File[]) => void;
 }) {
+  const onChangeRef = React.useRef(onChange);
+  const onFilesRef = React.useRef(onFiles);
+  React.useEffect(() => {
+    onChangeRef.current = onChange;
+    onFilesRef.current = onFiles;
+  }, [onChange, onFiles]);
   const editor = useEditor(
     {
       extensions: [
-        StarterKit,
-        Link.configure({ openOnClick: false }),
+        StarterKit.configure({ link: { openOnClick: false } }),
         Placeholder.configure({ placeholder: "Write your message…" })
       ],
       content: html,
@@ -40,19 +44,19 @@ export function RichEmailEditor({
         handleDrop: (_view, event) => {
           const files = Array.from(event.dataTransfer?.files ?? []);
           if (files.length === 0) return false;
-          onFiles(files);
+          onFilesRef.current(files);
           return true;
         },
         handlePaste: (_view, event) => {
           const files = Array.from(event.clipboardData?.files ?? []);
           if (files.length === 0) return false;
-          onFiles(files);
+          onFilesRef.current(files);
           return true;
         }
       },
-      onUpdate: ({ editor: value }) => onChange(value.getHTML(), value.getText())
+      onUpdate: ({ editor: value }) => onChangeRef.current(value.getHTML(), value.getText())
     },
-    [onFiles]
+    []
   );
   React.useEffect(() => {
     if (editor && editor.getHTML() !== html)

@@ -8,6 +8,7 @@ import track1Migration from "../../../migrations/0004_track1_operations.sql?raw"
 import multiDomainMigration from "../../../migrations/0005_multi_domain.sql?raw";
 import composerMigration from "../../../migrations/0006_composer.sql?raw";
 import billingMigration from "../../../migrations/0007_billing.sql?raw";
+import upgradeLifecycleMigration from "../../../migrations/0008_upgrade_lifecycle.sql?raw";
 import { appPasswordHash } from "../../../worker/features/app-passwords/crypto";
 import {
   insertAppPassword,
@@ -28,6 +29,10 @@ import {
   findMailboxForSending,
   insertMailboxAddress
 } from "../../../worker/features/mailboxes/queries";
+import {
+  getUpgradeLifecycle,
+  markCutoverVerified
+} from "../../../worker/features/upgrades/queries";
 import { processJob } from "../../../worker/jobs/consumer";
 import type { WorkerEnv } from "../../../worker/lib/env";
 
@@ -69,6 +74,7 @@ beforeAll(async () => {
   await applyMigration(multiDomainMigration);
   await applyMigration(composerMigration);
   await applyMigration(billingMigration);
+  await applyMigration(upgradeLifecycleMigration);
 });
 
 beforeEach(async () => {
@@ -94,10 +100,33 @@ describe("Community to Pro migration", () => {
       value: "pro"
     });
     await expect(
+      env.DB.prepare("SELECT value FROM pro_schema_state WHERE key = 'upgrade_lifecycle'").first()
+    ).resolves.toMatchObject({ value: "0008" });
+    await expect(
       env.DB.prepare(
         "SELECT access_level FROM pro_mailbox_grants WHERE user_id = 'usr_existing' AND mailbox_id = 'mbx_existing'"
       ).first()
     ).resolves.toMatchObject({ access_level: "agent" });
+  });
+
+  it("persists the recoverable deploy and cutover lifecycle", async () => {
+    await env.DB.prepare(
+      `INSERT OR REPLACE INTO pro_upgrade_lifecycle
+       (singleton, source_edition, state, checkpoint_bookmark, backup_r2_key,
+        source_worker_name, target_worker_name, started_at, migrated_at, deployed_at, updated_at)
+       VALUES (1, 'community', 'deployed', 'bookmark-1', '_hqbase/backups/upgrade.sql',
+               'hqbase', 'hqbase-pro', datetime('now'), datetime('now'), datetime('now'), datetime('now'))`
+    ).run();
+    await expect(getUpgradeLifecycle(env.DB)).resolves.toMatchObject({
+      state: "deployed",
+      checkpointBookmark: "bookmark-1",
+      backupR2Key: "_hqbase/backups/upgrade.sql",
+      sourceWorkerName: "hqbase",
+      targetWorkerName: "hqbase-pro"
+    });
+    await expect(markCutoverVerified(env.DB)).resolves.toMatchObject({
+      state: "cutover_verified"
+    });
   });
 });
 

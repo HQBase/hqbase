@@ -4,6 +4,15 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from "@/components/ui/select";
+import { listCloudflareZones } from "@/features/setup/api";
+import type { CloudflareZone } from "@/features/setup/types";
 import { changePortal, listDomains, provisionDomain, updateDomain } from "./api";
 import type { MailDomain } from "./types";
 export function DomainSettings({
@@ -14,11 +23,11 @@ export function DomainSettings({
   onChanged: () => void;
 }) {
   const [domains, setDomains] = React.useState<MailDomain[]>([]);
+  const [zones, setZones] = React.useState<CloudflareZone[]>([]);
   const [token, setToken] = React.useState("");
   const [zoneId, setZoneId] = React.useState("");
   const [name, setName] = React.useState("");
   const [hostname, setHostname] = React.useState(portalHostname ?? "");
-  const [workerName, setWorkerName] = React.useState("hqbase-pro");
   const refresh = React.useCallback(
     () =>
       void listDomains()
@@ -27,10 +36,32 @@ export function DomainSettings({
     []
   );
   React.useEffect(refresh, [refresh]);
+  async function loadZones() {
+    try {
+      const next = (await listCloudflareZones(token)).filter((zone) => zone.status === "active");
+      setZones(next);
+      const migrated = domains.find((domain) => !domain.zoneId);
+      const selected = next.find((zone) => zone.name === migrated?.name) ?? next[0];
+      if (selected) chooseZone(selected.id, next);
+      toast.success(
+        `${next.length} active Cloudflare domain${next.length === 1 ? "" : "s"} loaded.`
+      );
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Cloudflare domains could not be loaded."
+      );
+    }
+  }
+  function chooseZone(id: string, source = zones) {
+    const selected = source.find((zone) => zone.id === id);
+    setZoneId(id);
+    setName(selected?.name ?? "");
+  }
   async function add(e: React.FormEvent) {
     e.preventDefault();
     try {
-      await provisionDomain({ apiToken: token, zoneId, workerName, name, enableSending: true });
+      await provisionDomain({ apiToken: token, zoneId, name, enableSending: true });
+      setToken("");
       setName("");
       setZoneId("");
       refresh();
@@ -46,7 +77,8 @@ export function DomainSettings({
     if (!domain?.zoneId)
       return toast.error("The portal must use a connected domain with a Cloudflare zone.");
     try {
-      await changePortal({ apiToken: token, zoneId: domain.zoneId, workerName, hostname });
+      await changePortal({ apiToken: token, zoneId: domain.zoneId, hostname });
+      setToken("");
       onChanged();
       toast.success("Portal address changed.");
     } catch (error) {
@@ -101,31 +133,38 @@ export function DomainSettings({
           </CardDescription>
         </CardHeader>
         <CardContent className="grid gap-5">
-          <Input
-            type="password"
-            placeholder="Temporary Cloudflare API token"
-            value={token}
-            onChange={(e) => setToken(e.target.value)}
-          />
-          <Input
-            placeholder="Worker name"
-            value={workerName}
-            onChange={(e) => setWorkerName(e.target.value)}
-          />
-          <form className="grid gap-2 sm:grid-cols-[1fr_1fr_auto]" onSubmit={(e) => void add(e)}>
+          <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
             <Input
-              required
-              placeholder="example.com"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
+              type="password"
+              placeholder="Temporary Cloudflare API token"
+              value={token}
+              onChange={(e) => setToken(e.target.value)}
             />
-            <Input
-              required
-              placeholder="Cloudflare zone ID"
-              value={zoneId}
-              onChange={(e) => setZoneId(e.target.value)}
-            />
-            <Button type="submit">Add domain</Button>
+            <Button
+              disabled={token.length < 20}
+              type="button"
+              variant="outline"
+              onClick={() => void loadZones()}
+            >
+              Load domains
+            </Button>
+          </div>
+          <form className="grid gap-2 sm:grid-cols-[1fr_auto]" onSubmit={(e) => void add(e)}>
+            <Select required value={zoneId} onValueChange={chooseZone}>
+              <SelectTrigger>
+                <SelectValue placeholder="Choose an active Cloudflare domain" />
+              </SelectTrigger>
+              <SelectContent>
+                {zones.map((zone) => (
+                  <SelectItem key={zone.id} value={zone.id}>
+                    {zone.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button disabled={!name || !zoneId} type="submit">
+              Connect domain
+            </Button>
           </form>
           <form className="grid gap-2 sm:grid-cols-[1fr_auto]" onSubmit={(e) => void portal(e)}>
             <Input

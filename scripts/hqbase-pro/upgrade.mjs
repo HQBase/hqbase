@@ -35,7 +35,8 @@ const PRO_TABLES = [
   "mailbox_addresses",
   "workspace_hosts",
   "pro_drafts",
-  "pro_draft_attachments"
+  "pro_draft_attachments",
+  "pro_upgrade_lifecycle"
 ];
 
 export function validateUpgradeOptions(flags) {

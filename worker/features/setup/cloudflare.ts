@@ -53,6 +53,7 @@ const workerDomainSchema = z.object({
   zone_id: z.string(),
   zone_name: z.string()
 });
+const workerDomainsSchema = z.array(workerDomainSchema);
 
 type CloudflareStep = CloudflareConfigureResult["steps"][number];
 
@@ -265,6 +266,20 @@ export async function attachWorkerCustomDomain(input: {
       "CLOUDFLARE_ZONE_ACCOUNT_MISSING",
       "Cloudflare did not return the zone account ID needed to attach a Worker domain.",
       400
+    );
+  }
+  const domains = await cloudflareRequestResult(
+    input.apiToken,
+    `/accounts/${input.zone.accountId}/workers/domains`,
+    workerDomainsSchema
+  );
+  const existing = domains.find((domain) => domain.hostname === input.hostname);
+  if (existing?.service === input.workerName) return existing;
+  if (existing) {
+    throw new AppError(
+      "CLOUDFLARE_WORKER_DOMAIN_CONFLICT",
+      `${existing.hostname} already routes to Worker ${existing.service}. Choose another workspace address.`,
+      409
     );
   }
   return cloudflareRequestResult(

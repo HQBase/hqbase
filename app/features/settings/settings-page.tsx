@@ -11,6 +11,8 @@ import { MailboxSettings } from "@/features/mailboxes/mailbox-settings";
 import type { Mailbox } from "@/features/mailboxes/types";
 import { GeneralSettings } from "@/features/settings/general-settings";
 import type { SetupStatus } from "@/features/setup/types";
+import type { UpgradeLifecycle } from "@/features/upgrades/types";
+import { UpgradeSettings } from "@/features/upgrades/upgrade-settings";
 import type { WorkspaceUser } from "@/features/users/types";
 import { UserSettings } from "@/features/users/user-settings";
 
@@ -20,7 +22,9 @@ type SettingsPageProps = {
   setup: SetupStatus;
   users: WorkspaceUser[];
   entitlement: EntitlementStatus | null;
+  upgrade: UpgradeLifecycle | null;
   onEntitlementChanged: (status: EntitlementStatus) => void;
+  onUpgradeChanged: (upgrade: UpgradeLifecycle) => void;
   onRefresh: () => void;
 };
 
@@ -30,7 +34,9 @@ export function SettingsPage({
   setup,
   users,
   entitlement,
+  upgrade,
   onEntitlementChanged,
+  onUpgradeChanged,
   onRefresh
 }: SettingsPageProps): React.ReactElement {
   return (
@@ -48,6 +54,9 @@ export function SettingsPage({
             {canManage ? <SettingsTab value="access">Access</SettingsTab> : null}
             <SettingsTab value="mail-clients">Mail clients</SettingsTab>
             {canManage && entitlement ? <SettingsTab value="billing">Billing</SettingsTab> : null}
+            {canManage && entitlement && upgrade ? (
+              <SettingsTab value="upgrade">Upgrade</SettingsTab>
+            ) : null}
             <SettingsTab value="general">General</SettingsTab>
           </TabsList>
           <TabsContent className="mt-5" value="mailboxes">
@@ -75,6 +84,15 @@ export function SettingsPage({
           {canManage && entitlement ? (
             <TabsContent className="mt-5" value="billing">
               <BillingSettings status={entitlement} onChanged={onEntitlementChanged} />
+            </TabsContent>
+          ) : null}
+          {canManage && entitlement && upgrade ? (
+            <TabsContent className="mt-5" value="upgrade">
+              <UpgradeSettings
+                entitlement={entitlement}
+                lifecycle={upgrade}
+                onChanged={onUpgradeChanged}
+              />
             </TabsContent>
           ) : null}
         </Tabs>

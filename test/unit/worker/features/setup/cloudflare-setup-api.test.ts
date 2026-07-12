@@ -335,7 +335,8 @@ describe("Cloudflare setup API", () => {
     });
 
     const attachCall = fetchMock.mock.calls.find(
-      ([url]) => url === `${API_BASE}/accounts/account-1/workers/domains`
+      ([url, init]) =>
+        url === `${API_BASE}/accounts/account-1/workers/domains` && init?.method === "PUT"
     );
     expect(result.steps[0]?.status).toBe("success");
     expect(attachCall?.[1]?.body).toBe(
@@ -363,6 +364,9 @@ function cloudflareSetupResponse(url: string, method: string) {
         zone_name: "example.com"
       }
     });
+  }
+  if (url === `${API_BASE}/accounts/account-1/workers/domains`) {
+    return jsonResponse({ result: [] });
   }
   if (url === `${API_BASE}/zones/zone-1/email/routing/dns` && method === "POST") {
     return jsonResponse({ result: {} });

@@ -8,7 +8,7 @@
     "dev": "wrangler dev --port 8787",
     "dev:vite": "vite --host 127.0.0.1 --port 5173",
     "build": "vite build",
-    "deploy": "pnpm build && pnpm db:migrate:remote && wrangler deploy && pnpm hqbase-pro postdeploy",
+    "deploy": "pnpm build && node scripts/hqbase-pro/deploy.mjs && pnpm hqbase-pro postdeploy",
     "db:migrate:local": "wrangler d1 migrations apply DB --local",
     "db:migrate:remote": "wrangler d1 migrations apply DB --remote",
     "format": "biome format --write .",
@@ -51,10 +51,10 @@
         "description": "Deployment-scoped AES key material used to encrypt the Polar license key stored in D1."
       },
       "DB": {
-        "description": "Cloudflare D1 database used for Better Auth, setup state, mailboxes, threads, and message metadata."
+        "description": "Fresh Pro: create a new D1 database. Community upgrade: select the existing Community D1 database; deployment checkpoints, backs up, migrates, and verifies it before cutover."
       },
       "MAIL_OBJECTS": {
-        "description": "Cloudflare R2 bucket used for raw emails, HTML bodies, and attachments."
+        "description": "Fresh Pro: create a new R2 bucket. Community upgrade: select the existing Community mail bucket so objects and the pre-upgrade SQL backup stay in the customer's account."
       },
       "PRO_JOBS": {
         "description": "Queue used for bounded Pro maintenance and integrity jobs with a dead-letter queue."

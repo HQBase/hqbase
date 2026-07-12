@@ -5,13 +5,17 @@ Cloudflare-managed email domains.
 
 ## Deploy Button
 
-The README includes a Deploy to Cloudflare button. Before publishing, point it at the public repository:
+The README includes a Deploy to Cloudflare button pointing at the public source-available repository:
 
 ```sh
 pnpm hqbase-pro:button --repo-url https://github.com/OWNER/REPO
 ```
 
 Cloudflare's deploy flow clones the repository, prompts for configured secrets and variables, provisions supported resources from `wrangler.jsonc`, builds the Worker, and deploys it.
+
+For a Community upgrade, select the existing Community D1 database and R2 mail bucket. The deploy
+command recognizes Community, creates a customer-owned bookmark and R2 SQL backup, migrates and
+verifies D1, and deploys Pro as a separate Worker. Do not select new storage for an upgrade.
 
 The default `wrangler.jsonc` does not set `BETTER_AUTH_URL`; the Worker derives the deployed request origin. Only set `BETTER_AUTH_URL` explicitly when you need to pin auth to a specific custom origin.
 

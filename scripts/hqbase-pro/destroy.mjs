@@ -38,6 +38,22 @@ export function destroy(flags) {
   if (targets.domain) {
     reset({ name, scope: "domain", "dry-run": dryRun });
   }
+  if (targets.queues && manifest.queue) {
+    run(
+      "pnpm",
+      [
+        "exec",
+        "wrangler",
+        "queues",
+        "consumer",
+        "worker",
+        "remove",
+        manifest.queue.name,
+        manifest.worker.name
+      ],
+      { dryRun, allowFailure: true }
+    );
+  }
   if (targets.worker) {
     run("pnpm", ["exec", "wrangler", "delete", manifest.worker.name, "--force"], {
       dryRun,
