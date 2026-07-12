@@ -259,6 +259,7 @@ export async function attachWorkerCustomDomain(input: {
   apiToken: string;
   hostname: string;
   workerName: string;
+  replaceWorkerName?: string | undefined;
   zone: CloudflareZone;
 }): Promise<z.infer<typeof workerDomainSchema>> {
   if (!input.zone.accountId) {
@@ -275,7 +276,7 @@ export async function attachWorkerCustomDomain(input: {
   );
   const existing = domains.find((domain) => domain.hostname === input.hostname);
   if (existing?.service === input.workerName) return existing;
-  if (existing) {
+  if (existing && existing.service !== input.replaceWorkerName) {
     throw new AppError(
       "CLOUDFLARE_WORKER_DOMAIN_CONFLICT",
       `${existing.hostname} already routes to Worker ${existing.service}. Choose another workspace address.`,

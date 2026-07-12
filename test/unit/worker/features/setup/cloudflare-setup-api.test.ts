@@ -1,4 +1,5 @@
 import {
+  attachWorkerCustomDomain,
   configureCloudflareDomain,
   listCloudflareZones,
   verifyCloudflareToken
@@ -347,6 +348,95 @@ describe("Cloudflare setup API", () => {
         zone_name: "example.com"
       })
     );
+  });
+
+  it("reassigns an upgrade portal only from the recorded Community Worker", async () => {
+    const fetchMock = vi.fn<typeof fetch>((input, init) => {
+      const url = fetchInputUrl(input);
+      if (url === `${API_BASE}/accounts/account-1/workers/domains` && init?.method === "PUT") {
+        return Promise.resolve(
+          jsonResponse({
+            result: {
+              hostname: "hqbase.example.com",
+              id: "domain-1",
+              service: "hqbase-pro",
+              zone_id: "zone-1",
+              zone_name: "example.com"
+            }
+          })
+        );
+      }
+      return Promise.resolve(
+        jsonResponse({
+          result: [
+            {
+              hostname: "hqbase.example.com",
+              id: "domain-1",
+              service: "hqbase-community",
+              zone_id: "zone-1",
+              zone_name: "example.com"
+            }
+          ]
+        })
+      );
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      attachWorkerCustomDomain({
+        apiToken: "token-123",
+        hostname: "hqbase.example.com",
+        replaceWorkerName: "hqbase-community",
+        workerName: "hqbase-pro",
+        zone: {
+          accountId: "account-1",
+          accountName: "HQBase",
+          id: "zone-1",
+          name: "example.com",
+          status: "active",
+          type: "full"
+        }
+      })
+    ).resolves.toMatchObject({ service: "hqbase-pro" });
+    expect(fetchMock.mock.calls.some(([, init]) => init?.method === "PUT")).toBe(true);
+  });
+
+  it("does not take over a portal from an unrelated Worker", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn<typeof fetch>(() =>
+        Promise.resolve(
+          jsonResponse({
+            result: [
+              {
+                hostname: "hqbase.example.com",
+                id: "domain-1",
+                service: "other-worker",
+                zone_id: "zone-1",
+                zone_name: "example.com"
+              }
+            ]
+          })
+        )
+      )
+    );
+
+    await expect(
+      attachWorkerCustomDomain({
+        apiToken: "token-123",
+        hostname: "hqbase.example.com",
+        replaceWorkerName: "hqbase-community",
+        workerName: "hqbase-pro",
+        zone: {
+          accountId: "account-1",
+          accountName: "HQBase",
+          id: "zone-1",
+          name: "example.com",
+          status: "active",
+          type: "full"
+        }
+      })
+    ).rejects.toThrow("already routes to Worker other-worker");
   });
 });
 

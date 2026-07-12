@@ -11,6 +11,7 @@ import {
   inspectCloudflareDomain
 } from "../setup/cloudflare";
 import { upsertWorkspaceHost } from "../setup/queries";
+import { getUpgradeLifecycle } from "../upgrades/queries";
 import { listMailDomains, updateMailDomainSettings, upsertMailDomain } from "./queries";
 import {
   changePortalHostnameSchema,
@@ -88,9 +89,11 @@ domainRoutes.put("/portal", async (c) => {
     workerName: c.env.HQBASE_WORKER_NAME ?? input.workerName,
     zoneId: input.zoneId
   });
+  const upgrade = await getUpgradeLifecycle(c.env.DB);
   await attachWorkerCustomDomain({
     apiToken: input.apiToken,
     hostname: input.hostname,
+    replaceWorkerName: upgrade?.sourceWorkerName ?? undefined,
     workerName: inspected.workerName,
     zone: inspected.zone
   });
