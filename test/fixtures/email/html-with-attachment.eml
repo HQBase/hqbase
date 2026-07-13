@@ -1,0 +1,32 @@
+From: Design Bot <design@example.net>
+To: Team <team@example.com>
+Subject: HTML brief
+Message-ID: <html-1@example.net>
+Date: Tue, 24 Jun 2026 11:00:00 -0400
+MIME-Version: 1.0
+Content-Type: multipart/mixed; boundary="mixed-boundary"
+
+--mixed-boundary
+Content-Type: multipart/alternative; boundary="alt-boundary"
+
+--alt-boundary
+Content-Type: text/plain; charset=utf-8
+
+Here is the plain text brief.
+
+--alt-boundary
+Content-Type: text/html; charset=utf-8
+
+<p>Here is the <strong>HTML</strong> brief.</p>
+
+--alt-boundary--
+
+--mixed-boundary
+Content-Type: text/plain; name="brief.txt"
+Content-Disposition: attachment; filename="brief.txt"
+Content-Transfer-Encoding: base64
+
+QnJpZWYgYXR0YWNobWVudAo=
+
+--mixed-boundary--
+

@@ -1,0 +1,135 @@
+name: Staging E2E
+
+on:
+  workflow_dispatch:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+
+concurrency:
+  group: hqbase-community-staging-e2e
+  cancel-in-progress: false
+
+jobs:
+  lifecycle:
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    environment: hqbase-staging
+    timeout-minutes: 30
+    env:
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.HQBASE_E2E_CLOUDFLARE_ACCOUNT_ID }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.HQBASE_E2E_CLOUDFLARE_API_TOKEN }}
+      HQBASE_STAGING_CLOUDFLARE_TOKEN: ${{ secrets.HQBASE_E2E_CLOUDFLARE_API_TOKEN }}
+      HQBASE_STAGING_ACCESS_CLIENT_ID: ${{ secrets.HQBASE_E2E_ACCESS_CLIENT_ID }}
+      HQBASE_STAGING_ACCESS_CLIENT_SECRET: ${{ secrets.HQBASE_E2E_ACCESS_CLIENT_SECRET }}
+      HQBASE_STAGING_EMAIL_DOMAIN: ${{ secrets.HQBASE_E2E_EMAIL_DOMAIN }}
+      HQBASE_STAGING_OWNER_PASSWORD: ${{ secrets.HQBASE_E2E_OWNER_PASSWORD }}
+      HQBASE_STAGING_URL: https://community-e2e.hqbase.io
+      HQBASE_STAGING_WORKER_NAME: hqbase-e2e-staging
+      DEPLOYMENT_NAME: e2e-${{ github.run_id }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.7.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
+      - name: Verify staging isolation
+        run: |
+          case "$HQBASE_STAGING_EMAIL_DOMAIN" in
+            e2e.*|e2e-*|staging.*|staging-*) ;;
+            *) echo "Email domain must be a dedicated e2e/staging subdomain"; exit 1 ;;
+          esac
+          case "${HQBASE_STAGING_URL#https://}" in
+            e2e.*|e2e-*|*-e2e.*|staging.*|staging-*) ;;
+            *) echo "App hostname must be a dedicated e2e/staging hostname"; exit 1 ;;
+          esac
+          test -n "$HQBASE_STAGING_ACCESS_CLIENT_ID"
+          test -n "$HQBASE_STAGING_ACCESS_CLIENT_SECRET"
+      - name: Deploy disposable Community installation
+        run: >-
+          pnpm hqbase install
+          --name "$DEPLOYMENT_NAME"
+          --worker-name "$HQBASE_STAGING_WORKER_NAME"
+          --domain "$HQBASE_STAGING_EMAIL_DOMAIN"
+          --no-email
+          --app-domain "${HQBASE_STAGING_URL#https://}"
+      - name: Resolve the checked-in release compatibility window
+        id: release-versions
+        run: |
+          current_version=$(node -p "require('./package.json').version")
+          previous_version=$(node -p "require('./package.json').hqbaseRelease.minimumVersion")
+          published_version=$(node --input-type=module -e '
+            const response = await fetch("https://billing.hqbase.io/v1/releases/community/stable");
+            if (!response.ok) throw new Error(`Stable manifest failed (${response.status})`);
+            const envelope = await response.json();
+            const manifest = JSON.parse(Buffer.from(envelope.payload, "base64url").toString());
+            console.log(manifest.version);
+          ')
+          test "$current_version" != "$previous_version"
+          echo "current=$current_version" >> "$GITHUB_OUTPUT"
+          echo "previous=$previous_version" >> "$GITHUB_OUTPUT"
+          echo "published=$published_version" >> "$GITHUB_OUTPUT"
+          if [ "$published_version" = "$current_version" ]; then
+            echo "candidate_released=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "candidate_released=false" >> "$GITHUB_OUTPUT"
+            echo "Stable is $published_version; deferring signed $current_version update acceptance until publication."
+          fi
+      - name: Prepare a supported prior Community installation
+        run: |
+          previous_version="${{ steps.release-versions.outputs.previous }}"
+          config=".hqbase/deployments/$DEPLOYMENT_NAME/wrangler.jsonc"
+          secrets=".hqbase/deployments/$DEPLOYMENT_NAME/secrets.json"
+          node --input-type=module -e '
+            import fs from "node:fs";
+            const path = process.argv[1];
+            const version = process.argv[2];
+            const config = JSON.parse(fs.readFileSync(path, "utf8"));
+            config.vars.HQBASE_APP_VERSION = version;
+            fs.writeFileSync(path, `${JSON.stringify(config, null, 2)}\n`);
+          ' "$config" "$previous_version"
+          pnpm exec wrangler d1 execute DB --remote --config "$config" \
+            --command "UPDATE app_release_state SET installed_version = '$previous_version', updated_at = datetime('now') WHERE singleton = 1"
+          pnpm exec wrangler deploy --config "$config" --secrets-file "$secrets"
+      - name: Exercise setup, update discovery, and outbound mail
+        env:
+          HQBASE_STAGING_EXPECT_UPDATE_VERSION: ${{ steps.release-versions.outputs.candidate_released == 'true' && steps.release-versions.outputs.current || '' }}
+        run: pnpm test:e2e:staging
+      - name: Apply the signed Community N-1 update
+        if: steps.release-versions.outputs.candidate_released == 'true'
+        run: |
+          previous_version="${{ steps.release-versions.outputs.previous }}"
+          current_version="${{ steps.release-versions.outputs.current }}"
+          config=".hqbase/deployments/$DEPLOYMENT_NAME/wrangler.jsonc"
+          WORKERS_CI=1 CONFIG_FILE="$config" CURRENT_VERSION="$previous_version" node --input-type=module -e '
+            import { deploy } from "./scripts/release/deploy.mjs";
+            await deploy({ currentVersion: process.env.CURRENT_VERSION, configFile: process.env.CONFIG_FILE });
+          '
+          release=$(pnpm exec wrangler d1 execute DB --remote --config "$config" --json \
+            --command "SELECT installed_version FROM app_release_state WHERE singleton = 1")
+          history=$(pnpm exec wrangler d1 execute DB --remote --config "$config" --json \
+            --command "SELECT from_version, to_version, state FROM app_update_history ORDER BY started_at DESC LIMIT 1")
+          jq -e --arg version "$current_version" '.[0].results[0].installed_version == $version' <<<"$release"
+          jq -e --arg from "$previous_version" --arg to "$current_version" \
+            '.[0].results[0] == {"from_version":$from,"to_version":$to,"state":"verified"}' \
+            <<<"$history"
+      - name: Exercise outbound mail after the signed update
+        if: steps.release-versions.outputs.candidate_released == 'true'
+        run: pnpm test:e2e:staging
+      - name: Destroy disposable installation
+        if: always()
+        run: |
+          manifest=".hqbase/deployments/$DEPLOYMENT_NAME/manifest.json"
+          if [ -f "$manifest" ]; then
+            pnpm hqbase destroy --name "$DEPLOYMENT_NAME" --scope all --yes
+          else
+            echo "No manifest exists; no run-scoped resources are eligible for cleanup."
+          fi

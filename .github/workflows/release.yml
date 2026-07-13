@@ -1,0 +1,131 @@
+name: Signed release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Semantic release version
+        required: true
+      min_version:
+        description: Oldest Community version supported by this release
+        required: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hqbase-community-release
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    environment: release
+    timeout-minutes: 20
+    env:
+      BETTER_AUTH_SECRET: ci-auth-secret-not-used-in-production
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.7.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm check
+      - run: pnpm deploy:dry-run
+      - name: Verify release credentials
+        env:
+          HQBASE_RELEASE_PRIVATE_KEY: ${{ secrets.HQBASE_RELEASE_PRIVATE_KEY }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: test -n "$HQBASE_RELEASE_PRIVATE_KEY" && test -n "$CLOUDFLARE_API_TOKEN" && test -n "$CLOUDFLARE_ACCOUNT_ID"
+      - name: Verify checked-in release version
+        env:
+          HQBASE_RELEASE_VERSION: ${{ inputs.version }}
+        run: |
+          release_version="${HQBASE_RELEASE_VERSION#v}"
+          package_version=$(node -p "require('./package.json').version")
+          test "$release_version" = "$package_version"
+      - name: Package and sign
+        env:
+          HQBASE_RELEASE_PRIVATE_KEY: ${{ secrets.HQBASE_RELEASE_PRIVATE_KEY }}
+          HQBASE_RELEASE_VERSION: ${{ inputs.version }}
+          HQBASE_MIN_VERSION: ${{ inputs.min_version }}
+        run: |
+          export HQBASE_RELEASE_VERSION="${HQBASE_RELEASE_VERSION#v}"
+          pnpm release:package
+      - name: Refuse to overwrite an immutable artifact
+        id: immutable-artifact
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          HQBASE_RELEASE_VERSION: ${{ inputs.version }}
+        run: |
+          release_version="${HQBASE_RELEASE_VERSION#v}"
+          if pnpm exec wrangler r2 object get \
+            "hqbase-releases/artifacts/community/${release_version}.tar.gz" \
+            --file /tmp/existing-community-release.tar.gz --remote; then
+            cmp "release/community-${release_version}.tar.gz" /tmp/existing-community-release.tar.gz
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Publish immutable artifact and stable manifest
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          HQBASE_RELEASE_VERSION: ${{ inputs.version }}
+          HQBASE_ARTIFACT_EXISTS: ${{ steps.immutable-artifact.outputs.exists }}
+        run: |
+          export HQBASE_RELEASE_VERSION="${HQBASE_RELEASE_VERSION#v}"
+          if [ "$HQBASE_ARTIFACT_EXISTS" != "true" ]; then
+            pnpm exec wrangler r2 object put "hqbase-releases/artifacts/community/${HQBASE_RELEASE_VERSION}.tar.gz" --file "release/community-${HQBASE_RELEASE_VERSION}.tar.gz" --remote
+          fi
+          pnpm exec wrangler r2 object put "hqbase-releases/manifests/community/stable.json" --file release/stable.json --remote
+      - name: Verify published artifact and signed manifest
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          HQBASE_RELEASE_VERSION: ${{ inputs.version }}
+        run: |
+          release_version="${HQBASE_RELEASE_VERSION#v}"
+          for attempt in $(seq 1 10); do
+            if pnpm exec wrangler r2 object get \
+              "hqbase-releases/artifacts/community/${release_version}.tar.gz" \
+              --file /tmp/published-community.tar.gz --remote; then
+              break
+            fi
+            test "$attempt" -lt 10
+            sleep 2
+          done
+          for attempt in $(seq 1 10); do
+            if pnpm exec wrangler r2 object get \
+              "hqbase-releases/manifests/community/stable.json" \
+              --file /tmp/published-community-stable.json --remote; then
+              break
+            fi
+            test "$attempt" -lt 10
+            sleep 2
+          done
+          cmp "release/community-${release_version}.tar.gz" /tmp/published-community.tar.gz
+          cmp release/stable.json /tmp/published-community-stable.json
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent --show-error \
+              https://billing.hqbase.io/v1/releases/community/stable \
+              --output /tmp/live-community-stable.json && \
+              node -e 'const fs = require("node:fs"); const expected = JSON.parse(fs.readFileSync("release/stable.json", "utf8")); const actual = JSON.parse(fs.readFileSync("/tmp/live-community-stable.json", "utf8")); process.exit(expected.payload === actual.payload && expected.signature === actual.signature ? 0 : 1)'; then
+              break
+            fi
+            test "$attempt" -lt 30
+            sleep 2
+          done
+          node --input-type=module -e '
+            import { createPublicKey, verify } from "node:crypto";
+            import { readFileSync } from "node:fs";
+            const envelope = JSON.parse(readFileSync("/tmp/live-community-stable.json", "utf8"));
+            const key = createPublicKey({ key: Buffer.from("MCowBQYDK2VwAyEAsVwKniCvpHDwbbnjTPP0SuIIG97cRL+iFBQvay9OrU4=", "base64"), format: "der", type: "spki" });
+            if (!verify(null, Buffer.from(envelope.payload, "base64url"), key, Buffer.from(envelope.signature, "base64url"))) process.exit(1);
+          '
