@@ -10,12 +10,15 @@ const edition = "pro";
 const schemaVersion = 9;
 const packageJson = JSON.parse(readFileSync(resolve(root, "package.json"), "utf8"));
 const version = process.env.HQBASE_RELEASE_VERSION ?? packageJson.version;
+const minVersion = process.env.HQBASE_MIN_VERSION || packageJson.hqbaseRelease?.minimumVersion;
 const privateKeyValue = process.env.HQBASE_RELEASE_PRIVATE_KEY_FILE
   ? readFileSync(process.env.HQBASE_RELEASE_PRIVATE_KEY_FILE, "utf8")
   : process.env.HQBASE_RELEASE_PRIVATE_KEY;
 if (!privateKeyValue) throw new Error("HQBASE_RELEASE_PRIVATE_KEY is required.");
 if (!/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(version))
   throw new Error("Release version must be semantic.");
+if (!/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(minVersion ?? ""))
+  throw new Error("Minimum release version must be semantic.");
 
 const output = resolve(root, "release");
 mkdirSync(output, { recursive: true });
@@ -31,9 +34,9 @@ const manifest = {
   channel: "stable",
   version,
   schemaVersion,
-  minVersion: process.env.HQBASE_MIN_VERSION ?? version,
+  minVersion,
   publishedAt: new Date().toISOString(),
-  notesUrl: `https://github.com/HQBase/hqbase-pro-deploy/releases/tag/v${version}`,
+  notesUrl: "https://github.com/HQBase/hqbase-pro-deploy/releases",
   artifact: {
     url: `https://billing.hqbase.io/v1/releases/${edition}/${version}/artifact`,
     sha256: createHash("sha256").update(bytes).digest("hex"),
