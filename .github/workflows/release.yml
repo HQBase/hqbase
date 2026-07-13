@@ -1,8 +1,6 @@
 name: Signed Pro release
 
 on:
-  push:
-    tags: ["v*"]
   workflow_dispatch:
     inputs:
       version:
@@ -50,7 +48,7 @@ jobs:
         run: test -n "$HQBASE_RELEASE_PRIVATE_KEY" && test -n "$CLOUDFLARE_API_TOKEN" && test -n "$CLOUDFLARE_ACCOUNT_ID"
       - name: Verify checked-in release version
         env:
-          HQBASE_RELEASE_VERSION: ${{ inputs.version || github.ref_name }}
+          HQBASE_RELEASE_VERSION: ${{ inputs.version }}
         run: |
           release_version="${HQBASE_RELEASE_VERSION#v}"
           package_version=$(node -p "require('./package.json').version")
@@ -58,7 +56,7 @@ jobs:
       - name: Package and sign
         env:
           HQBASE_RELEASE_PRIVATE_KEY: ${{ secrets.HQBASE_RELEASE_PRIVATE_KEY }}
-          HQBASE_RELEASE_VERSION: ${{ inputs.version || github.ref_name }}
+          HQBASE_RELEASE_VERSION: ${{ inputs.version }}
           HQBASE_MIN_VERSION: ${{ inputs.min_version }}
         run: |
           export HQBASE_RELEASE_VERSION="${HQBASE_RELEASE_VERSION#v}"
@@ -68,7 +66,7 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          HQBASE_RELEASE_VERSION: ${{ inputs.version || github.ref_name }}
+          HQBASE_RELEASE_VERSION: ${{ inputs.version }}
         run: |
           release_version="${HQBASE_RELEASE_VERSION#v}"
           if pnpm exec wrangler r2 object get \
@@ -83,7 +81,7 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          HQBASE_RELEASE_VERSION: ${{ inputs.version || github.ref_name }}
+          HQBASE_RELEASE_VERSION: ${{ inputs.version }}
           HQBASE_ARTIFACT_EXISTS: ${{ steps.immutable-artifact.outputs.exists }}
         run: |
           export HQBASE_RELEASE_VERSION="${HQBASE_RELEASE_VERSION#v}"
@@ -95,15 +93,27 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          HQBASE_RELEASE_VERSION: ${{ inputs.version || github.ref_name }}
+          HQBASE_RELEASE_VERSION: ${{ inputs.version }}
         run: |
           release_version="${HQBASE_RELEASE_VERSION#v}"
-          pnpm exec wrangler r2 object get \
-            "hqbase-releases/artifacts/pro/${release_version}.tar.gz" \
-            --file /tmp/published-pro.tar.gz --remote
-          pnpm exec wrangler r2 object get \
-            "hqbase-releases/manifests/pro/stable.json" \
-            --file /tmp/published-pro-stable.json --remote
+          for attempt in $(seq 1 10); do
+            if pnpm exec wrangler r2 object get \
+              "hqbase-releases/artifacts/pro/${release_version}.tar.gz" \
+              --file /tmp/published-pro.tar.gz --remote; then
+              break
+            fi
+            test "$attempt" -lt 10
+            sleep 2
+          done
+          for attempt in $(seq 1 10); do
+            if pnpm exec wrangler r2 object get \
+              "hqbase-releases/manifests/pro/stable.json" \
+              --file /tmp/published-pro-stable.json --remote; then
+              break
+            fi
+            test "$attempt" -lt 10
+            sleep 2
+          done
           cmp "release/pro-${release_version}.tar.gz" /tmp/published-pro.tar.gz
           cmp release/stable.json /tmp/published-pro-stable.json
           for attempt in $(seq 1 30); do
