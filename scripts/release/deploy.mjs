@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-import { execFileSync } from "node:child_process";
-import { createHash, createPublicKey, verify } from "node:crypto";
+import { execFileSync, spawnSync } from "node:child_process";
+import { createHash, createPublicKey, randomBytes, verify } from "node:crypto";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
@@ -194,8 +194,66 @@ export function normalizeConfig(config, version) {
 function sourceDeploy(cwd) {
   run("pnpm", ["build"], cwd);
   run("pnpm", ["db:migrate:remote"], cwd);
-  run("pnpm", ["exec", "wrangler", "deploy"], cwd);
+  deploySource(cwd);
   run("pnpm", ["hqbase", "postdeploy"], cwd);
+}
+export function deploySource(cwd, options = {}) {
+  const execute = options.run ?? run;
+  const attempt = options.attempt ?? attemptRun;
+  const workersCi = options.workersCi ?? process.env.WORKERS_CI === "1";
+  const deployArgs = ["exec", "wrangler", "deploy"];
+
+  if (!workersCi) {
+    execute("pnpm", deployArgs, cwd);
+    return;
+  }
+
+  const inspection = attempt(
+    "pnpm",
+    ["exec", "wrangler", "secret", "list", "--format", "json"],
+    cwd
+  );
+  let needsSecret;
+  try {
+    needsSecret = needsInitialAuthSecret(inspection, "BETTER_AUTH_SECRET");
+  } catch (error) {
+    emitCommandOutput(inspection);
+    throw error;
+  }
+  if (!needsSecret) {
+    execute("pnpm", deployArgs, cwd);
+    return;
+  }
+
+  const workspace = mkdtempSync(resolve(tmpdir(), "hqbase-community-secrets-"));
+  const secretsFile = resolve(workspace, "secrets.json");
+  try {
+    const bytes = (options.randomBytes ?? randomBytes)(32);
+    writeFileSync(
+      secretsFile,
+      `${JSON.stringify({ BETTER_AUTH_SECRET: bytes.toString("base64url") })}\n`,
+      { mode: 0o600 }
+    );
+    execute("pnpm", [...deployArgs, "--secrets-file", secretsFile], cwd);
+  } finally {
+    rmSync(workspace, { recursive: true, force: true });
+  }
+}
+export function needsInitialAuthSecret(result, secretName) {
+  const output = `${result.stdout ?? ""}\n${result.stderr ?? ""}`.replace(
+    // biome-ignore lint/suspicious/noControlCharactersInRegex: ANSI escape stripping.
+    /\x1b\[[0-?]*[ -/]*[@-~]/g,
+    ""
+  );
+  if (result.status === 0) {
+    const secrets = JSON.parse(result.stdout || "[]");
+    if (!Array.isArray(secrets)) throw new Error("Wrangler returned an invalid secret list.");
+    return !secrets.some((secret) => secret?.name === secretName);
+  }
+  if (/Worker ".+"(?: \(env: .+\))? not found\.\s+If this is a new Worker,/s.test(output)) {
+    return true;
+  }
+  throw result.error ?? new Error(`wrangler secret list exited with status ${result.status}.`);
 }
 function sql(cwd, command) {
   run(
@@ -228,6 +286,17 @@ function capture(command, args, cwd) {
     env: { ...process.env, CI: process.env.CI ?? "true" },
     encoding: "utf8"
   });
+}
+function attemptRun(command, args, cwd) {
+  return spawnSync(command, args, {
+    cwd,
+    env: { ...process.env, CI: process.env.CI ?? "true" },
+    encoding: "utf8"
+  });
+}
+function emitCommandOutput(result) {
+  if (result.stdout) process.stdout.write(result.stdout);
+  if (result.stderr) process.stderr.write(result.stderr);
 }
 function findString(value, ...keys) {
   if (!value || typeof value !== "object") return null;

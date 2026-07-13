@@ -26,8 +26,7 @@ HQBase is a self-hosted shared email workspace for one Cloudflare account and on
 
 ```sh
 pnpm install
-cp .env.example .dev.vars
-# Edit .dev.vars: set BETTER_AUTH_SECRET to `openssl rand -base64 32`.
+printf 'BETTER_AUTH_SECRET=%s\n' "$(openssl rand -base64 32)" > .dev.vars
 pnpm db:migrate:local
 pnpm dev
 ```
@@ -68,7 +67,7 @@ The Deploy to Cloudflare button is the public install path. Before publishing th
 pnpm hqbase:button --repo-url https://github.com/OWNER/REPO
 ```
 
-Cloudflare clones the repository, provisions configured Worker resources, prompts for required secrets, builds the Worker, and deploys it into the installer's account. After deployment, visit `/setup`.
+Cloudflare clones the repository, provisions configured Worker resources, builds the Worker, and deploys it into the installer's account. The first customer-owned build generates and stores a unique masked Better Auth secret automatically; later builds preserve it. After deployment, visit `/setup`.
 
 HQBase requires a domain with authoritative DNS managed by Cloudflare. In `/setup`, click `Authorize Cloudflare`, approve the listed permissions, and select the primary domain. `Connect domain and continue` enables Email Routing DNS, points catch-all mail at the Worker, enables Email Sending, and advances only after Cloudflare reports the domain ready. The short-lived OAuth grant stays encrypted in an HTTP-only cookie and is revoked when domain setup succeeds; it is never stored in D1 or R2.
 
@@ -82,7 +81,6 @@ Suggested Deploy to Cloudflare form choices:
 - Project name: keep `hqbase`, or change it if you already have a Worker/project with that name.
 - D1 database: create new. Rename from `hqbase` only if it conflicts or you want an environment-specific name.
 - R2 bucket: create new. Rename from `hqbase-mail` only if it conflicts or you want an environment-specific name.
-- `BETTER_AUTH_SECRET`: paste a fresh value from `openssl rand -base64 32`.
 - Build command: keep `pnpm run build`.
 - Deploy command: keep `pnpm run deploy`; it prints the setup link after Wrangler deploys the Worker.
 
