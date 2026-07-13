@@ -4,6 +4,9 @@
   "private": true,
   "type": "module",
   "packageManager": "pnpm@11.7.0",
+  "hqbaseRelease": {
+    "minimumVersion": "0.1.1"
+  },
   "scripts": {
     "dev": "wrangler dev --port 8787",
     "dev:vite": "vite --host 127.0.0.1 --port 5173",

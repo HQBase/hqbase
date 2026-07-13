@@ -38,7 +38,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: HQBase/hqbase
-          ref: 6ce880e861254effff0636a81ecf2af2e86764d3
+          ref: 981f12508f53e0accbf840328f8629a8c21990b4
           path: .staging/community
       - name: Install Community operator dependencies
         working-directory: .staging/community
@@ -122,7 +122,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: HQBase/hqbase-mail-bridge
-          ref: bb0d504f6de8a810240002891a58d8cb2d9c337e
+          ref: 5416175d622ffcfc093f583ce5c26fc25c70e2
           path: .staging/bridge
           ssh-key: ${{ secrets.HQBASE_BRIDGE_REPO_DEPLOY_KEY }}
       - name: Build the headless IMAPS/SMTPS acceptance client
@@ -154,18 +154,22 @@ jobs:
         id: release-versions
         run: |
           current_version=$(node -p "require('./package.json').version")
+          previous_version=$(node -p "require('./package.json').hqbaseRelease.minimumVersion")
+          test "$current_version" != "$previous_version"
           echo "current=$current_version" >> "$GITHUB_OUTPUT"
+          echo "previous=$previous_version" >> "$GITHUB_OUTPUT"
           config=".hqbase-pro/deployments/$DEPLOYMENT_NAME/wrangler.jsonc"
           secrets=".hqbase-pro/deployments/$DEPLOYMENT_NAME/secrets.json"
           node --input-type=module -e '
             import fs from "node:fs";
             const path = process.argv[1];
+            const version = process.argv[2];
             const config = JSON.parse(fs.readFileSync(path, "utf8"));
-            config.vars.HQBASE_APP_VERSION = "0.1.1";
+            config.vars.HQBASE_APP_VERSION = version;
             fs.writeFileSync(path, `${JSON.stringify(config, null, 2)}\n`);
-          ' "$config"
+          ' "$config" "$previous_version"
           pnpm exec wrangler d1 execute DB --remote --config "$config" \
-            --command "UPDATE pro_release_state SET installed_version = '0.1.1', updated_at = datetime('now') WHERE singleton = 1"
+            --command "UPDATE pro_release_state SET installed_version = '$previous_version', updated_at = datetime('now') WHERE singleton = 1"
           pnpm exec wrangler deploy --config "$config" --secrets-file "$secrets"
       - name: Verify the Fly bridge can reach Pro
         run: |
@@ -185,6 +189,7 @@ jobs:
       - name: Apply the guarded Pro N-1 update while the bridge remains running
         run: |
           current_version=$(node -p "require('./package.json').version")
+          previous_version="${{ steps.release-versions.outputs.previous }}"
           config=".hqbase-pro/deployments/$DEPLOYMENT_NAME/wrangler.jsonc"
           node --input-type=module -e '
             import fs from "node:fs";
@@ -204,8 +209,8 @@ jobs:
           history=$(pnpm exec wrangler d1 execute DB --remote --config "$config" --json \
             --command "SELECT from_version, to_version, state FROM pro_update_history ORDER BY started_at DESC LIMIT 1")
           jq -e --arg version "$current_version" '.[0].results[0].installed_version == $version' <<<"$release"
-          jq -e --arg version "$current_version" \
-            '.[0].results[0] == {"from_version":"0.1.1","to_version":$version,"state":"verified"}' \
+          jq -e --arg from "$previous_version" --arg version "$current_version" \
+            '.[0].results[0] == {"from_version":$from,"to_version":$version,"state":"verified"}' \
             <<<"$history"
       - name: Verify deep readiness after redeploy
         run: |
@@ -237,8 +242,21 @@ jobs:
           curl --fail --silent --show-error "https://$HQBASE_PRO_STAGING_BRIDGE_HOST/ready" >/dev/null
       - name: Exercise the still-running bridge after restore
         run: pnpm test:e2e:staging
-      - name: Destroy disposable Pro installation
-        if: always()
-        # Keep the Worker and custom domain stable. Recreating the custom domain on
-        # every run can leave recursive DNS caches holding NXDOMAIN during the test.
-        run: pnpm hqbase-pro destroy --name "$DEPLOYMENT_NAME" --scope state --yes
+      - name: Verify the successful run is a healthy persistent staging anchor
+        run: |
+          config=".hqbase-pro/deployments/$DEPLOYMENT_NAME/wrangler.jsonc"
+          pnpm exec wrangler d1 info "hqbase-pro-$DEPLOYMENT_NAME" --config "$config" >/dev/null
+          pnpm exec wrangler r2 bucket info "hqbase-pro-$DEPLOYMENT_NAME-mail" >/dev/null
+          pnpm exec wrangler queues info "hqbase-pro-$DEPLOYMENT_NAME-jobs" >/dev/null
+          curl --fail --silent --show-error \
+            -H "CF-Access-Client-Id: $HQBASE_PRO_STAGING_ACCESS_CLIENT_ID" \
+            -H "CF-Access-Client-Secret: $HQBASE_PRO_STAGING_ACCESS_CLIENT_SECRET" \
+            "$HQBASE_PRO_STAGING_URL/api/health" >/dev/null
+          curl --fail --silent --show-error "https://$HQBASE_PRO_STAGING_BRIDGE_HOST/ready" >/dev/null
+      - name: Retain the non-secret staging manifest for verified cleanup
+        uses: actions/upload-artifact@v4
+        with:
+          name: hqbase-pro-staging-manifest-${{ github.run_id }}
+          path: .hqbase-pro/deployments/e2e-${{ github.run_id }}/manifest.json
+          if-no-files-found: error
+          retention-days: 30

@@ -1,21 +1,35 @@
-# Mail bridge preview
+# Mail bridge
 
-The Pro Worker owns `/api/pro/mail-bridge/v1`. The Fly bridge receives only its deployment token and the Pro HTTPS URL.
+The Pro Worker owns the versioned `/api/pro/mail-bridge/v2` HTTPS contract. The separately deployed
+Fly bridge translates IMAPS and SMTPS and receives only the Pro HTTPS URL, a deployment-scoped
+bridge token, and—when staging is protected—a Cloudflare Access service token. It never receives a
+Cloudflare API token or direct D1/R2 credentials.
 
-Implemented:
+Implemented in v2:
 
-- separately revocable app passwords, shown once and stored as peppered HMACs;
-- short-lived mail sessions revoked with their app password;
-- standard-folder snapshots with persistent UIDs;
-- bounded raw MIME retrieval;
-- idempotent SMTP submission with raw MIME retention;
-- idempotent flag replacement by UID.
+- separately revocable app passwords, shown once and stored as peppered HMAC verifiers;
+- short-lived sessions that fail closed after password, user, mailbox, grant, or entitlement
+  revocation;
+- paginated mailbox synchronization with persistent `UIDVALIDITY`, `UIDNEXT`, stable UIDs, and an
+  opaque replayable change cursor;
+- on-demand raw MIME streaming with HTTP byte-range support;
+- idempotent SMTP submission with allowed-sender enforcement;
+- idempotent flag, append, copy, and expunge mutations using explicit UIDs;
+- `NOOP` and polling `IDLE` synchronization for cross-session message, flag, and expunge changes;
+- deep authenticated readiness for schema, entitlement, D1, and R2 dependencies.
 
-Preview limitations:
+The headless staging acceptance test proves app-password authentication, one SMTPS submission, and
+an IMAPS read of the resulting Sent message through a pinned bridge build. Local contract and
+protocol tests cover pagination, cursor replay, range reads, mutations, revocation, search, partial
+fetches, and reconnect behavior.
 
-- the snapshot response must become cursor-based and stream raw MIME before large mailboxes;
-- append, copy, move, archive, trash, expunge, folder changes, and `IDLE` propagation are not persisted yet;
-- the bridge must identify sequence-number versus UID targets before general flag/copy support;
-- entitlement enforcement is not implemented.
+Current limits:
 
-These limitations are explicit API errors. This build is for contract and staging validation, not production mail-client use.
+- mailbox create, rename, and delete are unsupported; HQBase exposes the standard Pro mailbox set;
+- `IDLE` polls the change feed rather than using server push;
+- the deployed automated acceptance client is not a substitute for full Apple Mail or Thunderbird
+  compatibility testing;
+- Apple Mail and Thunderbird remain explicit human release-candidate checks.
+
+The canonical cross-repository contract is `hqbase-internal/contracts/mail-bridge-v2.md`. The
+bridge repository's endpoint reference is `docs/hqbase-api-contract.md` there.
