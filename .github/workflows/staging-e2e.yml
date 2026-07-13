@@ -170,7 +170,14 @@ jobs:
           ' "$config" "$previous_version"
           pnpm exec wrangler d1 execute DB --remote --config "$config" \
             --command "UPDATE pro_release_state SET installed_version = '$previous_version', updated_at = datetime('now') WHERE singleton = 1"
-          pnpm exec wrangler deploy --config "$config" --secrets-file "$secrets"
+          for attempt in $(seq 1 5); do
+            if pnpm exec wrangler deploy --config "$config" --secrets-file "$secrets"; then
+              break
+            fi
+            test "$attempt" -lt 5
+            echo "Worker trigger reconciliation failed; retrying in 15 seconds."
+            sleep 15
+          done
       - name: Verify the Fly bridge can reach Pro
         run: |
           for attempt in $(seq 1 150); do
@@ -200,10 +207,17 @@ jobs:
             fs.writeFileSync(path, `${JSON.stringify(config, null, 2)}\n`);
           ' "$config" "$current_version"
           pnpm build
-          HQBASE_TARGET_VERSION="$current_version" CONFIG_FILE="$config" node --input-type=module -e '
-            import { runDeployLifecycle } from "./scripts/hqbase-pro/deploy.mjs";
-            runDeployLifecycle({ configFile: process.env.CONFIG_FILE });
-          '
+          for attempt in $(seq 1 5); do
+            if HQBASE_TARGET_VERSION="$current_version" CONFIG_FILE="$config" node --input-type=module -e '
+              import { runDeployLifecycle } from "./scripts/hqbase-pro/deploy.mjs";
+              runDeployLifecycle({ configFile: process.env.CONFIG_FILE });
+            '; then
+              break
+            fi
+            test "$attempt" -lt 5
+            echo "Guarded Worker redeploy failed; retrying in 15 seconds."
+            sleep 15
+          done
           release=$(pnpm exec wrangler d1 execute DB --remote --config "$config" --json \
             --command "SELECT installed_version FROM pro_release_state WHERE singleton = 1")
           history=$(pnpm exec wrangler d1 execute DB --remote --config "$config" --json \
@@ -254,6 +268,7 @@ jobs:
             "$HQBASE_PRO_STAGING_URL/api/health" >/dev/null
           curl --fail --silent --show-error "https://$HQBASE_PRO_STAGING_BRIDGE_HOST/ready" >/dev/null
       - name: Retain the non-secret staging manifest for verified cleanup
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: hqbase-pro-staging-manifest-${{ github.run_id }}
