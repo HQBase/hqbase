@@ -58,7 +58,7 @@ export function SettingsPage({
             <SettingsTab value="users">Users</SettingsTab>
             {canManage ? <SettingsTab value="domains">Domains</SettingsTab> : null}
             {canManage ? <SettingsTab value="access">Access</SettingsTab> : null}
-            <SettingsTab value="mail-clients">Mail clients</SettingsTab>
+            <SettingsTab value="mail-clients">Mail clients (preview)</SettingsTab>
             {canManage && entitlement ? <SettingsTab value="billing">Billing</SettingsTab> : null}
             {canManage && entitlement && upgrade ? (
               <SettingsTab value="upgrade">Upgrade</SettingsTab>

@@ -71,6 +71,15 @@ export function AppPasswordSettings(): React.ReactElement {
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-5">
+        <Alert>
+          <KeyRound />
+          <AlertTitle>Private preview</AlertTitle>
+          <AlertDescription>
+            The basic Pro launch is web-first. These credentials work only after HQBase confirms
+            that this workspace has a dedicated preview bridge; IMAP/SMTP is not generally available
+            yet.
+          </AlertDescription>
+        </Alert>
         <form
           className="grid gap-2 sm:grid-cols-[1fr_150px_auto]"
           onSubmit={(event) => void handleCreate(event)}
