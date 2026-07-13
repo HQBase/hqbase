@@ -11,7 +11,7 @@ The README includes a Deploy to Cloudflare button. Before publishing, point it a
 pnpm hqbase:button --repo-url https://github.com/OWNER/REPO
 ```
 
-Cloudflare's deploy flow clones the repository, prompts for configured secrets and variables, provisions supported resources from `wrangler.jsonc`, builds the Worker, and deploys it.
+Cloudflare's deploy flow clones the repository, prompts for configured variables, provisions supported resources from `wrangler.jsonc`, builds the Worker, and deploys it. On the first customer-owned build, the deploy command generates a unique `BETTER_AUTH_SECRET`, uploads it as a masked Worker secret, and deletes the temporary local file. Later builds preserve the existing value instead of rotating it.
 
 The default `wrangler.jsonc` does not set `BETTER_AUTH_URL`; the Worker derives the deployed request origin. Only set `BETTER_AUTH_URL` explicitly when you need to pin auth to a specific custom origin.
 
@@ -29,7 +29,6 @@ domain Active before completing `/setup`.
 - D1 read replication: leave disabled for the MVP.
 - R2 bucket: choose Create new. Keep `hqbase-mail`, or rename it for the target environment.
 - R2 location hint: leave blank/automatic unless the deployer has a specific data-location requirement.
-- `BETTER_AUTH_SECRET`: paste a fresh value generated with `openssl rand -base64 32`.
 - `BETTER_AUTH_URL`: normally leave unset. HQBase derives the request origin at runtime.
 - Build command: keep `pnpm run build`.
 - Deploy command: keep `pnpm run deploy`; this runs the build, applies D1 migrations by the `DB` binding, deploys the Worker, and prints the setup link.
@@ -77,7 +76,8 @@ The operator writes `.hqbase/deployments/<name>/manifest.json` and a generated W
 
 ## Required Secret
 
-- `BETTER_AUTH_SECRET`: generate with `openssl rand -base64 32`.
+- `BETTER_AUTH_SECRET`: generated automatically by the first Deploy to Cloudflare build. Manual
+  deployments must set it with `wrangler secret put BETTER_AUTH_SECRET` before `pnpm deploy`.
 
 ## Deployment Check
 

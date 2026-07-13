@@ -38,9 +38,6 @@
   },
   "cloudflare": {
     "bindings": {
-      "BETTER_AUTH_SECRET": {
-        "description": "Required Better Auth signing secret. Paste a long random value generated with `openssl rand -base64 32`."
-      },
       "DB": {
         "description": "Cloudflare D1 database used for Better Auth, setup state, mailboxes, threads, and message metadata."
       },
