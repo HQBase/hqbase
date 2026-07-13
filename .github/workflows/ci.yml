@@ -5,6 +5,9 @@ on:
   push:
     branches: [main]
 
+permissions:
+  contents: read
+
 jobs:
   quality:
     runs-on: ubuntu-latest
@@ -12,6 +15,7 @@ jobs:
       BETTER_AUTH_SECRET: ci-auth-secret-not-used-in-production
       PRO_APP_PASSWORD_PEPPER: ci-app-password-pepper-not-used-in-production
       PRO_BRIDGE_TOKEN: ci-bridge-token-not-used-in-production
+      PRO_ENTITLEMENT_SECRET: ci-entitlement-secret-not-used-in-production
       PRO_SESSION_SECRET: ci-session-secret-not-used-in-production
     steps:
       - uses: actions/checkout@v4

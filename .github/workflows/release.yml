@@ -12,18 +12,39 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: hqbase-pro-release
+  cancel-in-progress: false
+
 jobs:
   publish:
     runs-on: ubuntu-latest
+    environment: release
+    timeout-minutes: 20
+    env:
+      BETTER_AUTH_SECRET: ci-auth-secret-not-used-in-production
+      PRO_APP_PASSWORD_PEPPER: ci-app-password-pepper-not-used-in-production
+      PRO_BRIDGE_TOKEN: ci-bridge-token-not-used-in-production
+      PRO_ENTITLEMENT_SECRET: ci-entitlement-secret-not-used-in-production
+      PRO_SESSION_SECRET: ci-session-secret-not-used-in-production
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
+        with:
+          version: 11.7.0
       - uses: actions/setup-node@v4
         with:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm check
+      - run: pnpm deploy:dry-run
+      - name: Verify release credentials
+        env:
+          HQBASE_RELEASE_PRIVATE_KEY: ${{ secrets.HQBASE_RELEASE_PRIVATE_KEY }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: test -n "$HQBASE_RELEASE_PRIVATE_KEY" && test -n "$CLOUDFLARE_API_TOKEN" && test -n "$CLOUDFLARE_ACCOUNT_ID"
       - name: Package and sign
         env:
           HQBASE_RELEASE_PRIVATE_KEY: ${{ secrets.HQBASE_RELEASE_PRIVATE_KEY }}
