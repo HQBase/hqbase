@@ -49,7 +49,7 @@ export function useSetupFlow(onComplete: () => void) {
   const steps = [
     {
       canOpen: furthestStep >= ACCESS_STEP,
-      description: cloudflare.tokenReady ? "Access verified" : "Temporary setup token",
+      description: cloudflare.tokenReady ? "Access verified" : "Installation grant",
       icon: KeyRound,
       id: "access",
       isComplete: cloudflare.tokenReady,

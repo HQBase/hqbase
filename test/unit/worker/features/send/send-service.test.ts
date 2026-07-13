@@ -57,6 +57,7 @@ describe("send service", () => {
   const env = {
     ASSETS: {} as Fetcher,
     BETTER_AUTH_SECRET: "test-secret",
+    CLOUDFLARE_OAUTH_CLIENT_ID: "1c413f324b518b452096929b847e6703",
     DB: {} as D1Database,
     HQBASE_APP_VERSION: "0.1.2",
     HQBASE_BILLING_URL: "https://billing.hqbase.io",

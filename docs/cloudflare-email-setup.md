@@ -20,8 +20,9 @@ from the in-app setup wizard or from the repeatable operator.
 
 Public Deploy Button installs use `/setup` after the Worker is deployed:
 
-1. Create a temporary Cloudflare API token scoped to the target account or zone.
-2. Paste the token into `/setup`, then click `Verify and continue`.
+1. Approve the requested accounts, zones, and permissions in the Cloudflare OAuth screen during
+   Pro installation.
+2. Open `/setup`, then click `Continue with Cloudflare`.
 3. Select the primary domain and choose the editable workspace subdomain. The
    selected domain is the fixed suffix for the app address.
 4. Click `Connect domain and continue`. HQBase configures Cloudflare and advances
@@ -30,12 +31,11 @@ Public Deploy Button installs use `/setup` after the Worker is deployed:
 On the owner step, choose only the part before `@`. HQBase combines it with the
 selected domain and uses the complete address as the owner login.
 
-The setup wizard uses the token to enable Email Routing DNS, point the catch-all
-route at the deployed Worker, and enable Email Sending when permitted by the
-account. The token is sent to the Worker for these Cloudflare API calls and is
-not stored in D1.
+The setup wizard uses the delegated grant to enable Email Routing DNS, point the catch-all route at
+the deployed Worker, and enable Email Sending when permitted by the account. The access token is a
+masked Worker secret, is never stored in D1, and is deleted and revoked after setup.
 
-Recommended token permissions:
+OAuth permissions:
 
 - Account / Email Sending / Edit.
 - Account / Workers Scripts / Edit.
@@ -74,7 +74,7 @@ Use `pnpm hqbase-pro:reset --name dev-01 --scope domain` to disable the catch-al
 ## Troubleshooting
 
 - If inbound mail does not appear, confirm the catch-all route targets the deployed Worker.
-- If Email Routing DNS shows `Authentication error`, add Zone Settings / Edit to
-  the setup token and retry the domain connection.
+- If Email Routing DNS shows `Authentication error`, confirm Zone Settings / Edit was approved and
+  restart authorization.
 - If sent mail fails, confirm Email Sending is enabled and the sender mailbox uses the primary domain.
 - If attachments are missing, confirm the `MAIL_OBJECTS` R2 bucket exists and is bound.

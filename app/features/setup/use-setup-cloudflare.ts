@@ -3,7 +3,7 @@ import { toast } from "sonner";
 
 import { configureCloudflareDomain, listCloudflareZones, verifyCloudflareToken } from "./api";
 import { buildAppHostname, customDomainSucceeded, inferWorkerName } from "./setup-helpers";
-import { hasErrors, validateDomain, validateToken } from "./setup-validation";
+import { hasErrors, validateDomain } from "./setup-validation";
 import type { CloudflareConfigureResult, CloudflareTokenStatus, CloudflareZone } from "./types";
 
 export type ConfiguredDomain = { zone: CloudflareZone; result: CloudflareConfigureResult };
@@ -15,7 +15,6 @@ export function useSetupCloudflare(callbacks: {
   onTokenChanged: () => void;
   onTokenVerified: () => void;
 }) {
-  const [apiToken, setApiToken] = React.useState("");
   const [tokenStatus, setTokenStatus] = React.useState<CloudflareTokenStatus | null>(null);
   const [tokenError, setTokenError] = React.useState<string | null>(null);
   const [zones, setZones] = React.useState<CloudflareZone[]>([]);
@@ -55,18 +54,16 @@ export function useSetupCloudflare(callbacks: {
     : {};
 
   async function handleTokenNext() {
-    const validationError = validateToken(apiToken);
-    setTokenError(validationError);
-    if (validationError) return;
+    setTokenError(null);
     setIsLoading(true);
     try {
-      const verified = await verifyCloudflareToken(apiToken.trim());
+      const verified = await verifyCloudflareToken();
       if (!verified.active) {
         setTokenStatus(verified);
         setTokenError(`Cloudflare reports this token as ${verified.status}.`);
         return;
       }
-      const nextZones = await listCloudflareZones(apiToken.trim());
+      const nextZones = await listCloudflareZones();
       if (nextZones.length === 0) {
         setTokenError("The token is valid, but it cannot read any Cloudflare domains.");
         return;
@@ -95,7 +92,6 @@ export function useSetupCloudflare(callbacks: {
         const result = await configureCloudflareDomain({
           ...(isPortal ? { appHostname, serviceHostname } : {}),
           attachCustomDomain: isPortal,
-          apiToken,
           enableSending: true,
           workerName: workerName.trim(),
           zoneId: zone.id
@@ -130,17 +126,6 @@ export function useSetupCloudflare(callbacks: {
     callbacks.onConnectionInvalidated();
   }
 
-  function handleTokenChange(value: string) {
-    setApiToken(value);
-    setTokenStatus(null);
-    setTokenError(null);
-    setZones([]);
-    setSelectedZoneIds([]);
-    setPortalZoneId("");
-    invalidateConnection();
-    callbacks.onTokenChanged();
-  }
-
   function toggleZone(zoneId: string, selected: boolean) {
     const previousDomain = primaryDomain;
     const next = selected
@@ -159,10 +144,8 @@ export function useSetupCloudflare(callbacks: {
   };
   return {
     access: {
-      apiToken,
       error: tokenError,
       isLoading,
-      onApiTokenChange: handleTokenChange,
       onNext: () => void handleTokenNext()
     },
     domain: {

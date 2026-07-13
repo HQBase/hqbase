@@ -112,12 +112,11 @@ The deploy command prints the setup link. Use the Worker URL shown by Wrangler,
 then add `/setup`.
 
 1. Visit `/setup`.
-2. Create and verify the temporary Cloudflare API token described in the table.
+2. Continue with the temporary Cloudflare authorization approved during installation.
 3. Select every email domain, choose which domain hosts the portal, and connect them. Setup also
    creates the separate stable service origin.
 4. Enter the owner's full sign-in email. Authentication does not have to use an email domain.
 5. Create shared mailboxes using any connected domain.
 
-The temporary token needs Account / Email Sending / Edit, Account / Workers
-Scripts / Edit, Zone / Zone / Read, Zone / Zone Settings / Edit, and Zone / Email
-Routing Rules / Edit.
+No Cloudflare API token is pasted into Pro. The installer carries the short-lived delegated grant
+into setup as a masked Worker secret. HQBase revokes it and deletes the secret after setup.

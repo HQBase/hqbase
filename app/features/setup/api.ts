@@ -16,19 +16,23 @@ export async function bootstrapSetup(input: BootstrapSetupInput): Promise<void> 
   await apiPost("/api/setup/bootstrap", input);
 }
 
-export async function verifyCloudflareToken(apiToken: string): Promise<CloudflareTokenStatus> {
-  return apiPost<CloudflareTokenStatus>("/api/setup/cloudflare/token", { apiToken });
+export async function verifyCloudflareToken(apiToken?: string): Promise<CloudflareTokenStatus> {
+  return apiPost<CloudflareTokenStatus>(
+    "/api/setup/cloudflare/token",
+    apiToken ? { apiToken } : {}
+  );
 }
 
-export async function listCloudflareZones(apiToken: string): Promise<CloudflareZone[]> {
-  const response = await apiPost<{ zones: CloudflareZone[] }>("/api/setup/cloudflare/zones", {
-    apiToken
-  });
+export async function listCloudflareZones(apiToken?: string): Promise<CloudflareZone[]> {
+  const response = await apiPost<{ zones: CloudflareZone[] }>(
+    "/api/setup/cloudflare/zones",
+    apiToken ? { apiToken } : {}
+  );
   return response.zones;
 }
 
 export async function inspectCloudflareDomain(input: {
-  apiToken: string;
+  apiToken?: string;
   workerName: string;
   zoneId: string;
 }): Promise<CloudflareDomainStatus> {
@@ -39,7 +43,7 @@ export async function configureCloudflareDomain(input: {
   appHostname?: string;
   serviceHostname?: string;
   attachCustomDomain: boolean;
-  apiToken: string;
+  apiToken?: string;
   enableSending: boolean;
   workerName: string;
   zoneId: string;
