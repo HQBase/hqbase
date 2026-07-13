@@ -3,6 +3,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Field, FieldDescription, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { applyUpdate, getUpdateStatus } from "./api";
 import type { UpdateStatus } from "./types";
@@ -14,49 +15,60 @@ export function UpdateSettings({
 }): React.ReactElement {
   const [status, setStatus] = React.useState(initialStatus);
   const [apiToken, setApiToken] = React.useState("");
-  const [error, setError] = React.useState<string | null>(null);
+  const [checkError, setCheckError] = React.useState<string | null>(null);
+  const [applyError, setApplyError] = React.useState<string | null>(null);
   const [buildId, setBuildId] = React.useState<string | null>(null);
-  const [busy, setBusy] = React.useState(false);
+  const [pendingAction, setPendingAction] = React.useState<"check" | "apply" | null>(null);
+  const tokenDescriptionId = "update-cloudflare-token-description";
+  const tokenErrorId = "update-cloudflare-token-error";
 
   async function check(): Promise<void> {
-    setBusy(true);
-    setError(null);
+    setPendingAction("check");
+    setCheckError(null);
     try {
       setStatus(await getUpdateStatus());
     } catch (nextError) {
-      setError(nextError instanceof Error ? nextError.message : "Update check failed.");
+      setCheckError(nextError instanceof Error ? nextError.message : "Update check failed.");
     } finally {
-      setBusy(false);
+      setPendingAction(null);
     }
   }
-  async function apply(): Promise<void> {
-    setBusy(true);
-    setError(null);
+  async function apply(event: React.FormEvent<HTMLFormElement>): Promise<void> {
+    event.preventDefault();
+    setPendingAction("apply");
+    setApplyError(null);
     try {
       const result = await applyUpdate(apiToken);
       setBuildId(result.buildId);
       setApiToken("");
     } catch (nextError) {
-      setError(nextError instanceof Error ? nextError.message : "Update could not start.");
+      setApplyError(nextError instanceof Error ? nextError.message : "Update could not start.");
     } finally {
-      setBusy(false);
+      setPendingAction(null);
     }
   }
 
+  const isPending = pendingAction !== null;
+  const statusLabel = !status
+    ? "Not checked"
+    : status.available
+      ? "Update available"
+      : "Up to date";
+
   return (
     <div className="grid gap-5">
-      {error ? (
+      {checkError ? (
         <Alert variant="destructive">
-          <AlertTitle>Update unavailable</AlertTitle>
-          <AlertDescription>{error}</AlertDescription>
+          <AlertTitle>Update check unavailable</AlertTitle>
+          <AlertDescription>{checkError}</AlertDescription>
         </Alert>
       ) : null}
       {buildId ? (
         <Alert>
           <AlertTitle>Update started</AlertTitle>
           <AlertDescription>
-            Cloudflare build {buildId} is running. HQBase remains available during the build and
-            will reconnect after deployment.
+            Cloudflare build <span className="font-mono">{buildId}</span> is running. HQBase remains
+            available during the build and will reconnect after deployment.
           </AlertDescription>
         </Alert>
       ) : null}
@@ -69,8 +81,11 @@ export function UpdateSettings({
                 Signed stable releases for this installation
               </CardDescription>
             </div>
-            <Badge variant={status?.available ? "default" : "secondary"}>
-              {status?.available ? "Update available" : "Up to date"}
+            <Badge
+              role="status"
+              variant={!status ? "outline" : status.available ? "default" : "secondary"}
+            >
+              {statusLabel}
             </Badge>
           </div>
         </CardHeader>
@@ -96,8 +111,8 @@ export function UpdateSettings({
               </a>
             </div>
           ) : null}
-          <Button disabled={busy} onClick={() => void check()} type="button" variant="outline">
-            {busy ? "Checking…" : "Check again"}
+          <Button disabled={isPending} onClick={() => void check()} type="button" variant="outline">
+            {pendingAction === "check" ? "Checking for updates…" : "Check again"}
           </Button>
         </CardContent>
       </Card>
@@ -110,30 +125,48 @@ export function UpdateSettings({
               deploys, and verifies before reporting success.
             </CardDescription>
           </CardHeader>
-          <CardContent className="grid gap-3">
-            <Input
-              autoComplete="off"
-              onChange={(event) => setApiToken(event.target.value)}
-              placeholder="Temporary Cloudflare API token"
-              type="password"
-              value={apiToken}
-            />
-            <p className="text-xs text-muted-foreground">
-              Required permissions: Workers Scripts Read, Workers Builds Configuration Edit, and
-              Zone Read. The token is used for this request and is never stored.
-            </p>
-            <Button
-              disabled={busy || !apiToken || !status.compatible}
-              onClick={() => void apply()}
-              type="button"
-            >
-              Start update
-            </Button>
-            {!status.compatible ? (
-              <p className="text-xs text-destructive">
-                This release cannot update directly from the installed version.
-              </p>
-            ) : null}
+          <CardContent>
+            <form className="flex flex-col gap-4" onSubmit={(event) => void apply(event)}>
+              <Field data-invalid={Boolean(applyError)}>
+                <FieldLabel htmlFor="update-cloudflare-token">
+                  Temporary Cloudflare API token
+                </FieldLabel>
+                <Input
+                  aria-describedby={`${tokenDescriptionId}${applyError ? ` ${tokenErrorId}` : ""}`}
+                  aria-invalid={Boolean(applyError)}
+                  autoCapitalize="none"
+                  autoComplete="off"
+                  id="update-cloudflare-token"
+                  minLength={20}
+                  required
+                  type="password"
+                  value={apiToken}
+                  onChange={(event) => {
+                    setApiToken(event.target.value);
+                    setApplyError(null);
+                  }}
+                />
+                <FieldDescription id={tokenDescriptionId}>
+                  Required permissions: Workers Scripts Read, Workers Builds Configuration Edit, and
+                  Zone Read. The token is used for this request and is never stored.
+                </FieldDescription>
+                {applyError ? <FieldError id={tokenErrorId}>{applyError}</FieldError> : null}
+              </Field>
+              {!status.compatible ? (
+                <Alert variant="destructive">
+                  <AlertTitle>Direct update unavailable</AlertTitle>
+                  <AlertDescription>
+                    This release cannot update directly from the installed version.
+                  </AlertDescription>
+                </Alert>
+              ) : null}
+              <Button
+                disabled={isPending || apiToken.length < 20 || !status.compatible}
+                type="submit"
+              >
+                {pendingAction === "apply" ? "Starting update…" : "Start update"}
+              </Button>
+            </form>
           </CardContent>
         </Card>
       ) : null}

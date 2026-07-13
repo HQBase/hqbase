@@ -12,11 +12,15 @@ export function BillingBanner({
   if (!copy) return null;
   return (
     <Alert
+      aria-live="polite"
       className="rounded-none border-x-0 border-t-0"
       variant={copy.destructive ? "destructive" : "default"}
     >
-      <CircleAlert />
-      <AlertTitle>{copy.title}</AlertTitle>
+      <CircleAlert aria-hidden="true" />
+      <AlertTitle>
+        <span className="sr-only">License status: </span>
+        {copy.title}
+      </AlertTitle>
       <AlertDescription>{copy.description}</AlertDescription>
     </Alert>
   );

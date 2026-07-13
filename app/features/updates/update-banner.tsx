@@ -12,9 +12,13 @@ export function UpdateBanner({
 }): React.ReactElement | null {
   if (!status?.available) return null;
   return (
-    <div className="flex min-h-10 shrink-0 items-center justify-between gap-3 border-b border-blue-500/25 bg-blue-500/10 px-3 text-xs md:px-4">
+    <div
+      aria-live="polite"
+      className="flex min-h-10 shrink-0 items-center justify-between gap-3 border-b bg-muted/45 px-3 text-xs md:px-4"
+      role="status"
+    >
       <div className="flex items-center gap-2">
-        <ArrowUpCircle className="size-4 text-blue-600" />
+        <ArrowUpCircle aria-hidden="true" className="size-4 text-muted-foreground" />
         <span>
           <strong>Update available</strong> · HQBase {status.release.version}
         </span>

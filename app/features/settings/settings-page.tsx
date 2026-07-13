@@ -53,7 +53,7 @@ export function SettingsPage({
           <p className="mt-1 text-xs text-muted-foreground">Workspace and access</p>
         </div>
         <Tabs defaultValue={defaultTab}>
-          <TabsList className="h-auto w-full justify-start rounded-none border-b bg-transparent p-0">
+          <TabsList className="h-auto w-full flex-wrap justify-start gap-x-1 rounded-none border-b bg-transparent p-0">
             <SettingsTab value="mailboxes">Mailboxes</SettingsTab>
             <SettingsTab value="users">Users</SettingsTab>
             {canManage ? <SettingsTab value="domains">Domains</SettingsTab> : null}

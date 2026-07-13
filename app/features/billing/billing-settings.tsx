@@ -1,6 +1,7 @@
 import { ArrowUpRight, RefreshCw } from "lucide-react";
 import * as React from "react";
 import { toast } from "sonner";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -11,7 +12,7 @@ import {
   CardHeader,
   CardTitle
 } from "@/components/ui/card";
-import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field";
+import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { activateEntitlement, refreshEntitlement } from "./api";
 import type { EntitlementStatus } from "./types";
@@ -24,42 +25,69 @@ export function BillingSettings({
   onChanged: (status: EntitlementStatus) => void;
 }): React.ReactElement {
   const [licenseKey, setLicenseKey] = React.useState("");
-  const [isPending, setIsPending] = React.useState(false);
+  const [pendingAction, setPendingAction] = React.useState<"activate" | "refresh" | null>(null);
+  const [activationError, setActivationError] = React.useState<string | null>(null);
+  const [refreshError, setRefreshError] = React.useState<string | null>(null);
+  const activationErrorId = "pro-license-key-error";
 
   async function activate(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setIsPending(true);
+    setActivationError(null);
+    setPendingAction("activate");
     try {
       const next = await activateEntitlement({ licenseKey, hostname: window.location.hostname });
       setLicenseKey("");
       onChanged(next);
       toast.success("HQBase Pro license activated.");
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "License activation failed.");
+      const message = error instanceof Error ? error.message : "License activation failed.";
+      setActivationError(message);
+      toast.error(message);
     } finally {
-      setIsPending(false);
+      setPendingAction(null);
     }
   }
 
   async function refresh() {
-    setIsPending(true);
+    setRefreshError(null);
+    setPendingAction("refresh");
     try {
       const next = await refreshEntitlement();
       onChanged(next);
-      toast.success("Subscription status refreshed.");
+      if (next.lastError) {
+        const message =
+          "The subscription check could not be completed. Access remains based on the last verified status.";
+        setRefreshError(message);
+        toast.error(message);
+      } else {
+        toast.success("Subscription status refreshed.");
+      }
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Subscription refresh failed.");
+      const message = error instanceof Error ? error.message : "Subscription refresh failed.";
+      setRefreshError(message);
+      toast.error(message);
     } finally {
-      setIsPending(false);
+      setPendingAction(null);
     }
   }
+
+  const isPending = pendingAction !== null;
+  const statusDiagnostic =
+    refreshError ??
+    (status.lastError
+      ? "The last subscription check could not be completed. Access remains based on the last verified status."
+      : null);
 
   return (
     <Card className="bg-card/70 shadow-none">
       <CardHeader>
         <div className="flex items-center gap-2">
           <CardTitle className="text-base font-medium">HQBase Pro</CardTitle>
-          <Badge variant={status.canConfigure ? "secondary" : "destructive"}>
+          <Badge
+            aria-label={`License status: ${label(status.state)}`}
+            role="status"
+            variant={status.canConfigure ? "secondary" : "destructive"}
+          >
             {label(status.state)}
           </Badge>
         </div>
@@ -68,6 +96,12 @@ export function BillingSettings({
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-5">
+        {statusDiagnostic ? (
+          <Alert variant={refreshError ? "destructive" : "default"}>
+            <AlertTitle>Subscription check needs attention</AlertTitle>
+            <AlertDescription>{statusDiagnostic}</AlertDescription>
+          </Alert>
+        ) : null}
         <dl className="grid gap-3 text-sm sm:grid-cols-3">
           <StatusItem label="License" value={status.displayKey ?? "Not activated"} />
           <StatusItem
@@ -84,9 +118,11 @@ export function BillingSettings({
           onSubmit={(event) => void activate(event)}
         >
           <FieldGroup>
-            <Field>
+            <Field data-invalid={Boolean(activationError)}>
               <FieldLabel htmlFor="pro-license-key">License key</FieldLabel>
               <Input
+                aria-describedby={activationError ? activationErrorId : undefined}
+                aria-invalid={Boolean(activationError)}
                 autoCapitalize="none"
                 autoComplete="off"
                 id="pro-license-key"
@@ -94,29 +130,42 @@ export function BillingSettings({
                 required
                 type="password"
                 value={licenseKey}
-                onChange={(event) => setLicenseKey(event.target.value)}
+                onChange={(event) => {
+                  setLicenseKey(event.target.value);
+                  setActivationError(null);
+                }}
               />
               <FieldDescription>
                 The key is encrypted before storage and is never written to logs.
               </FieldDescription>
+              {activationError ? (
+                <FieldError id={activationErrorId}>{activationError}</FieldError>
+              ) : null}
             </Field>
             <Button disabled={isPending} type="submit">
-              {isPending ? "Checking…" : status.displayKey ? "Replace license" : "Activate license"}
+              {pendingAction === "activate"
+                ? status.displayKey
+                  ? "Replacing license…"
+                  : "Activating license…"
+                : status.displayKey
+                  ? "Replace license"
+                  : "Activate license"}
             </Button>
           </FieldGroup>
         </form>
       </CardContent>
-      <CardFooter className="gap-2 border-t pt-4">
+      <CardFooter className="flex-col items-stretch gap-2 border-t pt-4 sm:flex-row sm:items-center">
         <Button
           disabled={isPending || !status.displayKey}
+          className="w-full sm:w-auto"
           type="button"
           variant="outline"
           onClick={() => void refresh()}
         >
           <RefreshCw data-icon="inline-start" />
-          Refresh status
+          {pendingAction === "refresh" ? "Refreshing status…" : "Refresh status"}
         </Button>
-        <Button asChild variant="ghost">
+        <Button asChild className="w-full sm:w-auto" variant="ghost">
           <a href="https://polar.sh/hqbase/portal" rel="noreferrer" target="_blank">
             Manage subscription
             <ArrowUpRight data-icon="inline-end" />
@@ -137,7 +186,14 @@ function StatusItem({ label: itemLabel, value }: { label: string; value: string 
 }
 
 function label(state: EntitlementStatus["state"]): string {
-  return state.replace("_", " ");
+  return {
+    unlicensed: "Not activated",
+    active: "Active",
+    canceling: "Canceling",
+    past_due: "Past due",
+    grace: "Grace period",
+    inactive: "Inactive"
+  }[state];
 }
 
 function formatDate(value: string): string {
