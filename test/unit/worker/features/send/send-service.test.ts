@@ -59,7 +59,7 @@ describe("send service", () => {
     BETTER_AUTH_SECRET: "test-secret",
     CLOUDFLARE_OAUTH_CLIENT_ID: "1c413f324b518b452096929b847e6703",
     DB: {} as D1Database,
-    HQBASE_APP_VERSION: "0.1.2",
+    HQBASE_APP_VERSION: "0.1.3",
     HQBASE_BILLING_URL: "https://billing.hqbase.io",
     HQBASE_COMMUNITY_WORKER_NAME: "hqbase",
     HQBASE_RELEASE_PUBLIC_KEY: "MCowBQYDK2VwAyEAsVwKniCvpHDwbbnjTPP0SuIIG97cRL+iFBQvay9OrU4=",

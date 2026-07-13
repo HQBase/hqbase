@@ -12,3 +12,6 @@ mail service continues under the billing safety policy.
 Before a Pro-to-Pro migration the updater records D1 Time Travel and the active Worker version.
 The artifact signature and SHA-256 digest are verified before extraction. Migrations run before the
 Worker replacement, and exact D1 and Worker recovery commands are printed on failure.
+
+The 0.1.3 release supports direct Pro updates from 0.1.2. The supported Community-to-Pro source is
+Community 0.1.2. Older Community or Pro installations must first reach 0.1.2.

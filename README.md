@@ -14,6 +14,10 @@ attachment-aware composer, migrations, app-password management, persistent IMAP 
 API, and staging E2E orchestration. The Fly-hosted `hqbase-mail-bridge` connects through
 authenticated HTTPS and never receives Cloudflare credentials.
 
+The basic production launch is a web-first beta. IMAP/SMTP and app-password setup remain a private
+preview backed by dedicated preview bridge deployments; they are not generally available or part
+of the launch purchase promise. See `docs/mail-bridge.md`.
+
 ## Deploy
 
 The same Cloudflare flow supports both lifecycles:
