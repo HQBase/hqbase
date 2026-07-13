@@ -60,6 +60,10 @@ See `docs/community-upgrade.md` for the current cutover boundary and `docs/mail-
 - `docs/operations.md`: doctor, backup, restore, queues, retention, and incident order.
 - `docs/updates.md`: signed releases, licensed downloads, notification, and recovery.
 
+Pushes to `main` run the full quality gate and automatically start Pro's deployed staging E2E.
+Signed publication remains an explicit tag or workflow-dispatch decision; packaging, signing, and
+artifact upload are automated after that trigger.
+
 ## License
 
 Source-available under the HQBase Commercial Source License 1.0. See `LICENSE.md`, `LICENSING.md`,

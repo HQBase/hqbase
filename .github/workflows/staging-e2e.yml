@@ -2,6 +2,10 @@ name: Staging E2E
 
 on:
   workflow_dispatch:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
 
 concurrency:
   group: hqbase-pro-staging-e2e
@@ -9,6 +13,7 @@ concurrency:
 
 jobs:
   community-upgrade-migration:
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     environment: hqbase-staging
     timeout-minutes: 20
@@ -19,6 +24,8 @@ jobs:
       D1_NAME: hqbase-upgrade-${{ github.run_id }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
       - uses: pnpm/action-setup@v4
         with:
           version: 11.7.0
@@ -31,6 +38,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: HQBase/hqbase
+          ref: 6ce880e861254effff0636a81ecf2af2e86764d3
           path: .staging/community
       - name: Install Community operator dependencies
         working-directory: .staging/community
@@ -76,6 +84,7 @@ jobs:
         run: pnpm hqbase destroy --name "$DEPLOYMENT_NAME" --scope all --yes
 
   fresh-install-and-bridge:
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     environment: hqbase-staging
     timeout-minutes: 30
@@ -95,6 +104,8 @@ jobs:
       DEPLOYMENT_NAME: e2e-${{ github.run_id }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
       - uses: pnpm/action-setup@v4
         with:
           version: 11.7.0
@@ -111,7 +122,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: HQBase/hqbase-mail-bridge
-          ref: 96ef024476845fea431d2203b88550a646f04316
+          ref: bb0d504f6de8a810240002891a58d8cb2d9c337e
           path: .staging/bridge
           ssh-key: ${{ secrets.HQBASE_BRIDGE_REPO_DEPLOY_KEY }}
       - name: Build the headless IMAPS/SMTPS acceptance client
