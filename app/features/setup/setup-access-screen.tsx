@@ -68,17 +68,24 @@ export function AccessStep({
           ))}
         </div>
 
-        <form action="/api/setup/cloudflare/oauth/start" method="get" className="sm:pl-[3.125rem]">
-          <Button className="h-11 w-full sm:w-auto sm:px-6" disabled={isLoading} type="submit">
-            {isLoading ? (
-              <Loader2 className="animate-spin" data-icon="inline-start" />
-            ) : (
-              <Cloud aria-hidden="true" />
-            )}
-            Authorize Cloudflare
-            {!isLoading ? <ArrowRight data-icon="inline-end" aria-hidden="true" /> : null}
+        <div className="sm:pl-[3.125rem]">
+          <Button asChild size="sm">
+            <a
+              aria-disabled={isLoading}
+              className={isLoading ? "pointer-events-none opacity-50" : undefined}
+              href="/api/setup/cloudflare/oauth/start"
+              tabIndex={isLoading ? -1 : undefined}
+            >
+              {isLoading ? (
+                <Loader2 className="animate-spin" data-icon="inline-start" />
+              ) : (
+                <Cloud aria-hidden="true" />
+              )}
+              Authorize Cloudflare
+              {!isLoading ? <ArrowRight data-icon="inline-end" aria-hidden="true" /> : null}
+            </a>
           </Button>
-        </form>
+        </div>
       </section>
 
       {error ? (
