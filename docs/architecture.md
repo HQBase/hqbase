@@ -4,7 +4,7 @@ HQBase is a Cloudflare-native SPA plus Worker API.
 
 ## Request Flow
 
-Static assets are built by Vite into `dist` and served by the Worker assets binding. API requests use `/api/*` and are routed by Hono. SPA routes fall back to the asset handler.
+Static assets are built by Vite into `dist` and served by the Worker assets binding. API requests use `/api/*` and are routed by Hono before SPA asset handling, including top-level browser navigations. SPA routes fall back to the asset handler.
 
 ## Auth Flow
 
