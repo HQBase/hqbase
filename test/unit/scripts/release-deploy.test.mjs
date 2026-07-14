@@ -6,7 +6,8 @@ import {
   deploySource,
   needsInitialAuthSecret,
   normalizeConfig,
-  verifyManifest
+  verifyManifest,
+  workerNameFromConfig
 } from "../../../scripts/release/deploy.mjs";
 
 describe("Community release deployment", () => {
@@ -38,6 +39,7 @@ describe("Community release deployment", () => {
     expect(
       normalizeConfig(
         {
+          name: "customer-worker",
           main: "../../../worker/index.ts",
           assets: { directory: "../../../dist", binding: "ASSETS" },
           d1_databases: [{ binding: "DB", migrations_dir: "../../../migrations" }],
@@ -52,10 +54,15 @@ describe("Community release deployment", () => {
       vars: { HQBASE_APP_VERSION: "0.1.1", HQBASE_WORKER_NAME: "customer-worker" }
     });
   });
+  it("uses the configured Worker name as the runtime automation identity", () => {
+    expect(workerNameFromConfig({ name: "hqbase-deeptake-test" })).toBe("hqbase-deeptake-test");
+    expect(() => workerNameFromConfig({ name: "" })).toThrow("deployed Worker name");
+  });
   it("generates a masked auth secret only when the first Workers Build needs it", () => {
     let secretFile;
     deploySource("/customer/repo", {
       workersCi: true,
+      workerName: "hqbase-deeptake-test",
       attempt: () => ({
         status: 0,
         stdout: "[]",
@@ -65,6 +72,7 @@ describe("Community release deployment", () => {
       run: (command, args, cwd) => {
         expect(command).toBe("pnpm");
         expect(args.slice(0, 3)).toEqual(["exec", "wrangler", "deploy"]);
+        expect(args).toContain("HQBASE_WORKER_NAME:hqbase-deeptake-test");
         expect(args.at(-2)).toBe("--secrets-file");
         expect(cwd).toBe("/customer/repo");
         secretFile = args.at(-1);
@@ -80,6 +88,7 @@ describe("Community release deployment", () => {
     let deployCalls = 0;
     deploySource("/customer/repo", {
       workersCi: true,
+      workerName: "hqbase-deeptake-test",
       attempt: () => ({
         status: 0,
         stdout: JSON.stringify([{ name: "BETTER_AUTH_SECRET", type: "secret_text" }]),
