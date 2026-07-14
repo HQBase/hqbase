@@ -104,7 +104,19 @@ export async function deploy(options = {}) {
       source,
       `INSERT INTO app_update_history (id, from_version, to_version, checkpoint_bookmark, worker_version, state, started_at) VALUES (${quote(updateId)}, ${quote(currentVersion)}, ${quote(manifest.version)}, ${quote(bookmark)}, ${quote(workerVersion)}, 'started', datetime('now'))`
     );
-    run("pnpm", ["exec", "wrangler", "deploy", "--config", "wrangler.jsonc"], source);
+    run(
+      "pnpm",
+      [
+        "exec",
+        "wrangler",
+        "deploy",
+        "--config",
+        "wrangler.jsonc",
+        "--var",
+        `HQBASE_WORKER_NAME:${config.name}`
+      ],
+      source
+    );
     capture(
       "pnpm",
       [
@@ -184,7 +196,11 @@ export function normalizeConfig(config, version) {
       ...config.assets,
       directory: "./dist"
     },
-    vars: { ...config.vars, HQBASE_APP_VERSION: version },
+    vars: {
+      ...config.vars,
+      HQBASE_APP_VERSION: version,
+      HQBASE_WORKER_NAME: workerNameFromConfig(config)
+    },
     d1_databases: config.d1_databases?.map((binding) => ({
       ...binding,
       migrations_dir: "migrations"
@@ -201,7 +217,8 @@ export function deploySource(cwd, options = {}) {
   const execute = options.run ?? run;
   const attempt = options.attempt ?? attemptRun;
   const workersCi = options.workersCi ?? process.env.WORKERS_CI === "1";
-  const deployArgs = ["exec", "wrangler", "deploy"];
+  const workerName = options.workerName ?? workerNameFromConfigFile(resolve(cwd, "wrangler.jsonc"));
+  const deployArgs = ["exec", "wrangler", "deploy", "--var", `HQBASE_WORKER_NAME:${workerName}`];
 
   if (!workersCi) {
     execute("pnpm", deployArgs, cwd);
@@ -238,6 +255,15 @@ export function deploySource(cwd, options = {}) {
   } finally {
     rmSync(workspace, { recursive: true, force: true });
   }
+}
+export function workerNameFromConfig(config) {
+  if (typeof config?.name !== "string" || !config.name.trim()) {
+    throw new Error("wrangler.jsonc must define the deployed Worker name.");
+  }
+  return config.name.trim();
+}
+function workerNameFromConfigFile(configFile) {
+  return workerNameFromConfig(JSON.parse(readFileSync(configFile, "utf8")));
 }
 export function needsInitialAuthSecret(result, secretName) {
   const output = `${result.stdout ?? ""}\n${result.stderr ?? ""}`.replace(

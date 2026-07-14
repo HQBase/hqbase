@@ -13,6 +13,12 @@ pnpm hqbase:button --repo-url https://github.com/OWNER/REPO
 
 Cloudflare's deploy flow clones the repository, prompts for configured variables, provisions supported resources from `wrangler.jsonc`, builds the Worker, and deploys it. On the first customer-owned build, the deploy command generates a unique `BETTER_AUTH_SECRET`, uploads it as a masked Worker secret, and deletes the temporary local file. Later builds preserve the existing value instead of rotating it.
 
+Cloudflare may rewrite `wrangler.jsonc.name` when the installer chooses a custom
+project name. `pnpm deploy` treats that configured name as the source of truth
+and injects it as `HQBASE_WORKER_NAME` for both source deployments and signed
+updates. Setup and update automation must not maintain a second independent
+Worker name.
+
 The default `wrangler.jsonc` does not set `BETTER_AUTH_URL`; the Worker derives the deployed request origin. Only set `BETTER_AUTH_URL` explicitly when you need to pin auth to a specific custom origin.
 
 HQBase requires the primary domain to use Cloudflare authoritative DNS. If the
