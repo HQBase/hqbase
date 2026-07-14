@@ -27,10 +27,8 @@ export function Sidebar({ activeFolder, onFolderChange }: SidebarProps): React.R
 
   return (
     <aside className="hidden w-56 shrink-0 flex-col border-r bg-background p-3 md:flex">
-      <div className="mb-7 flex h-9 items-center gap-2 px-2">
-        <span className="flex size-6 items-center justify-center rounded-md border bg-card font-mono text-[10px] font-semibold">
-          HQ
-        </span>
+      <div className="mb-7 flex h-9 items-center gap-2.5 px-2">
+        <img alt="" className="h-7 w-auto shrink-0" src="/logo.svg" />
         <span className="text-sm font-medium tracking-tight">HQBase</span>
       </div>
       <div className="mb-2 px-2 text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
