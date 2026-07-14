@@ -113,4 +113,11 @@ describe("Community release deployment", () => {
     expect(packageJson.cloudflare.bindings).not.toHaveProperty("BETTER_AUTH_SECRET");
     expect(readFileSync(".env.example", "utf8")).not.toMatch(/^BETTER_AUTH_SECRET=/m);
   });
+  it("routes browser navigations to API endpoints before the SPA fallback", () => {
+    const wranglerConfig = JSON.parse(readFileSync("wrangler.jsonc", "utf8"));
+    expect(wranglerConfig.assets).toMatchObject({
+      not_found_handling: "single-page-application",
+      run_worker_first: ["/api/*"]
+    });
+  });
 });
