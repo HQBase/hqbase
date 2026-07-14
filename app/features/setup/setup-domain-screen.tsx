@@ -66,7 +66,6 @@ export function DomainStep({
         />
       }
       description="Choose the domain for mail and your HQBase URL."
-      eyebrow="Domain"
       title="Connect a domain"
     >
       <Field data-invalid={Boolean(errors.selectedZoneId)}>

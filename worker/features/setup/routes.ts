@@ -34,6 +34,10 @@ setupRoutes.get("/status", async (c) => {
   return c.json(await getSetupStatus(c.env.DB));
 });
 
+setupRoutes.get("/cloudflare/oauth/start", async (c) => {
+  return startCloudflareOAuth(c.req.raw, c.env);
+});
+
 setupRoutes.post("/cloudflare/oauth/start", async (c) => {
   return startCloudflareOAuth(c.req.raw, c.env);
 });
