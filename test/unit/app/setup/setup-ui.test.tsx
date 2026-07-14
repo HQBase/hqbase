@@ -19,9 +19,12 @@ describe("setup UI", () => {
 
     expect(html).toContain('<h2 id="setup-step-title"');
     expect(html).toContain('<h3 id="one-time-authorization"');
-    expect(html).toContain('action="/api/setup/cloudflare/oauth/start"');
-    expect(html).toContain('method="get"');
+    expect(html).toContain('href="/api/setup/cloudflare/oauth/start"');
+    expect(html).not.toContain("<form");
     expect(html).toContain("Authorize Cloudflare");
+    expect(html).toContain("h-8 rounded-md px-3 text-xs");
+    expect(html).toContain('aria-labelledby="setup-step-title" class="w-full"');
+    expect(html).not.toContain("max-w-2xl");
     expect(html).toContain("<details");
     expect(html).toContain("Use an API token instead");
     expect(html).not.toContain(">Cloudflare</p>");

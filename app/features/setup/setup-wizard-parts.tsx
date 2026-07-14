@@ -64,7 +64,7 @@ export function WizardPanel({
   title: string;
 }): React.ReactElement {
   return (
-    <section aria-labelledby="setup-step-title" className="mx-auto w-full max-w-2xl">
+    <section aria-labelledby="setup-step-title" className="w-full">
       <header className="border-b border-border/80 pb-6">
         <h2 id="setup-step-title" className="text-xl font-medium tracking-tight sm:text-2xl">
           {title}
