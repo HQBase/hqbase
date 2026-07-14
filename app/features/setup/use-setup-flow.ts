@@ -54,7 +54,7 @@ export function useSetupFlow(onComplete: () => void) {
       description: cloudflare.tokenReady ? "Access verified" : "Authorize once",
       icon: KeyRound,
       id: "access",
-      isComplete: cloudflare.tokenReady,
+      isComplete: isWizardStepComplete(ACCESS_STEP, furthestStep, cloudflare.tokenReady),
       title: "Cloudflare access"
     },
     {
@@ -64,7 +64,7 @@ export function useSetupFlow(onComplete: () => void) {
         : "Choose and connect a domain",
       icon: Globe2,
       id: "domain",
-      isComplete: cloudflare.domainConnected,
+      isComplete: isWizardStepComplete(DOMAIN_STEP, furthestStep, cloudflare.domainConnected),
       title: "Domain"
     },
     {
@@ -72,15 +72,18 @@ export function useSetupFlow(onComplete: () => void) {
       description: ownerReady ? ownerEmail : "Create your sign-in",
       icon: UserRound,
       id: "owner",
-      isComplete: ownerReady,
+      isComplete: isWizardStepComplete(OWNER_STEP, furthestStep, ownerReady),
       title: "Owner account"
     },
     {
       canOpen: furthestStep >= MAILBOX_STEP,
-      description: mailboxesReady ? `${mailboxes.length} shared addresses` : "Add shared addresses",
+      description:
+        furthestStep >= MAILBOX_STEP && mailboxesReady
+          ? `${mailboxes.length} shared addresses`
+          : "Add shared addresses",
       icon: Inbox,
       id: "mailboxes",
-      isComplete: mailboxesReady,
+      isComplete: isWizardStepComplete(MAILBOX_STEP, furthestStep, mailboxesReady),
       title: "Mailboxes"
     }
   ];
@@ -212,4 +215,12 @@ export function useSetupFlow(onComplete: () => void) {
     steps,
     onStepSelect: handleStepSelect
   };
+}
+
+export function isWizardStepComplete(
+  step: number,
+  furthestStep: number,
+  isReady: boolean
+): boolean {
+  return isReady && furthestStep > step;
 }
