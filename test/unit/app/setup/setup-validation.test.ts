@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { buildDomainAddress } from "@/features/setup/setup-helpers";
+import { buildOwnerMailboxDraft } from "@/features/setup/setup-helpers";
 import {
   hasErrors,
   hasMailboxErrors,
@@ -21,43 +21,38 @@ const activeZone: CloudflareZone = {
 };
 
 describe("setup form validation", () => {
-  it("builds the owner sign-in address from the editable local part and selected domain", () => {
-    expect(buildDomainAddress(" Oleg ", "Example.COM")).toBe("oleg@example.com");
-    expect(buildDomainAddress("", "example.com")).toBe("");
+  it("builds an optional owner-named mailbox on the workspace domain", () => {
+    expect(buildOwnerMailboxDraft(" Oleg@Gmail.com ", "Oleg", "Example.COM")).toEqual({
+      address: "oleg@example.com",
+      displayName: "Oleg"
+    });
+    expect(buildOwnerMailboxDraft("", "Oleg", "example.com")).toBeNull();
   });
 
   it("blocks invalid owner details before the mailbox step", () => {
-    expect(
-      validateOwner({ email: "not-an-email", name: "", password: "short" }, "example.com")
-    ).toEqual({
-      email: "Choose a valid address before @example.com.",
+    expect(validateOwner({ email: "not-an-email", name: "", password: "short" })).toEqual({
+      email: "Enter a valid account email.",
       name: "Enter your name.",
       password: "Use at least 8 characters."
     });
   });
 
-  it("requires the owner sign-in address to use the selected domain", () => {
+  it("allows the account email to use a domain outside the workspace", () => {
     expect(
-      validateOwner(
-        {
-          email: "owner@gmail.com",
-          name: "Workspace Owner",
-          password: "a-secure-password"
-        },
-        "example.com"
-      )
-    ).toEqual({ email: "Choose a valid address before @example.com." });
+      validateOwner({
+        email: "owner@gmail.com",
+        name: "Workspace Owner",
+        password: "a-secure-password"
+      })
+    ).toEqual({});
 
     expect(
       hasErrors(
-        validateOwner(
-          {
-            email: "owner@example.com",
-            name: "Workspace Owner",
-            password: "a-secure-password"
-          },
-          "example.com"
-        )
+        validateOwner({
+          email: "owner@example.com",
+          name: "Workspace Owner",
+          password: "a-secure-password"
+        })
       )
     ).toBe(false);
   });

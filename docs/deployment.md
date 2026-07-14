@@ -105,8 +105,11 @@ then add `/setup`.
 2. Click `Authorize Cloudflare` and approve the requested setup permissions.
 3. Select the primary domain, then click `Connect domain and continue` to run
    the required Cloudflare configuration and readiness checks.
-4. Choose the local part of the owner sign-in address—the selected domain is
-   fixed—then create at least one shared mailbox.
+4. Enter the owner's account email. It may use any valid domain because it is
+   used for sign-in and recovery, not as a mailbox.
+5. Create at least one shared mailbox on the selected workspace domain. Community
+   mailboxes are shared with the workspace. The optional owner-named mailbox is
+   off by default and is created only when explicitly selected.
 
 HQBase keeps the OAuth grant encrypted in a short-lived HTTP-only cookie, never
 stores it in D1 or R2, and revokes it after Cloudflare reports the domain ready.

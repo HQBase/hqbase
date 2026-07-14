@@ -58,23 +58,16 @@ export function validateDomain(input: {
   return errors;
 }
 
-export function validateOwner(owner: OwnerDraft, primaryDomain: string): OwnerErrors {
+export function validateOwner(owner: OwnerDraft): OwnerErrors {
   const errors: OwnerErrors = {};
   const name = owner.name.trim();
 
   if (!name) errors.name = "Enter your name.";
   else if (name.length > 100) errors.name = "Name must be 100 characters or fewer.";
 
-  const normalizedDomain = primaryDomain.trim().toLowerCase();
   const normalizedEmail = owner.email.trim().toLowerCase();
-  if (
-    !normalizedDomain ||
-    !emailSchema.safeParse(normalizedEmail).success ||
-    !normalizedEmail.endsWith(`@${normalizedDomain}`)
-  ) {
-    errors.email = normalizedDomain
-      ? `Choose a valid address before @${normalizedDomain}.`
-      : "Choose the Cloudflare domain before creating the owner.";
+  if (!emailSchema.safeParse(normalizedEmail).success) {
+    errors.email = "Enter a valid account email.";
   }
 
   if (owner.password.length < 8) {

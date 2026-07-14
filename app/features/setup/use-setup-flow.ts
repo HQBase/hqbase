@@ -3,7 +3,7 @@ import * as React from "react";
 import { toast } from "sonner";
 
 import { bootstrapSetup } from "./api";
-import { buildDomainAddress, emptyMailboxErrors, retargetMailboxes } from "./setup-helpers";
+import { buildOwnerMailboxDraft, emptyMailboxErrors, retargetMailboxes } from "./setup-helpers";
 import type { MailboxDraft } from "./setup-validation";
 import { hasErrors, hasMailboxErrors, validateMailboxes, validateOwner } from "./setup-validation";
 import type { BootstrapSetupInput } from "./types";
@@ -18,9 +18,10 @@ export function useSetupFlow(onComplete: () => void) {
   const [activeStep, setActiveStep] = React.useState(ACCESS_STEP);
   const [furthestStep, setFurthestStep] = React.useState(ACCESS_STEP);
   const [ownerName, setOwnerName] = React.useState("");
-  const [ownerEmailLocalPart, setOwnerEmailLocalPart] = React.useState("");
+  const [ownerEmail, setOwnerEmail] = React.useState("");
   const [ownerPassword, setOwnerPassword] = React.useState("");
   const [ownerAttempted, setOwnerAttempted] = React.useState(false);
+  const [createOwnerMailbox, setCreateOwnerMailbox] = React.useState(false);
   const [mailboxes, setMailboxes] = React.useState<MailboxDraft[]>([
     { address: "", displayName: "Support" },
     { address: "", displayName: "Privacy" }
@@ -37,16 +38,18 @@ export function useSetupFlow(onComplete: () => void) {
     onTokenChanged: () => setFurthestStep(ACCESS_STEP),
     onTokenVerified: () => advanceTo(DOMAIN_STEP)
   });
-  const ownerEmail = buildDomainAddress(ownerEmailLocalPart, cloudflare.primaryDomain);
   const ownerDraft = { email: ownerEmail, name: ownerName, password: ownerPassword };
-  const currentOwnerErrors = validateOwner(ownerDraft, cloudflare.primaryDomain);
-  const currentMailboxErrors = validateMailboxes(mailboxes, cloudflare.primaryDomain);
+  const ownerMailboxDraft = buildOwnerMailboxDraft(ownerEmail, ownerName, cloudflare.primaryDomain);
+  const submittedMailboxes =
+    createOwnerMailbox && ownerMailboxDraft ? [...mailboxes, ownerMailboxDraft] : mailboxes;
+  const currentOwnerErrors = validateOwner(ownerDraft);
+  const currentMailboxErrors = validateMailboxes(submittedMailboxes, cloudflare.primaryDomain);
   const ownerReady = !hasErrors(currentOwnerErrors);
   const mailboxesReady = !hasMailboxErrors(currentMailboxErrors);
   const ownerErrors = ownerAttempted ? currentOwnerErrors : {};
   const mailboxErrors = mailboxAttempted
     ? currentMailboxErrors
-    : emptyMailboxErrors(mailboxes.length);
+    : emptyMailboxErrors(submittedMailboxes.length);
 
   const steps = [
     {
@@ -79,7 +82,7 @@ export function useSetupFlow(onComplete: () => void) {
       canOpen: furthestStep >= MAILBOX_STEP,
       description:
         furthestStep >= MAILBOX_STEP && mailboxesReady
-          ? `${mailboxes.length} shared addresses`
+          ? `${submittedMailboxes.length} shared addresses`
           : "Add shared addresses",
       icon: Inbox,
       id: "mailboxes",
@@ -95,7 +98,7 @@ export function useSetupFlow(onComplete: () => void) {
 
   function handleOwnerNext() {
     setOwnerAttempted(true);
-    if (hasErrors(validateOwner(ownerDraft, cloudflare.primaryDomain))) return;
+    if (hasErrors(validateOwner(ownerDraft))) return;
     setSubmitError(null);
     advanceTo(MAILBOX_STEP);
   }
@@ -108,16 +111,16 @@ export function useSetupFlow(onComplete: () => void) {
       return;
     }
     setOwnerAttempted(true);
-    if (hasErrors(validateOwner(ownerDraft, cloudflare.primaryDomain))) {
+    if (hasErrors(validateOwner(ownerDraft))) {
       setActiveStep(OWNER_STEP);
       return;
     }
     setMailboxAttempted(true);
-    if (hasMailboxErrors(validateMailboxes(mailboxes, cloudflare.primaryDomain))) return;
+    if (hasMailboxErrors(validateMailboxes(submittedMailboxes, cloudflare.primaryDomain))) return;
 
     const input: BootstrapSetupInput = {
       checklistAcknowledged: true,
-      mailboxes,
+      mailboxes: submittedMailboxes,
       ownerEmail,
       ownerName,
       ownerPassword,
@@ -146,7 +149,7 @@ export function useSetupFlow(onComplete: () => void) {
       setActiveStep(DOMAIN_STEP);
       return;
     }
-    if (step >= MAILBOX_STEP && hasErrors(validateOwner(ownerDraft, cloudflare.primaryDomain))) {
+    if (step >= MAILBOX_STEP && hasErrors(validateOwner(ownerDraft))) {
       setOwnerAttempted(true);
       setActiveStep(OWNER_STEP);
       return;
@@ -160,7 +163,7 @@ export function useSetupFlow(onComplete: () => void) {
   }
 
   function addMailbox() {
-    if (mailboxes.length < 20) {
+    if (submittedMailboxes.length < 20) {
       setMailboxes((current) => [...current, { address: "", displayName: "" }]);
     }
     setSubmitError(null);
@@ -185,9 +188,11 @@ export function useSetupFlow(onComplete: () => void) {
     activeStep,
     domain: { ...cloudflare.domain, onBack: () => setActiveStep(ACCESS_STEP) },
     mailboxes: {
+      createOwnerMailbox,
       errors: mailboxErrors,
       isPending,
       mailboxes,
+      ownerMailboxDraft,
       ownerEmail,
       primaryDomain: cloudflare.primaryDomain,
       submitError,
@@ -197,16 +202,18 @@ export function useSetupFlow(onComplete: () => void) {
       onEditDomain: () => setActiveStep(DOMAIN_STEP),
       onEditOwner: () => setActiveStep(OWNER_STEP),
       onRemove: removeMailbox,
+      onSetCreateOwnerMailbox: (checked: boolean) => {
+        setCreateOwnerMailbox(checked);
+        setSubmitError(null);
+      },
       onUpdate: updateMailbox
     },
     owner: {
       errors: ownerErrors,
       ownerEmail,
-      ownerEmailLocalPart,
       ownerName,
       ownerPassword,
-      primaryDomain: cloudflare.primaryDomain,
-      setOwnerEmailLocalPart: (value: string) => updateOwner(() => setOwnerEmailLocalPart(value)),
+      setOwnerEmail: (value: string) => updateOwner(() => setOwnerEmail(value)),
       setOwnerName: (value: string) => updateOwner(() => setOwnerName(value)),
       setOwnerPassword: (value: string) => updateOwner(() => setOwnerPassword(value)),
       onBack: () => setActiveStep(DOMAIN_STEP),
