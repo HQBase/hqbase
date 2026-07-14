@@ -2,7 +2,6 @@ import { ArrowRight, Cloud, ExternalLink, Loader2 } from "lucide-react";
 import type * as React from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Field, FieldDescription, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import {
@@ -38,44 +37,49 @@ export function AccessStep({
 }): React.ReactElement {
   return (
     <WizardPanel
-      actions={
-        <form
-          action="/api/setup/cloudflare/oauth/start"
-          className="flex w-full justify-end"
-          method="post"
-        >
-          <Button disabled={isLoading} type="submit">
-            {isLoading ? <Loader2 className="animate-spin" data-icon="inline-start" /> : <Cloud />}
-            Authorize Cloudflare
-            {!isLoading ? <ArrowRight data-icon="inline-end" /> : null}
-          </Button>
-        </form>
-      }
+      actions={null}
       description="Approve the setup permissions once. HQBase revokes access as soon as your domain is connected."
-      eyebrow="Cloudflare"
       title="Connect Cloudflare"
     >
-      <Card className="bg-background/40 shadow-none">
-        <CardHeader className="pb-3">
-          <div className="flex size-9 items-center justify-center rounded-md border bg-card">
-            <Cloud className="size-4" />
+      <section aria-labelledby="one-time-authorization" className="flex flex-col gap-5 py-1">
+        <div className="flex items-start gap-3.5">
+          <div className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-full border bg-muted/40">
+            <Cloud className="size-4" aria-hidden="true" />
           </div>
-          <CardTitle className="text-sm font-medium">One-time authorization</CardTitle>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-3">
-          <p className="text-sm leading-6 text-muted-foreground">
-            Cloudflare will show the exact permissions before you approve them. HQBase uses the
-            grant only in this browser while it configures your workspace.
-          </p>
-          <div className="flex flex-wrap gap-1.5">
-            {requiredPermissions.map((permission) => (
-              <Badge key={`${permission.resource}-${permission.permission}`} variant="secondary">
-                {permission.permission} · {permission.access}
-              </Badge>
-            ))}
+          <div className="min-w-0">
+            <h3 id="one-time-authorization" className="text-base font-medium">
+              One-time authorization
+            </h3>
+            <p className="mt-1 text-sm leading-6 text-muted-foreground">
+              Cloudflare shows every permission before approval. HQBase uses the grant only in this
+              browser while it configures your workspace.
+            </p>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+
+        <div className="flex flex-wrap gap-x-4 gap-y-1 pl-0 text-xs text-muted-foreground sm:pl-[3.125rem]">
+          {requiredPermissions.map((permission) => (
+            <span
+              className="before:mr-1.5 before:text-foreground/40 before:content-['·']"
+              key={`${permission.resource}-${permission.permission}`}
+            >
+              {permission.permission} {permission.access}
+            </span>
+          ))}
+        </div>
+
+        <form action="/api/setup/cloudflare/oauth/start" method="get" className="sm:pl-[3.125rem]">
+          <Button className="h-11 w-full sm:w-auto sm:px-6" disabled={isLoading} type="submit">
+            {isLoading ? (
+              <Loader2 className="animate-spin" data-icon="inline-start" />
+            ) : (
+              <Cloud aria-hidden="true" />
+            )}
+            Authorize Cloudflare
+            {!isLoading ? <ArrowRight data-icon="inline-end" aria-hidden="true" /> : null}
+          </Button>
+        </form>
+      </section>
 
       {error ? (
         <Field data-invalid>
@@ -83,11 +87,11 @@ export function AccessStep({
         </Field>
       ) : null}
 
-      <details className="group rounded-md border bg-background/30">
-        <summary className="cursor-pointer list-none px-4 py-3 text-sm font-medium">
+      <details className="group border-t border-border/80 pt-4">
+        <summary className="w-fit cursor-pointer list-none text-xs text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
           Use an API token instead
         </summary>
-        <div className="flex flex-col gap-4 border-t p-4">
+        <div className="mt-4 flex flex-col gap-4 rounded-md border bg-background/30 p-4">
           <div className="overflow-hidden rounded-md border">
             <Table>
               <TableHeader>

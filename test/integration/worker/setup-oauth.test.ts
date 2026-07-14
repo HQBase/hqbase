@@ -2,11 +2,14 @@ import { SELF } from "cloudflare:test";
 import { describe, expect, it } from "vitest";
 
 describe("Community setup OAuth routes", () => {
-  it("starts the fixed Community PKCE flow without exposing credentials", async () => {
+  it.each([
+    "GET",
+    "POST"
+  ])("starts the fixed Community PKCE flow with a %s browser navigation", async (method) => {
     const response = await SELF.fetch(
       "https://community.user.workers.dev/api/setup/cloudflare/oauth/start",
       {
-        method: "POST",
+        method,
         redirect: "manual"
       }
     );

@@ -45,7 +45,6 @@ export function OwnerStep({
     <WizardPanel
       actions={<WizardActions nextLabel="Continue" onBack={onBack} onNext={onNext} />}
       description={`First admin. Login uses @${primaryDomain}.`}
-      eyebrow="Owner"
       title="Create your login"
     >
       <FieldGroup>
@@ -141,7 +140,6 @@ export function MailboxStep({
         />
       }
       description="Addresses your team sends and receives from."
-      eyebrow="Mailboxes"
       title="Add shared addresses"
     >
       <Card className="bg-background/40 shadow-none">
