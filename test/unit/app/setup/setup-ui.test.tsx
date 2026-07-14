@@ -4,6 +4,12 @@ import { describe, expect, it } from "vitest";
 
 import { AccessStep } from "@/features/setup/setup-access-screen";
 import { WizardLayout } from "@/features/setup/setup-wizard-parts";
+import {
+  ACCESS_STEP,
+  DOMAIN_STEP,
+  isWizardStepComplete,
+  MAILBOX_STEP
+} from "@/features/setup/use-setup-flow";
 
 describe("setup UI", () => {
   it("presents Cloudflare authorization as the primary access action", () => {
@@ -62,5 +68,11 @@ describe("setup UI", () => {
     expect(html).toContain('aria-current="step"');
     expect(html).toContain("after:bg-foreground/55");
     expect(html).toContain("Current step");
+  });
+
+  it("marks only ready steps that the user has actually completed", () => {
+    expect(isWizardStepComplete(ACCESS_STEP, DOMAIN_STEP, true)).toBe(true);
+    expect(isWizardStepComplete(DOMAIN_STEP, DOMAIN_STEP, true)).toBe(false);
+    expect(isWizardStepComplete(MAILBOX_STEP, DOMAIN_STEP, true)).toBe(false);
   });
 });
