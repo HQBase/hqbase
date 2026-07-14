@@ -21,17 +21,15 @@ export const bootstrapSetupSchema = z
     mailboxes: z.array(createMailboxSchema).min(1).max(20)
   })
   .superRefine((input, context) => {
-    const ownerDomain = input.ownerEmail.split("@")[1];
-    if (ownerDomain !== input.primaryDomain) {
-      context.addIssue({
-        code: "custom",
-        message: `Owner sign-in address must use ${input.primaryDomain}.`,
-        path: ["ownerEmail"]
-      });
-    }
-
     const seen = new Set<string>();
     for (const [index, mailbox] of input.mailboxes.entries()) {
+      if (mailbox.address.split("@")[1] !== input.primaryDomain) {
+        context.addIssue({
+          code: "custom",
+          message: `Mailbox address must use ${input.primaryDomain}.`,
+          path: ["mailboxes", index, "address"]
+        });
+      }
       if (seen.has(mailbox.address)) {
         context.addIssue({
           code: "custom",

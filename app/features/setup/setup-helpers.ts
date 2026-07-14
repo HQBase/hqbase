@@ -17,6 +17,21 @@ export function buildDomainAddress(localPart: string, domain: string): string {
     : "";
 }
 
+export function buildOwnerMailboxDraft(
+  ownerEmail: string,
+  ownerName: string,
+  domain: string
+): MailboxDraft | null {
+  const localPart = ownerEmail.trim().toLowerCase().split("@")[0];
+  const address = buildDomainAddress(localPart ?? "", domain);
+  if (!address) return null;
+
+  return {
+    address,
+    displayName: (ownerName.trim() || "Owner").slice(0, 80)
+  };
+}
+
 export function inferWorkerName(): string {
   const hostname = window.location.hostname;
   if (hostname.endsWith(".workers.dev")) {

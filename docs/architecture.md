@@ -8,7 +8,7 @@ Static assets are built by Vite into `dist` and served by the Worker assets bind
 
 ## Auth Flow
 
-Better Auth is mounted at `/api/auth/*` and stores users, sessions, accounts, and verification records in D1. Public signup is blocked at the HTTP route. The setup route creates the first owner through Better Auth internally. Owner/admin users can create more users.
+Better Auth is mounted at `/api/auth/*` and stores users, sessions, accounts, and verification records in D1. Public signup is blocked at the HTTP route. The setup route creates the first owner through Better Auth internally. The owner's account email is an authentication and recovery identity independent of the workspace domain and never creates a mailbox implicitly. Owner/admin users can create more users.
 
 ## Inbound Email Flow
 

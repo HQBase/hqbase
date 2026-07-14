@@ -3,8 +3,9 @@ import { expect, test } from "@playwright/test";
 const token = required("HQBASE_STAGING_CLOUDFLARE_TOKEN");
 const domain = required("HQBASE_STAGING_EMAIL_DOMAIN");
 const ownerPassword = required("HQBASE_STAGING_OWNER_PASSWORD");
-const ownerEmail = `owner@${domain}`;
+const ownerEmail = "community.owner.e2e@gmail.com";
 const sender = `hello@${domain}`;
+const recipient = `owner@${domain}`;
 
 test("fresh Community installation can create an owner and send mail", async ({
   page,
@@ -47,6 +48,11 @@ test("fresh Community installation can create an owner and send mail", async ({
       }
     });
     expect(bootstrapResponse.ok()).toBeTruthy();
+    expect(await bootstrapResponse.json()).toMatchObject({
+      owner: { email: ownerEmail },
+      mailboxes: [{ address: sender }],
+      setup: { mailboxCount: 1 }
+    });
   }
 
   const compose = page.getByRole("button", { name: "Compose" });
@@ -69,7 +75,7 @@ test("fresh Community installation can create an owner and send mail", async ({
   const sendResponse = await page.request.post("/api/send", {
     data: {
       from: sender,
-      to: [ownerEmail],
+      to: [recipient],
       cc: [],
       bcc: [],
       subject: `HQBase staging ${Date.now()}`,

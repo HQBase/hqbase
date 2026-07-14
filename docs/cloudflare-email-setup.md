@@ -27,8 +27,11 @@ Public Deploy Button installs use `/setup` after the Worker is deployed:
 4. Click `Connect domain and continue`. HQBase configures Cloudflare and advances
    to the owner account only after every required check passes.
 
-On the owner step, choose only the part before `@`. HQBase combines it with the
-selected domain and uses the complete address as the owner login.
+On the owner step, enter any valid account email, including an address on an
+external provider. HQBase uses it for sign-in and recovery; it does not create a
+mailbox from that address. Shared Community mailboxes remain restricted to the
+selected Cloudflare workspace domain. The Mailboxes step offers an optional,
+default-off owner-named shared mailbox on that domain.
 
 The customer-owned Worker exchanges the PKCE authorization code directly with
 Cloudflare. The setup grant is encrypted in a short-lived HTTP-only cookie; it

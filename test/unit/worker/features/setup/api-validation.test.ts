@@ -32,8 +32,8 @@ describe("setup API validation", () => {
     ).toThrow();
   });
 
-  it("requires the owner sign-in address to use the primary domain", () => {
-    expect(() =>
+  it("allows an external account email while keeping mailboxes on the workspace domain", () => {
+    expect(
       bootstrapSetupSchema.parse({
         ownerName: "Owner",
         ownerEmail: "owner@gmail.com",
@@ -42,7 +42,21 @@ describe("setup API validation", () => {
         checklistAcknowledged: true,
         mailboxes: [{ address: "hello@example.com", displayName: "Hello" }]
       })
-    ).toThrow("Owner sign-in address must use example.com.");
+    ).toMatchObject({
+      ownerEmail: "owner@gmail.com",
+      mailboxes: [{ address: "hello@example.com" }]
+    });
+
+    expect(() =>
+      bootstrapSetupSchema.parse({
+        ownerName: "Owner",
+        ownerEmail: "owner@gmail.com",
+        ownerPassword: "password123",
+        primaryDomain: "example.com",
+        checklistAcknowledged: true,
+        mailboxes: [{ address: "hello@gmail.com", displayName: "Hello" }]
+      })
+    ).toThrow("Mailbox address must use example.com.");
   });
 
   it("rejects duplicate bootstrap mailboxes", () => {

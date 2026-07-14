@@ -3,14 +3,9 @@ import type * as React from "react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import {
-  InputGroup,
-  InputGroupAddon,
-  InputGroupInput,
-  InputGroupText
-} from "@/components/ui/input-group";
 import type { MailboxDraft, MailboxErrors, OwnerErrors } from "./setup-validation";
 import { WizardActions, WizardPanel } from "./setup-wizard-parts";
 
@@ -21,11 +16,9 @@ export function OwnerStep({
   onBack,
   onNext,
   ownerEmail,
-  ownerEmailLocalPart,
   ownerName,
   ownerPassword,
-  primaryDomain,
-  setOwnerEmailLocalPart,
+  setOwnerEmail,
   setOwnerName,
   setOwnerPassword
 }: {
@@ -33,19 +26,17 @@ export function OwnerStep({
   onBack: () => void;
   onNext: () => void;
   ownerEmail: string;
-  ownerEmailLocalPart: string;
   ownerName: string;
   ownerPassword: string;
-  primaryDomain: string;
-  setOwnerEmailLocalPart: (value: string) => void;
+  setOwnerEmail: (value: string) => void;
   setOwnerName: (value: string) => void;
   setOwnerPassword: (value: string) => void;
 }): React.ReactElement {
   return (
     <WizardPanel
       actions={<WizardActions nextLabel="Continue" onBack={onBack} onNext={onNext} />}
-      description={`First admin. Login uses @${primaryDomain}.`}
-      title="Create your login"
+      description="Create the first admin account for this workspace."
+      title="Create owner account"
     >
       <FieldGroup>
         <Field data-invalid={Boolean(errors.name)}>
@@ -62,22 +53,20 @@ export function OwnerStep({
         </Field>
 
         <Field data-invalid={Boolean(errors.email)}>
-          <FieldLabel htmlFor="owner-email-local-part">Login address</FieldLabel>
-          <InputGroup data-invalid={Boolean(errors.email)}>
-            <InputGroupInput
-              aria-invalid={Boolean(errors.email)}
-              autoCapitalize="none"
-              autoComplete="off"
-              id="owner-email-local-part"
-              placeholder="oleg"
-              value={ownerEmailLocalPart}
-              onChange={(event) => setOwnerEmailLocalPart(event.target.value)}
-            />
-            <InputGroupAddon align="inline-end">
-              <InputGroupText>@{primaryDomain}</InputGroupText>
-            </InputGroupAddon>
-          </InputGroup>
-          <FieldDescription>Login: {ownerEmail || `your-name@${primaryDomain}`}</FieldDescription>
+          <FieldLabel htmlFor="owner-email">Account email</FieldLabel>
+          <Input
+            aria-invalid={Boolean(errors.email)}
+            autoCapitalize="none"
+            autoComplete="email"
+            id="owner-email"
+            placeholder="you@example.com"
+            type="email"
+            value={ownerEmail}
+            onChange={(event) => setOwnerEmail(event.target.value)}
+          />
+          <FieldDescription>
+            Used for sign-in and account recovery. This does not create a mailbox.
+          </FieldDescription>
           {errors.email ? <FieldError>{errors.email}</FieldError> : null}
         </Field>
 
@@ -101,6 +90,7 @@ export function OwnerStep({
 }
 
 export function MailboxStep({
+  createOwnerMailbox,
   errors,
   isPending,
   mailboxes,
@@ -110,11 +100,14 @@ export function MailboxStep({
   onEditDomain,
   onEditOwner,
   onRemove,
+  onSetCreateOwnerMailbox,
   onUpdate,
+  ownerMailboxDraft,
   ownerEmail,
   primaryDomain,
   submitError
 }: {
+  createOwnerMailbox: boolean;
   errors: MailboxErrors;
   isPending: boolean;
   mailboxes: MailboxDraft[];
@@ -124,7 +117,9 @@ export function MailboxStep({
   onEditDomain: () => void;
   onEditOwner: () => void;
   onRemove: (index: number) => void;
+  onSetCreateOwnerMailbox: (checked: boolean) => void;
   onUpdate: (index: number, patch: Partial<MailboxDraft>) => void;
+  ownerMailboxDraft: MailboxDraft | null;
   ownerEmail: string;
   primaryDomain: string;
   submitError: string | null;
@@ -139,7 +134,7 @@ export function MailboxStep({
           onNext={onComplete}
         />
       }
-      description="Addresses your team sends and receives from."
+      description={`Community mailboxes are shared with everyone in this workspace and must use @${primaryDomain}.`}
       title="Add shared addresses"
     >
       <Card className="bg-background/40 shadow-none">
@@ -148,9 +143,35 @@ export function MailboxStep({
         </CardHeader>
         <CardContent className="grid gap-3 sm:grid-cols-2">
           <SummaryItem label="Email domain" value={primaryDomain} onEdit={onEditDomain} />
-          <SummaryItem label="Owner sign-in" value={ownerEmail} onEdit={onEditOwner} />
+          <SummaryItem label="Account email" value={ownerEmail} onEdit={onEditOwner} />
         </CardContent>
       </Card>
+
+      {ownerMailboxDraft ? (
+        <Field data-invalid={Boolean(errors.rows[mailboxes.length]?.address)}>
+          <label
+            className="flex cursor-pointer items-start gap-3 rounded-lg border bg-background/40 p-4"
+            htmlFor="create-owner-mailbox"
+          >
+            <Checkbox
+              checked={createOwnerMailbox}
+              id="create-owner-mailbox"
+              onCheckedChange={(checked) => onSetCreateOwnerMailbox(checked === true)}
+            />
+            <span className="grid gap-1">
+              <span className="text-sm font-medium">
+                Create {ownerMailboxDraft.address} as a shared mailbox
+              </span>
+              <span className="text-sm text-muted-foreground">
+                Optional and off by default. Everyone in the Community workspace can use it.
+              </span>
+            </span>
+          </label>
+          {createOwnerMailbox && errors.rows[mailboxes.length]?.address ? (
+            <FieldError>{errors.rows[mailboxes.length]?.address}</FieldError>
+          ) : null}
+        </Field>
+      ) : null}
 
       <div className="flex flex-col gap-3">
         {mailboxes.map((mailbox, index) => (
