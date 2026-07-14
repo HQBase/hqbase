@@ -7,7 +7,7 @@ import { gzipSync } from "node:zlib";
 
 const root = resolve(import.meta.dirname, "../..");
 const edition = "pro";
-const schemaVersion = 9;
+const schemaVersion = 10;
 const packageJson = JSON.parse(readFileSync(resolve(root, "package.json"), "utf8"));
 const version = process.env.HQBASE_RELEASE_VERSION ?? packageJson.version;
 const minVersion = process.env.HQBASE_MIN_VERSION || packageJson.hqbaseRelease?.minimumVersion;

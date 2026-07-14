@@ -21,6 +21,7 @@ const COMMUNITY_TABLES = [
 ];
 
 const PRO_TABLES = [
+  "message_sender_preferences",
   "pro_app_passwords",
   "pro_bridge_mutations",
   "pro_bridge_submissions",

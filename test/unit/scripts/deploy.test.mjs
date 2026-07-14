@@ -21,6 +21,7 @@ const communityTables = [
 
 const proTables = [
   ...communityTables,
+  "message_sender_preferences",
   "mail_domains",
   "mailbox_addresses",
   "pro_app_passwords",
