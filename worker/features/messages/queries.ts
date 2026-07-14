@@ -234,6 +234,14 @@ export async function findAttachment(db: D1Database, id: string): Promise<Stored
   return row ? mapAttachment(row) : null;
 }
 
+export async function getMessageHtmlKey(db: D1Database, id: string): Promise<string | null> {
+  const row = await db
+    .prepare("SELECT html_r2_key FROM messages WHERE id = ?")
+    .bind(id)
+    .first<{ html_r2_key: string | null }>();
+  return row?.html_r2_key ?? null;
+}
+
 async function getMessageRow(db: D1Database, id: string): Promise<MessageRow | null> {
   return db.prepare("SELECT * FROM messages WHERE id = ?").bind(id).first<MessageRow>();
 }
