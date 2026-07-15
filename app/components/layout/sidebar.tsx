@@ -31,9 +31,6 @@ export function Sidebar({ activeFolder, onFolderChange }: SidebarProps): React.R
         <img alt="" className="h-7 w-auto shrink-0" src="/logo.svg" />
         <span className="text-sm font-medium tracking-tight">HQBase</span>
       </div>
-      <div className="mb-2 px-2 text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
-        Mail
-      </div>
       <nav className="flex flex-1 flex-col gap-0.5">
         {mailFolders.map((folder) => {
           const Icon = icons[folder.id];

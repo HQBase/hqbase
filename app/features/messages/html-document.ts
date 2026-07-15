@@ -5,7 +5,7 @@ export function buildEmailHtmlDocument(input: {
 }): string {
   const origin = new URL(input.origin).origin;
   const imageSources = input.allowRemoteImages ? `${origin} https: http:` : origin;
-  const policy = `default-src 'none'; img-src ${imageSources}; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'`;
+  const policy = `default-src 'none'; img-src ${imageSources}; font-src ${origin}; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'`;
   return `<!doctype html><html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="${escapeAttribute(policy)}"><meta name="referrer" content="no-referrer"><style>${baseStyles}</style></head><body>${input.html}</body></html>`;
 }
 
@@ -14,10 +14,11 @@ function escapeAttribute(value: string): string {
 }
 
 const baseStyles = `
+  @font-face { font-family: "Geist Sans"; src: url("/fonts/Geist-Regular.woff2") format("woff2"); font-style: normal; font-weight: 400; font-display: swap; }
   :root { color-scheme: light only; }
   * { box-sizing: border-box; }
   html, body { margin: 0; min-height: 100%; background: #fff; color: #171717; }
-  body { padding: 20px; font-family: Aptos, ui-sans-serif, system-ui, sans-serif; font-size: 14px; line-height: 1.55; overflow-wrap: anywhere; }
+  body { padding: 20px; font-family: "Geist Sans", ui-sans-serif, system-ui, sans-serif; font-size: 14px; line-height: 1.55; overflow-wrap: anywhere; }
   img { max-width: 100%; height: auto; }
   table { max-width: 100%; }
   a { color: #1d4ed8; }
