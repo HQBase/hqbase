@@ -31,5 +31,12 @@ export type MessageDetail = MessageSummary & {
     filename: string;
     contentType: string;
     sizeBytes: number;
+    contentId: string | null;
   }>;
+};
+
+export type MessageHtml = {
+  hasRemoteImages: boolean;
+  html: string;
+  remoteMediaTrusted: boolean;
 };
