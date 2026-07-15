@@ -40,5 +40,6 @@ describe("mail shell", () => {
 
     expect(html).toContain('src="/logo.svg"');
     expect(html).not.toContain(">HQ<");
+    expect(html).not.toContain(">Mail</div>");
   });
 });
