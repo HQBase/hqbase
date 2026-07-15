@@ -22,7 +22,7 @@ Public Deploy Button installs use `/setup` after the Worker is deployed:
 
 1. Approve the requested accounts, zones, and permissions in the Cloudflare OAuth screen during
    Pro installation.
-2. Open `/setup`, then click `Continue with Cloudflare`.
+2. Open `/setup`. HQBase verifies the delegated installation grant automatically.
 3. Select the primary domain and choose the editable workspace subdomain. The
    selected domain is the fixed suffix for the app address.
 4. Click `Connect domain and continue`. HQBase configures Cloudflare and advances

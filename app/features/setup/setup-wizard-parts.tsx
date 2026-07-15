@@ -1,16 +1,14 @@
 import type { LucideIcon } from "lucide-react";
-import { ArrowLeft, ArrowRight, Check, Loader2 } from "lucide-react";
-import type * as React from "react";
+import { ArrowLeft, ArrowRight, Check, Circle, Cloud, Loader2, Settings2 } from "lucide-react";
+import * as React from "react";
 
-import { Button } from "@/components/ui/button";
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle
-} from "@/components/ui/card";
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger
+} from "@/components/ui/accordion";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
 
 export type WizardStep = {
@@ -33,24 +31,150 @@ export function WizardLayout({
   onStepSelect: (index: number) => void;
   steps: WizardStep[];
 }): React.ReactElement {
+  const current = activeStep === 0 ? "authorize" : "configure";
+  const [openStep, setOpenStep] = React.useState(current);
+  React.useEffect(() => setOpenStep(current), [current]);
+  const configureStep = steps[activeStep];
+
   return (
-    <div className="flex flex-col gap-3">
-      <nav aria-label="Setup progress" className="rounded-lg border bg-card p-1">
-        <ol className="grid grid-cols-2 gap-1 sm:grid-cols-4">
-          {steps.map((step, index) => (
-            <li key={step.id}>
-              <StepRailItem
-                index={index}
-                isActive={index === activeStep}
-                step={step}
-                onSelect={() => onStepSelect(index)}
-              />
-            </li>
-          ))}
-        </ol>
-      </nav>
-      {children}
-    </div>
+    <Accordion
+      aria-label="Setup progress"
+      className="flex flex-col gap-2"
+      collapsible
+      type="single"
+      value={openStep}
+      onValueChange={(value) => {
+        if (value) setOpenStep(value);
+      }}
+    >
+      <SetupAccordionItem
+        description="Checkout was verified and the license was carried into this Worker."
+        icon={Check}
+        status="complete"
+        title="Purchase Pro"
+        value="purchase"
+      >
+        <p className="text-sm text-muted-foreground">
+          HQBase Billing issued a short-lived install claim. The full license is stored only as a
+          masked secret in your Cloudflare account.
+        </p>
+      </SetupAccordionItem>
+      <SetupAccordionItem
+        description="The Worker, database, mail bucket, and queues are in your Cloudflare account."
+        icon={Check}
+        status="complete"
+        title="Deploy resources"
+        value="deploy"
+      >
+        <p className="text-sm text-muted-foreground">
+          The licensed build is running under the Worker name selected during Deploy to Cloudflare.
+        </p>
+      </SetupAccordionItem>
+      <SetupAccordionItem
+        description={
+          activeStep === 0
+            ? (steps[0]?.description ?? "Checking the temporary grant")
+            : "Installation access verified"
+        }
+        icon={Cloud}
+        status={activeStep === 0 ? "current" : "complete"}
+        title="Authorize and install"
+        value="authorize"
+      >
+        {activeStep === 0 ? (
+          <div className="[&>section>header]:sr-only">{children}</div>
+        ) : (
+          <p className="text-sm text-muted-foreground">
+            The purchase, Worker identity, licensed build, and temporary setup grant have been
+            verified.
+          </p>
+        )}
+      </SetupAccordionItem>
+      <SetupAccordionItem
+        description={
+          activeStep > 0
+            ? `${configureStep?.title ?? "Workspace"} · ${activeStep} of 3`
+            : "Domain, owner, and mailboxes"
+        }
+        disabled={activeStep === 0}
+        icon={Settings2}
+        status={activeStep > 0 ? "current" : "upcoming"}
+        title="Configure workspace"
+        value="configure"
+        onOpen={() => {
+          if (activeStep > 0) onStepSelect(activeStep);
+        }}
+      >
+        {activeStep > 0 ? <div className="[&>section>header]:sr-only">{children}</div> : null}
+      </SetupAccordionItem>
+      <SetupAccordionItem
+        description="Sign in to your self-hosted Pro workspace."
+        disabled
+        icon={Circle}
+        status="upcoming"
+        title="Ready"
+        value="ready"
+      />
+    </Accordion>
+  );
+}
+
+function SetupAccordionItem({
+  children,
+  description,
+  disabled = false,
+  icon: Icon,
+  onOpen,
+  status,
+  title,
+  value
+}: {
+  children?: React.ReactNode;
+  description: string;
+  disabled?: boolean;
+  icon: LucideIcon;
+  onOpen?: () => void;
+  status: "complete" | "current" | "upcoming" | "failed";
+  title: string;
+  value: string;
+}): React.ReactElement {
+  const label =
+    status === "complete"
+      ? "Complete"
+      : status === "current"
+        ? "Current"
+        : status === "failed"
+          ? "Needs attention"
+          : "Upcoming";
+  return (
+    <AccordionItem
+      className="overflow-hidden rounded-lg border bg-card px-4 data-[state=open]:border-foreground/20"
+      disabled={disabled}
+      value={value}
+    >
+      <AccordionTrigger className="gap-3 py-4 hover:no-underline" onClick={onOpen}>
+        <span
+          className={cn(
+            "flex size-8 shrink-0 items-center justify-center rounded-md border bg-background",
+            status === "complete" && "bg-foreground text-background"
+          )}
+        >
+          <Icon className="size-4" />
+        </span>
+        <span className="min-w-0 flex-1 text-left">
+          <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+            <span className="font-medium">{title}</span>
+            <span className="font-mono text-[10px] uppercase tracking-wide text-muted-foreground">
+              {label}
+            </span>
+          </span>
+          <span className="mt-0.5 block text-xs font-normal leading-5 text-muted-foreground">
+            {description}
+          </span>
+        </span>
+      </AccordionTrigger>
+      {children ? <AccordionContent className="border-t pt-5">{children}</AccordionContent> : null}
+    </AccordionItem>
   );
 }
 
@@ -58,27 +182,24 @@ export function WizardPanel({
   actions,
   children,
   description,
-  eyebrow,
   title
 }: {
   actions: React.ReactNode;
   children: React.ReactNode;
   description: string;
-  eyebrow: string;
   title: string;
 }): React.ReactElement {
   return (
-    <Card className="overflow-hidden bg-card shadow-none">
-      <CardHeader className="border-b p-5 sm:px-6">
-        <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
-          {eyebrow}
-        </p>
-        <CardTitle className="text-xl font-medium tracking-tight">{title}</CardTitle>
-        <CardDescription className="max-w-2xl leading-5">{description}</CardDescription>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-5 p-5 sm:p-6">{children}</CardContent>
-      <CardFooter className="border-t p-4 sm:px-6">{actions}</CardFooter>
-    </Card>
+    <section aria-labelledby="setup-step-title" className="w-full">
+      <header className="border-b border-border/80 pb-6">
+        <h2 id="setup-step-title" className="text-xl font-medium tracking-tight sm:text-2xl">
+          {title}
+        </h2>
+        <p className="mt-1.5 max-w-2xl text-sm leading-6 text-muted-foreground">{description}</p>
+      </header>
+      <div className="flex flex-col gap-5 py-5">{children}</div>
+      {actions ? <footer className="border-t pt-4">{actions}</footer> : null}
+    </section>
   );
 }
 
@@ -111,46 +232,5 @@ export function WizardActions({
         {!isLoading ? <ArrowRight data-icon="inline-end" /> : null}
       </Button>
     </div>
-  );
-}
-
-function StepRailItem({
-  index,
-  isActive,
-  onSelect,
-  step
-}: {
-  index: number;
-  isActive: boolean;
-  onSelect: () => void;
-  step: WizardStep;
-}): React.ReactElement {
-  const Icon = step.icon;
-  return (
-    <Button
-      aria-current={isActive ? "step" : undefined}
-      aria-label={`${step.title}. ${step.description}`}
-      className={cn(
-        "h-10 w-full justify-start px-2.5 text-left text-muted-foreground",
-        isActive && "bg-muted text-foreground",
-        step.isComplete && !isActive && "text-foreground"
-      )}
-      disabled={!step.canOpen}
-      type="button"
-      variant="ghost"
-      onClick={onSelect}
-    >
-      <span
-        className={cn(
-          "flex size-5 shrink-0 items-center justify-center rounded-full border",
-          isActive && "border-foreground",
-          step.isComplete && "border-foreground bg-foreground text-background"
-        )}
-      >
-        {step.isComplete ? <Check /> : <Icon />}
-      </span>
-      <span className="truncate text-xs font-medium">{step.title}</span>
-      <span className="sr-only">Step {index + 1}</span>
-    </Button>
   );
 }

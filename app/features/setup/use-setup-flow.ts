@@ -25,6 +25,23 @@ export function useSetupFlow(onComplete: () => void) {
   const [submitError, setSubmitError] = React.useState<string | null>(null);
   const [isPending, setIsPending] = React.useState(false);
 
+  React.useEffect(() => {
+    const saved = readSetupDraft();
+    if (!saved) return;
+    setActiveStep(saved.activeStep);
+    setFurthestStep(saved.furthestStep);
+    setOwnerName(saved.ownerName);
+    setOwnerEmail(saved.ownerEmail);
+    setMailboxes(saved.mailboxes);
+  }, []);
+
+  React.useEffect(() => {
+    localStorage.setItem(
+      "hqb_pro_setup_draft_v1",
+      JSON.stringify({ activeStep, furthestStep, mailboxes, ownerEmail, ownerName })
+    );
+  }, [activeStep, furthestStep, mailboxes, ownerEmail, ownerName]);
+
   const cloudflare = useSetupCloudflare({
     onConnectionInvalidated: () => setFurthestStep((current) => Math.min(current, DOMAIN_STEP)),
     onDomainChanged: (previousDomain, domain) =>
@@ -132,6 +149,7 @@ export function useSetupFlow(onComplete: () => void) {
     setIsPending(true);
     try {
       await bootstrapSetup(input);
+      localStorage.removeItem("hqb_pro_setup_draft_v1");
       toast.success("HQBase is ready.");
       onComplete();
     } catch (error) {
@@ -219,4 +237,33 @@ export function useSetupFlow(onComplete: () => void) {
     steps,
     onStepSelect: handleStepSelect
   };
+}
+
+function readSetupDraft(): {
+  activeStep: number;
+  furthestStep: number;
+  mailboxes: MailboxDraft[];
+  ownerEmail: string;
+  ownerName: string;
+} | null {
+  try {
+    const value = JSON.parse(localStorage.getItem("hqb_pro_setup_draft_v1") ?? "null") as Record<
+      string,
+      unknown
+    > | null;
+    if (!value || !Array.isArray(value.mailboxes)) return null;
+    return {
+      activeStep: Math.min(MAILBOX_STEP, Math.max(ACCESS_STEP, Number(value.activeStep) || 0)),
+      furthestStep: Math.min(MAILBOX_STEP, Math.max(ACCESS_STEP, Number(value.furthestStep) || 0)),
+      mailboxes: value.mailboxes
+        .filter((item): item is MailboxDraft =>
+          Boolean(item && typeof item === "object" && "address" in item && "displayName" in item)
+        )
+        .slice(0, 20),
+      ownerEmail: typeof value.ownerEmail === "string" ? value.ownerEmail.slice(0, 320) : "",
+      ownerName: typeof value.ownerName === "string" ? value.ownerName.slice(0, 120) : ""
+    };
+  } catch {
+    return null;
+  }
 }

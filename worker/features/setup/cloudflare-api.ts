@@ -95,6 +95,12 @@ export async function cloudflareRequest<T extends z.ZodType>(
 
 function cloudflareErrorMessage(path: string, message?: string): string {
   if (!message) return "Cloudflare API request failed.";
+  if (
+    path.includes("/email/sending/") &&
+    /plan|subscription|entitl|workers paid|not available/i.test(message)
+  ) {
+    return "Outbound Email Sending requires Workers Paid in this Cloudflare account. Enable Workers Paid, then retry this resumable step.";
+  }
   if (isEmailRoutingSettingsPath(path) && isAuthenticationError(message)) {
     return [
       "Cloudflare rejected the Email Routing DNS/settings request.",

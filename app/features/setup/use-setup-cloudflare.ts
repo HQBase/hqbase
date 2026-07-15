@@ -15,6 +15,8 @@ export function useSetupCloudflare(callbacks: {
   onTokenChanged: () => void;
   onTokenVerified: () => void;
 }) {
+  const callbacksRef = React.useRef(callbacks);
+  callbacksRef.current = callbacks;
   const [tokenStatus, setTokenStatus] = React.useState<CloudflareTokenStatus | null>(null);
   const [tokenError, setTokenError] = React.useState<string | null>(null);
   const [zones, setZones] = React.useState<CloudflareZone[]>([]);
@@ -53,6 +55,12 @@ export function useSetupCloudflare(callbacks: {
     ? validateDomain({ appSubdomain, portalZone, selectedZones, serviceSubdomain })
     : {};
 
+  const handleTokenNextRef = React.useRef(handleTokenNext);
+  handleTokenNextRef.current = handleTokenNext;
+  React.useEffect(() => {
+    void handleTokenNextRef.current();
+  }, []);
+
   async function handleTokenNext() {
     setTokenError(null);
     setIsLoading(true);
@@ -70,7 +78,7 @@ export function useSetupCloudflare(callbacks: {
       }
       setTokenStatus(verified);
       setZones(nextZones);
-      callbacks.onTokenVerified();
+      callbacksRef.current.onTokenVerified();
     } catch (error) {
       setTokenError(error instanceof Error ? error.message : "Could not verify this token.");
     } finally {
@@ -82,7 +90,7 @@ export function useSetupCloudflare(callbacks: {
     setDomainAttempted(true);
     const errors = validateDomain({ appSubdomain, portalZone, selectedZones, serviceSubdomain });
     if (hasErrors(errors) || !portalZone) return;
-    if (domainConnected) return callbacks.onDomainConnected();
+    if (domainConnected) return callbacksRef.current.onDomainConnected();
     setConnectionError(null);
     setIsLoading(true);
     try {
@@ -111,7 +119,7 @@ export function useSetupCloudflare(callbacks: {
       toast.success(
         `${configured.length} email ${configured.length === 1 ? "domain" : "domains"} connected.`
       );
-      callbacks.onDomainConnected();
+      callbacksRef.current.onDomainConnected();
     } catch (error) {
       setConnectionError(error instanceof Error ? error.message : "Cloudflare setup failed.");
     } finally {
@@ -123,7 +131,7 @@ export function useSetupCloudflare(callbacks: {
     setResults([]);
     setConfiguredKey(null);
     setConnectionError(null);
-    callbacks.onConnectionInvalidated();
+    callbacksRef.current.onConnectionInvalidated();
   }
 
   function toggleZone(zoneId: string, selected: boolean) {
@@ -133,7 +141,8 @@ export function useSetupCloudflare(callbacks: {
       : selectedZoneIds.filter((id) => id !== zoneId);
     setSelectedZoneIds(next);
     const nextPrimary = zones.find((zone) => zone.id === next[0])?.name ?? "";
-    if (nextPrimary !== previousDomain) callbacks.onDomainChanged(previousDomain, nextPrimary);
+    if (nextPrimary !== previousDomain)
+      callbacksRef.current.onDomainChanged(previousDomain, nextPrimary);
     if (!next.includes(portalZoneId)) setPortalZoneId(next[0] ?? "");
     invalidateConnection();
   }

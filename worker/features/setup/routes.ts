@@ -3,6 +3,10 @@ import { Hono } from "hono";
 import type { HonoApp } from "../../lib/env";
 import { readJson } from "../../lib/json";
 import { parseWith } from "../../lib/validation";
+import { getEntitlementStatus } from "../billing/queries";
+import { activateWorkspace } from "../billing/service";
+import { verifyUpgradeCutoverWithGrant } from "../upgrades/cutover";
+import { getUpgradeLifecycle } from "../upgrades/queries";
 
 import {
   configureCloudflareDomain,
@@ -54,11 +58,13 @@ setupRoutes.post("/cloudflare/inspect", async (c) => {
 
 setupRoutes.post("/cloudflare/configure", async (c) => {
   const input = parseWith(configureCloudflareDomainSchema, await readJson(c.req.raw));
+  const upgrade = await getUpgradeLifecycle(c.env.DB);
   return c.json(
     await configureCloudflareDomain({
       ...input,
       apiToken: setupToken(c.env, input.apiToken),
-      workerName: c.env.HQBASE_WORKER_NAME ?? input.workerName
+      workerName: c.env.HQBASE_WORKER_NAME ?? input.workerName,
+      replaceWorkerName: upgrade?.sourceWorkerName ?? undefined
     })
   );
 });
@@ -66,9 +72,28 @@ setupRoutes.post("/cloudflare/configure", async (c) => {
 setupRoutes.post("/bootstrap", async (c) => {
   const input = parseWith(bootstrapSetupSchema, await readJson(c.req.raw));
   const result = await bootstrapSetup(c.env, c.req.raw, input);
-  c.executionCtx.waitUntil(
-    revokeSetupGrant(c.env, result.setup.domains[0]?.accountId).catch(() => undefined)
-  );
+  const upgrade = await getUpgradeLifecycle(c.env.DB);
+  if (upgrade && c.env.HQBASE_SETUP_OAUTH_ACCESS_TOKEN) {
+    try {
+      const entitlement = await getEntitlementStatus(c.env.DB);
+      if (entitlement.state === "unlicensed" && c.env.PRO_LICENSE_KEY) {
+        await activateWorkspace(c.env, {
+          licenseKey: c.env.PRO_LICENSE_KEY,
+          hostname: new URL(c.req.url).hostname
+        });
+      }
+      await verifyUpgradeCutoverWithGrant(c.env, c.env.HQBASE_SETUP_OAUTH_ACCESS_TOKEN);
+      c.executionCtx.waitUntil(
+        revokeSetupGrant(c.env, result.setup.domains[0]?.accountId).catch(() => undefined)
+      );
+    } catch {
+      // Keep the masked grant so the authenticated owner can retry explicit cutover verification.
+    }
+  } else {
+    c.executionCtx.waitUntil(
+      revokeSetupGrant(c.env, result.setup.domains[0]?.accountId).catch(() => undefined)
+    );
+  }
   return c.json(result, 201);
 });
 

@@ -21,13 +21,15 @@ export function SetupPage({ onComplete }: { onComplete: () => void }): React.Rea
             <span className="text-sm font-medium">HQBase</span>
           </div>
           <span className="font-mono text-xs text-muted-foreground">
-            {flow.activeStep + 1} / {flow.steps.length}
+            {flow.activeStep === ACCESS_STEP ? 3 : 4} / 5
           </span>
         </header>
 
         <div className="flex flex-col gap-1">
-          <h1 className="text-2xl font-medium tracking-tight sm:text-3xl">Set up HQBase</h1>
-          <p className="text-sm text-muted-foreground">Shared email on your Cloudflare domain.</p>
+          <h1 className="text-2xl font-medium tracking-tight sm:text-3xl">Set up HQBase Pro</h1>
+          <p className="text-sm text-muted-foreground">
+            Your purchase and deployment carry into this resumable workspace setup.
+          </p>
         </div>
 
         <WizardLayout

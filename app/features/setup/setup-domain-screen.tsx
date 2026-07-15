@@ -59,7 +59,6 @@ export function DomainStep(props: {
         />
       }
       description="Connect every domain this workspace receives or sends email for."
-      eyebrow="Domains"
       title="Connect email domains"
     >
       <Field data-invalid={Boolean(props.errors.selectedZoneIds)}>
