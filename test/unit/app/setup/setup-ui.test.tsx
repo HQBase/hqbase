@@ -36,7 +36,7 @@ describe("setup UI", () => {
     expect(html).not.toContain(">Cloudflare</p>");
   });
 
-  it("renders an accessible connected progress rail", () => {
+  it("renders the accessible accordion onboarding shell", () => {
     const html = renderToStaticMarkup(
       <WizardLayout
         activeStep={1}
@@ -65,8 +65,10 @@ describe("setup UI", () => {
     );
 
     expect(html).toContain('aria-label="Setup progress"');
-    expect(html).toContain('aria-current="step"');
-    expect(html).toContain("after:bg-foreground/55");
+    expect(html).toContain("Requirements");
+    expect(html).toContain("Deploy resources");
+    expect(html).toContain("Configure workspace");
+    expect(html).toContain("data-radix-collection-item");
     expect(html).toContain("Current step");
   });
 
