@@ -36,11 +36,8 @@ export function ProUpgradeCard({
   return (
     <Card className="relative overflow-hidden bg-background/55 shadow-none">
       <CardHeader className="pr-12">
-        <div className="mb-1 flex items-center gap-2">
+        <div className="mb-1">
           <Badge variant="outline">Pro</Badge>
-          <span className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
-            One workspace · unlimited users
-          </span>
         </div>
         <CardTitle className="text-sm font-medium">{title}</CardTitle>
         <CardDescription className="max-w-2xl text-xs leading-5">{description}</CardDescription>

@@ -18,6 +18,9 @@ describe("message HTML view", () => {
     });
 
     expect(blocked).toContain("img-src https://mail.example.com;");
+    expect(blocked).toContain("font-src https://mail.example.com;");
+    expect(blocked).toContain('font-family: "Geist Sans"');
+    expect(blocked).toContain('url("/fonts/Geist-Regular.woff2")');
     expect(blocked).not.toContain("https: http:");
     expect(loaded).toContain("img-src https://mail.example.com https: http:");
   });

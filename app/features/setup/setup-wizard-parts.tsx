@@ -1,7 +1,13 @@
 import type { LucideIcon } from "lucide-react";
-import { ArrowLeft, ArrowRight, Check, Loader2 } from "lucide-react";
-import type * as React from "react";
+import { ArrowLeft, ArrowRight, Check, Circle, Cloud, Loader2, Settings2 } from "lucide-react";
+import * as React from "react";
 
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger
+} from "@/components/ui/accordion";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
 
@@ -25,30 +31,157 @@ export function WizardLayout({
   onStepSelect: (index: number) => void;
   steps: WizardStep[];
 }): React.ReactElement {
+  const current = activeStep === 0 ? "cloudflare" : "configure";
+  const [openStep, setOpenStep] = React.useState(current);
+  React.useEffect(() => setOpenStep(current), [current]);
+  const configureStep = steps[activeStep];
+
   return (
-    <div className="flex flex-col gap-8 sm:gap-10">
-      <nav aria-label="Setup progress" className="py-1">
-        <ol className="grid grid-cols-4">
-          {steps.map((step, index) => (
-            <li
-              className={cn(
-                "relative min-w-0 after:absolute after:left-[calc(50%+0.875rem)] after:top-3.5 after:h-px after:w-[calc(100%-1.75rem)] after:bg-border after:content-[''] last:after:hidden",
-                step.isComplete && "after:bg-foreground/55"
-              )}
-              key={step.id}
-            >
-              <StepRailItem
-                index={index}
-                isActive={index === activeStep}
-                step={step}
-                onSelect={() => onStepSelect(index)}
-              />
-            </li>
-          ))}
-        </ol>
-      </nav>
-      {children}
-    </div>
+    <Accordion
+      aria-label="Setup progress"
+      className="flex flex-col gap-2"
+      collapsible
+      type="single"
+      value={openStep}
+      onValueChange={(value) => {
+        if (value) setOpenStep(value);
+      }}
+    >
+      <SetupAccordionItem
+        description="Workers Paid for outbound mail, R2 enabled, and an active domain on Cloudflare DNS."
+        icon={Check}
+        status="complete"
+        title="Requirements"
+        value="requirements"
+      >
+        <ul className="grid gap-2 text-sm text-muted-foreground sm:grid-cols-3">
+          <li className="rounded-md border bg-background/40 p-3">
+            <strong className="block text-foreground">Active domain</strong>Using Cloudflare DNS
+          </li>
+          <li className="rounded-md border bg-background/40 p-3">
+            <strong className="block text-foreground">R2</strong>Enabled for mail storage
+          </li>
+          <li className="rounded-md border bg-background/40 p-3">
+            <strong className="block text-foreground">Workers Paid</strong>Required for arbitrary
+            recipients
+          </li>
+        </ul>
+      </SetupAccordionItem>
+      <SetupAccordionItem
+        description="The Community Worker and customer-owned storage are deployed."
+        icon={Check}
+        status="complete"
+        title="Deploy resources"
+        value="deploy"
+      >
+        <p className="text-sm text-muted-foreground">
+          Cloudflare created this Worker, its D1 database, and its R2 mail bucket in your account.
+        </p>
+      </SetupAccordionItem>
+      <SetupAccordionItem
+        description={
+          activeStep === 0 ? (steps[0]?.description ?? "Authorize once") : "Access verified"
+        }
+        icon={Cloud}
+        status={activeStep === 0 ? "current" : "complete"}
+        title="Connect Cloudflare"
+        value="cloudflare"
+      >
+        {activeStep === 0 ? (
+          <div className="[&>section>header]:sr-only">{children}</div>
+        ) : (
+          <p className="text-sm text-muted-foreground">
+            The temporary setup authorization is connected. You can review its permission boundary
+            in this step.
+          </p>
+        )}
+      </SetupAccordionItem>
+      <SetupAccordionItem
+        description={
+          activeStep > 0
+            ? `${configureStep?.title ?? "Workspace"} · ${activeStep} of 3`
+            : "Domain, owner, and mailboxes"
+        }
+        disabled={activeStep === 0}
+        icon={Settings2}
+        status={activeStep > 0 ? "current" : "upcoming"}
+        title="Configure workspace"
+        value="configure"
+        onOpen={() => {
+          if (activeStep === 0) return;
+          onStepSelect(activeStep);
+        }}
+      >
+        {activeStep > 0 ? <div className="[&>section>header]:sr-only">{children}</div> : null}
+      </SetupAccordionItem>
+      <SetupAccordionItem
+        description="Sign in to your self-hosted workspace."
+        disabled
+        icon={Circle}
+        status="upcoming"
+        title="Ready"
+        value="ready"
+      />
+    </Accordion>
+  );
+}
+
+function SetupAccordionItem({
+  children,
+  description,
+  disabled = false,
+  icon: Icon,
+  onOpen,
+  status,
+  title,
+  value
+}: {
+  children?: React.ReactNode;
+  description: string;
+  disabled?: boolean;
+  icon: LucideIcon;
+  onOpen?: () => void;
+  status: "complete" | "current" | "upcoming" | "failed";
+  title: string;
+  value: string;
+}): React.ReactElement {
+  const label =
+    status === "complete"
+      ? "Complete"
+      : status === "current"
+        ? "Current"
+        : status === "failed"
+          ? "Needs attention"
+          : "Upcoming";
+  return (
+    <AccordionItem
+      className="overflow-hidden rounded-lg border bg-card px-4 data-[state=open]:border-foreground/20"
+      disabled={disabled}
+      value={value}
+    >
+      <AccordionTrigger className="gap-3 py-4 hover:no-underline" onClick={onOpen}>
+        <span
+          className={cn(
+            "flex size-8 shrink-0 items-center justify-center rounded-md border bg-background",
+            status === "complete" && "bg-foreground text-background"
+          )}
+        >
+          <Icon className="size-4" />
+        </span>
+        <span className="min-w-0 flex-1 text-left">
+          <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+            <span className="font-medium">{title}</span>
+            <span className="font-mono text-[10px] uppercase tracking-wide text-muted-foreground">
+              {label}
+            </span>
+          </span>
+          <span className="mt-0.5 block text-xs font-normal leading-5 text-muted-foreground">
+            {description}
+          </span>
+        </span>
+      </AccordionTrigger>
+      {children ? <AccordionContent className="border-t pt-5">{children}</AccordionContent> : null}
+    </AccordionItem>
   );
 }
 
@@ -106,46 +239,5 @@ export function WizardActions({
         {!isLoading ? <ArrowRight data-icon="inline-end" /> : null}
       </Button>
     </div>
-  );
-}
-
-function StepRailItem({
-  index,
-  isActive,
-  onSelect,
-  step
-}: {
-  index: number;
-  isActive: boolean;
-  onSelect: () => void;
-  step: WizardStep;
-}): React.ReactElement {
-  const Icon = step.icon;
-  return (
-    <Button
-      aria-current={isActive ? "step" : undefined}
-      aria-label={`${step.title}. ${step.description}`}
-      className={cn(
-        "relative z-10 h-auto w-full flex-col gap-2 rounded-none bg-transparent px-1 py-0 text-center text-muted-foreground hover:bg-transparent hover:text-foreground disabled:opacity-100",
-        isActive && "text-foreground",
-        step.isComplete && !isActive && "text-foreground"
-      )}
-      disabled={!step.canOpen}
-      type="button"
-      variant="ghost"
-      onClick={onSelect}
-    >
-      <span
-        className={cn(
-          "flex size-7 shrink-0 items-center justify-center rounded-full border bg-background [&_svg]:size-3.5",
-          isActive && "border-foreground ring-4 ring-background",
-          step.isComplete && "border-foreground bg-foreground text-background"
-        )}
-      >
-        {step.isComplete ? <Check /> : <Icon />}
-      </span>
-      <span className="max-w-full text-[11px] font-medium leading-4 sm:text-xs">{step.title}</span>
-      <span className="sr-only">Step {index + 1}</span>
-    </Button>
   );
 }

@@ -1,5 +1,4 @@
-export const proCheckoutBaseUrl =
-  "https://buy.polar.sh/polar_cl_ayTJJnuELUw2gsaggpVqpAarzjvRYCvskb3IH1Ztvge";
+export const proCheckoutBaseUrl = "https://billing.hqbase.io/buy/pro";
 
 export type ProCheckoutPlacement =
   | "onboarding-domains"
@@ -10,9 +9,8 @@ export type ProCheckoutPlacement =
 
 export function proCheckoutUrl(placement: ProCheckoutPlacement): string {
   const url = new URL(proCheckoutBaseUrl);
-  url.searchParams.set("utm_source", "hqbase-community");
-  url.searchParams.set("utm_medium", "product");
-  url.searchParams.set("utm_campaign", "community-upgrade");
-  url.searchParams.set("utm_content", placement);
+  url.searchParams.set("mode", "community_upgrade");
+  url.searchParams.set("source", "hqbase-community");
+  url.searchParams.set("placement", placement);
   return url.toString();
 }
