@@ -2,6 +2,11 @@ name: Staging E2E
 
 on:
   workflow_dispatch:
+    inputs:
+      community_ref:
+        description: Reviewed Community commit or ref for upgrade QA
+        required: false
+        default: a54934e4455de3d45e455c15fd23987f4054d63a
   workflow_run:
     workflows: [CI]
     types: [completed]
@@ -38,7 +43,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: HQBase/hqbase
-          ref: 981f12508f53e0accbf840328f8629a8c21990b4
+          ref: ${{ inputs.community_ref || 'a54934e4455de3d45e455c15fd23987f4054d63a' }}
           path: .staging/community
       - name: Install Community operator dependencies
         working-directory: .staging/community
