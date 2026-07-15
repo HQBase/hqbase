@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { formatDateTime } from "@/lib/format";
+import { MessageHtml } from "./message-html";
 import type { MessageDetail as MessageDetailType } from "./types";
 
 type MessageDetailProps = {
@@ -81,13 +82,12 @@ export function MessageDetail({
       </div>
       <div className="min-h-0 flex-1 overflow-auto px-4 py-6 sm:px-6 sm:py-8">
         <div className="max-w-3xl">
-          <pre className="whitespace-pre-wrap break-words font-sans text-sm leading-7 text-foreground/90">
-            {message.textBody || message.snippet}
-          </pre>
-          {message.htmlAvailable && (
-            <p className="mt-6 rounded-md border bg-card p-3 text-xs text-muted-foreground">
-              HTML is preserved. Text view shown for safety.
-            </p>
+          {message.htmlAvailable ? (
+            <MessageHtml message={message} />
+          ) : (
+            <pre className="whitespace-pre-wrap break-words font-sans text-sm leading-7 text-foreground/90">
+              {message.textBody || message.snippet}
+            </pre>
           )}
           {message.attachments.length > 0 && (
             <>

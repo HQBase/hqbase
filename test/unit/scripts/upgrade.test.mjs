@@ -51,6 +51,7 @@ describe("Community to Pro upgrade", () => {
     expect(() => assertProSchema(["pro_schema_state"])).toThrow("pro_app_passwords");
     expect(() =>
       assertProSchema([
+        "message_sender_preferences",
         "pro_app_passwords",
         "pro_bridge_mutations",
         "pro_bridge_submissions",

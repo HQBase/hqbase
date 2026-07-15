@@ -10,6 +10,7 @@ import composerMigration from "../../../migrations/0006_composer.sql?raw";
 import billingMigration from "../../../migrations/0007_billing.sql?raw";
 import upgradeLifecycleMigration from "../../../migrations/0008_upgrade_lifecycle.sql?raw";
 import updatesMigration from "../../../migrations/0009_updates.sql?raw";
+import remoteMediaMigration from "../../../migrations/0010_remote_media_preferences.sql?raw";
 import { appPasswordHash } from "../../../worker/features/app-passwords/crypto";
 import {
   insertAppPassword,
@@ -30,6 +31,10 @@ import {
   findMailboxForSending,
   insertMailboxAddress
 } from "../../../worker/features/mailboxes/queries";
+import {
+  isRemoteMediaTrusted,
+  trustRemoteMediaSender
+} from "../../../worker/features/messages/remote-media";
 import {
   getUpgradeLifecycle,
   markCutoverVerified
@@ -97,6 +102,7 @@ beforeAll(async () => {
      )`
   ).run();
   await applyMigration(updatesMigration);
+  await applyMigration(remoteMediaMigration);
 });
 
 beforeEach(async () => {
@@ -131,7 +137,7 @@ describe("Community to Pro migration", () => {
     ).resolves.toMatchObject({
       edition: "pro",
       installed_version: "0.1.1",
-      installed_schema_version: 9
+      installed_schema_version: 10
     });
     await expect(
       env.DB.prepare("SELECT edition FROM app_release_state WHERE singleton = 1").first()
@@ -161,6 +167,42 @@ describe("Community to Pro migration", () => {
     await expect(markCutoverVerified(env.DB)).resolves.toMatchObject({
       state: "cutover_verified"
     });
+  });
+
+  it("adds retryable per-user remote-media preferences to a populated upgrade", async () => {
+    await expect(isRemoteMediaTrusted(env.DB, userId, "sender@example.com")).resolves.toBe(false);
+    await trustRemoteMediaSender(env.DB, userId, " Sender@Example.COM ");
+    await expect(isRemoteMediaTrusted(env.DB, userId, "sender@example.com")).resolves.toBe(true);
+    await applyMigration(remoteMediaMigration);
+    await expect(isRemoteMediaTrusted(env.DB, userId, "SENDER@example.com")).resolves.toBe(true);
+    await expect(
+      env.DB.prepare(
+        "SELECT value FROM pro_schema_state WHERE key = 'remote_media_preferences'"
+      ).first()
+    ).resolves.toMatchObject({ value: "0010" });
+  });
+
+  it("rejects invalid remote-media state and cascades deleted users", async () => {
+    await env.DB.prepare(
+      `INSERT INTO "user"
+       (id, name, email, emailVerified, createdAt, updatedAt, role, banned)
+       VALUES ('usr_remote_temp', 'Temporary', 'temporary@example.com', 1,
+               datetime('now'), datetime('now'), 'member', 0)`
+    ).run();
+    await expect(
+      env.DB.prepare(
+        `INSERT INTO message_sender_preferences
+         (user_id, sender_address, load_remote_media, created_at, updated_at)
+         VALUES ('usr_remote_temp', 'bad@example.com', 2, datetime('now'), datetime('now'))`
+      ).run()
+    ).rejects.toThrow();
+    await trustRemoteMediaSender(env.DB, "usr_remote_temp", "sender@example.com");
+    await env.DB.prepare(`DELETE FROM "user" WHERE id = 'usr_remote_temp'`).run();
+    await expect(
+      env.DB.prepare(
+        "SELECT COUNT(*) AS count FROM message_sender_preferences WHERE user_id = 'usr_remote_temp'"
+      ).first()
+    ).resolves.toMatchObject({ count: 0 });
   });
 });
 
