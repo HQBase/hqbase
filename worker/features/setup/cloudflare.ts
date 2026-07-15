@@ -25,6 +25,7 @@ type CloudflareConfigureInput = CloudflareZoneInput & {
   serviceHostname?: string | undefined;
   attachCustomDomain?: boolean | undefined;
   enableSending: boolean;
+  replaceWorkerName?: string | undefined;
 };
 
 const cloudflareZoneSchema = z.object({
@@ -172,6 +173,7 @@ export async function configureCloudflareDomain(
           const domain = await attachWorkerCustomDomain({
             apiToken: input.apiToken,
             hostname,
+            replaceWorkerName: input.replaceWorkerName,
             workerName,
             zone
           });

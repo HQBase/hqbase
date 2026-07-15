@@ -17,12 +17,15 @@ The repository deploy command then performs the guarded lifecycle automatically:
 7. record the upgrade checkpoint in D1;
 8. deploy Pro and mark the deployment stage complete.
 
-The Community Worker and its routes are not deleted. Activate the Pro license and move domains only
-after Pro is healthy. Keep Community until inbound and outbound mail pass.
+The Community Worker and its routes are not deleted. The purchase-bound license activates
+automatically. During Pro setup, the delegated installation grant may reassign only hostnames
+recorded on the Community Worker, then verifies portal, inbound, and outbound routing before it is
+revoked. Keep Community until that explicit cutover stage passes.
 
 ## Operator path
 
-The first upgrade milestone migrates D1 in place and preserves Community rows and R2 references. It does not yet automate the complete Worker/R2 cutover.
+The operator path migrates D1 in place and preserves Community rows and R2 references. Domain
+cutover remains explicit and runs only after Pro has deployed and verification succeeds.
 
 Run preflight without mutations:
 

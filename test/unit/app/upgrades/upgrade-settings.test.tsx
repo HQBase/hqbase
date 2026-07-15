@@ -30,7 +30,7 @@ const lifecycle: UpgradeLifecycle = {
 };
 
 describe("upgrade settings", () => {
-  it("exposes checklist status text and a labelled verification form", () => {
+  it("exposes checklist status and grant-backed verification without a pasted token", () => {
     const html = renderToStaticMarkup(
       <UpgradeSettings
         entitlement={entitlement}
@@ -41,8 +41,9 @@ describe("upgrade settings", () => {
     expect(html).toContain('aria-label="Community upgrade progress"');
     expect(html).toContain("Complete");
     expect(html).toContain("Pending");
-    expect(html).toContain('for="upgrade-cloudflare-token"');
-    expect(html).toContain('type="submit"');
+    expect(html).toContain("No API token is required");
+    expect(html).toContain('type="button"');
+    expect(html).not.toContain('type="password"');
   });
 
   it("hides cutover credentials after verification", () => {

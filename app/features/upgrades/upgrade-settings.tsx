@@ -4,8 +4,6 @@ import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Field, FieldDescription, FieldError, FieldLabel } from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
 import type { EntitlementStatus } from "@/features/billing/types";
 import { verifyUpgradeCutover } from "./api";
 import type { UpgradeLifecycle } from "./types";
@@ -19,20 +17,15 @@ export function UpgradeSettings({
   lifecycle: UpgradeLifecycle;
   onChanged: (next: UpgradeLifecycle) => void;
 }): React.ReactElement {
-  const [apiToken, setApiToken] = React.useState("");
   const [pending, setPending] = React.useState(false);
   const [verificationError, setVerificationError] = React.useState<string | null>(null);
   const verified = lifecycle.state === "cutover_verified";
-  const tokenDescriptionId = "upgrade-cloudflare-token-description";
-  const tokenErrorId = "upgrade-cloudflare-token-error";
 
-  async function verify(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  async function verify() {
     setVerificationError(null);
     setPending(true);
     try {
-      const next = await verifyUpgradeCutover(apiToken);
-      setApiToken("");
+      const next = await verifyUpgradeCutover();
       onChanged(next);
       toast.success("Community to Pro cutover verified.");
     } catch (error) {
@@ -87,44 +80,19 @@ export function UpgradeSettings({
           <CardHeader>
             <CardTitle className="text-base">Verify cutover</CardTitle>
             <CardDescription>
-              First activate Billing and reconnect the migrated domain under Domains. Then use the
-              same temporary Cloudflare token to verify every enabled domain routes to Pro.
+              HQBase reuses the temporary installation grant to verify every enabled domain routes
+              to Pro. No API token is required.
             </CardDescription>
           </CardHeader>
-          <form onSubmit={(event) => void verify(event)}>
-            <CardContent className="flex flex-col gap-4">
-              <Field data-invalid={Boolean(verificationError)}>
-                <FieldLabel htmlFor="upgrade-cloudflare-token">
-                  Temporary Cloudflare API token
-                </FieldLabel>
-                <Input
-                  aria-describedby={`${tokenDescriptionId}${verificationError ? ` ${tokenErrorId}` : ""}`}
-                  aria-invalid={Boolean(verificationError)}
-                  autoCapitalize="none"
-                  autoComplete="off"
-                  id="upgrade-cloudflare-token"
-                  minLength={20}
-                  required
-                  type="password"
-                  value={apiToken}
-                  onChange={(event) => {
-                    setApiToken(event.target.value);
-                    setVerificationError(null);
-                  }}
-                />
-                <FieldDescription id={tokenDescriptionId}>
-                  The token is used for this check and is never stored.
-                </FieldDescription>
-                {verificationError ? (
-                  <FieldError id={tokenErrorId}>{verificationError}</FieldError>
-                ) : null}
-              </Field>
-              <Button disabled={pending || apiToken.length < 20} type="submit">
-                <ShieldCheck data-icon="inline-start" />
-                {pending ? "Verifying Pro cutover…" : "Verify Pro cutover"}
-              </Button>
-            </CardContent>
-          </form>
+          <CardContent className="flex flex-col gap-4">
+            {verificationError ? (
+              <p className="text-sm text-destructive">{verificationError}</p>
+            ) : null}
+            <Button disabled={pending} type="button" onClick={() => void verify()}>
+              <ShieldCheck data-icon="inline-start" />
+              {pending ? "Verifying Pro cutover…" : "Verify Pro cutover"}
+            </Button>
+          </CardContent>
         </Card>
       ) : null}
     </div>
