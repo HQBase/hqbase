@@ -73,17 +73,21 @@ jobs:
             "https://billing.hqbase.io/v1/releases/pro/${release_version}/artifact-metadata")
           case "$status" in
             200)
+              curl --fail --silent --show-error \
+                https://billing.hqbase.io/v1/releases/pro/stable \
+                --output /tmp/existing-pro-stable.json
               node --input-type=module -e '
-                import { createHash } from "node:crypto";
-                import { readFileSync, statSync } from "node:fs";
+                import { createPublicKey, verify } from "node:crypto";
+                import { readFileSync } from "node:fs";
                 const version = process.env.HQBASE_RELEASE_VERSION.replace(/^v/, "");
                 const metadata = JSON.parse(readFileSync("/tmp/existing-pro-release.json", "utf8"));
-                for (const [field, file] of [
-                  ["artifact", `release/pro-${version}.tar.gz`],
-                  ["deploymentArtifact", `release/pro-${version}.worker.json`]
-                ]) {
-                  const sha256 = createHash("sha256").update(readFileSync(file)).digest("hex");
-                  if (metadata[field]?.sha256 !== sha256 || metadata[field]?.size !== statSync(file).size) process.exit(1);
+                const envelope = JSON.parse(readFileSync("/tmp/existing-pro-stable.json", "utf8"));
+                const key = createPublicKey({ key: Buffer.from("MCowBQYDK2VwAyEAsVwKniCvpHDwbbnjTPP0SuIIG97cRL+iFBQvay9OrU4=", "base64"), format: "der", type: "spki" });
+                if (!verify(null, Buffer.from(envelope.payload, "base64url"), key, Buffer.from(envelope.signature, "base64url"))) process.exit(1);
+                const payload = JSON.parse(Buffer.from(envelope.payload, "base64url").toString("utf8"));
+                if (payload.edition !== "pro" || payload.version !== version) process.exit(1);
+                for (const [field, manifestField] of [["artifact", "artifact"], ["deploymentArtifact", "deploymentArtifact"]]) {
+                  if (metadata[field]?.sha256 !== payload[manifestField]?.sha256 || metadata[field]?.size !== payload[manifestField]?.size) process.exit(1);
                 }
               '
               echo "exists=true" >> "$GITHUB_OUTPUT"
@@ -107,11 +111,12 @@ jobs:
           if [ "$HQBASE_ARTIFACT_EXISTS" != "true" ]; then
             pnpm exec wrangler r2 object put "hqbase-releases/artifacts/pro/${HQBASE_RELEASE_VERSION}.tar.gz" --file "release/pro-${HQBASE_RELEASE_VERSION}.tar.gz" --remote
             pnpm exec wrangler r2 object put "hqbase-releases/artifacts/pro/${HQBASE_RELEASE_VERSION}.worker.json" --file "release/pro-${HQBASE_RELEASE_VERSION}.worker.json" --remote
+            pnpm exec wrangler r2 object put "hqbase-releases/manifests/pro/stable.json" --file release/stable.json --remote
           fi
-          pnpm exec wrangler r2 object put "hqbase-releases/manifests/pro/stable.json" --file release/stable.json --remote
       - name: Verify published artifact and signed manifest
         env:
           HQBASE_RELEASE_VERSION: ${{ inputs.version }}
+          HQBASE_ARTIFACT_EXISTS: ${{ steps.immutable-artifact.outputs.exists }}
         run: |
           release_version="${HQBASE_RELEASE_VERSION#v}"
           for attempt in $(seq 1 30); do
@@ -123,33 +128,37 @@ jobs:
             test "$attempt" -lt 30
             sleep 2
           done
-          node --input-type=module -e '
-            import { createHash } from "node:crypto";
-            import { readFileSync, statSync } from "node:fs";
-            const version = process.env.HQBASE_RELEASE_VERSION.replace(/^v/, "");
-            const metadata = JSON.parse(readFileSync("/tmp/published-pro-release.json", "utf8"));
-            for (const [field, file] of [
-              ["artifact", `release/pro-${version}.tar.gz`],
-              ["deploymentArtifact", `release/pro-${version}.worker.json`]
-            ]) {
-              const sha256 = createHash("sha256").update(readFileSync(file)).digest("hex");
-              if (metadata[field]?.sha256 !== sha256 || metadata[field]?.size !== statSync(file).size) process.exit(1);
-            }
-          '
           for attempt in $(seq 1 30); do
             if curl --fail --silent --show-error \
               https://billing.hqbase.io/v1/releases/pro/stable \
-              --output /tmp/live-pro-stable.json && \
-              node -e 'const fs = require("node:fs"); const expected = JSON.parse(fs.readFileSync("release/stable.json", "utf8")); const actual = JSON.parse(fs.readFileSync("/tmp/live-pro-stable.json", "utf8")); process.exit(expected.payload === actual.payload && expected.signature === actual.signature ? 0 : 1)'; then
+              --output /tmp/live-pro-stable.json; then
               break
             fi
             test "$attempt" -lt 30
             sleep 2
           done
           node --input-type=module -e '
-            import { createPublicKey, verify } from "node:crypto";
-            import { readFileSync } from "node:fs";
+            import { createHash, createPublicKey, verify } from "node:crypto";
+            import { readFileSync, statSync } from "node:fs";
+            const version = process.env.HQBASE_RELEASE_VERSION.replace(/^v/, "");
+            const metadata = JSON.parse(readFileSync("/tmp/published-pro-release.json", "utf8"));
             const envelope = JSON.parse(readFileSync("/tmp/live-pro-stable.json", "utf8"));
             const key = createPublicKey({ key: Buffer.from("MCowBQYDK2VwAyEAsVwKniCvpHDwbbnjTPP0SuIIG97cRL+iFBQvay9OrU4=", "base64"), format: "der", type: "spki" });
             if (!verify(null, Buffer.from(envelope.payload, "base64url"), key, Buffer.from(envelope.signature, "base64url"))) process.exit(1);
+            const payload = JSON.parse(Buffer.from(envelope.payload, "base64url").toString("utf8"));
+            if (payload.edition !== "pro" || payload.version !== version) process.exit(1);
+            for (const [field, manifestField, file] of [
+              ["artifact", "artifact", `release/pro-${version}.tar.gz`],
+              ["deploymentArtifact", "deploymentArtifact", `release/pro-${version}.worker.json`]
+            ]) {
+              if (metadata[field]?.sha256 !== payload[manifestField]?.sha256 || metadata[field]?.size !== payload[manifestField]?.size) process.exit(1);
+              if (process.env.HQBASE_ARTIFACT_EXISTS !== "true") {
+                const sha256 = createHash("sha256").update(readFileSync(file)).digest("hex");
+                if (sha256 !== metadata[field]?.sha256 || statSync(file).size !== metadata[field]?.size) process.exit(1);
+              }
+            }
+            if (process.env.HQBASE_ARTIFACT_EXISTS !== "true") {
+              const expected = JSON.parse(readFileSync("release/stable.json", "utf8"));
+              if (expected.payload !== envelope.payload || expected.signature !== envelope.signature) process.exit(1);
+            }
           '
