@@ -7,6 +7,7 @@ import type { UpgradeRecord } from "./types";
 export type PreparedResources = {
   jobsQueue: string;
   deadLetterQueue: string;
+  previewUrlsChanged?: boolean;
   candidateRelease?: {
     version: string;
     mainSha256: string;

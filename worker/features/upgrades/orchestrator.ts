@@ -184,7 +184,7 @@ async function advanceOneState(
         409
       );
     }
-    return verifyProCandidate(env, upgrade, draft.orchestrationSecret);
+    return verifyProCandidate(env, upgrade, token, draft.orchestrationSecret);
   }
   if (upgrade.state === "candidate_verified") {
     return promoteCandidate(env, upgrade, token);

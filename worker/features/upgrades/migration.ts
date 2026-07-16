@@ -2,6 +2,7 @@ import type { WorkerEnv } from "../../lib/env";
 import { AppError } from "../../lib/errors";
 import { cloudflare } from "./cloudflare";
 import { previewUrl } from "./deployment";
+import { enableCandidatePreview, restoreCandidatePreview } from "./preview";
 import { transitionUpgrade } from "./queries";
 import type { ProWorkerBundle } from "./release";
 import { readPreparedResources, requireCandidateRelease } from "./resources";
@@ -105,31 +106,37 @@ export async function migrateToPro(
 export async function verifyProCandidate(
   env: WorkerEnv,
   upgrade: UpgradeRecord,
+  token: string,
   orchestrationSecret: string,
   fetcher: typeof fetch = fetch
 ): Promise<UpgradeRecord> {
   const candidateRelease = requireCandidateRelease(await readPreparedResources(env.DB, upgrade.id));
-  const target = await previewUrl(env.DB, upgrade);
-  const response = await fetcher(`${target}/api/upgrades/pro/candidate/verify`, {
-    method: "POST",
-    headers: { authorization: `Bearer ${orchestrationSecret}` }
-  });
-  const result = (await response.json().catch(() => null)) as {
-    ok?: boolean;
-    version?: string;
-    edition?: string;
-  } | null;
-  if (
-    !response.ok ||
-    !result?.ok ||
-    result.edition !== "pro" ||
-    result.version !== candidateRelease.version
-  ) {
-    throw new AppError(
-      "UPGRADE_CANDIDATE_VERIFICATION_FAILED",
-      "The Pro candidate did not pass isolated validation.",
-      409
-    );
+  await enableCandidatePreview(env, upgrade, token, fetcher);
+  try {
+    const target = await previewUrl(env.DB, upgrade);
+    const response = await fetcher(`${target}/api/upgrades/pro/candidate/verify`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${orchestrationSecret}` }
+    });
+    const result = (await response.json().catch(() => null)) as {
+      ok?: boolean;
+      version?: string;
+      edition?: string;
+    } | null;
+    if (
+      !response.ok ||
+      !result?.ok ||
+      result.edition !== "pro" ||
+      result.version !== candidateRelease.version
+    ) {
+      throw new AppError(
+        "UPGRADE_CANDIDATE_VERIFICATION_FAILED",
+        "The Pro candidate did not pass isolated validation.",
+        409
+      );
+    }
+  } finally {
+    await restoreCandidatePreview(env, upgrade, token, fetcher);
   }
   return transitionUpgrade(env.DB, upgrade.id, "migration_complete", "candidate_verified", {
     error_code: null,

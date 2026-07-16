@@ -9,7 +9,11 @@ import {
   persistUpgradeContinuation,
   resolveUpgradeDraft
 } from "../../../worker/features/upgrades/continuation";
-import { ensureInstallationIdentity } from "../../../worker/features/upgrades/queries";
+import {
+  enableCandidatePreview,
+  restoreCandidatePreview
+} from "../../../worker/features/upgrades/preview";
+import { ensureInstallationIdentity, getUpgrade } from "../../../worker/features/upgrades/queries";
 import {
   readPreparedResources,
   recordPreparedSecretOwnership,
@@ -143,6 +147,64 @@ describe("in-place Community to Pro migration", () => {
         candidateRelease: { version: "0.1.5", mainSha256: "not-a-digest" }
       })
     ).toThrow("candidate identity");
+  });
+
+  it("temporarily enables and restores Preview URLs for isolated validation", async () => {
+    const row = await env.DB.prepare(
+      "SELECT id FROM community_pro_upgrades ORDER BY created_at DESC LIMIT 1"
+    ).first<{ id: string }>();
+    const prepared = {
+      jobsQueue: "custom-pro-jobs",
+      deadLetterQueue: "custom-pro-dlq",
+      candidateRelease: { version: "0.1.5", mainSha256: "a".repeat(64) },
+      resources: []
+    };
+    const inventory = {
+      accountId: "account-1",
+      accountSubdomain: "test-account",
+      workerName: "custom-community",
+      bindings: [],
+      subdomain: { enabled: false, previews_enabled: false }
+    };
+    await env.DB.prepare(
+      `UPDATE community_pro_upgrades
+       SET state = 'migration_complete', inventory_json = ?, created_resources_json = ?
+       WHERE id = ?`
+    )
+      .bind(JSON.stringify(inventory), JSON.stringify(prepared), row?.id)
+      .run();
+    const upgrade = await getUpgrade(env.DB, row?.id ?? "");
+    expect(upgrade).toBeTruthy();
+    if (!upgrade) throw new Error("Upgrade record missing.");
+    const bodies: Array<{ enabled: boolean; previews_enabled: boolean }> = [];
+    const fetcher = async (_input: RequestInfo | URL, init?: RequestInit) => {
+      const body = JSON.parse(String(init?.body)) as {
+        enabled: boolean;
+        previews_enabled: boolean;
+      };
+      bodies.push(body);
+      return Response.json({ success: true, result: body });
+    };
+
+    await enableCandidatePreview(env as WorkerEnv, upgrade, "temporary-token", fetcher);
+    expect((await readPreparedResources(env.DB, upgrade.id)).previewUrlsChanged).toBe(true);
+    await restoreCandidatePreview(env as WorkerEnv, upgrade, "temporary-token", fetcher);
+    expect((await readPreparedResources(env.DB, upgrade.id)).previewUrlsChanged).toBe(false);
+    expect(bodies).toEqual([
+      { enabled: false, previews_enabled: true },
+      { enabled: false, previews_enabled: false }
+    ]);
+    const audit = await env.DB.prepare(
+      `SELECT transition FROM community_pro_upgrade_audit
+       WHERE upgrade_id = ? AND transition LIKE 'preview_urls_%'
+       ORDER BY occurred_at`
+    )
+      .bind(upgrade.id)
+      .all<{ transition: string }>();
+    expect(audit.results.map((entry) => entry.transition)).toEqual([
+      "preview_urls_temporarily_enabled",
+      "preview_urls_restored"
+    ]);
   });
 
   it("resumes the exact active installation without a browser cookie", async () => {

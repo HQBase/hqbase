@@ -200,7 +200,7 @@ export async function promoteCandidate(
 
 export async function previewUrl(db: D1Database, upgrade: UpgradeRecord): Promise<string> {
   const inventory = await readInventory(db, upgrade.id);
-  if (!upgrade.previewAlias || !inventory.subdomain?.previews_enabled) {
+  if (!upgrade.previewAlias) {
     throw new AppError(
       "UPGRADE_PREVIEW_UNAVAILABLE",
       "Cloudflare Preview URLs must be enabled before the candidate can be verified.",
@@ -285,7 +285,7 @@ async function uploadAssets(
   return completion;
 }
 
-async function readInventory(db: D1Database, upgradeId: string): Promise<UpgradeInventory> {
+export async function readInventory(db: D1Database, upgradeId: string): Promise<UpgradeInventory> {
   const row = await db
     .prepare("SELECT inventory_json FROM community_pro_upgrades WHERE id = ?")
     .bind(upgradeId)
