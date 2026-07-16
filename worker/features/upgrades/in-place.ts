@@ -2,7 +2,12 @@ import type { WorkerEnv } from "../../lib/env";
 import { AppError } from "../../lib/errors";
 import { getEntitlementStatus } from "../billing/queries";
 import { activateWorkspace } from "../billing/service";
-import { deleteTemporarySecrets, revokeGrant, verifyPromotedService } from "./in-place-cloudflare";
+import {
+  deleteDisposableWorkers,
+  deleteTemporarySecrets,
+  revokeGrant,
+  verifyPromotedService
+} from "./in-place-cloudflare";
 
 type UpgradeRow = {
   id: string;
@@ -18,6 +23,7 @@ type UpgradeRow = {
   checkpoint_bookmark: string;
   backup_r2_key: string;
   inventory_json: string;
+  created_resources_json: string;
   preflight_counts_json: string;
 };
 
@@ -127,6 +133,7 @@ export async function completeInPlaceUpgrade(
   if (entitlement.state === "unlicensed" || entitlement.state === "inactive") {
     throw new AppError("UPGRADE_ENTITLEMENT_INACTIVE", "The Pro entitlement is not active.", 409);
   }
+  await deleteDisposableWorkers(upgrade, token, fetcher);
   const upgradeColumns = await env.DB.prepare("PRAGMA table_info(community_pro_upgrades)").all<{
     name: string;
   }>();
@@ -173,7 +180,8 @@ async function currentUpgrade(db: D1Database, states: string[]): Promise<Upgrade
     .prepare(
       `SELECT id, installation_id, worker_name, workspace_origin, state, account_id,
               active_version_id, candidate_version_id, d1_database_id, r2_bucket_name,
-              checkpoint_bookmark, backup_r2_key, inventory_json, preflight_counts_json
+              checkpoint_bookmark, backup_r2_key, inventory_json, created_resources_json,
+              preflight_counts_json
        FROM community_pro_upgrades WHERE state IN (${placeholders})
        ORDER BY created_at DESC LIMIT 1`
     )

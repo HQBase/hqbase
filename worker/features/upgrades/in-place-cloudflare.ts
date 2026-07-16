@@ -8,6 +8,7 @@ export type PromotionUpgrade = {
   d1_database_id: string;
   r2_bucket_name: string;
   inventory_json: string;
+  created_resources_json: string;
 };
 
 export async function verifyPromotedService(
@@ -149,6 +150,40 @@ export async function deleteTemporarySecrets(
       fetcher,
       { method: "DELETE" }
     );
+  }
+}
+
+export async function deleteDisposableWorkers(
+  upgrade: PromotionUpgrade,
+  token: string,
+  fetcher: typeof fetch
+): Promise<void> {
+  const prepared = JSON.parse(upgrade.created_resources_json) as {
+    resources?: Array<{
+      type?: string;
+      name?: string;
+      ownership?: string;
+      disposition?: string;
+    }>;
+  };
+  const workers = (prepared.resources ?? []).filter(
+    (resource) =>
+      resource.type === "worker" &&
+      resource.ownership === "created" &&
+      resource.disposition === "disposable" &&
+      resource.name &&
+      resource.name !== upgrade.worker_name
+  );
+  for (const worker of workers) {
+    const response = await fetcher(
+      `https://api.cloudflare.com/client/v4/accounts/${upgrade.account_id}/workers/scripts/${encodeURIComponent(String(worker.name))}`,
+      { method: "DELETE", headers: { authorization: `Bearer ${token}` } }
+    );
+    if (response.status === 404) continue;
+    const body = (await response.json().catch(() => null)) as { success?: boolean } | null;
+    if (!response.ok || !body?.success) {
+      throw new Error("Cloudflare disposable validator cleanup failed.");
+    }
   }
 }
 

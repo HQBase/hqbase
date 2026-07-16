@@ -13,7 +13,8 @@ Before a Pro-to-Pro migration the updater records D1 Time Travel and the active 
 The artifact signature and SHA-256 digest are verified before extraction. Migrations run before the
 Worker replacement, and exact D1 and Worker recovery commands are printed on failure.
 
-The 0.1.6 release supports direct Pro updates from 0.1.3. Its supported in-place Community-to-Pro
+The 0.1.7 release supports direct Pro updates from 0.1.3. Its supported in-place Community-to-Pro
 sources use recognized Community schema 5 and preserve attachment references across the Pro
 messages-table migration. The temporary recovery snapshot remains available until promoted-service
-verification succeeds. Older Community or Pro installations must first reach 0.1.3.
+verification succeeds. The customer-account candidate validator is deleted before the temporary
+grant is revoked. Older Community or Pro installations must first reach 0.1.3.
