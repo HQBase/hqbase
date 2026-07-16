@@ -9,18 +9,15 @@ import {
   persistUpgradeContinuation,
   resolveUpgradeDraft
 } from "../../../worker/features/upgrades/continuation";
-import { previewUrl } from "../../../worker/features/upgrades/deployment";
+import { stageCandidateForValidation } from "../../../worker/features/upgrades/deployment";
 import { fetchCandidateVerification } from "../../../worker/features/upgrades/migration";
-import {
-  enableCandidatePreview,
-  restoreCandidatePreview
-} from "../../../worker/features/upgrades/preview";
-import { ensureInstallationIdentity, getUpgrade } from "../../../worker/features/upgrades/queries";
+import { ensureInstallationIdentity } from "../../../worker/features/upgrades/queries";
 import {
   readPreparedResources,
   recordPreparedSecretOwnership,
   requireCandidateRelease
 } from "../../../worker/features/upgrades/resources";
+import type { UpgradeRecord } from "../../../worker/features/upgrades/types";
 import type { WorkerEnv } from "../../../worker/lib/env";
 
 async function applyMigration(source: string): Promise<void> {
@@ -151,82 +148,77 @@ describe("in-place Community to Pro migration", () => {
     ).toThrow("candidate identity");
   });
 
-  it("temporarily enables and restores Preview URLs for isolated validation", async () => {
-    const row = await env.DB.prepare(
-      "SELECT id FROM community_pro_upgrades ORDER BY created_at DESC LIMIT 1"
-    ).first<{ id: string }>();
-    const prepared = {
-      jobsQueue: "custom-pro-jobs",
-      deadLetterQueue: "custom-pro-dlq",
-      candidateRelease: { version: "0.1.5", mainSha256: "a".repeat(64) },
-      resources: []
-    };
-    const inventory = {
-      accountId: "account-1",
-      accountSubdomain: "test-account",
+  it("stages the candidate at zero percent without changing Community traffic", async () => {
+    const upgrade = {
+      id: "upgrade-1",
+      installationId: "installation-1",
       workerName: "custom-community",
-      bindings: [],
-      subdomain: { enabled: false, previews_enabled: false }
-    };
-    await env.DB.prepare(
-      `UPDATE community_pro_upgrades
-       SET state = 'migration_complete', inventory_json = ?, created_resources_json = ?,
-           candidate_version_id = '12345678-abcd-4000-8000-123456789abc'
-       WHERE id = ?`
-    )
-      .bind(JSON.stringify(inventory), JSON.stringify(prepared), row?.id)
-      .run();
-    const upgrade = await getUpgrade(env.DB, row?.id ?? "");
-    expect(upgrade).toBeTruthy();
-    if (!upgrade) throw new Error("Upgrade record missing.");
-    await expect(previewUrl(env.DB, upgrade)).resolves.toBe(
-      "https://12345678-custom-community.test-account.workers.dev"
-    );
-    const bodies: Array<{ enabled: boolean; previews_enabled: boolean }> = [];
+      workspaceOrigin: "https://mail.example.com",
+      state: "candidate_uploaded",
+      legacyRecovery: false,
+      legacyConfirmedAt: null,
+      accountId: "account-1",
+      activeVersionId: "community-version",
+      candidateVersionId: "candidate-version",
+      previewAlias: null,
+      d1DatabaseId: "database-1",
+      r2BucketName: "mail-objects",
+      checkpointBookmark: "bookmark-1",
+      backupR2Key: "_hqbase/backups/upgrade-1.sql",
+      errorCode: null,
+      recoveryAction: null,
+      createdAt: new Date().toISOString(),
+      expiresAt: new Date(Date.now() + 60_000).toISOString(),
+      updatedAt: new Date().toISOString(),
+      completedAt: null
+    } satisfies UpgradeRecord;
+    let versions = [{ version_id: "community-version", percentage: 100 }];
+    const bodies: Array<Record<string, unknown>> = [];
     const fetcher = async (_input: RequestInfo | URL, init?: RequestInit) => {
-      const body = JSON.parse(String(init?.body)) as {
-        enabled: boolean;
-        previews_enabled: boolean;
-      };
-      bodies.push(body);
-      return Response.json({ success: true, result: body });
+      if (init?.method === "POST") {
+        const body = JSON.parse(String(init.body)) as {
+          versions: Array<{ version_id: string; percentage: number }>;
+        };
+        bodies.push(body);
+        versions = body.versions;
+      }
+      return Response.json({ success: true, result: { deployments: [{ versions }] } });
     };
 
-    await enableCandidatePreview(env as WorkerEnv, upgrade, "temporary-token", fetcher);
-    expect((await readPreparedResources(env.DB, upgrade.id)).previewUrlsChanged).toBe(true);
-    await env.DB.prepare(
-      "UPDATE community_pro_upgrades SET state = 'candidate_uploaded' WHERE id = ?"
-    )
-      .bind(upgrade.id)
-      .run();
-    const uploaded = await getUpgrade(env.DB, upgrade.id);
-    if (!uploaded) throw new Error("Uploaded candidate record missing.");
-    await restoreCandidatePreview(env as WorkerEnv, uploaded, "temporary-token", fetcher);
-    expect((await readPreparedResources(env.DB, upgrade.id)).previewUrlsChanged).toBe(false);
+    await stageCandidateForValidation(upgrade, "temporary-token", fetcher);
     expect(bodies).toEqual([
-      { enabled: false, previews_enabled: true },
-      { enabled: false, previews_enabled: false }
+      expect.objectContaining({
+        strategy: "percentage",
+        versions: [
+          { version_id: "community-version", percentage: 100 },
+          { version_id: "candidate-version", percentage: 0 }
+        ]
+      })
     ]);
-    const audit = await env.DB.prepare(
-      `SELECT transition FROM community_pro_upgrade_audit
-       WHERE upgrade_id = ? AND transition LIKE 'preview_urls_%'
-       ORDER BY occurred_at`
-    )
-      .bind(upgrade.id)
-      .all<{ transition: string }>();
-    expect(audit.results.map((entry) => entry.transition)).toEqual([
-      "preview_urls_temporarily_enabled",
-      "preview_urls_restored"
-    ]);
+    await stageCandidateForValidation(upgrade, "temporary-token", fetcher);
+    expect(bodies).toHaveLength(1);
+
+    await expect(
+      stageCandidateForValidation(upgrade, "temporary-token", async () =>
+        Response.json({
+          success: true,
+          result: {
+            deployments: [{ versions: [{ version_id: "unexpected-version", percentage: 100 }] }]
+          }
+        })
+      )
+    ).rejects.toThrow("active Community version changed");
   });
 
-  it("waits for a version preview route to propagate without retrying application failures", async () => {
+  it("pins candidate checks to a zero-percent version override", async () => {
     const statuses = [404, 503, 200];
     const waits: number[] = [];
     const requests: RequestInit[] = [];
     const response = await fetchCandidateVerification(
       "https://candidate.example/api/upgrades/pro/candidate/verify",
       "orchestration-secret",
+      "custom-community",
+      "candidate-version",
       async (_input, init) => {
         requests.push(init ?? {});
         const status = statuses.shift() ?? 500;
@@ -241,12 +233,18 @@ describe("in-place Community to Pro migration", () => {
     expect(response.status).toBe(200);
     expect(waits).toEqual([1_000, 1_000]);
     expect(requests).toHaveLength(3);
-    expect(requests[0]?.headers).toEqual({ authorization: "Bearer orchestration-secret" });
+    expect(requests[0]?.headers).toEqual({
+      authorization: "Bearer orchestration-secret",
+      "cache-control": "no-store",
+      "cloudflare-workers-version-overrides": 'custom-community="candidate-version"'
+    });
 
     let attempts = 0;
     const rejected = await fetchCandidateVerification(
       "https://candidate.example/api/upgrades/pro/candidate/verify",
       "orchestration-secret",
+      "custom-community",
+      "candidate-version",
       async () => {
         attempts += 1;
         return Response.json({ code: "UPGRADE_SCHEMA_INCOMPLETE" }, { status: 409 });
@@ -260,16 +258,18 @@ describe("in-place Community to Pro migration", () => {
     const eventuallyReady = await fetchCandidateVerification(
       "https://candidate.example/api/upgrades/pro/candidate/verify",
       "orchestration-secret",
+      "custom-community",
+      "candidate-version",
       async () => {
         propagationAttempts += 1;
-        return propagationAttempts === 45
+        return propagationAttempts === 12
           ? Response.json({ ok: true, edition: "pro", version: "0.1.6" })
           : new Response("not ready", { status: 404 });
       },
       async () => undefined
     );
     expect(eventuallyReady.status).toBe(200);
-    expect(propagationAttempts).toBe(45);
+    expect(propagationAttempts).toBe(12);
   });
 
   it("resumes the exact active installation without a browser cookie", async () => {

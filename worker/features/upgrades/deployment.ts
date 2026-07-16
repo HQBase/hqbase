@@ -145,6 +145,71 @@ export async function uploadProCandidate(
   });
 }
 
+export async function stageCandidateForValidation(
+  upgrade: UpgradeRecord,
+  token: string,
+  fetcher: typeof fetch = fetch
+): Promise<void> {
+  if (!upgrade.accountId || !upgrade.activeVersionId || !upgrade.candidateVersionId) {
+    throw new AppError(
+      "UPGRADE_CANDIDATE_MISSING",
+      "The Pro candidate cannot be staged for isolated validation.",
+      409
+    );
+  }
+  const path = `/accounts/${upgrade.accountId}/workers/scripts/${upgrade.workerName}/deployments`;
+  const result = await cloudflare<{
+    deployments?: Array<{
+      versions?: Array<{ version_id?: string; percentage?: number }>;
+    }>;
+  }>(token, path, {}, fetcher);
+  const versions = result.deployments?.[0]?.versions ?? [];
+  const active = versions.filter((version) => version.percentage === 100);
+  if (active.length !== 1 || active[0]?.version_id !== upgrade.activeVersionId) {
+    throw new AppError(
+      "UPGRADE_ACTIVE_VERSION_CHANGED",
+      "The active Community version changed during the upgrade. Verify the signed Community release before retrying.",
+      409
+    );
+  }
+  const candidate = versions.find((version) => version.version_id === upgrade.candidateVersionId);
+  if (candidate) {
+    if (candidate.percentage !== 0 || versions.length !== 2) {
+      throw new AppError(
+        "UPGRADE_CANDIDATE_DEPLOYMENT_AMBIGUOUS",
+        "The Pro candidate is already attached with an unexpected traffic allocation.",
+        409
+      );
+    }
+    return;
+  }
+  if (versions.length !== 1) {
+    throw new AppError(
+      "UPGRADE_ACTIVE_VERSION_AMBIGUOUS",
+      "The Community Worker deployment changed during the upgrade.",
+      409
+    );
+  }
+  await cloudflare(
+    token,
+    path,
+    {
+      method: "POST",
+      body: JSON.stringify({
+        strategy: "percentage",
+        versions: [
+          { version_id: upgrade.activeVersionId, percentage: 100 },
+          { version_id: upgrade.candidateVersionId, percentage: 0 }
+        ],
+        annotations: {
+          "workers/message": "Stage HQBase Pro candidate for isolated validation"
+        }
+      })
+    },
+    fetcher
+  );
+}
+
 export async function promoteCandidate(
   env: WorkerEnv,
   upgrade: UpgradeRecord,
@@ -196,18 +261,6 @@ export async function promoteCandidate(
     error_code: null,
     recovery_action: null
   });
-}
-
-export async function previewUrl(db: D1Database, upgrade: UpgradeRecord): Promise<string> {
-  const inventory = await readInventory(db, upgrade.id);
-  if (!upgrade.candidateVersionId) {
-    throw new AppError(
-      "UPGRADE_PREVIEW_UNAVAILABLE",
-      "Cloudflare Preview URLs must be enabled before the candidate can be verified.",
-      409
-    );
-  }
-  return `https://${upgrade.candidateVersionId.slice(0, 8)}-${upgrade.workerName}.${inventory.accountSubdomain}.workers.dev`;
 }
 
 async function provisionSecrets(

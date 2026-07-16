@@ -4,10 +4,10 @@ import { AppError } from "../../lib/errors";
 import { advanceWorkspaceBackup } from "./backup";
 import { discoverCommunityInstallation } from "./cloudflare";
 import { resolveUpgradeDraft } from "./continuation";
-import { promoteCandidate, uploadProCandidate } from "./deployment";
+import { promoteCandidate, stageCandidateForValidation, uploadProCandidate } from "./deployment";
 import { migrateToPro, verifyProCandidate } from "./migration";
 import { revokeUpgradeGrant } from "./oauth";
-import { enableCandidatePreview, restoreCandidatePreview } from "./preview";
+import { restoreCandidatePreview } from "./preview";
 import { auditTransition, getUpgrade, recordUpgradeError, transitionUpgrade } from "./queries";
 import { downloadVerifiedProBundle } from "./release";
 import { prepareProResources } from "./resources";
@@ -168,24 +168,20 @@ async function advanceOneState(
       );
     }
     const bundle = await downloadVerifiedProBundle(env, upgrade, draft.licenseKey);
-    await enableCandidatePreview(env, upgrade, token);
-    try {
-      return await uploadProCandidate(
-        env,
-        upgrade,
-        token,
-        draft.licenseKey,
-        draft.orchestrationSecret,
-        bundle
-      );
-    } catch (error) {
-      await restoreCandidatePreview(env, upgrade, token).catch(async () => {
-        await auditTransition(env.DB, upgrade.id, "preview_urls_restore_failed", "failure");
-      });
-      throw error;
-    }
+    await restoreCandidatePreview(env, upgrade, token);
+    return uploadProCandidate(
+      env,
+      upgrade,
+      token,
+      draft.licenseKey,
+      draft.orchestrationSecret,
+      bundle
+    );
   }
   if (upgrade.state === "candidate_uploaded") {
+    await restoreCandidatePreview(env, upgrade, token);
+    await stageCandidateForValidation(upgrade, token);
+    await auditTransition(env.DB, upgrade.id, "candidate_staged_at_zero_percent", "success");
     return transitionUpgrade(env.DB, upgrade.id, "candidate_uploaded", "migration_started");
   }
   if (upgrade.state === "migration_started") {
@@ -207,7 +203,7 @@ async function advanceOneState(
         409
       );
     }
-    return verifyProCandidate(env, upgrade, token, draft.orchestrationSecret);
+    return verifyProCandidate(env, upgrade, draft.orchestrationSecret);
   }
   if (upgrade.state === "candidate_verified") {
     return promoteCandidate(env, upgrade, token);

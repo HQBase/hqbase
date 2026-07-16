@@ -1,8 +1,6 @@
 import type { WorkerEnv } from "../../lib/env";
 import { AppError } from "../../lib/errors";
 import { cloudflare } from "./cloudflare";
-import { previewUrl } from "./deployment";
-import { enableCandidatePreview, restoreCandidatePreview } from "./preview";
 import { auditTransition, transitionUpgrade } from "./queries";
 import type { ProWorkerBundle } from "./release";
 import { readPreparedResources, requireCandidateRelease } from "./resources";
@@ -106,41 +104,39 @@ export async function migrateToPro(
 export async function verifyProCandidate(
   env: WorkerEnv,
   upgrade: UpgradeRecord,
-  token: string,
   orchestrationSecret: string,
   fetcher: typeof fetch = fetch
 ): Promise<UpgradeRecord> {
   const candidateRelease = requireCandidateRelease(await readPreparedResources(env.DB, upgrade.id));
-  await enableCandidatePreview(env, upgrade, token, fetcher);
-  try {
-    const target = await previewUrl(env.DB, upgrade);
-    const response = await fetchCandidateVerification(
-      `${target}/api/upgrades/pro/candidate/verify`,
-      orchestrationSecret,
-      fetcher
+  if (!upgrade.candidateVersionId) {
+    throw new AppError("UPGRADE_CANDIDATE_MISSING", "The Pro candidate is missing.", 409);
+  }
+  const response = await fetchCandidateVerification(
+    `${upgrade.workspaceOrigin}/api/upgrades/pro/candidate/verify`,
+    orchestrationSecret,
+    upgrade.workerName,
+    upgrade.candidateVersionId,
+    fetcher
+  );
+  const result = (await response.json().catch(() => null)) as {
+    ok?: boolean;
+    version?: string;
+    edition?: string;
+  } | null;
+  if (
+    !response.ok ||
+    !result?.ok ||
+    result.edition !== "pro" ||
+    result.version !== candidateRelease.version
+  ) {
+    await auditTransition(env.DB, upgrade.id, "candidate_validation_rejected", "failure", {
+      status: response.status
+    });
+    throw new AppError(
+      "UPGRADE_CANDIDATE_VERIFICATION_FAILED",
+      "The Pro candidate did not pass isolated validation.",
+      409
     );
-    const result = (await response.json().catch(() => null)) as {
-      ok?: boolean;
-      version?: string;
-      edition?: string;
-    } | null;
-    if (
-      !response.ok ||
-      !result?.ok ||
-      result.edition !== "pro" ||
-      result.version !== candidateRelease.version
-    ) {
-      await auditTransition(env.DB, upgrade.id, "candidate_validation_rejected", "failure", {
-        status: response.status
-      });
-      throw new AppError(
-        "UPGRADE_CANDIDATE_VERIFICATION_FAILED",
-        "The Pro candidate did not pass isolated validation.",
-        409
-      );
-    }
-  } finally {
-    await restoreCandidatePreview(env, upgrade, token, fetcher);
   }
   return transitionUpgrade(env.DB, upgrade.id, "migration_complete", "candidate_verified", {
     error_code: null,
@@ -151,16 +147,22 @@ export async function verifyProCandidate(
 export async function fetchCandidateVerification(
   url: string,
   orchestrationSecret: string,
+  workerName: string,
+  candidateVersionId: string,
   fetcher: typeof fetch = fetch,
   wait: (milliseconds: number) => Promise<void> = delay
 ): Promise<Response> {
-  const attempts = 45;
+  const attempts = 12;
   let lastError: unknown;
   for (let attempt = 0; attempt < attempts; attempt += 1) {
     try {
       const response = await fetcher(url, {
         method: "POST",
-        headers: { authorization: `Bearer ${orchestrationSecret}` }
+        headers: {
+          authorization: `Bearer ${orchestrationSecret}`,
+          "cache-control": "no-store",
+          "cloudflare-workers-version-overrides": `${workerName}="${candidateVersionId}"`
+        }
       });
       if (response.status !== 404 && response.status < 500) return response;
       if (attempt === attempts - 1) return response;
