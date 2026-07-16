@@ -129,9 +129,17 @@ export async function uploadProCandidate(
       502
     );
   }
+  resources = {
+    ...resources,
+    candidateRelease: {
+      version: bundle.version,
+      mainSha256: bundle.main.sha256
+    }
+  };
   return transitionUpgrade(env.DB, upgrade.id, "resources_prepared", "candidate_uploaded", {
     candidate_version_id: candidate.id,
     preview_alias: alias,
+    created_resources_json: JSON.stringify(resources),
     error_code: null,
     recovery_action: null
   });

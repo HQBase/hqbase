@@ -7,6 +7,10 @@ import type { UpgradeRecord } from "./types";
 export type PreparedResources = {
   jobsQueue: string;
   deadLetterQueue: string;
+  candidateRelease?: {
+    version: string;
+    mainSha256: string;
+  };
   resources: Array<{
     type: "queue" | "secret" | "d1" | "r2";
     name: string;
@@ -97,6 +101,24 @@ export async function prepareProResources(
       created_resources_json: JSON.stringify(prepared)
     })
   };
+}
+
+export function requireCandidateRelease(
+  prepared: PreparedResources
+): NonNullable<PreparedResources["candidateRelease"]> {
+  const release = prepared.candidateRelease;
+  if (
+    !release ||
+    !/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(release.version) ||
+    !/^[a-f0-9]{64}$/.test(release.mainSha256)
+  ) {
+    throw new AppError(
+      "UPGRADE_CANDIDATE_RELEASE_MISSING",
+      "The signed Pro candidate identity is incomplete. Prepare the candidate again before migration.",
+      409
+    );
+  }
+  return release;
 }
 
 export async function readPreparedResources(

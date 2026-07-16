@@ -4,6 +4,7 @@ import { cloudflare } from "./cloudflare";
 import { previewUrl } from "./deployment";
 import { transitionUpgrade } from "./queries";
 import type { ProWorkerBundle } from "./release";
+import { readPreparedResources, requireCandidateRelease } from "./resources";
 import type { UpgradeRecord } from "./types";
 
 export async function migrateToPro(
@@ -17,6 +18,17 @@ export async function migrateToPro(
     throw new AppError(
       "UPGRADE_TARGET_INCOMPLETE",
       "The verified Community database is missing.",
+      409
+    );
+  }
+  const candidateRelease = requireCandidateRelease(await readPreparedResources(env.DB, upgrade.id));
+  if (
+    candidateRelease.version !== bundle.version ||
+    candidateRelease.mainSha256 !== bundle.main.sha256
+  ) {
+    throw new AppError(
+      "UPGRADE_RELEASE_CHANGED",
+      "The signed Pro release changed after the candidate was prepared. Prepare and verify a new candidate before migration.",
       409
     );
   }
@@ -96,13 +108,23 @@ export async function verifyProCandidate(
   orchestrationSecret: string,
   fetcher: typeof fetch = fetch
 ): Promise<UpgradeRecord> {
+  const candidateRelease = requireCandidateRelease(await readPreparedResources(env.DB, upgrade.id));
   const target = await previewUrl(env.DB, upgrade);
   const response = await fetcher(`${target}/api/upgrades/pro/candidate/verify`, {
     method: "POST",
     headers: { authorization: `Bearer ${orchestrationSecret}` }
   });
-  const result = (await response.json().catch(() => null)) as { ok?: boolean } | null;
-  if (!response.ok || !result?.ok) {
+  const result = (await response.json().catch(() => null)) as {
+    ok?: boolean;
+    version?: string;
+    edition?: string;
+  } | null;
+  if (
+    !response.ok ||
+    !result?.ok ||
+    result.edition !== "pro" ||
+    result.version !== candidateRelease.version
+  ) {
     throw new AppError(
       "UPGRADE_CANDIDATE_VERIFICATION_FAILED",
       "The Pro candidate did not pass isolated validation.",

@@ -12,7 +12,8 @@ import {
 import { ensureInstallationIdentity } from "../../../worker/features/upgrades/queries";
 import {
   readPreparedResources,
-  recordPreparedSecretOwnership
+  recordPreparedSecretOwnership,
+  requireCandidateRelease
 } from "../../../worker/features/upgrades/resources";
 import type { WorkerEnv } from "../../../worker/lib/env";
 
@@ -121,6 +122,27 @@ describe("in-place Community to Pro migration", () => {
       ])
     );
     expect(JSON.stringify(stored)).not.toContain("secret-value");
+  });
+
+  it("durably binds migration and preview verification to the signed candidate release", async () => {
+    const prepared = {
+      jobsQueue: "custom-pro-jobs",
+      deadLetterQueue: "custom-pro-dlq",
+      candidateRelease: {
+        version: "0.1.5",
+        mainSha256: "a".repeat(64)
+      },
+      resources: []
+    };
+    expect(requireCandidateRelease(prepared)).toEqual(prepared.candidateRelease);
+    const { candidateRelease: _candidateRelease, ...missingRelease } = prepared;
+    expect(() => requireCandidateRelease(missingRelease)).toThrow("candidate identity");
+    expect(() =>
+      requireCandidateRelease({
+        ...prepared,
+        candidateRelease: { version: "0.1.5", mainSha256: "not-a-digest" }
+      })
+    ).toThrow("candidate identity");
   });
 
   it("resumes the exact active installation without a browser cookie", async () => {
