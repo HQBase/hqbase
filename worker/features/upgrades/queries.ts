@@ -101,7 +101,10 @@ export async function transitionUpgrade(
   const assignments = ["state = ?", "updated_at = datetime('now')"];
   const values: unknown[] = [to];
   for (const [name, value] of Object.entries(fields)) {
-    if (!transitionFields.has(name)) throw new Error("Unsafe upgrade field.");
+    if (!transitionFields.has(name)) {
+      console.warn("community_pro_upgrade_unsafe_transition_field", { field: name });
+      throw new Error("Unsafe upgrade field.");
+    }
     assignments.push(`${name} = ?`);
     values.push(value);
   }
