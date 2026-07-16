@@ -4,6 +4,7 @@ import initialMigration from "../../../migrations/0001_initial.sql?raw";
 import updatesMigration from "../../../migrations/0002_updates.sql?raw";
 import preferencesMigration from "../../../migrations/0003_remote_media_preferences.sql?raw";
 import upgradeMigration from "../../../migrations/0004_in_place_pro_upgrade.sql?raw";
+import resumeMigration from "../../../migrations/0005_durable_upgrade_resume.sql?raw";
 import { discoverCommunityInstallation } from "../../../worker/features/upgrades/cloudflare";
 import type { WorkerEnv } from "../../../worker/lib/env";
 
@@ -27,6 +28,7 @@ beforeAll(async () => {
   await applyMigration(updatesMigration);
   await applyMigration(preferencesMigration);
   await applyMigration(upgradeMigration);
+  await applyMigration(resumeMigration);
   const keys = (await crypto.subtle.generateKey("Ed25519", true, [
     "sign",
     "verify"
@@ -126,7 +128,7 @@ describe("automatic Community installation discovery", () => {
       )
     ).rejects.toMatchObject({ code: "UPGRADE_SCHEMA_UNSUPPORTED" });
     await env.DB.prepare(
-      "UPDATE app_release_state SET installed_schema_version = 4 WHERE singleton = 1"
+      "UPDATE app_release_state SET installed_schema_version = 5 WHERE singleton = 1"
     ).run();
   });
 });

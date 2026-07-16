@@ -72,7 +72,7 @@ export async function downloadVerifiedProBundle(
         licenseKey,
         installationId: upgrade.installationId,
         hostname: new URL(upgrade.workspaceOrigin).hostname,
-        appVersion: env.HQBASE_APP_VERSION ?? "0.1.4"
+        appVersion: env.HQBASE_APP_VERSION ?? "0.1.5"
       })
     }
   );

@@ -4,9 +4,10 @@ HQBase checks the signed Community stable manifest after an owner/admin signs in
 hours while the app remains open. A newer release produces an **Update available** banner outside
 Settings.
 
-The 0.1.4 release supports direct Community updates from 0.1.3. It introduces the durable
-installation identity and owner-only, purchase-bound in-place Pro upgrade. Older installations
-must first reach 0.1.3; no direct update from an older artifact is claimed.
+The 0.1.5 release supports direct Community updates from 0.1.3. It adds encrypted durable resume
+for the owner-only, purchase-bound in-place Pro upgrade, including safe recovery after a browser
+profile change without persisting a Cloudflare grant. Older installations must first reach 0.1.3;
+no direct update from an older artifact is claimed.
 
 Open Settings -> Updates, review compatibility and release notes, then supply a temporary
 user-scoped Cloudflare API token with Zone Read, Workers Scripts Read, and Workers Builds

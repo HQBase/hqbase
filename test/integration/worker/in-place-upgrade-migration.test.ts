@@ -4,11 +4,17 @@ import initialMigration from "../../../migrations/0001_initial.sql?raw";
 import updatesMigration from "../../../migrations/0002_updates.sql?raw";
 import preferencesMigration from "../../../migrations/0003_remote_media_preferences.sql?raw";
 import upgradeMigration from "../../../migrations/0004_in_place_pro_upgrade.sql?raw";
+import resumeMigration from "../../../migrations/0005_durable_upgrade_resume.sql?raw";
+import {
+  persistUpgradeContinuation,
+  resolveUpgradeDraft
+} from "../../../worker/features/upgrades/continuation";
 import { ensureInstallationIdentity } from "../../../worker/features/upgrades/queries";
 import {
   readPreparedResources,
   recordPreparedSecretOwnership
 } from "../../../worker/features/upgrades/resources";
+import type { WorkerEnv } from "../../../worker/lib/env";
 
 async function applyMigration(source: string): Promise<void> {
   for (const statement of source
@@ -24,6 +30,7 @@ beforeAll(async () => {
   await applyMigration(updatesMigration);
   await applyMigration(preferencesMigration);
   await applyMigration(upgradeMigration);
+  await applyMigration(resumeMigration);
 });
 
 describe("in-place Community to Pro migration", () => {
@@ -65,6 +72,7 @@ describe("in-place Community to Pro migration", () => {
     const columns = await env.DB.prepare("PRAGMA table_info(community_pro_upgrades)").all<{
       name: string;
     }>();
+    expect(columns.results.map((column) => column.name)).toContain("continuation_ciphertext");
     expect(columns.results.map((column) => column.name)).not.toEqual(
       expect.arrayContaining(["cloudflare_token", "license_key", "secret_value"])
     );
@@ -113,5 +121,47 @@ describe("in-place Community to Pro migration", () => {
       ])
     );
     expect(JSON.stringify(stored)).not.toContain("secret-value");
+  });
+
+  it("resumes the exact active installation without a browser cookie", async () => {
+    const row = await env.DB.prepare(
+      "SELECT id FROM community_pro_upgrades ORDER BY created_at DESC LIMIT 1"
+    ).first<{ id: string }>();
+    expect(row?.id).toBeTruthy();
+    await env.DB.prepare(
+      "UPDATE community_pro_upgrades SET state = 'purchase_verified' WHERE id = ?"
+    )
+      .bind(row?.id)
+      .run();
+    const upgradeEnv = {
+      ...env,
+      BETTER_AUTH_SECRET: "test-better-auth-secret",
+      HQBASE_WORKER_NAME: "custom-community"
+    } as WorkerEnv;
+    await persistUpgradeContinuation(upgradeEnv, row?.id ?? "", {
+      upgradeId: row?.id ?? "",
+      licenseKey: "test-polar-license"
+    });
+
+    const resolved = await resolveUpgradeDraft(
+      new Request("https://custom-community.example.workers.dev/api/upgrades/pro/status"),
+      upgradeEnv
+    );
+    expect(resolved).toMatchObject({
+      upgradeId: row?.id,
+      licenseKey: "test-polar-license"
+    });
+    const stored = await env.DB.prepare(
+      "SELECT continuation_ciphertext FROM community_pro_upgrades WHERE id = ?"
+    )
+      .bind(row?.id)
+      .first<{ continuation_ciphertext: string }>();
+    expect(stored?.continuation_ciphertext).not.toContain("test-polar-license");
+    await expect(
+      resolveUpgradeDraft(
+        new Request("https://wrong-origin.example/api/upgrades/pro/status"),
+        upgradeEnv
+      )
+    ).resolves.toBeNull();
   });
 });

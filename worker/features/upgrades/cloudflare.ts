@@ -281,7 +281,10 @@ async function verifyCommunitySchema(db: D1Database): Promise<void> {
   const releaseState = await db
     .prepare("SELECT edition, installed_schema_version FROM app_release_state WHERE singleton = 1")
     .first<{ edition: string; installed_schema_version: number }>();
-  if (releaseState?.edition !== "community" || releaseState.installed_schema_version !== 4) {
+  if (
+    releaseState?.edition !== "community" ||
+    ![4, 5].includes(releaseState.installed_schema_version)
+  ) {
     throw new AppError(
       "UPGRADE_SCHEMA_UNSUPPORTED",
       "This database is not a supported HQBase Community schema.",

@@ -1,6 +1,7 @@
 import { requireAuthContext, requireRecentSession, requireRole } from "../../auth/session";
 import type { WorkerEnv } from "../../lib/env";
 import { AppError } from "../../lib/errors";
+import { persistUpgradeContinuation, resolveUpgradeDraft } from "./continuation";
 import { readUpgradeDraft, writeUpgradeDraft } from "./cookies";
 import { auditTransition, getUpgrade, transitionUpgrade } from "./queries";
 
@@ -22,7 +23,7 @@ export async function startUpgradeOAuth(request: Request, env: WorkerEnv): Promi
   const auth = await requireAuthContext(env, request);
   requireRole(auth, ["owner"], "Only the workspace owner can authorize the upgrade.");
   requireRecentSession(auth);
-  const draft = await readUpgradeDraft(request, env.BETTER_AUTH_SECRET);
+  const draft = await resolveUpgradeDraft(request, env);
   if (!draft?.licenseKey)
     throw new AppError("UPGRADE_PURCHASE_REQUIRED", "Verify the purchase first.", 409);
   const upgrade = await getUpgrade(env.DB, draft.upgradeId);
@@ -98,6 +99,12 @@ export async function finishUpgradeOAuth(
       resumedState: upgrade.state
     });
   }
+  const orchestrationSecret = draft.orchestrationSecret ?? randomToken(32);
+  await persistUpgradeContinuation(env, upgrade.id, {
+    upgradeId: upgrade.id,
+    licenseKey: draft.licenseKey,
+    orchestrationSecret
+  });
   const headers = new Headers({
     "cache-control": "no-store",
     location: `${url.origin}/?upgrade=progress`
@@ -107,10 +114,10 @@ export async function finishUpgradeOAuth(
     await writeUpgradeDraft(
       {
         upgradeId: draft.upgradeId,
-        nonce: draft.nonce,
-        verifier: draft.verifier,
+        ...(draft.nonce ? { nonce: draft.nonce } : {}),
+        ...(draft.verifier ? { verifier: draft.verifier } : {}),
         licenseKey: draft.licenseKey,
-        orchestrationSecret: randomToken(32),
+        orchestrationSecret,
         cloudflareAccessToken: token.access_token
       },
       env.BETTER_AUTH_SECRET

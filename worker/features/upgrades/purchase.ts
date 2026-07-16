@@ -1,6 +1,7 @@
 import { requireAuthContext, requireRecentSession, requireRole } from "../../auth/session";
 import type { WorkerEnv } from "../../lib/env";
 import { AppError } from "../../lib/errors";
+import { persistUpgradeContinuation } from "./continuation";
 import { readUpgradeDraft, writeUpgradeDraft } from "./cookies";
 import {
   auditTransition,
@@ -102,7 +103,7 @@ export async function finishUpgradePurchase(
   const draft = await readUpgradeDraft(request, env.BETTER_AUTH_SECRET);
   const code = url.searchParams.get("code") ?? "";
   const state = url.searchParams.get("state") ?? "";
-  if (!draft || !code || !state || state !== draft.nonce) {
+  if (!draft?.nonce || !draft.verifier || !code || !state || state !== draft.nonce) {
     return redirectUpgrade(request, "purchase_error");
   }
   const upgrade = await getUpgrade(env.DB, draft.upgradeId);
@@ -141,6 +142,10 @@ export async function finishUpgradePurchase(
     return redirectUpgrade(request, "purchase_error");
   }
   await transitionUpgrade(env.DB, upgrade.id, "created", "purchase_verified");
+  await persistUpgradeContinuation(env, upgrade.id, {
+    upgradeId: upgrade.id,
+    licenseKey: claim.licenseKey
+  });
   const headers = new Headers({
     "cache-control": "no-store",
     location: `${url.origin}/?upgrade=authorize`
