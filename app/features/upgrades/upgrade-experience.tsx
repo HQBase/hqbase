@@ -2,6 +2,8 @@ import { Check, Circle, LoaderCircle, ShieldCheck } from "lucide-react";
 import * as React from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { signOut } from "@/features/auth/api";
+import { ApiRequestError } from "@/lib/api-client";
 import {
   advanceProUpgrade,
   completeProUpgrade,
@@ -40,13 +42,14 @@ export function UpgradeExperience(): React.ReactElement | null {
   const result = new URLSearchParams(window.location.search).get("upgrade");
   const [status, setStatus] = React.useState<UpgradeStatus | null>(null);
   const [error, setError] = React.useState<string | null>(null);
+  const [errorCode, setErrorCode] = React.useState<string | null>(null);
   const [busy, setBusy] = React.useState(false);
 
   React.useEffect(() => {
     if (result !== "progress") return;
     void getProUpgradeStatus()
       .then(setStatus)
-      .catch((reason) => setError(message(reason)));
+      .catch((reason) => captureError(reason, setError, setErrorCode));
   }, [result]);
 
   React.useEffect(() => {
@@ -55,6 +58,7 @@ export function UpgradeExperience(): React.ReactElement | null {
     const timer = window.setTimeout(() => {
       setBusy(true);
       setError(null);
+      setErrorCode(null);
       const operation =
         status.state === "promoted"
           ? completeProUpgrade().then(() => {
@@ -71,7 +75,7 @@ export function UpgradeExperience(): React.ReactElement | null {
           }
         })
         .catch(async (reason) => {
-          setError(message(reason));
+          captureError(reason, setError, setErrorCode);
           await getProUpgradeStatus()
             .then(setStatus)
             .catch(() => undefined);
@@ -94,7 +98,7 @@ export function UpgradeExperience(): React.ReactElement | null {
         <Button
           disabled={busy}
           type="button"
-          onClick={() => void beginCloudflareAuthorization(setBusy, setError)}
+          onClick={() => void beginCloudflareAuthorization(setBusy, setError, setErrorCode)}
         >
           {busy ? "Opening Cloudflare…" : "Authorize Cloudflare and upgrade"}
         </Button>
@@ -151,7 +155,7 @@ export function UpgradeExperience(): React.ReactElement | null {
               setBusy(true);
               void confirmLegacyProUpgrade()
                 .then(setStatus)
-                .catch((reason) => setError(message(reason)))
+                .catch((reason) => captureError(reason, setError, setErrorCode))
                 .finally(() => setBusy(false));
             }}
           >
@@ -169,9 +173,21 @@ export function UpgradeExperience(): React.ReactElement | null {
             <Button
               disabled={busy}
               type="button"
-              onClick={() => void beginCloudflareAuthorization(setBusy, setError)}
+              onClick={() => void beginCloudflareAuthorization(setBusy, setError, setErrorCode)}
             >
               Authorize Cloudflare again
+            </Button>
+          ) : null}
+          {errorCode === "RECENT_AUTH_REQUIRED" ? (
+            <Button
+              disabled={busy}
+              type="button"
+              onClick={() => {
+                setBusy(true);
+                void signOut().finally(() => window.location.reload());
+              }}
+            >
+              Sign in again
             </Button>
           ) : null}
           <Button
@@ -217,17 +233,28 @@ function message(error: unknown): string {
   return error instanceof Error ? error.message : "This upgrade step could not continue.";
 }
 
+function captureError(
+  error: unknown,
+  setError: (error: string | null) => void,
+  setErrorCode: (code: string | null) => void
+): void {
+  setError(message(error));
+  setErrorCode(error instanceof ApiRequestError ? error.code : null);
+}
+
 async function beginCloudflareAuthorization(
   setBusy: (busy: boolean) => void,
-  setError: (error: string | null) => void
+  setError: (error: string | null) => void,
+  setErrorCode: (code: string | null) => void
 ): Promise<void> {
   setBusy(true);
   setError(null);
+  setErrorCode(null);
   try {
     const authorization = await startProUpgradeOAuth();
     window.location.assign(authorization.authorizeUrl);
   } catch (error) {
-    setError(message(error));
+    captureError(error, setError, setErrorCode);
     setBusy(false);
   }
 }

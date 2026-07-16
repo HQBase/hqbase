@@ -5,6 +5,16 @@ export type ApiError = {
   };
 };
 
+export class ApiRequestError extends Error {
+  constructor(
+    public readonly code: string,
+    message: string
+  ) {
+    super(message);
+    this.name = "ApiRequestError";
+  }
+}
+
 export async function apiGet<T>(path: string): Promise<T> {
   return apiRequest<T>(path, { method: "GET" });
 }
@@ -34,9 +44,10 @@ async function apiRequest<T>(path: string, init: RequestInit): Promise<T> {
 
   const data = (await readResponseJson(response)) as T | ApiError;
   if (!response.ok) {
-    const message =
-      typeof data === "object" && data && "error" in data ? data.error.message : "Request failed.";
-    throw new Error(message);
+    if (typeof data === "object" && data && "error" in data) {
+      throw new ApiRequestError(data.error.code, data.error.message);
+    }
+    throw new ApiRequestError("REQUEST_FAILED", "Request failed.");
   }
 
   return data as T;
