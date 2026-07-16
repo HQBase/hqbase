@@ -92,23 +92,25 @@ jobs:
           HQBASE_RELEASE_VERSION: ${{ inputs.version }}
         run: |
           release_version="${HQBASE_RELEASE_VERSION#v}"
-          for attempt in $(seq 1 10); do
+          # R2 object uploads can take longer than the default verification window to
+          # become readable from a fresh request, even after Wrangler reports success.
+          for attempt in $(seq 1 40); do
             if pnpm exec wrangler r2 object get \
               "hqbase-releases/artifacts/community/${release_version}.tar.gz" \
               --file /tmp/published-community.tar.gz --remote; then
               break
             fi
-            test "$attempt" -lt 10
-            sleep 2
+            test "$attempt" -lt 40
+            sleep 3
           done
-          for attempt in $(seq 1 10); do
+          for attempt in $(seq 1 40); do
             if pnpm exec wrangler r2 object get \
               "hqbase-releases/manifests/community/stable.json" \
               --file /tmp/published-community-stable.json --remote; then
               break
             fi
-            test "$attempt" -lt 10
-            sleep 2
+            test "$attempt" -lt 40
+            sleep 3
           done
           cmp "release/community-${release_version}.tar.gz" /tmp/published-community.tar.gz
           cmp release/stable.json /tmp/published-community-stable.json
