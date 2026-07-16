@@ -24,7 +24,7 @@ export function createWranglerConfig(manifest) {
     name: manifest.worker.name,
     main: `${rootFromDeployment}/worker/index.ts`,
     compatibility_date: "2026-06-28",
-    compatibility_flags: ["nodejs_compat"],
+    compatibility_flags: ["nodejs_compat", "global_fetch_strictly_public"],
     assets: {
       directory: `${rootFromDeployment}/dist`,
       binding: "ASSETS",

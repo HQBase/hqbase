@@ -198,6 +198,9 @@ export function normalizeConfig(config, version, artifactSha256) {
     ...config,
     $schema: "./node_modules/wrangler/config-schema.json",
     main: "worker/index.ts",
+    compatibility_flags: [
+      ...new Set([...(config.compatibility_flags ?? []), "global_fetch_strictly_public"])
+    ],
     assets: {
       ...config.assets,
       directory: "./dist"

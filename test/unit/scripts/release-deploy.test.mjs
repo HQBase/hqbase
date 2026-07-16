@@ -43,6 +43,7 @@ describe("Community release deployment", () => {
         {
           name: "customer-worker",
           main: "../../../worker/index.ts",
+          compatibility_flags: ["nodejs_compat"],
           assets: { directory: "../../../dist", binding: "ASSETS" },
           d1_databases: [{ binding: "DB", migrations_dir: "../../../migrations" }],
           vars: { HQBASE_WORKER_NAME: "customer-worker" }
@@ -52,6 +53,7 @@ describe("Community release deployment", () => {
       )
     ).toMatchObject({
       main: "worker/index.ts",
+      compatibility_flags: ["nodejs_compat", "global_fetch_strictly_public"],
       assets: { directory: "./dist", binding: "ASSETS" },
       d1_databases: [{ binding: "DB", migrations_dir: "migrations" }],
       vars: {
