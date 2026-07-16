@@ -16,7 +16,9 @@ import { sendRoutes } from "../features/send/routes";
 import { sessionControlRoutes } from "../features/sessions/routes";
 import { setupRoutes } from "../features/setup/routes";
 import { updateRoutes } from "../features/updates/routes";
+import { inPlaceUpgradeRoutes } from "../features/upgrades/in-place-routes";
 import { upgradeRoutes } from "../features/upgrades/routes";
+import { enforceInPlaceUpgradeWritePause } from "../features/upgrades/write-pause";
 import { userRoutes } from "../features/users/routes";
 import type { HonoApp } from "../lib/env";
 import { errorBody, toAppError } from "../lib/errors";
@@ -27,6 +29,8 @@ import { healthRoutes } from "./health";
 import { meRoutes } from "./me";
 
 export const apiRoutes = new Hono<HonoApp>();
+
+apiRoutes.use("*", enforceInPlaceUpgradeWritePause);
 
 apiRoutes.use("*", async (c, next) => {
   const provided = c.req.header("x-request-id") ?? "";
@@ -72,6 +76,7 @@ apiRoutes.route("/api/pro/mail-bridge/v2", mailBridgeV2Routes);
 apiRoutes.route("/api/pro/sessions", sessionControlRoutes);
 apiRoutes.route("/api/pro/operations", operationRoutes);
 apiRoutes.route("/api/pro/upgrade", upgradeRoutes);
+apiRoutes.route("/api/upgrades/pro", inPlaceUpgradeRoutes);
 apiRoutes.route("/api/mailboxes", mailboxRoutes);
 apiRoutes.route("/api/messages", messageRoutes);
 apiRoutes.route("/api/attachments", attachmentRoutes);

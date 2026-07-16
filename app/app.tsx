@@ -22,6 +22,7 @@ import { getUpdateStatus } from "@/features/updates/api";
 import type { UpdateStatus } from "@/features/updates/types";
 import { getUpgradeLifecycle } from "@/features/upgrades/api";
 import type { UpgradeLifecycle } from "@/features/upgrades/types";
+import { UpgradeComplete } from "@/features/upgrades/upgrade-complete";
 import { listUsers } from "@/features/users/api";
 import type { WorkspaceUser } from "@/features/users/types";
 import type { FolderId } from "@/lib/routes";
@@ -174,6 +175,18 @@ export function App(): React.ReactElement {
 
   return (
     <>
+      <UpgradeComplete
+        onOpenSettings={() => {
+          window.history.replaceState(null, "", "/");
+          setSettingsTab("billing");
+          setActiveFolder("settings");
+        }}
+        onAddDomain={() => {
+          window.history.replaceState(null, "", "/");
+          setSettingsTab("domains");
+          setActiveFolder("settings");
+        }}
+      />
       <AppShell
         activeFolder={activeFolder}
         mailboxId={mailboxId}

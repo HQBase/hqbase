@@ -54,7 +54,7 @@ describe("upgrade settings", () => {
         onChanged={() => undefined}
       />
     );
-    expect(html).toContain("Verified");
+    expect(html).toContain("Complete");
     expect(html).not.toContain("Temporary Cloudflare API token");
   });
 });

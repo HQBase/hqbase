@@ -5,7 +5,7 @@ Cloudflare-managed email domains.
 
 ## Customer deployment source
 
-Customer deployments start only from the public, product-code-free
+Fresh Pro deployments start only from the public, product-code-free
 [`HQBase/hqbase-pro-deploy`](https://github.com/HQBase/hqbase-pro-deploy) bootstrap linked by the
 README's Deploy to Cloudflare button. Cloudflare clones that repository into the customer's source
 control account and connects it to Workers Builds. The private `HQBase/hqbase-pro` repository is
@@ -17,9 +17,9 @@ generates the runtime secrets as masked Worker secrets, downloads the licensed s
 and deploys it through the connected build. Customers do not copy product source or paste a
 Cloudflare API token into HQBase.
 
-For a Community upgrade, select the existing Community D1 database and R2 mail bucket. The deploy
-command recognizes Community, creates a customer-owned bookmark and R2 SQL backup, migrates and
-verifies D1, and deploys Pro as a separate Worker. Do not select new storage for an upgrade.
+Community upgrades start inside the authenticated existing workspace. The Community Worker
+discovers and verifies its own D1 and R2 bindings, backs them up, and uploads a signed Pro candidate
+as a new version of the same Worker service. The public bootstrap is not deployed for this path.
 
 The default `wrangler.jsonc` does not set `BETTER_AUTH_URL`; the Worker derives the deployed request origin. Only set `BETTER_AUTH_URL` explicitly when you need to pin auth to a specific custom origin.
 
@@ -33,14 +33,12 @@ zone is Active before completing `/setup`.
   Make the generated repository private when the source-control provider offers that choice.
 - Project name: keep `hqbase-pro`, or choose another unique Worker/project name.
 - Fresh Pro D1: choose Create new. Keep `hqbase-pro`, or rename it for the target environment.
-- Community upgrade D1: select the existing Community database. Do not create a replacement.
 - D1 location hint: leave Automatic unless the deployer has a specific data-location requirement.
 - D1 read replication: leave disabled for the MVP.
 - Fresh Pro R2: choose Create new. Keep `hqbase-pro-mail`, or rename it.
-- Community upgrade R2: select the existing Community mail bucket. Do not create a replacement.
 - R2 location hint: leave blank/automatic unless the deployer has a specific data-location requirement.
-- Queues: create new `hqbase-pro-jobs` and `hqbase-pro-jobs-dlq` queues for both fresh installs and
-  upgrades. Never reuse Community storage as a queue substitute.
+- Queues: create new `hqbase-pro-jobs` and `hqbase-pro-jobs-dlq` queues for fresh installs.
+  In-place upgrades create or reuse installation-owned queue names automatically.
 - Secrets: do not add `BETTER_AUTH_SECRET`, app-password, bridge, session, entitlement, license, or
   setup-token values in the deploy form. The installer generates or stores them as masked values
   after OAuth. `BETTER_AUTH_URL` normally remains unset because Pro derives the request origin.
@@ -131,9 +129,10 @@ attaches the consumer.
 - `PRO_SESSION_SECRET`
 - `PRO_ENTITLEMENT_SECRET`
 
-The customer installer generates these. Operators deploying private source directly must create
-independent random values with Wrangler. Never commit them or pass them to the Fly bridge; Fly gets
-only the deployment-scoped bridge token and Pro HTTPS URL.
+The fresh-install bootstrap generates these. In-place upgrades inherit the existing
+`BETTER_AUTH_SECRET` and create only missing Pro-specific secrets. Operators deploying private
+source directly must create independent random values with Wrangler. Never commit them or pass
+them to the Fly bridge; Fly gets only the deployment-scoped bridge token and Pro HTTPS URL.
 
 ## Deployment Check
 

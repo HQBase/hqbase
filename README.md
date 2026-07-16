@@ -20,16 +20,16 @@ of the launch purchase promise. See `docs/mail-bridge.md`.
 
 ## Deploy
 
-The same Cloudflare flow supports both lifecycles:
+HQBase Pro supports both lifecycles with distinct safe entry points:
 
 - **Fresh Pro:** create a new D1 database and R2 bucket.
-- **Upgrade Community:** select the existing Community D1 database and mail R2 bucket. Deployment
-  records a D1 Time Travel bookmark, exports SQL into the customer's R2 bucket, applies and verifies
-  Pro migrations, then deploys Pro without deleting the Community Worker.
+- **Upgrade Community:** start from Settings in the existing Community workspace. HQBase binds the
+  purchase to that installation, automatically verifies its Worker and bindings, records a D1 Time
+  Travel bookmark, exports SQL into its existing R2 bucket, validates a signed Pro candidate, and
+  promotes the same Worker service in place.
 
-After an upgrade deployment, sign in again, activate the Polar license under Settings → Billing,
-and cut over domains from the Pro domain wizard. Keep Community until send and receive verification
-passes.
+After promotion, the same workspace origin exposes Pro settings immediately. Existing domains,
+routes, D1 and R2 resources, authentication secret, users, sessions, and mail remain attached.
 
 ## Local development
 

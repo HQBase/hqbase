@@ -20,6 +20,7 @@ export function UpgradeSettings({
   const [pending, setPending] = React.useState(false);
   const [verificationError, setVerificationError] = React.useState<string | null>(null);
   const verified = lifecycle.state === "cutover_verified";
+  const inPlace = lifecycle.sourceWorkerName === lifecycle.targetWorkerName;
 
   async function verify() {
     setVerificationError(null);
@@ -44,38 +45,54 @@ export function UpgradeSettings({
           <div className="flex flex-wrap items-center gap-2">
             <CardTitle className="text-base">Community upgrade</CardTitle>
             <Badge variant={verified ? "secondary" : "outline"}>
-              {verified ? "Verified" : "Cutover pending"}
+              {verified ? "Complete" : inPlace ? "Promotion pending" : "Cutover pending"}
             </Badge>
           </div>
           <CardDescription>
-            Community remains the fallback until license, domains, portal, sending, and receiving
-            are verified on {lifecycle.targetWorkerName}.
+            {inPlace
+              ? `This workspace was promoted in place on ${lifecycle.targetWorkerName}. Its Worker identity, storage, domains, users, sessions, and mail were preserved.`
+              : `Community remains the fallback until license, domains, portal, sending, and receiving are verified on ${lifecycle.targetWorkerName}.`}
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
           <ol className="flex flex-col gap-3" aria-label="Community upgrade progress">
             <UpgradeStep complete label="Customer-owned D1 checkpoint created" />
             <UpgradeStep complete label="SQL backup copied to the existing R2 bucket" />
-            <UpgradeStep complete={lifecycle.state !== "migrated"} label="Pro Worker deployed" />
+            <UpgradeStep
+              complete={lifecycle.state !== "migrated"}
+              label={
+                inPlace ? "Signed Pro version promoted on the same Worker" : "Pro Worker deployed"
+              }
+            />
             <UpgradeStep
               complete={entitlement.state !== "unlicensed" && entitlement.state !== "inactive"}
               label="Pro license activated"
             />
-            <UpgradeStep complete={verified} label="Portal and mail routing verified on Pro" />
+            <UpgradeStep
+              complete={verified}
+              label={
+                inPlace
+                  ? "Original workspace origin and resources verified"
+                  : "Portal and mail routing verified on Pro"
+              }
+            />
           </ol>
           <dl className="grid gap-3 rounded-md border bg-background/45 p-4 text-xs sm:grid-cols-2">
             <RecordItem label="Rollback bookmark" value={lifecycle.checkpointBookmark} />
             <RecordItem label="R2 backup" value={lifecycle.backupR2Key} />
             <RecordItem
-              label="Community Worker"
+              label={inPlace ? "Previous Community version on Worker" : "Community Worker"}
               value={lifecycle.sourceWorkerName ?? "Not recorded"}
             />
-            <RecordItem label="Pro Worker" value={lifecycle.targetWorkerName} />
+            <RecordItem
+              label={inPlace ? "Active Pro Worker" : "Pro Worker"}
+              value={lifecycle.targetWorkerName}
+            />
           </dl>
         </CardContent>
       </Card>
 
-      {!verified ? (
+      {!verified && !inPlace ? (
         <Card className="bg-card/70 shadow-none">
           <CardHeader>
             <CardTitle className="text-base">Verify cutover</CardTitle>

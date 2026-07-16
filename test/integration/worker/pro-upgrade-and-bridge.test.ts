@@ -11,6 +11,7 @@ import billingMigration from "../../../migrations/0007_billing.sql?raw";
 import upgradeLifecycleMigration from "../../../migrations/0008_upgrade_lifecycle.sql?raw";
 import updatesMigration from "../../../migrations/0009_updates.sql?raw";
 import remoteMediaMigration from "../../../migrations/0010_remote_media_preferences.sql?raw";
+import inPlaceUpgradeMigration from "../../../migrations/0011_in_place_community_upgrade.sql?raw";
 import { appPasswordHash } from "../../../worker/features/app-passwords/crypto";
 import {
   insertAppPassword,
@@ -103,6 +104,7 @@ beforeAll(async () => {
   ).run();
   await applyMigration(updatesMigration);
   await applyMigration(remoteMediaMigration);
+  await applyMigration(inPlaceUpgradeMigration);
 });
 
 beforeEach(async () => {
@@ -132,12 +134,22 @@ describe("Community to Pro migration", () => {
     ).resolves.toMatchObject({ value: "0008" });
     await expect(
       env.DB.prepare(
+        "SELECT value FROM pro_schema_state WHERE key = 'in_place_community_upgrade'"
+      ).first()
+    ).resolves.toMatchObject({ value: "0011" });
+    await expect(
+      env.DB.prepare(
+        "SELECT COUNT(*) AS count FROM sqlite_schema WHERE type = 'table' AND name IN ('installation_identity', 'community_pro_upgrades', 'pro_applied_migrations')"
+      ).first()
+    ).resolves.toMatchObject({ count: 3 });
+    await expect(
+      env.DB.prepare(
         "SELECT edition, installed_version, installed_schema_version FROM pro_release_state"
       ).first()
     ).resolves.toMatchObject({
       edition: "pro",
       installed_version: "0.1.1",
-      installed_schema_version: 10
+      installed_schema_version: 11
     });
     await expect(
       env.DB.prepare("SELECT edition FROM app_release_state WHERE singleton = 1").first()
