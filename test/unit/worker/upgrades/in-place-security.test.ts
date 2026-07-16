@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { cloudflare } from "../../../../worker/features/upgrades/cloudflare";
 import {
   openUpgradeContinuation,
   sealUpgradeContinuation
@@ -32,5 +33,26 @@ describe("in-place upgrade secret boundary", () => {
       continuation
     );
     await expect(openUpgradeContinuation(ciphertext, "wrong-secret")).rejects.toThrow();
+  });
+
+  it("lets fetch set the multipart boundary for candidate uploads", async () => {
+    const form = new FormData();
+    form.set("metadata", "{}");
+    const fetcher: typeof fetch = async (_input, init) => {
+      expect(new Headers(init?.headers).has("content-type")).toBe(false);
+      return Response.json({ success: true, result: { id: "candidate-version" } });
+    };
+
+    await expect(
+      cloudflare(
+        "short-lived-token",
+        "/accounts/account/workers/scripts/worker/versions",
+        {
+          method: "POST",
+          body: form
+        },
+        fetcher
+      )
+    ).resolves.toEqual({ id: "candidate-version" });
   });
 });

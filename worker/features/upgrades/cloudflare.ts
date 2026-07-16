@@ -19,7 +19,9 @@ export async function cloudflare<T>(
 ): Promise<T> {
   const headers = new Headers(init.headers);
   headers.set("authorization", `Bearer ${token}`);
-  if (init.body && !headers.has("content-type")) headers.set("content-type", "application/json");
+  if (init.body && !(init.body instanceof FormData) && !headers.has("content-type")) {
+    headers.set("content-type", "application/json");
+  }
   const response = await fetcher(`${apiBase}${path}`, { ...init, headers });
   const payload = (await safeJson(response)) as Envelope<T> | null;
   if (!response.ok || !payload?.success) {
