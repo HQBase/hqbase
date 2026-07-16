@@ -28,7 +28,8 @@ export function createWranglerConfig(manifest) {
     assets: {
       directory: `${rootFromDeployment}/dist`,
       binding: "ASSETS",
-      not_found_handling: "single-page-application"
+      not_found_handling: "single-page-application",
+      run_worker_first: ["/api/*"]
     },
     observability: {
       enabled: true,

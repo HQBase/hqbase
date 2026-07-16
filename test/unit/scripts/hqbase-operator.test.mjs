@@ -18,6 +18,10 @@ describe("HQBase operator upgrade identity", () => {
     expect(config.name).toBe("community-upgrade-worker");
     expect(config.d1_databases[0]).toMatchObject({ database_name: "community-upgrade-db" });
     expect(config.r2_buckets[0]).toMatchObject({ bucket_name: "community-upgrade-mail" });
+    expect(config.assets).toMatchObject({
+      not_found_handling: "single-page-application",
+      run_worker_first: ["/api/*"]
+    });
     expect(config.vars).toMatchObject({
       HQBASE_BILLING_URL: "https://billing.hqbase.io",
       HQBASE_INSTALLATION_ID: manifest.installationId,
