@@ -126,7 +126,7 @@ async function queryD1Batch(
   const result = await cloudflare<Array<{ success?: boolean }>>(
     token,
     `/accounts/${accountId}/d1/database/${databaseId}/query`,
-    { method: "POST", body: JSON.stringify(statements) },
+    { method: "POST", body: JSON.stringify({ batch: statements }) },
     fetcher
   );
   if (result.length !== statements.length || result.some((entry) => entry.success === false)) {

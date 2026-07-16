@@ -47,6 +47,7 @@ function cloudflareOperation(path: string): string {
   if (path.endsWith("/secrets")) return "list_worker_secrets";
   if (path.endsWith("/workers/domains")) return "list_worker_domains";
   if (path.endsWith("/subdomain")) return "read_worker_subdomain";
+  if (path.endsWith("/query")) return "query_d1_database";
   if (path.includes("/d1/database")) return "list_d1_databases";
   if (/^\/zones(?:\?|$)/u.test(path)) return "list_zones";
   if (path.endsWith("/workers/routes")) return "list_worker_routes";
