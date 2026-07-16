@@ -5,6 +5,10 @@ export function startProUpgrade(): Promise<{ checkoutUrl: string; upgradeId: str
   return apiPost("/api/upgrades/pro/purchase");
 }
 
+export function startProUpgradeOAuth(): Promise<{ authorizeUrl: string }> {
+  return apiPost("/api/upgrades/pro/oauth");
+}
+
 export function getProUpgradeStatus(): Promise<UpgradeStatus> {
   return apiGet("/api/upgrades/pro/status");
 }

@@ -3,13 +3,19 @@ const COOKIE_TTL_SECONDS = 24 * 60 * 60;
 
 export type UpgradeDraft = {
   upgradeId: string;
-  nonce: string;
-  verifier: string;
+  nonce?: string;
+  verifier?: string;
   licenseKey?: string;
   orchestrationSecret?: string;
   cloudflareVerifier?: string;
   cloudflareState?: string;
   cloudflareAccessToken?: string;
+};
+
+export type UpgradeContinuation = {
+  upgradeId: string;
+  licenseKey: string;
+  orchestrationSecret?: string;
 };
 
 export async function readUpgradeDraft(
@@ -38,6 +44,20 @@ export async function writeUpgradeDraft(
 
 export function clearUpgradeDraft(): string {
   return secureCookie(COOKIE_NAME, "", 0);
+}
+
+export async function sealUpgradeContinuation(
+  continuation: UpgradeContinuation,
+  betterAuthSecret: string
+): Promise<string> {
+  return encrypt(JSON.stringify(continuation), betterAuthSecret);
+}
+
+export async function openUpgradeContinuation(
+  ciphertext: string,
+  betterAuthSecret: string
+): Promise<UpgradeContinuation> {
+  return JSON.parse(await decrypt(ciphertext, betterAuthSecret)) as UpgradeContinuation;
 }
 
 async function encrypt(value: string, secret: string): Promise<string> {

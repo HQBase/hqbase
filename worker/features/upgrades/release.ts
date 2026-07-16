@@ -9,6 +9,10 @@ export type ProWorkerBundle = {
   schemaVersion: number;
   compatibilityDate: string;
   compatibilityFlags: string[];
+  communityUpgrade: {
+    sourceSchemaVersions: number[];
+    targetSchemaVersion: number;
+  };
   main: { name: string; sha256: string; contentBase64: string };
   assets: Array<{
     path: string;
@@ -72,7 +76,7 @@ export async function downloadVerifiedProBundle(
         licenseKey,
         installationId: upgrade.installationId,
         hostname: new URL(upgrade.workspaceOrigin).hostname,
-        appVersion: env.HQBASE_APP_VERSION ?? "0.1.4"
+        appVersion: env.HQBASE_APP_VERSION ?? "0.1.5"
       })
     }
   );
@@ -143,6 +147,12 @@ async function verifyBundle(bundle: ProWorkerBundle, manifest: ReleaseManifest):
     bundle.edition !== "pro" ||
     bundle.version !== manifest.version ||
     bundle.schemaVersion !== manifest.schemaVersion ||
+    bundle.communityUpgrade?.targetSchemaVersion !== bundle.schemaVersion ||
+    !Array.isArray(bundle.communityUpgrade?.sourceSchemaVersions) ||
+    bundle.communityUpgrade.sourceSchemaVersions.length === 0 ||
+    bundle.communityUpgrade.sourceSchemaVersions.some(
+      (version) => !Number.isInteger(version) || version <= 0
+    ) ||
     bundle.main.name !== "index.js" ||
     (await sha256Hex(fromBase64(bundle.main.contentBase64))) !== bundle.main.sha256 ||
     !Array.isArray(bundle.assets) ||

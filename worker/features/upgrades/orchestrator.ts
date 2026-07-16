@@ -3,7 +3,7 @@ import type { WorkerEnv } from "../../lib/env";
 import { AppError } from "../../lib/errors";
 import { advanceWorkspaceBackup } from "./backup";
 import { discoverCommunityInstallation } from "./cloudflare";
-import { readUpgradeDraft } from "./cookies";
+import { resolveUpgradeDraft } from "./continuation";
 import { promoteCandidate, uploadProCandidate } from "./deployment";
 import { migrateToPro, verifyProCandidate } from "./migration";
 import { revokeUpgradeGrant } from "./oauth";
@@ -131,6 +131,14 @@ async function advanceOneState(
         409
       );
     }
+    if (!draft.licenseKey) {
+      throw new AppError(
+        "UPGRADE_SESSION_MISSING",
+        "Resume the purchase-bound upgrade session.",
+        409
+      );
+    }
+    await downloadVerifiedProBundle(env, upgrade, draft.licenseKey);
     return advanceWorkspaceBackup(env, upgrade, token);
   }
   if (upgrade.state === "backup_complete") {
@@ -195,7 +203,7 @@ async function requireOwnedUpgrade(request: Request, env: WorkerEnv, recent: boo
   const auth = await requireAuthContext(env, request);
   requireRole(auth, ["owner"], "Only the workspace owner can manage this upgrade.");
   if (recent) requireRecentSession(auth);
-  const draft = await readUpgradeDraft(request, env.BETTER_AUTH_SECRET);
+  const draft = await resolveUpgradeDraft(request, env);
   if (!draft)
     throw new AppError("UPGRADE_SESSION_MISSING", "Resume the upgrade from Settings.", 404);
   const upgrade = await getUpgrade(env.DB, draft.upgradeId);

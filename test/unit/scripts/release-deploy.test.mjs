@@ -2,6 +2,7 @@ import { generateKeyPairSync, sign } from "node:crypto";
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
+  communityReleaseTag,
   compareVersions,
   deploySource,
   needsInitialAuthSecret,
@@ -27,9 +28,10 @@ describe("Community release deployment", () => {
     };
     const encoded = publicKey.export({ type: "spki", format: "der" }).toString("base64");
     expect(verifyManifest(envelope, encoded)).toMatchObject({ version: "1.2.3" });
-    expect(() =>
-      verifyManifest({ ...envelope, signature: `A${envelope.signature.slice(1)}` }, encoded)
-    ).toThrow("signature");
+    const invalidSignature = `${envelope.signature.startsWith("A") ? "B" : "A"}${envelope.signature.slice(1)}`;
+    expect(() => verifyManifest({ ...envelope, signature: invalidSignature }, encoded)).toThrow(
+      "signature"
+    );
   });
   it("selects only newer semantic releases", () => {
     expect(compareVersions("0.2.0", "0.1.9")).toBeGreaterThan(0);
@@ -45,14 +47,25 @@ describe("Community release deployment", () => {
           d1_databases: [{ binding: "DB", migrations_dir: "../../../migrations" }],
           vars: { HQBASE_WORKER_NAME: "customer-worker" }
         },
-        "0.1.1"
+        "0.1.1",
+        "b".repeat(64)
       )
     ).toMatchObject({
       main: "worker/index.ts",
       assets: { directory: "./dist", binding: "ASSETS" },
       d1_databases: [{ binding: "DB", migrations_dir: "migrations" }],
-      vars: { HQBASE_APP_VERSION: "0.1.1", HQBASE_WORKER_NAME: "customer-worker" }
+      vars: {
+        HQBASE_APP_VERSION: "0.1.1",
+        HQBASE_RELEASE_ARTIFACT_SHA256: "b".repeat(64),
+        HQBASE_WORKER_NAME: "customer-worker"
+      }
     });
+  });
+  it("creates an immutable active-version tag from the signed Community artifact", () => {
+    expect(communityReleaseTag("0.1.5", "a".repeat(64))).toBe(
+      `hqbase-community:0.1.5:${"a".repeat(64)}`
+    );
+    expect(() => communityReleaseTag("0.1.5", "not-a-digest")).toThrow("identity");
   });
   it("uses the configured Worker name as the runtime automation identity", () => {
     expect(workerNameFromConfig({ name: "hqbase-deeptake-test" })).toBe("hqbase-deeptake-test");

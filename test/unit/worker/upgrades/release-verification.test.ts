@@ -17,6 +17,10 @@ describe("in-place Pro release verification", () => {
       schemaVersion: 11,
       compatibilityDate: "2026-07-11",
       compatibilityFlags: ["nodejs_compat"],
+      communityUpgrade: {
+        sourceSchemaVersions: [5],
+        targetSchemaVersion: 11
+      },
       main: {
         name: "index.js",
         sha256: await sha256Hex(main),

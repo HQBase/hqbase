@@ -2,11 +2,14 @@ import { Check, Circle, LoaderCircle, ShieldCheck } from "lucide-react";
 import * as React from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { signOut } from "@/features/auth/api";
+import { ApiRequestError } from "@/lib/api-client";
 import {
   advanceProUpgrade,
   completeProUpgrade,
   confirmLegacyProUpgrade,
-  getProUpgradeStatus
+  getProUpgradeStatus,
+  startProUpgradeOAuth
 } from "./api";
 import type { UpgradeState, UpgradeStatus } from "./types";
 
@@ -39,20 +42,23 @@ export function UpgradeExperience(): React.ReactElement | null {
   const result = new URLSearchParams(window.location.search).get("upgrade");
   const [status, setStatus] = React.useState<UpgradeStatus | null>(null);
   const [error, setError] = React.useState<string | null>(null);
+  const [errorCode, setErrorCode] = React.useState<string | null>(null);
   const [busy, setBusy] = React.useState(false);
 
   React.useEffect(() => {
     if (result !== "progress") return;
     void getProUpgradeStatus()
       .then(setStatus)
-      .catch((reason) => setError(message(reason)));
+      .catch((reason) => captureError(reason, setError, setErrorCode));
   }, [result]);
 
   React.useEffect(() => {
-    if (!status || busy || status.legacyConfirmationRequired || terminal(status.state)) return;
+    if (!status || busy || error || status.legacyConfirmationRequired || terminal(status.state))
+      return;
     const timer = window.setTimeout(() => {
       setBusy(true);
       setError(null);
+      setErrorCode(null);
       const operation =
         status.state === "promoted"
           ? completeProUpgrade().then(() => {
@@ -69,7 +75,7 @@ export function UpgradeExperience(): React.ReactElement | null {
           }
         })
         .catch(async (reason) => {
-          setError(message(reason));
+          captureError(reason, setError, setErrorCode);
           await getProUpgradeStatus()
             .then(setStatus)
             .catch(() => undefined);
@@ -77,7 +83,7 @@ export function UpgradeExperience(): React.ReactElement | null {
         .finally(() => setBusy(false));
     }, 500);
     return () => window.clearTimeout(timer);
-  }, [busy, status]);
+  }, [busy, error, status]);
 
   if (!result) return null;
   if (result === "authorize") {
@@ -89,9 +95,14 @@ export function UpgradeExperience(): React.ReactElement | null {
           Purchase verified. Authorize Cloudflare once so HQBase can securely detect your existing
           resources, back up the workspace, and promote this Worker in place.
         </CardDescription>
-        <form action="/api/upgrades/pro/oauth" method="post">
-          <Button type="submit">Authorize Cloudflare and upgrade</Button>
-        </form>
+        <Button
+          disabled={busy}
+          type="button"
+          onClick={() => void beginCloudflareAuthorization(setBusy, setError, setErrorCode)}
+        >
+          {busy ? "Opening Cloudflare…" : "Authorize Cloudflare and upgrade"}
+        </Button>
+        {error ? <p className="text-sm text-destructive">{error}</p> : null}
       </UpgradeFrame>
     );
   }
@@ -144,7 +155,7 @@ export function UpgradeExperience(): React.ReactElement | null {
               setBusy(true);
               void confirmLegacyProUpgrade()
                 .then(setStatus)
-                .catch((reason) => setError(message(reason)))
+                .catch((reason) => captureError(reason, setError, setErrorCode))
                 .finally(() => setBusy(false));
             }}
           >
@@ -159,9 +170,25 @@ export function UpgradeExperience(): React.ReactElement | null {
             <p className="text-muted-foreground">{status.recoveryAction}</p>
           ) : null}
           {status?.recoveryAction?.startsWith("Authorize Cloudflare") ? (
-            <form action="/api/upgrades/pro/oauth" method="post">
-              <Button type="submit">Authorize Cloudflare again</Button>
-            </form>
+            <Button
+              disabled={busy}
+              type="button"
+              onClick={() => void beginCloudflareAuthorization(setBusy, setError, setErrorCode)}
+            >
+              Authorize Cloudflare again
+            </Button>
+          ) : null}
+          {errorCode === "RECENT_AUTH_REQUIRED" ? (
+            <Button
+              disabled={busy}
+              type="button"
+              onClick={() => {
+                setBusy(true);
+                void signOut().finally(() => window.location.reload());
+              }}
+            >
+              Sign in again
+            </Button>
           ) : null}
           <Button
             disabled={busy}
@@ -204,4 +231,30 @@ function terminal(state: UpgradeState): boolean {
 
 function message(error: unknown): string {
   return error instanceof Error ? error.message : "This upgrade step could not continue.";
+}
+
+function captureError(
+  error: unknown,
+  setError: (error: string | null) => void,
+  setErrorCode: (code: string | null) => void
+): void {
+  setError(message(error));
+  setErrorCode(error instanceof ApiRequestError ? error.code : null);
+}
+
+async function beginCloudflareAuthorization(
+  setBusy: (busy: boolean) => void,
+  setError: (error: string | null) => void,
+  setErrorCode: (code: string | null) => void
+): Promise<void> {
+  setBusy(true);
+  setError(null);
+  setErrorCode(null);
+  try {
+    const authorization = await startProUpgradeOAuth();
+    window.location.assign(authorization.authorizeUrl);
+  } catch (error) {
+    captureError(error, setError, setErrorCode);
+    setBusy(false);
+  }
 }

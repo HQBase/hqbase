@@ -19,10 +19,17 @@ export async function cloudflare<T>(
 ): Promise<T> {
   const headers = new Headers(init.headers);
   headers.set("authorization", `Bearer ${token}`);
-  if (init.body && !headers.has("content-type")) headers.set("content-type", "application/json");
+  if (init.body && !(init.body instanceof FormData) && !headers.has("content-type")) {
+    headers.set("content-type", "application/json");
+  }
   const response = await fetcher(`${apiBase}${path}`, { ...init, headers });
   const payload = (await safeJson(response)) as Envelope<T> | null;
   if (!response.ok || !payload?.success) {
+    console.warn("community_pro_upgrade_cloudflare_api_error", {
+      apiCode: payload?.errors?.[0]?.code ?? null,
+      operation: cloudflareOperation(path),
+      status: response.status
+    });
     throw new AppError(
       "CLOUDFLARE_UPGRADE_API_ERROR",
       publicCloudflareError(path, payload?.errors?.[0]?.code),
@@ -30,6 +37,21 @@ export async function cloudflare<T>(
     );
   }
   return payload.result;
+}
+
+function cloudflareOperation(path: string): string {
+  if (/^\/accounts(?:\?|$)/u.test(path)) return "list_accounts";
+  if (/\/workers\/scripts\/?(?:\?|$)/u.test(path)) return "list_workers";
+  if (path.endsWith("/settings")) return "read_worker_settings";
+  if (path.endsWith("/deployments")) return "read_worker_deployments";
+  if (path.endsWith("/secrets")) return "list_worker_secrets";
+  if (path.endsWith("/workers/domains")) return "list_worker_domains";
+  if (path.endsWith("/subdomain")) return "read_worker_subdomain";
+  if (path.endsWith("/query")) return "query_d1_database";
+  if (path.includes("/d1/database")) return "list_d1_databases";
+  if (/^\/zones(?:\?|$)/u.test(path)) return "list_zones";
+  if (path.endsWith("/workers/routes")) return "list_worker_routes";
+  return "upgrade_cloudflare_api";
 }
 
 export async function discoverCommunityInstallation(
@@ -167,7 +189,20 @@ export async function discoverCommunityInstallation(
       409
     );
   }
-  await verifySignedCommunityRelease(bindings, env, fetcher);
+  const activeVersion = await cloudflare<{
+    annotations?: { "workers/tag"?: string };
+  }>(
+    token,
+    `/accounts/${accountId}/workers/scripts/${expected.workerName}/versions/${active[0].version_id}`,
+    {},
+    fetcher
+  );
+  await verifySignedCommunityRelease(
+    bindings,
+    activeVersion.annotations?.["workers/tag"] ?? null,
+    env,
+    fetcher
+  );
   await verifyCommunitySchema(env.DB);
   const routes = await listWorkerRoutes(token, accountId, expected.workerName, fetcher);
   const customDomains = domains
@@ -281,7 +316,10 @@ async function verifyCommunitySchema(db: D1Database): Promise<void> {
   const releaseState = await db
     .prepare("SELECT edition, installed_schema_version FROM app_release_state WHERE singleton = 1")
     .first<{ edition: string; installed_schema_version: number }>();
-  if (releaseState?.edition !== "community" || releaseState.installed_schema_version !== 4) {
+  if (
+    releaseState?.edition !== "community" ||
+    ![4, 5].includes(releaseState.installed_schema_version)
+  ) {
     throw new AppError(
       "UPGRADE_SCHEMA_UNSUPPORTED",
       "This database is not a supported HQBase Community schema.",

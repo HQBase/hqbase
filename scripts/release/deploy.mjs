@@ -36,7 +36,11 @@ export async function deploy(options = {}) {
     writeFileSync(archive, bytes);
     run("mkdir", ["-p", source], root);
     run("tar", ["-xzf", archive, "-C", source], root);
-    const config = normalizeConfig(JSON.parse(readFileSync(configFile, "utf8")), manifest.version);
+    const config = normalizeConfig(
+      JSON.parse(readFileSync(configFile, "utf8")),
+      manifest.version,
+      manifest.artifact.sha256
+    );
     writeFileSync(resolve(source, "wrangler.jsonc"), `${JSON.stringify(config, null, 2)}\n`);
     run("pnpm", ["install", "--frozen-lockfile"], source);
     run("pnpm", ["build"], source);
@@ -112,6 +116,8 @@ export async function deploy(options = {}) {
         "deploy",
         "--config",
         "wrangler.jsonc",
+        "--tag",
+        communityReleaseTag(manifest.version, manifest.artifact.sha256),
         "--var",
         `HQBASE_WORKER_NAME:${config.name}`
       ],
@@ -187,7 +193,7 @@ export function compareVersions(left, right) {
   }
   return 0;
 }
-export function normalizeConfig(config, version) {
+export function normalizeConfig(config, version, artifactSha256) {
   return {
     ...config,
     $schema: "./node_modules/wrangler/config-schema.json",
@@ -199,6 +205,7 @@ export function normalizeConfig(config, version) {
     vars: {
       ...config.vars,
       HQBASE_APP_VERSION: version,
+      ...(artifactSha256 ? { HQBASE_RELEASE_ARTIFACT_SHA256: artifactSha256 } : {}),
       HQBASE_WORKER_NAME: workerNameFromConfig(config)
     },
     d1_databases: config.d1_databases?.map((binding) => ({
@@ -206,6 +213,11 @@ export function normalizeConfig(config, version) {
       migrations_dir: "migrations"
     }))
   };
+}
+export function communityReleaseTag(version, artifactSha256) {
+  if (!/^\d+\.\d+\.\d+/.test(version) || !/^[a-f0-9]{64}$/.test(artifactSha256))
+    throw new Error("Community release identity is invalid.");
+  return `hqbase-community:${version}:${artifactSha256}`;
 }
 function sourceDeploy(cwd) {
   run("pnpm", ["build"], cwd);
