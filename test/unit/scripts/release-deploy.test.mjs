@@ -104,7 +104,8 @@ describe("Community release deployment", () => {
         attempt: () => ({
           status: 1,
           stdout: "",
-          stderr: 'Worker "customer-worker" not found. If this is a new Worker, deploy it.'
+          stderr:
+            "This Worker does not exist on your account. [code: 10007] If this is a new Worker, deploy it."
         })
       })
     ).toBeNull();

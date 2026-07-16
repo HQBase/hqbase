@@ -75,7 +75,8 @@ export function isWorkerNotFound(result) {
   );
   return (
     /Worker ".+"(?: \(env: .+\))? not found\./s.test(output) ||
-    /workers\.api\.error\.script_not_found|code["': ]+10090/i.test(output)
+    /This Worker does not exist on your account\./i.test(output) ||
+    /workers\.api\.error\.script_not_found|code["': ]+(?:10007|10090)/i.test(output)
   );
 }
 
