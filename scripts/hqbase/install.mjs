@@ -99,7 +99,7 @@ export function install(flags) {
   console.log(`HQBase deployment "${name}" is ready.`);
 }
 
-function createManifest(name, input) {
+export function createManifest(name, input) {
   const workerName = input.workerName ?? `hqbase-${name}`;
   const d1Name = input.d1Name ?? `hqbase-${name}`;
   const r2Bucket = input.r2Bucket ?? `hqbase-${name}-mail`;
@@ -109,6 +109,7 @@ function createManifest(name, input) {
   return {
     version: 1,
     name,
+    installationId: input.installationId ?? crypto.randomUUID(),
     createdAt: new Date().toISOString(),
     worker: { name: workerName, deployed: false },
     d1: { name: d1Name, id: "00000000-0000-0000-0000-000000000000", created: false },
