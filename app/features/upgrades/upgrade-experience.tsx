@@ -50,7 +50,14 @@ export function UpgradeExperience(): React.ReactElement | null {
   }, [result]);
 
   React.useEffect(() => {
-    if (!status || busy || status.legacyConfirmationRequired || terminal(status.state)) return;
+    if (
+      !status ||
+      busy ||
+      error ||
+      status.legacyConfirmationRequired ||
+      terminal(status.state)
+    )
+      return;
     const timer = window.setTimeout(() => {
       setBusy(true);
       setError(null);
@@ -78,7 +85,7 @@ export function UpgradeExperience(): React.ReactElement | null {
         .finally(() => setBusy(false));
     }, 500);
     return () => window.clearTimeout(timer);
-  }, [busy, status]);
+  }, [busy, error, status]);
 
   if (!result) return null;
   if (result === "authorize") {
