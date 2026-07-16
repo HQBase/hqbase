@@ -5,6 +5,7 @@ import { mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync }
 import { extname, relative, resolve } from "node:path";
 import { gzipSync } from "node:zlib";
 import { hash as blake3 } from "blake3-wasm";
+import { assertCommunityUpgradeCompatibility } from "./community-upgrade.mjs";
 
 const root = resolve(import.meta.dirname, "../..");
 const edition = "pro";
@@ -77,6 +78,7 @@ writeFileSync(
     schemaVersion,
     compatibilityDate: "2026-07-11",
     compatibilityFlags: ["nodejs_compat"],
+    communityUpgrade: assertCommunityUpgradeCompatibility(schemaVersion),
     main: {
       name: "index.js",
       sha256: createHash("sha256").update(mainBytes).digest("hex"),
