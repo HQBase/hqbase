@@ -19,6 +19,7 @@ describe("Community updates", () => {
     expect(status).toMatchObject({
       edition: "community",
       installedVersion: "0.1.1",
+      latestIsNewer: false,
       available: false,
       compatible: true
     });

@@ -67,7 +67,7 @@ The Deploy to Cloudflare button is the public install path. Before publishing th
 pnpm hqbase:button --repo-url https://github.com/OWNER/REPO
 ```
 
-Cloudflare clones the repository, provisions configured Worker resources, builds the Worker, and deploys it into the installer's account. The first customer-owned build generates and stores a unique masked Better Auth secret automatically; later builds preserve it. After deployment, visit `/setup`.
+Cloudflare clones the repository, provisions configured Worker resources, and deploys the verified signed Community stable artifact into the installer's account. The first customer-owned build generates and stores a unique masked Better Auth secret automatically; later builds preserve it. After deployment, visit `/setup`.
 
 HQBase requires a domain with authoritative DNS managed by Cloudflare. In `/setup`, click `Authorize Cloudflare`, approve the listed permissions, and select the primary domain. `Connect domain and continue` enables Email Routing DNS, points catch-all mail at the Worker, enables Email Sending, and advances only after Cloudflare reports the domain ready. The short-lived OAuth grant stays encrypted in an HTTP-only cookie and is revoked when domain setup succeeds; it is never stored in D1 or R2. The owner account email may use any valid domain because it is only the sign-in and recovery identity. Shared mailboxes always use the selected workspace domain; setup does not create one from the account email unless you explicitly opt in.
 

@@ -4,6 +4,7 @@ export type UpdateStatus = {
   installedSchemaVersion: number;
   channel: "stable";
   checkedAt: string;
+  latestIsNewer: boolean;
   available: boolean;
   compatible: boolean;
   release: {

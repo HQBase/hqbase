@@ -5,7 +5,7 @@ import { AppError } from "../../lib/errors";
 import type { ReleaseManifest, UpdateStatus } from "./types";
 
 const edition = "community" as const;
-const installedSchemaVersion = 4;
+const installedSchemaVersion = 5;
 const defaultReleaseUrl = "https://billing.hqbase.io/v1/releases";
 
 const envelopeSchema = z.object({
@@ -52,14 +52,17 @@ export async function getUpdateStatus(
       503
     );
   }
+  const latestIsNewer = compareVersions(release.version, installedVersion) > 0;
+  const compatible = compareVersions(installedVersion, release.minVersion) >= 0;
   return {
     edition,
     installedVersion,
     installedSchemaVersion,
     channel: "stable",
     checkedAt: new Date().toISOString(),
-    available: compareVersions(release.version, installedVersion) > 0,
-    compatible: compareVersions(installedVersion, release.minVersion) >= 0,
+    latestIsNewer,
+    available: latestIsNewer && compatible,
+    compatible,
     release: release as ReleaseManifest
   };
 }

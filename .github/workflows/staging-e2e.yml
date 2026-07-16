@@ -109,9 +109,9 @@ jobs:
           previous_version="${{ steps.release-versions.outputs.previous }}"
           current_version="${{ steps.release-versions.outputs.current }}"
           config=".hqbase/deployments/$DEPLOYMENT_NAME/wrangler.jsonc"
-          WORKERS_CI=1 CONFIG_FILE="$config" CURRENT_VERSION="$previous_version" node --input-type=module -e '
+          WORKERS_CI=1 CONFIG_FILE="$config" node --input-type=module -e '
             import { deploy } from "./scripts/release/deploy.mjs";
-            await deploy({ currentVersion: process.env.CURRENT_VERSION, configFile: process.env.CONFIG_FILE });
+            await deploy({ configFile: process.env.CONFIG_FILE });
           '
           release=$(pnpm exec wrangler d1 execute DB --remote --config "$config" --json \
             --command "SELECT installed_version FROM app_release_state WHERE singleton = 1")

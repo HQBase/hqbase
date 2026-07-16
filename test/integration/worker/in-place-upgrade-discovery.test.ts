@@ -168,6 +168,9 @@ function cloudflareFixture(
   return (async (input: RequestInfo | URL) => {
     const url = new URL(String(input));
     if (url.hostname === "billing.test") {
+      if (url.pathname !== "/v1/releases/community/0.1.4/manifest") {
+        return new Response(null, { status: 404 });
+      }
       return Response.json(
         options.invalidRelease
           ? { ...releaseEnvelope, signature: base64Url(new Uint8Array(64)) }
@@ -208,7 +211,7 @@ function cloudflareFixture(
                   text: options.installationId ?? installationId
                 }
               ]),
-          { name: "HQBASE_APP_VERSION", type: "plain_text", text: "0.1.3" },
+          { name: "HQBASE_APP_VERSION", type: "plain_text", text: "0.1.4" },
           { name: "HQBASE_RELEASE_PUBLIC_KEY", type: "plain_text", text: releaseKey }
         ]
       };
@@ -220,8 +223,8 @@ function cloudflareFixture(
       result = {
         annotations: {
           "workers/tag": options.invalidReleaseTag
-            ? "hqbase-community:0.1.3:invalid"
-            : `hqbase-community:0.1.3:${releaseSha256}`
+            ? "hqbase-community:0.1.4:invalid"
+            : `hqbase-community:0.1.4:${releaseSha256}`
         }
       };
     } else if (path.endsWith(`/workers/scripts/${workerName}/secrets`)) {

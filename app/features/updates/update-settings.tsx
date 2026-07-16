@@ -70,7 +70,11 @@ export function UpdateSettings({
               </CardDescription>
             </div>
             <Badge variant={status?.available ? "default" : "secondary"}>
-              {status?.available ? "Update available" : "Up to date"}
+              {status?.available
+                ? "Update available"
+                : status?.latestIsNewer
+                  ? "Recovery required"
+                  : "Up to date"}
             </Badge>
           </div>
         </CardHeader>
@@ -79,7 +83,7 @@ export function UpdateSettings({
             <Version label="Installed" value={status?.installedVersion ?? "Unknown"} />
             <Version label="Latest stable" value={status?.release.version ?? "Not checked"} />
           </div>
-          {status?.available ? (
+          {status?.latestIsNewer ? (
             <div className="rounded-md border bg-background/50 p-4">
               <p className="font-medium">HQBase {status.release.version}</p>
               <p className="mt-1 text-xs text-muted-foreground">
@@ -136,6 +140,15 @@ export function UpdateSettings({
             ) : null}
           </CardContent>
         </Card>
+      ) : null}
+      {status?.latestIsNewer && !status.compatible ? (
+        <Alert variant="destructive">
+          <AlertTitle>Update recovery required</AlertTitle>
+          <AlertDescription>
+            This installation cannot apply the latest release directly. Keep the workspace online
+            and contact HQBase support for the supported intermediate release.
+          </AlertDescription>
+        </Alert>
       ) : null}
     </div>
   );

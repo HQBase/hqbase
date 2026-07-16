@@ -11,7 +11,7 @@ The README includes a Deploy to Cloudflare button. Before publishing, point it a
 pnpm hqbase:button --repo-url https://github.com/OWNER/REPO
 ```
 
-Cloudflare's deploy flow clones the repository, prompts for configured variables, provisions supported resources from `wrangler.jsonc`, builds the Worker, and deploys it. On the first customer-owned build, the deploy command generates a unique `BETTER_AUTH_SECRET`, uploads it as a masked Worker secret, and deletes the temporary local file. Later builds preserve the existing value instead of rotating it.
+Cloudflare's deploy flow clones the repository, prompts for configured variables, provisions supported resources from `wrangler.jsonc`, and runs the deploy command. That command verifies and deploys the current signed Community stable artifact instead of treating the cloned source as a released Worker. On the first customer-owned build, it generates a unique `BETTER_AUTH_SECRET`, uploads it as a masked Worker secret, and deletes the temporary local file. Later builds preserve the existing value instead of rotating it.
 
 Cloudflare may rewrite `wrangler.jsonc.name` when the installer chooses a custom
 project name. `pnpm deploy` treats that configured name as the source of truth
@@ -38,6 +38,11 @@ domain Active before completing `/setup`.
 - `BETTER_AUTH_URL`: normally leave unset. HQBase derives the request origin at runtime.
 - Build command: keep `pnpm run build`.
 - Deploy command: keep `pnpm run deploy`; this runs the build, applies D1 migrations by the `DB` binding, deploys the Worker, and prints the setup link.
+
+Normal customer deployments fail closed if the cloned source is newer than the published signed
+stable release. Maintainers may set `HQBASE_FORCE_SOURCE_DEPLOY=1` only for an intentionally
+unsigned development deployment; such a Worker cannot start an in-place Pro upgrade until it has
+applied a signed Community release.
 
 ## Manual Deployment
 

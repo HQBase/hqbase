@@ -21,7 +21,7 @@ export async function verifySignedCommunityRelease(
   }
 
   const response = await fetcher(
-    `${env.HQBASE_RELEASES_URL ?? "https://billing.hqbase.io/v1/releases"}/community/stable`,
+    `${env.HQBASE_RELEASES_URL ?? "https://billing.hqbase.io/v1/releases"}/community/${encodeURIComponent(version)}/manifest`,
     { headers: { accept: "application/json" } }
   );
   const envelope = (await safeJson(response)) as { payload?: string; signature?: string } | null;
@@ -55,13 +55,12 @@ export async function verifySignedCommunityRelease(
       manifest.format !== "hqbase-release-v1" ||
       manifest.edition !== "community" ||
       manifest.channel !== "stable" ||
-      typeof manifest.version !== "string" ||
+      manifest.version !== version ||
       typeof manifest.minVersion !== "string" ||
       !/^[a-f0-9]{64}$/.test(manifest.artifact?.sha256 ?? "") ||
       activeVersionTag !==
         `hqbase-community:${version}:${manifest.artifact?.sha256 ?? "missing"}` ||
-      compareVersions(version, manifest.minVersion) < 0 ||
-      compareVersions(version, manifest.version) > 0
+      compareVersions(version, manifest.minVersion) < 0
     ) {
       throw unsupportedRelease();
     }
@@ -74,7 +73,7 @@ export async function verifySignedCommunityRelease(
 function unsupportedRelease(): AppError {
   return new AppError(
     "UPGRADE_RELEASE_UNSUPPORTED",
-    "The target is not a supported signed HQBase Community release.",
+    "Update this Community workspace to the latest signed release before retrying Pro upgrade.",
     409
   );
 }

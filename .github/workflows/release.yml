@@ -94,7 +94,7 @@ jobs:
               exit 1
               ;;
           esac
-      - name: Publish immutable artifact and stable manifest
+      - name: Preserve previous stable manifest and publish immutable release
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -103,7 +103,27 @@ jobs:
         run: |
           export HQBASE_RELEASE_VERSION="${HQBASE_RELEASE_VERSION#v}"
           if [ "$HQBASE_ARTIFACT_EXISTS" != "true" ]; then
+            curl --fail --silent --show-error \
+              https://billing.hqbase.io/v1/releases/community/stable \
+              --output /tmp/previous-community-stable.json
+            previous_version=$(node --input-type=module -e '
+              import { readFileSync } from "node:fs";
+              const envelope = JSON.parse(readFileSync("/tmp/previous-community-stable.json", "utf8"));
+              console.log(JSON.parse(Buffer.from(envelope.payload, "base64url").toString("utf8")).version);
+            ')
+            if pnpm exec wrangler r2 object get \
+              "hqbase-releases/manifests/community/${previous_version}.json" \
+              --file /tmp/previous-versioned-community-manifest.json --remote; then
+              cmp --silent \
+                /tmp/previous-community-stable.json \
+                /tmp/previous-versioned-community-manifest.json
+            else
+              pnpm exec wrangler r2 object put \
+                "hqbase-releases/manifests/community/${previous_version}.json" \
+                --file /tmp/previous-community-stable.json --remote
+            fi
             pnpm exec wrangler r2 object put "hqbase-releases/artifacts/community/${HQBASE_RELEASE_VERSION}.tar.gz" --file "release/community-${HQBASE_RELEASE_VERSION}.tar.gz" --remote
+            pnpm exec wrangler r2 object put "hqbase-releases/manifests/community/${HQBASE_RELEASE_VERSION}.json" --file release/stable.json --remote
             pnpm exec wrangler r2 object put "hqbase-releases/manifests/community/stable.json" --file release/stable.json --remote
           fi
       - name: Verify published artifact and signed manifest
@@ -123,6 +143,15 @@ jobs:
           done
           for attempt in $(seq 1 30); do
             if curl --fail --silent --show-error \
+              "https://billing.hqbase.io/v1/releases/community/${release_version}/manifest" \
+              --output /tmp/live-community-versioned.json; then
+              break
+            fi
+            test "$attempt" -lt 30
+            sleep 2
+          done
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent --show-error \
               https://billing.hqbase.io/v1/releases/community/stable \
               --output /tmp/live-community-stable.json; then
               break
@@ -134,6 +163,7 @@ jobs:
             import { createHash, createPublicKey, verify } from "node:crypto";
             import { readFileSync, statSync } from "node:fs";
             const envelope = JSON.parse(readFileSync("/tmp/live-community-stable.json", "utf8"));
+            const versioned = JSON.parse(readFileSync("/tmp/live-community-versioned.json", "utf8"));
             const key = createPublicKey({ key: Buffer.from("MCowBQYDK2VwAyEAsVwKniCvpHDwbbnjTPP0SuIIG97cRL+iFBQvay9OrU4=", "base64"), format: "der", type: "spki" });
             if (!verify(null, Buffer.from(envelope.payload, "base64url"), key, Buffer.from(envelope.signature, "base64url"))) process.exit(1);
             const payload = JSON.parse(Buffer.from(envelope.payload, "base64url").toString("utf8"));
@@ -141,6 +171,7 @@ jobs:
             const file = "/tmp/published-community.tar.gz";
             const sha256 = createHash("sha256").update(readFileSync(file)).digest("hex");
             if (payload.edition !== "community" || payload.version !== version || payload.artifact?.sha256 !== sha256 || payload.artifact?.size !== statSync(file).size) process.exit(1);
+            if (versioned.payload !== envelope.payload || versioned.signature !== envelope.signature) process.exit(1);
             if (process.env.HQBASE_ARTIFACT_EXISTS !== "true") {
               const expected = JSON.parse(readFileSync("release/stable.json", "utf8"));
               if (expected.payload !== envelope.payload || expected.signature !== envelope.signature) process.exit(1);

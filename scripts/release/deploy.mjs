@@ -4,20 +4,23 @@ import { createHash, createPublicKey, randomBytes, verify } from "node:crypto";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
+import { inspectActiveCommunityRelease, isWorkerNotFound } from "./active-version.mjs";
 
 const root = resolve(import.meta.dirname, "../..");
 const packageVersion = JSON.parse(readFileSync(resolve(root, "package.json"), "utf8")).version;
 const publicKey = "MCowBQYDK2VwAyEAsVwKniCvpHDwbbnjTPP0SuIIG97cRL+iFBQvay9OrU4=";
 
 export async function deploy(options = {}) {
-  const currentVersion = options.currentVersion ?? packageVersion;
   const configFile = resolve(options.configFile ?? resolve(root, "wrangler.jsonc"));
-  if (process.env.WORKERS_CI !== "1" || process.env.HQBASE_FORCE_SOURCE_DEPLOY === "1")
-    return sourceDeploy(root);
+  if (process.env.HQBASE_FORCE_SOURCE_DEPLOY === "1") return sourceDeploy(root);
   const response = await fetch("https://billing.hqbase.io/v1/releases/community/stable");
   if (!response.ok) throw new Error(`Release check failed (${response.status}).`);
   const manifest = verifyManifest(await response.json());
-  if (compareVersions(manifest.version, currentVersion) <= 0) return sourceDeploy(root);
+  if (compareVersions(manifest.version, packageVersion) < 0) {
+    throw new Error(
+      `Community ${packageVersion} has not been published as a signed stable release yet.`
+    );
+  }
 
   const workspace = mkdtempSync(resolve(tmpdir(), "hqbase-community-release-"));
   let recovery = null;
@@ -44,6 +47,45 @@ export async function deploy(options = {}) {
     writeFileSync(resolve(source, "wrangler.jsonc"), `${JSON.stringify(config, null, 2)}\n`);
     run("pnpm", ["install", "--frozen-lockfile"], source);
     run("pnpm", ["build"], source);
+    const activeRelease = inspectActiveCommunityRelease(source, config.name);
+    const releaseTag = communityReleaseTag(manifest.version, manifest.artifact.sha256);
+    if (!activeRelease) {
+      run(
+        "pnpm",
+        [
+          "exec",
+          "wrangler",
+          "d1",
+          "migrations",
+          "apply",
+          "DB",
+          "--remote",
+          "--config",
+          "wrangler.jsonc"
+        ],
+        source
+      );
+      deploySource(source, { releaseTag });
+      sql(
+        source,
+        `UPDATE app_release_state SET installed_version = ${quote(manifest.version)}, installed_schema_version = ${manifest.schemaVersion}, updated_at = datetime('now') WHERE singleton = 1`
+      );
+      run("pnpm", ["hqbase", "postdeploy"], source);
+      console.log(`HQBase Community ${manifest.version} installed from its signed release.`);
+      return;
+    }
+    if (compareVersions(activeRelease.version, manifest.version) > 0) {
+      throw new Error("The active Community Worker is newer than the signed stable release.");
+    }
+    if (compareVersions(activeRelease.version, manifest.minVersion) < 0) {
+      throw new Error(
+        `Community ${activeRelease.version} cannot update directly to ${manifest.version}.`
+      );
+    }
+    if (activeRelease.version === manifest.version && activeRelease.tag === releaseTag) {
+      console.log(`HQBase Community ${manifest.version} is already the active signed release.`);
+      return;
+    }
     const bookmark = findString(
       JSON.parse(
         capture(
@@ -64,27 +106,7 @@ export async function deploy(options = {}) {
       ),
       "bookmark"
     );
-    const workerVersion = findString(
-      JSON.parse(
-        capture(
-          "pnpm",
-          [
-            "exec",
-            "wrangler",
-            "deployments",
-            "status",
-            "--name",
-            config.name,
-            "--json",
-            "--config",
-            "wrangler.jsonc"
-          ],
-          source
-        )
-      ),
-      "version_id",
-      "versionId"
-    );
+    const workerVersion = activeRelease.versionId;
     if (!bookmark || !workerVersion)
       throw new Error("Could not establish the update recovery checkpoint.");
     recovery = { bookmark, workerVersion, name: config.name };
@@ -106,7 +128,7 @@ export async function deploy(options = {}) {
     const updateId = crypto.randomUUID();
     sql(
       source,
-      `INSERT INTO app_update_history (id, from_version, to_version, checkpoint_bookmark, worker_version, state, started_at) VALUES (${quote(updateId)}, ${quote(currentVersion)}, ${quote(manifest.version)}, ${quote(bookmark)}, ${quote(workerVersion)}, 'started', datetime('now'))`
+      `INSERT INTO app_update_history (id, from_version, to_version, checkpoint_bookmark, worker_version, state, started_at) VALUES (${quote(updateId)}, ${quote(activeRelease.version)}, ${quote(manifest.version)}, ${quote(bookmark)}, ${quote(workerVersion)}, 'started', datetime('now'))`
     );
     run(
       "pnpm",
@@ -114,10 +136,11 @@ export async function deploy(options = {}) {
         "exec",
         "wrangler",
         "deploy",
+        "--keep-vars",
         "--config",
         "wrangler.jsonc",
         "--tag",
-        communityReleaseTag(manifest.version, manifest.artifact.sha256),
+        releaseTag,
         "--var",
         `HQBASE_WORKER_NAME:${config.name}`
       ],
@@ -179,7 +202,10 @@ export function verifyManifest(envelope, publicKeyBase64 = publicKey) {
     manifest.edition !== "community" ||
     manifest.channel !== "stable" ||
     !/^\d+\.\d+\.\d+/.test(manifest.version) ||
-    !/^[a-f0-9]{64}$/.test(manifest.artifact?.sha256)
+    !/^\d+\.\d+\.\d+/.test(manifest.minVersion) ||
+    !/^[a-f0-9]{64}$/.test(manifest.artifact?.sha256) ||
+    !Number.isInteger(manifest.artifact?.size) ||
+    manifest.artifact.size <= 0
   )
     throw new Error("Release manifest is incompatible.");
   return manifest;
@@ -241,6 +267,7 @@ export function deploySource(cwd, options = {}) {
     "--var",
     `HQBASE_WORKER_NAME:${workerName}`
   ];
+  if (options.releaseTag) deployArgs.push("--tag", options.releaseTag);
 
   if (!workersCi) {
     execute("pnpm", deployArgs, cwd);
@@ -293,17 +320,12 @@ function workerNameFromConfigFile(configFile) {
   return workerNameFromConfig(JSON.parse(readFileSync(configFile, "utf8")));
 }
 export function needsInitialAuthSecret(result, secretName) {
-  const output = `${result.stdout ?? ""}\n${result.stderr ?? ""}`.replace(
-    // biome-ignore lint/suspicious/noControlCharactersInRegex: ANSI escape stripping.
-    /\x1b\[[0-?]*[ -/]*[@-~]/g,
-    ""
-  );
   if (result.status === 0) {
     const secrets = JSON.parse(result.stdout || "[]");
     if (!Array.isArray(secrets)) throw new Error("Wrangler returned an invalid secret list.");
     return !secrets.some((secret) => secret?.name === secretName);
   }
-  if (/Worker ".+"(?: \(env: .+\))? not found\.\s+If this is a new Worker,/s.test(output)) {
+  if (isWorkerNotFound(result)) {
     return true;
   }
   throw result.error ?? new Error(`wrangler secret list exited with status ${result.status}.`);

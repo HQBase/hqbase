@@ -2,6 +2,10 @@ import { generateKeyPairSync, sign } from "node:crypto";
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
+  inspectActiveCommunityRelease,
+  parseActiveCommunityRelease
+} from "../../../scripts/release/active-version.mjs";
+import {
   communityReleaseTag,
   compareVersions,
   deploySource,
@@ -19,6 +23,7 @@ describe("Community release deployment", () => {
       edition: "community",
       channel: "stable",
       version: "1.2.3",
+      minVersion: "1.2.0",
       artifact: { sha256: "a".repeat(64), size: 1 }
     };
     const payload = Buffer.from(JSON.stringify(manifest)).toString("base64url");
@@ -69,6 +74,59 @@ describe("Community release deployment", () => {
     );
     expect(() => communityReleaseTag("0.1.5", "not-a-digest")).toThrow("identity");
   });
+  it("reads the installed release from the active Worker instead of the source checkout", () => {
+    expect(
+      parseActiveCommunityRelease(
+        { versions: [{ version_id: "active-version", percentage: 100 }] },
+        {
+          id: "active-version",
+          annotations: { "workers/tag": `hqbase-community:0.1.14:${"a".repeat(64)}` },
+          resources: {
+            bindings: [{ name: "HQBASE_APP_VERSION", type: "plain_text", text: "0.1.14" }]
+          }
+        }
+      )
+    ).toEqual({
+      versionId: "active-version",
+      version: "0.1.14",
+      tag: `hqbase-community:0.1.14:${"a".repeat(64)}`
+    });
+    expect(() =>
+      parseActiveCommunityRelease(
+        { versions: [{ version_id: "one", percentage: 50 }] },
+        { id: "one", resources: { bindings: [] } }
+      )
+    ).toThrow("one active 100-percent version");
+  });
+  it("distinguishes a fresh Worker from an existing active release", () => {
+    expect(
+      inspectActiveCommunityRelease("/release", "customer-worker", {
+        attempt: () => ({
+          status: 1,
+          stdout: "",
+          stderr: 'Worker "customer-worker" not found. If this is a new Worker, deploy it.'
+        })
+      })
+    ).toBeNull();
+    expect(
+      inspectActiveCommunityRelease("/release", "customer-worker", {
+        attempt: () => ({
+          status: 0,
+          stdout: JSON.stringify({
+            versions: [{ version_id: "active-version", percentage: 100 }]
+          }),
+          stderr: ""
+        }),
+        capture: () =>
+          JSON.stringify({
+            id: "active-version",
+            resources: {
+              bindings: [{ name: "HQBASE_APP_VERSION", type: "plain_text", text: "0.1.14" }]
+            }
+          })
+      })
+    ).toMatchObject({ versionId: "active-version", version: "0.1.14" });
+  });
   it("uses the configured Worker name as the runtime automation identity", () => {
     expect(workerNameFromConfig({ name: "hqbase-deeptake-test" })).toBe("hqbase-deeptake-test");
     expect(() => workerNameFromConfig({ name: "" })).toThrow("deployed Worker name");
@@ -85,12 +143,14 @@ describe("Community release deployment", () => {
       }),
       randomBytes: () => Buffer.alloc(32, 7),
       randomUUID: () => "00000000-0000-4000-8000-000000000123",
+      releaseTag: `hqbase-community:0.1.15:${"a".repeat(64)}`,
       run: (command, args, cwd) => {
         expect(command).toBe("pnpm");
         expect(args.slice(0, 3)).toEqual(["exec", "wrangler", "deploy"]);
         expect(args).toContain("HQBASE_WORKER_NAME:hqbase-deeptake-test");
         expect(args).toContain("HQBASE_INSTALLATION_ID:00000000-0000-4000-8000-000000000123");
         expect(args).toContain("--keep-vars");
+        expect(args).toContain(`hqbase-community:0.1.15:${"a".repeat(64)}`);
         expect(args.at(-2)).toBe("--secrets-file");
         expect(cwd).toBe("/customer/repo");
         secretFile = args.at(-1);
@@ -146,5 +206,10 @@ describe("Community release deployment", () => {
       not_found_handling: "single-page-application",
       run_worker_first: ["/api/*"]
     });
+  });
+  it("keeps the deploy configuration version aligned with the package release", () => {
+    const packageJson = JSON.parse(readFileSync("package.json", "utf8"));
+    const wranglerConfig = JSON.parse(readFileSync("wrangler.jsonc", "utf8"));
+    expect(wranglerConfig.vars.HQBASE_APP_VERSION).toBe(packageJson.version);
   });
 });

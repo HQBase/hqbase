@@ -215,6 +215,9 @@ function publicStatus(upgrade: UpgradeRecord) {
 }
 
 function recoveryAction(code: string): string {
+  if (code === "UPGRADE_RELEASE_UNSUPPORTED") {
+    return "Return to Settings, apply the current signed Community update, then retry the Pro upgrade.";
+  }
   if (code.includes("REAUTH") || code.includes("CLOUDFLARE")) {
     return "Authorize Cloudflare again, then resume the upgrade.";
   }
