@@ -3,7 +3,7 @@ import { AppError } from "../../lib/errors";
 import { cloudflare } from "./cloudflare";
 import { previewUrl } from "./deployment";
 import { enableCandidatePreview, restoreCandidatePreview } from "./preview";
-import { transitionUpgrade } from "./queries";
+import { auditTransition, transitionUpgrade } from "./queries";
 import type { ProWorkerBundle } from "./release";
 import { readPreparedResources, requireCandidateRelease } from "./resources";
 import type { UpgradeRecord } from "./types";
@@ -130,6 +130,9 @@ export async function verifyProCandidate(
       result.edition !== "pro" ||
       result.version !== candidateRelease.version
     ) {
+      await auditTransition(env.DB, upgrade.id, "candidate_validation_rejected", "failure", {
+        status: response.status
+      });
       throw new AppError(
         "UPGRADE_CANDIDATE_VERIFICATION_FAILED",
         "The Pro candidate did not pass isolated validation.",
@@ -151,7 +154,7 @@ export async function fetchCandidateVerification(
   fetcher: typeof fetch = fetch,
   wait: (milliseconds: number) => Promise<void> = delay
 ): Promise<Response> {
-  const attempts = 12;
+  const attempts = 45;
   let lastError: unknown;
   for (let attempt = 0; attempt < attempts; attempt += 1) {
     try {

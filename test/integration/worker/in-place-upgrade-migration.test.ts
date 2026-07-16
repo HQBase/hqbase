@@ -255,6 +255,21 @@ describe("in-place Community to Pro migration", () => {
     );
     expect(rejected.status).toBe(409);
     expect(attempts).toBe(1);
+
+    let propagationAttempts = 0;
+    const eventuallyReady = await fetchCandidateVerification(
+      "https://candidate.example/api/upgrades/pro/candidate/verify",
+      "orchestration-secret",
+      async () => {
+        propagationAttempts += 1;
+        return propagationAttempts === 45
+          ? Response.json({ ok: true, edition: "pro", version: "0.1.6" })
+          : new Response("not ready", { status: 404 });
+      },
+      async () => undefined
+    );
+    expect(eventuallyReady.status).toBe(200);
+    expect(propagationAttempts).toBe(45);
   });
 
   it("resumes the exact active installation without a browser cookie", async () => {
