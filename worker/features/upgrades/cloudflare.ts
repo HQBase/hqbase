@@ -189,7 +189,20 @@ export async function discoverCommunityInstallation(
       409
     );
   }
-  await verifySignedCommunityRelease(bindings, env, fetcher);
+  const activeVersion = await cloudflare<{
+    annotations?: { "workers/tag"?: string };
+  }>(
+    token,
+    `/accounts/${accountId}/workers/scripts/${expected.workerName}/versions/${active[0].version_id}`,
+    {},
+    fetcher
+  );
+  await verifySignedCommunityRelease(
+    bindings,
+    activeVersion.annotations?.["workers/tag"] ?? null,
+    env,
+    fetcher
+  );
   await verifyCommunitySchema(env.DB);
   const routes = await listWorkerRoutes(token, accountId, expected.workerName, fetcher);
   const customDomains = domains

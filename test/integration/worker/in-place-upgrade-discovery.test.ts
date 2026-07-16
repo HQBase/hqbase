@@ -11,6 +11,7 @@ import type { WorkerEnv } from "../../../worker/lib/env";
 const installationId = "00000000-0000-4000-8000-000000000123";
 const workerName = "custom-community-worker";
 const databaseId = "00000000-0000-4000-8000-000000000456";
+const releaseSha256 = "a".repeat(64);
 let releaseKey = "";
 let releaseEnvelope: { payload: string; signature: string };
 
@@ -40,7 +41,7 @@ beforeAll(async () => {
     channel: "stable",
     version: "0.1.4",
     minVersion: "0.1.3",
-    artifact: { sha256: "a".repeat(64) }
+    artifact: { sha256: releaseSha256 }
   };
   const payloadBytes = new TextEncoder().encode(JSON.stringify(manifest));
   releaseEnvelope = {
@@ -115,6 +116,17 @@ describe("automatic Community installation discovery", () => {
     ).rejects.toMatchObject({ code: "UPGRADE_RELEASE_UNSUPPORTED" });
   });
 
+  it("rejects an active Worker version without the signed release identity", async () => {
+    await expect(
+      discoverCommunityInstallation(
+        discoveryEnv(),
+        "temporary-token",
+        { installationId, workerName, workspaceOrigin: "https://mail.example.com" },
+        cloudflareFixture({ invalidReleaseTag: true })
+      )
+    ).rejects.toMatchObject({ code: "UPGRADE_RELEASE_UNSUPPORTED" });
+  });
+
   it("rejects an unknown or partially migrated Community schema", async () => {
     await env.DB.prepare(
       "UPDATE app_release_state SET installed_schema_version = 99 WHERE singleton = 1"
@@ -138,6 +150,7 @@ function cloudflareFixture(
     duplicateAccount?: boolean;
     installationId?: string;
     invalidRelease?: boolean;
+    invalidReleaseTag?: boolean;
     missingR2?: boolean;
   } = {}
 ): typeof fetch {
@@ -187,6 +200,14 @@ function cloudflareFixture(
     } else if (path.endsWith(`/workers/scripts/${workerName}/deployments`)) {
       result = {
         deployments: [{ versions: [{ version_id: "community-version", percentage: 100 }] }]
+      };
+    } else if (path.endsWith(`/workers/scripts/${workerName}/versions/community-version`)) {
+      result = {
+        annotations: {
+          "workers/tag": options.invalidReleaseTag
+            ? "hqbase-community:0.1.3:invalid"
+            : `hqbase-community:0.1.3:${releaseSha256}`
+        }
       };
     } else if (path.endsWith(`/workers/scripts/${workerName}/secrets`)) {
       result = [{ name: "EXISTING_CUSTOM_SECRET" }, { name: "BETTER_AUTH_SECRET" }];

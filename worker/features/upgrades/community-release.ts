@@ -4,6 +4,7 @@ import type { UpgradeInventory } from "./types";
 
 export async function verifySignedCommunityRelease(
   bindings: UpgradeInventory["bindings"],
+  activeVersionTag: string | null,
   env: WorkerEnv,
   fetcher: typeof fetch
 ): Promise<void> {
@@ -57,6 +58,8 @@ export async function verifySignedCommunityRelease(
       typeof manifest.version !== "string" ||
       typeof manifest.minVersion !== "string" ||
       !/^[a-f0-9]{64}$/.test(manifest.artifact?.sha256 ?? "") ||
+      activeVersionTag !==
+        `hqbase-community:${version}:${manifest.artifact?.sha256 ?? "missing"}` ||
       compareVersions(version, manifest.minVersion) < 0 ||
       compareVersions(version, manifest.version) > 0
     ) {
