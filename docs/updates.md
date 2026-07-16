@@ -13,5 +13,6 @@ Before a Pro-to-Pro migration the updater records D1 Time Travel and the active 
 The artifact signature and SHA-256 digest are verified before extraction. Migrations run before the
 Worker replacement, and exact D1 and Worker recovery commands are printed on failure.
 
-The 0.1.3 release supports direct Pro updates from 0.1.2. The supported Community-to-Pro source is
-Community 0.1.2. Older Community or Pro installations must first reach 0.1.2.
+The 0.1.4 release supports direct Pro updates from 0.1.3. Its supported in-place Community-to-Pro
+source is signed Community 0.1.4 with the recognized schema; Community 0.1.3 first applies the
+signed 0.1.4 Community update. Older Community or Pro installations must first reach 0.1.3.

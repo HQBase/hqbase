@@ -69,14 +69,22 @@ jobs:
           HQBASE_RELEASE_VERSION: ${{ inputs.version }}
         run: |
           release_version="${HQBASE_RELEASE_VERSION#v}"
+          artifact_exists=false
           if pnpm exec wrangler r2 object get \
             "hqbase-releases/artifacts/pro/${release_version}.tar.gz" \
             --file /tmp/existing-pro-release.tar.gz --remote; then
             cmp "release/pro-${release_version}.tar.gz" /tmp/existing-pro-release.tar.gz
-            echo "exists=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "exists=false" >> "$GITHUB_OUTPUT"
+            artifact_exists=true
           fi
+          if pnpm exec wrangler r2 object get \
+            "hqbase-releases/artifacts/pro/${release_version}.worker.json" \
+            --file /tmp/existing-pro-release.worker.json --remote; then
+            cmp "release/pro-${release_version}.worker.json" /tmp/existing-pro-release.worker.json
+          elif [ "$artifact_exists" = "true" ]; then
+            echo "Existing source artifact is missing its immutable deployment artifact." >&2
+            exit 1
+          fi
+          echo "exists=$artifact_exists" >> "$GITHUB_OUTPUT"
       - name: Publish private artifact and public signed manifest
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -87,6 +95,7 @@ jobs:
           export HQBASE_RELEASE_VERSION="${HQBASE_RELEASE_VERSION#v}"
           if [ "$HQBASE_ARTIFACT_EXISTS" != "true" ]; then
             pnpm exec wrangler r2 object put "hqbase-releases/artifacts/pro/${HQBASE_RELEASE_VERSION}.tar.gz" --file "release/pro-${HQBASE_RELEASE_VERSION}.tar.gz" --remote
+            pnpm exec wrangler r2 object put "hqbase-releases/artifacts/pro/${HQBASE_RELEASE_VERSION}.worker.json" --file "release/pro-${HQBASE_RELEASE_VERSION}.worker.json" --remote
           fi
           pnpm exec wrangler r2 object put "hqbase-releases/manifests/pro/stable.json" --file release/stable.json --remote
       - name: Verify published artifact and signed manifest
@@ -115,6 +124,10 @@ jobs:
             sleep 2
           done
           cmp "release/pro-${release_version}.tar.gz" /tmp/published-pro.tar.gz
+          pnpm exec wrangler r2 object get \
+            "hqbase-releases/artifacts/pro/${release_version}.worker.json" \
+            --file /tmp/published-pro.worker.json --remote
+          cmp "release/pro-${release_version}.worker.json" /tmp/published-pro.worker.json
           cmp release/stable.json /tmp/published-pro-stable.json
           for attempt in $(seq 1 30); do
             if curl --fail --silent --show-error \

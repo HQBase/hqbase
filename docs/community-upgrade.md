@@ -2,60 +2,44 @@
 
 ## Customer path
 
-Use the **Deploy HQBase Pro to Cloudflare** button in the README. In Cloudflare, select the existing
-Community `DB` and `MAIL_OBJECTS` resources instead of creating replacements. Use a distinct Pro
-Worker name during the verified blue-green cutover.
+An authenticated Community workspace owner starts **Upgrade to Pro** in the existing workspace.
+There is no second Pro deployment and no D1 or R2 picker.
 
-The repository deploy command then performs the guarded lifecycle automatically:
+The purchase is bound to the workspace installation ID, Worker name, origin, nonce, and PKCE
+challenge. After Billing verifies the Polar checkout, the browser returns a single-use claim to the
+original workspace. The customer approves a fixed, least-privilege Cloudflare OAuth grant once.
+Billing and the OAuth relay never receive the resulting Cloudflare token.
 
-1. classify the remote D1 schema;
-2. reject unknown non-empty databases before mutation;
-3. record a D1 Time Travel bookmark;
-4. export SQL to `_hqbase/backups/` in the selected mail R2 bucket;
-5. apply only pending migrations;
-6. verify the complete Pro schema;
-7. record the upgrade checkpoint in D1;
-8. deploy Pro and mark the deployment stage complete.
+The Community Worker then runs a persisted, retry-safe lifecycle:
 
-The Community Worker and its routes are not deleted. The purchase-bound license activates
-automatically. During Pro setup, the delegated installation grant may reassign only hostnames
-recorded on the Community Worker, then verifies portal, inbound, and outbound routing before it is
-revoked. Keep Community until that explicit cutover stage passes.
+1. find the exact signed Community Worker and verify its installation ID, account, active version,
+   required bindings, secret names, routes, domains, and supported D1 schema;
+2. acquire the installation lock, record the active Community version and complete non-secret
+   inventory, create a D1 Time Travel bookmark, export SQL to `_hqbase/backups/` in the existing R2
+   bucket, and verify the backup;
+3. create or reuse owned Pro job and dead-letter queues;
+4. download and verify the licensed, signed Pro deployment artifact;
+5. add only new Pro secrets, upload a Pro version of the same Worker with inherited bindings and
+   assets, and leave production traffic on Community;
+6. apply signed additive migrations idempotently and validate the candidate through its isolated
+   Cloudflare Preview URL;
+7. promote the candidate to 100 percent of the same Worker service, verify the original origin and
+   resources, revoke the OAuth grant, and remove temporary upgrade secrets.
 
-## Operator path
+The Worker name, routes, domains, D1 ID, R2 bucket, `BETTER_AUTH_SECRET`, users, sessions, messages,
+attachments, settings, and primary-domain configuration remain unchanged. Pro settings are
+available immediately at the original workspace origin.
 
-The operator path migrates D1 in place and preserves Community rows and R2 references. Domain
-cutover remains explicit and runs only after Pro has deployed and verification succeeds.
+## Recovery
 
-Run preflight without mutations:
+Failures before mutation leave Community unchanged. Failures after backup and before promotion
+leave the recorded Community version serving. The upgrade record retains the previous Worker
+version, D1 bookmark, SQL backup key, resource inventory, and created-resource list.
 
-```sh
-pnpm hqbase-pro upgrade --from-community --database <d1-name-or-id> --remote --dry-run
-```
+Worker code can be rolled back independently. D1 is never restored automatically after Pro may
+have accepted writes because Time Travel restoration can discard post-upgrade data. An operator
+must make that recovery decision explicitly.
 
-After reviewing the target, run the migration:
-
-```sh
-pnpm hqbase-pro upgrade --from-community --database <d1-name-or-id> --remote --yes
-```
-
-Remote mutation always exports a timestamped SQL backup first. `--backup <path>` overrides its location. Unknown schemas fail before backup or migration. Verification requires every Pro table after Wrangler applies the migrations.
-
-After the migration succeeds, deploy Pro against the existing Community data plane. Preserving the
-Community auth secret also preserves active sessions; using a new secret safely requires users to
-sign in again:
-
-```sh
-HQBASE_AUTH_SECRET=<existing-better-auth-secret> pnpm hqbase-pro install \
-  --name upgraded-workspace \
-  --worker-name <community-worker> \
-  --d1-name <community-database> \
-  --reuse-d1-id <community-database-id> \
-  --reuse-r2-bucket <community-mail-bucket> \
-  --domain <email-domain>
-```
-
-This is an in-place data upgrade with a blue-green Worker cutover: users, mail metadata, and objects
-stay in the same D1 and R2 resources while Community remains available until routing moves. The Pro
-installer adds its queues, secrets, migrations, and Worker code. Automated D1 rollback remains
-intentionally unsupported because it could discard mail received after cutover.
+The private-source `hqbase-pro upgrade` command remains an operator-only data recovery tool. It is
+not the customer installation path and must not deploy a second permanent Worker or rotate the
+Community authentication secret.
