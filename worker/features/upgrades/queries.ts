@@ -24,6 +24,23 @@ type UpgradeRow = {
   completed_at: string | null;
 };
 
+const transitionFields = new Set([
+  "account_id",
+  "active_version_id",
+  "backup_r2_key",
+  "candidate_version_id",
+  "checkpoint_bookmark",
+  "created_resources_json",
+  "d1_database_id",
+  "error_code",
+  "inventory_json",
+  "legacy_recovery",
+  "preflight_counts_json",
+  "preview_alias",
+  "r2_bucket_name",
+  "recovery_action"
+]);
+
 export async function ensureInstallationIdentity(
   db: D1Database,
   workerName: string,
@@ -84,7 +101,7 @@ export async function transitionUpgrade(
   const assignments = ["state = ?", "updated_at = datetime('now')"];
   const values: unknown[] = [to];
   for (const [name, value] of Object.entries(fields)) {
-    if (!/^[a-z_]+$/.test(name)) throw new Error("Unsafe upgrade field.");
+    if (!transitionFields.has(name)) throw new Error("Unsafe upgrade field.");
     assignments.push(`${name} = ?`);
     values.push(value);
   }
