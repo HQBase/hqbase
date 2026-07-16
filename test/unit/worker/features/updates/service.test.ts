@@ -29,7 +29,10 @@ describe("Community updates", () => {
   it("rejects a tampered manifest", async () => {
     await expect(
       getUpdateStatus({ HQBASE_RELEASE_PUBLIC_KEY: publicKey } as WorkerEnv, async () =>
-        Response.json({ ...envelope, signature: `A${envelope.signature.slice(1)}` })
+        Response.json({
+          ...envelope,
+          signature: `${envelope.signature.startsWith("A") ? "B" : "A"}${envelope.signature.slice(1)}`
+        })
       )
     ).rejects.toThrow("signature");
   });

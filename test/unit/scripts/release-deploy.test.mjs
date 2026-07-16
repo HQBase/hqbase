@@ -27,9 +27,10 @@ describe("Community release deployment", () => {
     };
     const encoded = publicKey.export({ type: "spki", format: "der" }).toString("base64");
     expect(verifyManifest(envelope, encoded)).toMatchObject({ version: "1.2.3" });
-    expect(() =>
-      verifyManifest({ ...envelope, signature: `A${envelope.signature.slice(1)}` }, encoded)
-    ).toThrow("signature");
+    const invalidSignature = `${envelope.signature.startsWith("A") ? "B" : "A"}${envelope.signature.slice(1)}`;
+    expect(() => verifyManifest({ ...envelope, signature: invalidSignature }, encoded)).toThrow(
+      "signature"
+    );
   });
   it("selects only newer semantic releases", () => {
     expect(compareVersions("0.2.0", "0.1.9")).toBeGreaterThan(0);
