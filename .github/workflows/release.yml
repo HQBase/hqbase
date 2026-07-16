@@ -60,19 +60,26 @@ jobs:
       - name: Refuse to overwrite an immutable artifact
         id: immutable-artifact
         env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           HQBASE_RELEASE_VERSION: ${{ inputs.version }}
         run: |
           release_version="${HQBASE_RELEASE_VERSION#v}"
-          if pnpm exec wrangler r2 object get \
-            "hqbase-releases/artifacts/community/${release_version}.tar.gz" \
-            --file /tmp/existing-community-release.tar.gz --remote; then
-            cmp "release/community-${release_version}.tar.gz" /tmp/existing-community-release.tar.gz
-            echo "exists=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "exists=false" >> "$GITHUB_OUTPUT"
-          fi
+          status=$(curl --silent --show-error \
+            --output /tmp/existing-community-release.tar.gz \
+            --write-out '%{http_code}' \
+            "https://billing.hqbase.io/v1/releases/community/${release_version}/artifact")
+          case "$status" in
+            200)
+              cmp "release/community-${release_version}.tar.gz" /tmp/existing-community-release.tar.gz
+              echo "exists=true" >> "$GITHUB_OUTPUT"
+              ;;
+            404)
+              echo "exists=false" >> "$GITHUB_OUTPUT"
+              ;;
+            *)
+              echo "Community artifact lookup returned HTTP ${status}" >&2
+              exit 1
+              ;;
+          esac
       - name: Publish immutable artifact and stable manifest
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -87,33 +94,19 @@ jobs:
           pnpm exec wrangler r2 object put "hqbase-releases/manifests/community/stable.json" --file release/stable.json --remote
       - name: Verify published artifact and signed manifest
         env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           HQBASE_RELEASE_VERSION: ${{ inputs.version }}
         run: |
           release_version="${HQBASE_RELEASE_VERSION#v}"
-          # R2 object uploads can take longer than the default verification window to
-          # become readable from a fresh request, even after Wrangler reports success.
-          for attempt in $(seq 1 40); do
-            if pnpm exec wrangler r2 object get \
-              "hqbase-releases/artifacts/community/${release_version}.tar.gz" \
-              --file /tmp/published-community.tar.gz --remote; then
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent --show-error \
+              "https://billing.hqbase.io/v1/releases/community/${release_version}/artifact" \
+              --output /tmp/published-community.tar.gz; then
               break
             fi
-            test "$attempt" -lt 40
-            sleep 3
-          done
-          for attempt in $(seq 1 40); do
-            if pnpm exec wrangler r2 object get \
-              "hqbase-releases/manifests/community/stable.json" \
-              --file /tmp/published-community-stable.json --remote; then
-              break
-            fi
-            test "$attempt" -lt 40
-            sleep 3
+            test "$attempt" -lt 30
+            sleep 2
           done
           cmp "release/community-${release_version}.tar.gz" /tmp/published-community.tar.gz
-          cmp release/stable.json /tmp/published-community-stable.json
           for attempt in $(seq 1 30); do
             if curl --fail --silent --show-error \
               https://billing.hqbase.io/v1/releases/community/stable \
