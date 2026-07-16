@@ -23,6 +23,11 @@ export async function cloudflare<T>(
   const response = await fetcher(`${apiBase}${path}`, { ...init, headers });
   const payload = (await safeJson(response)) as Envelope<T> | null;
   if (!response.ok || !payload?.success) {
+    console.warn("community_pro_upgrade_cloudflare_api_error", {
+      apiCode: payload?.errors?.[0]?.code ?? null,
+      operation: cloudflareOperation(path),
+      status: response.status
+    });
     throw new AppError(
       "CLOUDFLARE_UPGRADE_API_ERROR",
       publicCloudflareError(path, payload?.errors?.[0]?.code),
@@ -30,6 +35,20 @@ export async function cloudflare<T>(
     );
   }
   return payload.result;
+}
+
+function cloudflareOperation(path: string): string {
+  if (/^\/accounts(?:\?|$)/u.test(path)) return "list_accounts";
+  if (/\/workers\/scripts\/?(?:\?|$)/u.test(path)) return "list_workers";
+  if (path.endsWith("/settings")) return "read_worker_settings";
+  if (path.endsWith("/deployments")) return "read_worker_deployments";
+  if (path.endsWith("/secrets")) return "list_worker_secrets";
+  if (path.endsWith("/workers/domains")) return "list_worker_domains";
+  if (path.endsWith("/subdomain")) return "read_worker_subdomain";
+  if (path.includes("/d1/database")) return "list_d1_databases";
+  if (/^\/zones(?:\?|$)/u.test(path)) return "list_zones";
+  if (path.endsWith("/workers/routes")) return "list_worker_routes";
+  return "upgrade_cloudflare_api";
 }
 
 export async function discoverCommunityInstallation(

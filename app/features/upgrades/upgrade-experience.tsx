@@ -50,13 +50,7 @@ export function UpgradeExperience(): React.ReactElement | null {
   }, [result]);
 
   React.useEffect(() => {
-    if (
-      !status ||
-      busy ||
-      error ||
-      status.legacyConfirmationRequired ||
-      terminal(status.state)
-    )
+    if (!status || busy || error || status.legacyConfirmationRequired || terminal(status.state))
       return;
     const timer = window.setTimeout(() => {
       setBusy(true);
