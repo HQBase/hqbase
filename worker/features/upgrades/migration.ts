@@ -20,6 +20,25 @@ export async function migrateToPro(
       409
     );
   }
+  const sourceRelease = await queryD1<{ installed_schema_version: number }>(
+    token,
+    upgrade.accountId,
+    upgrade.d1DatabaseId,
+    "SELECT installed_schema_version FROM app_release_state WHERE singleton = 1",
+    fetcher
+  );
+  const sourceSchemaVersion = sourceRelease[0]?.installed_schema_version;
+  if (
+    typeof sourceSchemaVersion !== "number" ||
+    !Number.isInteger(sourceSchemaVersion) ||
+    !bundle.communityUpgrade.sourceSchemaVersions.includes(sourceSchemaVersion)
+  ) {
+    throw new AppError(
+      "UPGRADE_SCHEMA_UNSUPPORTED",
+      "The Community database schema is not supported by this Pro release.",
+      409
+    );
+  }
   await queryD1(
     token,
     upgrade.accountId,
@@ -129,7 +148,11 @@ async function queryD1Batch(
     { method: "POST", body: JSON.stringify({ batch: statements }) },
     fetcher
   );
-  if (result.length !== statements.length || result.some((entry) => entry.success === false)) {
+  if (!d1BatchSucceeded(result)) {
     throw new AppError("UPGRADE_MIGRATION_FAILED", "The Pro database migration failed.", 502);
   }
+}
+
+export function d1BatchSucceeded(result: Array<{ success?: boolean }>): boolean {
+  return result.length > 0 && result.every((entry) => entry.success !== false);
 }

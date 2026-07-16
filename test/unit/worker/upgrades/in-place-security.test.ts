@@ -5,6 +5,7 @@ import {
   sealUpgradeContinuation
 } from "../../../../worker/features/upgrades/cookies";
 import { proUpgradeSecretNames } from "../../../../worker/features/upgrades/deployment";
+import { d1BatchSucceeded } from "../../../../worker/features/upgrades/migration";
 import { bypassUpgradeWritePause } from "../../../../worker/features/upgrades/write-pause";
 
 describe("in-place upgrade secret boundary", () => {
@@ -63,5 +64,11 @@ describe("in-place upgrade secret boundary", () => {
     expect(bypassUpgradeWritePause("POST", "/api/upgrades/pro/advance")).toBe(true);
     expect(bypassUpgradeWritePause("POST", "/api/messages")).toBe(false);
     expect(bypassUpgradeWritePause("PATCH", "/api/users/member-1")).toBe(false);
+  });
+
+  it("accepts every successful result from a multi-statement D1 migration batch", () => {
+    expect(d1BatchSucceeded([{ success: true }, { success: true }, { success: true }])).toBe(true);
+    expect(d1BatchSucceeded([{ success: true }, { success: false }])).toBe(false);
+    expect(d1BatchSucceeded([])).toBe(false);
   });
 });
