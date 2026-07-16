@@ -28,6 +28,7 @@ export function ProUpgradeCard({
   const storageKey = `hqbase-pro-dismissed:${placement}`;
   const [dismissed, setDismissed] = React.useState(false);
   const [pending, setPending] = React.useState(false);
+  const [checkoutUrl, setCheckoutUrl] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     if (dismissible) setDismissed(window.localStorage.getItem(storageKey) === "1");
@@ -66,15 +67,24 @@ export function ProUpgradeCard({
         {description} $19/month or $190/year per production workspace.
       </CardContent>
       <CardFooter>
-        <Button
-          disabled={pending}
-          size="sm"
-          type="button"
-          onClick={() => void beginUpgrade(setPending)}
-        >
-          {pending ? "Preparing secure checkout…" : "Upgrade to Pro"}
-          <ArrowUpRight data-icon="inline-end" />
-        </Button>
+        {checkoutUrl ? (
+          <Button asChild size="sm">
+            <a href={checkoutUrl}>
+              Continue to secure checkout
+              <ArrowUpRight data-icon="inline-end" />
+            </a>
+          </Button>
+        ) : (
+          <Button
+            disabled={pending}
+            size="sm"
+            type="button"
+            onClick={() => void beginUpgrade(setPending, setCheckoutUrl)}
+          >
+            {pending ? "Preparing secure checkout…" : "Upgrade to Pro"}
+            <ArrowUpRight data-icon="inline-end" />
+          </Button>
+        )}
       </CardFooter>
     </Card>
   );
@@ -105,10 +115,15 @@ export function ProUpgradeLink({
   );
 }
 
-async function beginUpgrade(setPending: (pending: boolean) => void): Promise<void> {
+async function beginUpgrade(
+  setPending: (pending: boolean) => void,
+  setCheckoutUrl?: (url: string) => void
+): Promise<void> {
   setPending(true);
   try {
     const purchase = await startProUpgrade();
+    setCheckoutUrl?.(purchase.checkoutUrl);
+    setPending(false);
     window.location.assign(purchase.checkoutUrl);
   } catch (error) {
     setPending(false);
