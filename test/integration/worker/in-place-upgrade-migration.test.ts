@@ -18,6 +18,10 @@ import {
   requireCandidateRelease
 } from "../../../worker/features/upgrades/resources";
 import type { UpgradeRecord } from "../../../worker/features/upgrades/types";
+import {
+  ensureCandidateValidator,
+  validatorName
+} from "../../../worker/features/upgrades/validator";
 import type { WorkerEnv } from "../../../worker/lib/env";
 
 async function applyMigration(source: string): Promise<void> {
@@ -217,8 +221,6 @@ describe("in-place Community to Pro migration", () => {
     const response = await fetchCandidateVerification(
       "https://candidate.example/api/upgrades/pro/candidate/verify",
       "orchestration-secret",
-      "custom-community",
-      "candidate-version",
       async (_input, init) => {
         requests.push(init ?? {});
         const status = statuses.shift() ?? 500;
@@ -235,16 +237,13 @@ describe("in-place Community to Pro migration", () => {
     expect(requests).toHaveLength(3);
     expect(requests[0]?.headers).toEqual({
       authorization: "Bearer orchestration-secret",
-      "cache-control": "no-store",
-      "cloudflare-workers-version-overrides": 'custom-community="candidate-version"'
+      "cache-control": "no-store"
     });
 
     let attempts = 0;
     const rejected = await fetchCandidateVerification(
       "https://candidate.example/api/upgrades/pro/candidate/verify",
       "orchestration-secret",
-      "custom-community",
-      "candidate-version",
       async () => {
         attempts += 1;
         return Response.json({ code: "UPGRADE_SCHEMA_INCOMPLETE" }, { status: 409 });
@@ -258,8 +257,6 @@ describe("in-place Community to Pro migration", () => {
     const eventuallyReady = await fetchCandidateVerification(
       "https://candidate.example/api/upgrades/pro/candidate/verify",
       "orchestration-secret",
-      "custom-community",
-      "candidate-version",
       async () => {
         propagationAttempts += 1;
         return propagationAttempts === 12
@@ -270,6 +267,89 @@ describe("in-place Community to Pro migration", () => {
     );
     expect(eventuallyReady.status).toBe(200);
     expect(propagationAttempts).toBe(12);
+  });
+
+  it("creates and inventories a no-secret disposable validator Worker", async () => {
+    const row = await env.DB.prepare(
+      "SELECT id FROM community_pro_upgrades ORDER BY created_at DESC LIMIT 1"
+    ).first<{ id: string }>();
+    const installationId = (await ensureInstallationIdentity(env.DB, "custom-community"))
+      .installationId;
+    const upgrade = {
+      id: row?.id ?? "",
+      installationId,
+      workerName: "custom-community",
+      workspaceOrigin: "https://mail.example.com",
+      state: "migration_complete",
+      legacyRecovery: false,
+      legacyConfirmedAt: null,
+      accountId: "account-1",
+      activeVersionId: "community-version",
+      candidateVersionId: "candidate-version",
+      previewAlias: null,
+      d1DatabaseId: "database-1",
+      r2BucketName: "mail-objects",
+      checkpointBookmark: "bookmark-1",
+      backupR2Key: "_hqbase/backups/upgrade.sql",
+      errorCode: null,
+      recoveryAction: null,
+      createdAt: new Date().toISOString(),
+      expiresAt: new Date(Date.now() + 60_000).toISOString(),
+      updatedAt: new Date().toISOString(),
+      completedAt: null
+    } satisfies UpgradeRecord;
+    const prepared = {
+      jobsQueue: "custom-pro-jobs",
+      deadLetterQueue: "custom-pro-dlq",
+      candidateRelease: { version: "0.1.6", mainSha256: "a".repeat(64) },
+      resources: []
+    };
+    await env.DB.prepare(
+      `UPDATE community_pro_upgrades
+       SET state = 'migration_complete', account_id = ?, candidate_version_id = ?,
+           inventory_json = ?, created_resources_json = ? WHERE id = ?`
+    )
+      .bind(
+        upgrade.accountId,
+        upgrade.candidateVersionId,
+        JSON.stringify({
+          accountId: "account-1",
+          accountSubdomain: "test-account",
+          bindings: []
+        }),
+        JSON.stringify(prepared),
+        upgrade.id
+      )
+      .run();
+    const forms: FormData[] = [];
+    const fetcher = async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith("/workers/scripts")) {
+        return Response.json({ success: true, result: [] });
+      }
+      if (init?.body instanceof FormData) {
+        forms.push(init.body);
+        return Response.json({ success: true, result: {} });
+      }
+      return Response.json({ success: true, result: { enabled: true } });
+    };
+    await expect(
+      ensureCandidateValidator(env as WorkerEnv, upgrade, "temporary-token", fetcher)
+    ).resolves.toBe(`https://${validatorName(installationId)}.test-account.workers.dev/validate`);
+    const stored = await readPreparedResources(env.DB, upgrade.id);
+    expect(stored.resources).toContainEqual({
+      type: "worker",
+      name: validatorName(installationId),
+      id: validatorName(installationId),
+      ownership: "created",
+      disposition: "disposable"
+    });
+    const validatorFile = forms[0]?.get("validator.mjs");
+    expect(validatorFile).toBeInstanceOf(File);
+    const source = await (validatorFile as File).text();
+    expect(source).toContain('custom-community=\\"candidate-version\\"');
+    expect(source).toContain("https://mail.example.com/api/upgrades/pro/candidate/verify");
+    expect(source).not.toContain("temporary-token");
   });
 
   it("resumes the exact active installation without a browser cookie", async () => {

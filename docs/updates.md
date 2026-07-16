@@ -4,12 +4,12 @@ HQBase checks the signed Community stable manifest after an owner/admin signs in
 hours while the app remains open. A newer release produces an **Update available** banner outside
 Settings.
 
-The 0.1.12 release supports direct Community updates from 0.1.3. It adds encrypted durable resume
+The 0.1.13 release supports direct Community updates from 0.1.3. It adds encrypted durable resume
 and pins migration and validation to the exact signed Pro candidate. The candidate is staged at zero
-percent beside the 100-percent Community version, then validated through the existing workspace
-origin with Cloudflare's candidate-pinned version override. The installation's workers.dev and
-Preview URL settings are not changed. Older installations must first reach 0.1.3; no direct update
-from an older artifact is claimed.
+percent beside the 100-percent Community version, then validated through a no-secret disposable
+validator Worker and a candidate-pinned Cloudflare version override. The installation's workers.dev
+and Preview URL settings are not changed, and the validator is removed after promotion. Older
+installations must first reach 0.1.3; no direct update from an older artifact is claimed.
 
 Open Settings -> Updates, review compatibility and release notes, then supply a temporary
 user-scoped Cloudflare API token with Zone Read, Workers Scripts Read, and Workers Builds

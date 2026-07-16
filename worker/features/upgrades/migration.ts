@@ -5,6 +5,7 @@ import { auditTransition, transitionUpgrade } from "./queries";
 import type { ProWorkerBundle } from "./release";
 import { readPreparedResources, requireCandidateRelease } from "./resources";
 import type { UpgradeRecord } from "./types";
+import { ensureCandidateValidator } from "./validator";
 
 export async function migrateToPro(
   env: WorkerEnv,
@@ -104,6 +105,7 @@ export async function migrateToPro(
 export async function verifyProCandidate(
   env: WorkerEnv,
   upgrade: UpgradeRecord,
+  token: string,
   orchestrationSecret: string,
   fetcher: typeof fetch = fetch
 ): Promise<UpgradeRecord> {
@@ -111,13 +113,8 @@ export async function verifyProCandidate(
   if (!upgrade.candidateVersionId) {
     throw new AppError("UPGRADE_CANDIDATE_MISSING", "The Pro candidate is missing.", 409);
   }
-  const response = await fetchCandidateVerification(
-    `${upgrade.workspaceOrigin}/api/upgrades/pro/candidate/verify`,
-    orchestrationSecret,
-    upgrade.workerName,
-    upgrade.candidateVersionId,
-    fetcher
-  );
+  const validator = await ensureCandidateValidator(env, upgrade, token, fetcher);
+  const response = await fetchCandidateVerification(validator, orchestrationSecret, fetcher);
   const result = (await response.json().catch(() => null)) as {
     ok?: boolean;
     version?: string;
@@ -147,8 +144,6 @@ export async function verifyProCandidate(
 export async function fetchCandidateVerification(
   url: string,
   orchestrationSecret: string,
-  workerName: string,
-  candidateVersionId: string,
   fetcher: typeof fetch = fetch,
   wait: (milliseconds: number) => Promise<void> = delay
 ): Promise<Response> {
@@ -160,8 +155,7 @@ export async function fetchCandidateVerification(
         method: "POST",
         headers: {
           authorization: `Bearer ${orchestrationSecret}`,
-          "cache-control": "no-store",
-          "cloudflare-workers-version-overrides": `${workerName}="${candidateVersionId}"`
+          "cache-control": "no-store"
         }
       });
       if (response.status !== 404 && response.status < 500) return response;

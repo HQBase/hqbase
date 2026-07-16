@@ -12,6 +12,7 @@ import { auditTransition, getUpgrade, recordUpgradeError, transitionUpgrade } fr
 import { downloadVerifiedProBundle } from "./release";
 import { prepareProResources } from "./resources";
 import type { UpgradeRecord } from "./types";
+import { deleteCandidateValidators } from "./validator";
 
 export async function getUpgradeStatus(request: Request, env: WorkerEnv): Promise<Response> {
   const { upgrade, draft } = await requireOwnedUpgrade(request, env, false);
@@ -203,7 +204,7 @@ async function advanceOneState(
         409
       );
     }
-    return verifyProCandidate(env, upgrade, draft.orchestrationSecret);
+    return verifyProCandidate(env, upgrade, token, draft.orchestrationSecret);
   }
   if (upgrade.state === "candidate_verified") {
     return promoteCandidate(env, upgrade, token);
@@ -285,6 +286,9 @@ async function cleanExpiredGrant(
   if (!token) return true;
   let cleaned = true;
   if (upgrade.accountId) {
+    await deleteCandidateValidators(env, upgrade, token).catch(() => {
+      cleaned = false;
+    });
     for (const name of ["HQBASE_SETUP_OAUTH_ACCESS_TOKEN", "PRO_UPGRADE_ORCHESTRATION_SECRET"]) {
       const response = await fetch(
         `https://api.cloudflare.com/client/v4/accounts/${upgrade.accountId}/workers/scripts/${encodeURIComponent(upgrade.workerName)}/secrets/${name}`,

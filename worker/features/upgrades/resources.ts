@@ -13,7 +13,7 @@ export type PreparedResources = {
     mainSha256: string;
   };
   resources: Array<{
-    type: "queue" | "secret" | "d1" | "r2";
+    type: "queue" | "secret" | "d1" | "r2" | "worker";
     name: string;
     id: string;
     ownership: "created" | "reused";
