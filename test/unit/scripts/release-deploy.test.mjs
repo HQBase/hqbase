@@ -69,10 +69,13 @@ describe("Community release deployment", () => {
         stderr: ""
       }),
       randomBytes: () => Buffer.alloc(32, 7),
+      randomUUID: () => "00000000-0000-4000-8000-000000000123",
       run: (command, args, cwd) => {
         expect(command).toBe("pnpm");
         expect(args.slice(0, 3)).toEqual(["exec", "wrangler", "deploy"]);
         expect(args).toContain("HQBASE_WORKER_NAME:hqbase-deeptake-test");
+        expect(args).toContain("HQBASE_INSTALLATION_ID:00000000-0000-4000-8000-000000000123");
+        expect(args).toContain("--keep-vars");
         expect(args.at(-2)).toBe("--secrets-file");
         expect(cwd).toBe("/customer/repo");
         secretFile = args.at(-1);

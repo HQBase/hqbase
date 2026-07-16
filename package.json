@@ -1,11 +1,11 @@
 {
   "name": "hqbase",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "private": true,
   "type": "module",
   "packageManager": "pnpm@11.7.0",
   "hqbaseRelease": {
-    "minimumVersion": "0.1.2"
+    "minimumVersion": "0.1.3"
   },
   "scripts": {
     "dev": "wrangler dev --port 8787",

@@ -1,5 +1,6 @@
 import { ArrowUpRight, X } from "lucide-react";
 import * as React from "react";
+import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -10,14 +11,14 @@ import {
   CardHeader,
   CardTitle
 } from "@/components/ui/card";
+import { startProUpgrade } from "@/features/upgrades/api";
 import { cn } from "@/lib/cn";
-import { type ProCheckoutPlacement, proCheckoutUrl } from "@/lib/pro-checkout";
+import type { ProCheckoutPlacement } from "@/lib/pro-checkout";
 
 export function ProUpgradeCard({
   description,
   dismissible = false,
-  placement,
-  title
+  placement
 }: {
   description: string;
   dismissible?: boolean;
@@ -26,6 +27,7 @@ export function ProUpgradeCard({
 }): React.ReactElement | null {
   const storageKey = `hqbase-pro-dismissed:${placement}`;
   const [dismissed, setDismissed] = React.useState(false);
+  const [pending, setPending] = React.useState(false);
 
   React.useEffect(() => {
     if (dismissible) setDismissed(window.localStorage.getItem(storageKey) === "1");
@@ -39,8 +41,11 @@ export function ProUpgradeCard({
         <div className="mb-1">
           <Badge variant="outline">Pro</Badge>
         </div>
-        <CardTitle className="text-sm font-medium">{title}</CardTitle>
-        <CardDescription className="max-w-2xl text-xs leading-5">{description}</CardDescription>
+        <CardTitle className="text-sm font-medium">Upgrade this workspace to Pro</CardTitle>
+        <CardDescription className="max-w-2xl text-xs leading-5">
+          HQBase will securely detect your existing Cloudflare resources, back up your workspace,
+          and upgrade it in place. Your domains, users, and mail remain unchanged.
+        </CardDescription>
       </CardHeader>
       {dismissible ? (
         <Button
@@ -58,15 +63,17 @@ export function ProUpgradeCard({
         </Button>
       ) : null}
       <CardContent className="pb-3 text-xs text-muted-foreground">
-        $19/month or $190/year per production workspace. Checkout returns to the guided Cloudflare
-        deployment for either a fresh Pro workspace or an upgrade that keeps Community data.
+        {description} $19/month or $190/year per production workspace.
       </CardContent>
       <CardFooter>
-        <Button asChild size="sm">
-          <a href={proCheckoutUrl(placement)} rel="noreferrer" target="_blank">
-            Upgrade to Pro
-            <ArrowUpRight data-icon="inline-end" />
-          </a>
+        <Button
+          disabled={pending}
+          size="sm"
+          type="button"
+          onClick={() => void beginUpgrade(setPending)}
+        >
+          {pending ? "Preparing secure checkout…" : "Upgrade to Pro"}
+          <ArrowUpRight data-icon="inline-end" />
         </Button>
       </CardFooter>
     </Card>
@@ -83,17 +90,28 @@ export function ProUpgradeLink({
   placement: ProCheckoutPlacement;
 }): React.ReactElement {
   return (
-    <a
+    <button
       className={cn(
         "inline-flex items-center gap-1 text-xs text-foreground hover:underline",
         className
       )}
-      href={proCheckoutUrl(placement)}
-      rel="noreferrer"
-      target="_blank"
+      type="button"
+      data-placement={placement}
+      onClick={() => void beginUpgrade(() => undefined)}
     >
       {children}
       <ArrowUpRight data-icon="inline-end" />
-    </a>
+    </button>
   );
+}
+
+async function beginUpgrade(setPending: (pending: boolean) => void): Promise<void> {
+  setPending(true);
+  try {
+    const purchase = await startProUpgrade();
+    window.location.assign(purchase.checkoutUrl);
+  } catch (error) {
+    setPending(false);
+    toast.error(error instanceof Error ? error.message : "Upgrade checkout could not start.");
+  }
 }

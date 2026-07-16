@@ -5,7 +5,7 @@ import { AppError } from "../../lib/errors";
 import type { ReleaseManifest, UpdateStatus } from "./types";
 
 const edition = "community" as const;
-const installedSchemaVersion = 2;
+const installedSchemaVersion = 4;
 const defaultReleaseUrl = "https://billing.hqbase.io/v1/releases";
 
 const envelopeSchema = z.object({
