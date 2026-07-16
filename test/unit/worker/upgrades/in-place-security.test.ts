@@ -5,6 +5,7 @@ import {
   sealUpgradeContinuation
 } from "../../../../worker/features/upgrades/cookies";
 import { proUpgradeSecretNames } from "../../../../worker/features/upgrades/deployment";
+import { bypassUpgradeWritePause } from "../../../../worker/features/upgrades/write-pause";
 
 describe("in-place upgrade secret boundary", () => {
   it("creates only new Pro secrets and never rotates Better Auth", () => {
@@ -54,5 +55,13 @@ describe("in-place upgrade secret boundary", () => {
         fetcher
       )
     ).resolves.toEqual({ id: "candidate-version" });
+  });
+
+  it("allows authentication needed to resume while ordinary writes remain paused", () => {
+    expect(bypassUpgradeWritePause("POST", "/api/auth/sign-in/email")).toBe(true);
+    expect(bypassUpgradeWritePause("POST", "/api/auth/sign-out")).toBe(true);
+    expect(bypassUpgradeWritePause("POST", "/api/upgrades/pro/advance")).toBe(true);
+    expect(bypassUpgradeWritePause("POST", "/api/messages")).toBe(false);
+    expect(bypassUpgradeWritePause("PATCH", "/api/users/member-1")).toBe(false);
   });
 });

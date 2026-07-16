@@ -5,10 +5,7 @@ import { AppError } from "../../lib/errors";
 const pausedStates = ["migration_started", "migration_complete", "candidate_verified", "promoted"];
 
 export const enforceUpgradeWritePause: MiddlewareHandler<HonoApp> = async (c, next) => {
-  if (
-    ["GET", "HEAD", "OPTIONS"].includes(c.req.method) ||
-    new URL(c.req.url).pathname.startsWith("/api/upgrades/pro/")
-  ) {
+  if (bypassUpgradeWritePause(c.req.method, new URL(c.req.url).pathname)) {
     await next();
     return;
   }
@@ -28,3 +25,9 @@ export const enforceUpgradeWritePause: MiddlewareHandler<HonoApp> = async (c, ne
   }
   await next();
 };
+
+export function bypassUpgradeWritePause(method: string, pathname: string): boolean {
+  if (["GET", "HEAD", "OPTIONS"].includes(method)) return true;
+  if (pathname.startsWith("/api/upgrades/pro/")) return true;
+  return ["/api/auth/sign-in/email", "/api/auth/sign-out"].includes(pathname);
+}
