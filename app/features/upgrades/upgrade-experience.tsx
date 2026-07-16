@@ -6,7 +6,8 @@ import {
   advanceProUpgrade,
   completeProUpgrade,
   confirmLegacyProUpgrade,
-  getProUpgradeStatus
+  getProUpgradeStatus,
+  startProUpgradeOAuth
 } from "./api";
 import type { UpgradeState, UpgradeStatus } from "./types";
 
@@ -89,9 +90,14 @@ export function UpgradeExperience(): React.ReactElement | null {
           Purchase verified. Authorize Cloudflare once so HQBase can securely detect your existing
           resources, back up the workspace, and promote this Worker in place.
         </CardDescription>
-        <form action="/api/upgrades/pro/oauth" method="post">
-          <Button type="submit">Authorize Cloudflare and upgrade</Button>
-        </form>
+        <Button
+          disabled={busy}
+          type="button"
+          onClick={() => void beginCloudflareAuthorization(setBusy, setError)}
+        >
+          {busy ? "Opening Cloudflare…" : "Authorize Cloudflare and upgrade"}
+        </Button>
+        {error ? <p className="text-sm text-destructive">{error}</p> : null}
       </UpgradeFrame>
     );
   }
@@ -159,9 +165,13 @@ export function UpgradeExperience(): React.ReactElement | null {
             <p className="text-muted-foreground">{status.recoveryAction}</p>
           ) : null}
           {status?.recoveryAction?.startsWith("Authorize Cloudflare") ? (
-            <form action="/api/upgrades/pro/oauth" method="post">
-              <Button type="submit">Authorize Cloudflare again</Button>
-            </form>
+            <Button
+              disabled={busy}
+              type="button"
+              onClick={() => void beginCloudflareAuthorization(setBusy, setError)}
+            >
+              Authorize Cloudflare again
+            </Button>
           ) : null}
           <Button
             disabled={busy}
@@ -204,4 +214,19 @@ function terminal(state: UpgradeState): boolean {
 
 function message(error: unknown): string {
   return error instanceof Error ? error.message : "This upgrade step could not continue.";
+}
+
+async function beginCloudflareAuthorization(
+  setBusy: (busy: boolean) => void,
+  setError: (error: string | null) => void
+): Promise<void> {
+  setBusy(true);
+  setError(null);
+  try {
+    const authorization = await startProUpgradeOAuth();
+    window.location.assign(authorization.authorizeUrl);
+  } catch (error) {
+    setError(message(error));
+    setBusy(false);
+  }
 }

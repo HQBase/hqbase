@@ -42,7 +42,7 @@ export async function startUpgradeOAuth(request: Request, env: WorkerEnv): Promi
   );
   relay.searchParams.set("state", state);
   relay.searchParams.set("code_challenge", await sha256Base64Url(verifier));
-  const headers = new Headers({ "cache-control": "no-store", location: relay.toString() });
+  const headers = new Headers({ "cache-control": "no-store" });
   headers.append(
     "set-cookie",
     await writeUpgradeDraft(
@@ -50,7 +50,7 @@ export async function startUpgradeOAuth(request: Request, env: WorkerEnv): Promi
       env.BETTER_AUTH_SECRET
     )
   );
-  return new Response(null, { status: 303, headers });
+  return Response.json({ authorizeUrl: relay.toString() }, { headers });
 }
 
 export async function finishUpgradeOAuth(
