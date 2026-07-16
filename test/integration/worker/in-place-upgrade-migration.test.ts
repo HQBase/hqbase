@@ -9,6 +9,8 @@ import {
   persistUpgradeContinuation,
   resolveUpgradeDraft
 } from "../../../worker/features/upgrades/continuation";
+import { previewUrl } from "../../../worker/features/upgrades/deployment";
+import { fetchCandidateVerification } from "../../../worker/features/upgrades/migration";
 import {
   enableCandidatePreview,
   restoreCandidatePreview
@@ -168,7 +170,8 @@ describe("in-place Community to Pro migration", () => {
     };
     await env.DB.prepare(
       `UPDATE community_pro_upgrades
-       SET state = 'migration_complete', inventory_json = ?, created_resources_json = ?
+       SET state = 'migration_complete', inventory_json = ?, created_resources_json = ?,
+           candidate_version_id = '12345678-abcd-4000-8000-123456789abc'
        WHERE id = ?`
     )
       .bind(JSON.stringify(inventory), JSON.stringify(prepared), row?.id)
@@ -176,6 +179,9 @@ describe("in-place Community to Pro migration", () => {
     const upgrade = await getUpgrade(env.DB, row?.id ?? "");
     expect(upgrade).toBeTruthy();
     if (!upgrade) throw new Error("Upgrade record missing.");
+    await expect(previewUrl(env.DB, upgrade)).resolves.toBe(
+      "https://12345678-custom-community.test-account.workers.dev"
+    );
     const bodies: Array<{ enabled: boolean; previews_enabled: boolean }> = [];
     const fetcher = async (_input: RequestInfo | URL, init?: RequestInit) => {
       const body = JSON.parse(String(init?.body)) as {
@@ -205,6 +211,43 @@ describe("in-place Community to Pro migration", () => {
       "preview_urls_temporarily_enabled",
       "preview_urls_restored"
     ]);
+  });
+
+  it("waits for a version preview route to propagate without retrying application failures", async () => {
+    const statuses = [404, 503, 200];
+    const waits: number[] = [];
+    const requests: RequestInit[] = [];
+    const response = await fetchCandidateVerification(
+      "https://candidate.example/api/upgrades/pro/candidate/verify",
+      "orchestration-secret",
+      async (_input, init) => {
+        requests.push(init ?? {});
+        const status = statuses.shift() ?? 500;
+        return status === 200
+          ? Response.json({ ok: true, edition: "pro", version: "0.1.6" })
+          : new Response("not ready", { status });
+      },
+      async (milliseconds) => {
+        waits.push(milliseconds);
+      }
+    );
+    expect(response.status).toBe(200);
+    expect(waits).toEqual([1_000, 1_000]);
+    expect(requests).toHaveLength(3);
+    expect(requests[0]?.headers).toEqual({ authorization: "Bearer orchestration-secret" });
+
+    let attempts = 0;
+    const rejected = await fetchCandidateVerification(
+      "https://candidate.example/api/upgrades/pro/candidate/verify",
+      "orchestration-secret",
+      async () => {
+        attempts += 1;
+        return Response.json({ code: "UPGRADE_SCHEMA_INCOMPLETE" }, { status: 409 });
+      },
+      async () => undefined
+    );
+    expect(rejected.status).toBe(409);
+    expect(attempts).toBe(1);
   });
 
   it("resumes the exact active installation without a browser cookie", async () => {

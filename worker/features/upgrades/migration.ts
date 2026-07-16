@@ -114,10 +114,11 @@ export async function verifyProCandidate(
   await enableCandidatePreview(env, upgrade, token, fetcher);
   try {
     const target = await previewUrl(env.DB, upgrade);
-    const response = await fetcher(`${target}/api/upgrades/pro/candidate/verify`, {
-      method: "POST",
-      headers: { authorization: `Bearer ${orchestrationSecret}` }
-    });
+    const response = await fetchCandidateVerification(
+      `${target}/api/upgrades/pro/candidate/verify`,
+      orchestrationSecret,
+      fetcher
+    );
     const result = (await response.json().catch(() => null)) as {
       ok?: boolean;
       version?: string;
@@ -142,6 +143,35 @@ export async function verifyProCandidate(
     error_code: null,
     recovery_action: null
   });
+}
+
+export async function fetchCandidateVerification(
+  url: string,
+  orchestrationSecret: string,
+  fetcher: typeof fetch = fetch,
+  wait: (milliseconds: number) => Promise<void> = delay
+): Promise<Response> {
+  const attempts = 12;
+  let lastError: unknown;
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    try {
+      const response = await fetcher(url, {
+        method: "POST",
+        headers: { authorization: `Bearer ${orchestrationSecret}` }
+      });
+      if (response.status !== 404 && response.status < 500) return response;
+      if (attempt === attempts - 1) return response;
+    } catch (error) {
+      lastError = error;
+      if (attempt === attempts - 1) throw error;
+    }
+    await wait(1_000);
+  }
+  throw lastError ?? new Error("Candidate preview did not become reachable.");
+}
+
+function delay(milliseconds: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, milliseconds));
 }
 
 async function queryD1<T = Record<string, unknown>>(

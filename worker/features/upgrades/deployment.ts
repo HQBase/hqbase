@@ -200,14 +200,14 @@ export async function promoteCandidate(
 
 export async function previewUrl(db: D1Database, upgrade: UpgradeRecord): Promise<string> {
   const inventory = await readInventory(db, upgrade.id);
-  if (!upgrade.previewAlias) {
+  if (!upgrade.candidateVersionId) {
     throw new AppError(
       "UPGRADE_PREVIEW_UNAVAILABLE",
       "Cloudflare Preview URLs must be enabled before the candidate can be verified.",
       409
     );
   }
-  return `https://${upgrade.previewAlias}-${upgrade.workerName}.${inventory.accountSubdomain}.workers.dev`;
+  return `https://${upgrade.candidateVersionId.slice(0, 8)}-${upgrade.workerName}.${inventory.accountSubdomain}.workers.dev`;
 }
 
 async function provisionSecrets(
