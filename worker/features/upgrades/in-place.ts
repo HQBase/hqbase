@@ -34,6 +34,10 @@ export async function verifyInPlaceCandidate(request: Request, env: WorkerEnv): 
     !env.HQBASE_INSTALLATION_ID ||
     !env.PRO_LICENSE_KEY ||
     !env.BETTER_AUTH_SECRET ||
+    !env.PRO_APP_PASSWORD_PEPPER ||
+    !env.PRO_BRIDGE_TOKEN ||
+    !env.PRO_SESSION_SECRET ||
+    !env.PRO_ENTITLEMENT_SECRET ||
     !env.PRO_JOBS
   ) {
     throw new AppError(

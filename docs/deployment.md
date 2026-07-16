@@ -19,7 +19,10 @@ Cloudflare API token into HQBase.
 
 Community upgrades start inside the authenticated existing workspace. The Community Worker
 discovers and verifies its own D1 and R2 bindings, backs them up, and uploads a signed Pro candidate
-as a new version of the same Worker service. The public bootstrap is not deployed for this path.
+as a new version of the same Worker service. It disables Cloudflare Preview URLs, keeps Community
+at 100 percent while Pro is staged at zero percent for exact-version smoke validation, and removes
+the storage-free validator Worker after promotion. The public bootstrap is not deployed for this
+path.
 
 The default `wrangler.jsonc` does not set `BETTER_AUTH_URL`; the Worker derives the deployed request origin. Only set `BETTER_AUTH_URL` explicitly when you need to pin auth to a specific custom origin.
 

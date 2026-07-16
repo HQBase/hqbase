@@ -19,12 +19,21 @@ The Community Worker then runs a persisted, retry-safe lifecycle:
    bucket, and verify the backup;
 3. create or reuse owned Pro job and dead-letter queues;
 4. download and verify the licensed, signed Pro deployment artifact;
-5. add only new Pro secrets, upload a Pro version of the same Worker with inherited bindings and
-   assets, and leave production traffic on Community;
-6. apply signed additive migrations idempotently and validate the candidate through its isolated
-   Cloudflare Preview URL;
-7. promote the candidate to 100 percent of the same Worker service, verify the original origin and
-   resources, revoke the OAuth grant, and remove temporary upgrade secrets.
+5. disable Cloudflare Preview URLs without changing the workers.dev route, add only new Pro
+   secrets, upload a Pro version of the same Worker with inherited bindings and assets, and stage
+   it at zero percent while Community remains at 100 percent;
+6. apply signed additive migrations idempotently, then use a storage-free disposable validator
+   Worker to select that exact Pro version and run the application smoke gate;
+7. after every smoke check passes, promote Pro to 100 percent of the same Worker service, verify
+   the original origin and resources, delete the validator, revoke the OAuth grant, and remove
+   temporary upgrade secrets.
+
+The validator is needed only because Cloudflare does not let the target Worker recursively select
+another version of itself through its production route. It exposes one temporary workers.dev
+endpoint, has Preview URLs disabled, receives no D1, R2, queue, or secret bindings, and is never a
+customer workspace. The smoke gate verifies release and installation identity, Pro bindings and
+secrets, the migrated schema, preserved row counts and mail objects, static assets, and active
+entitlement. It is an application gate, not a Cloudflare built-in health check.
 
 The Worker name, routes, domains, D1 ID, R2 bucket, `BETTER_AUTH_SECRET`, users, sessions, messages,
 attachments, settings, and primary-domain configuration remain unchanged. Pro settings are

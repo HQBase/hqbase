@@ -49,14 +49,17 @@ pnpm check
 pnpm deploy:dry-run
 ```
 
-## Community upgrade
+## Operator-only recovery check
 
 ```sh
 pnpm hqbase-pro upgrade --from-community --database <d1-name-or-id> --remote --dry-run
 ```
 
-Only documented Community schema versions are accepted. Unknown schemas fail before mutation.
-See `docs/community-upgrade.md` for the current cutover boundary and `docs/mail-bridge.md` for bridge preview limits.
+This private-source command is for HQBase operators testing or recovering data. Customers never run
+it or select a D1 database during an upgrade. The supported customer path starts in the existing
+Community workspace and discovers its bindings automatically. Only documented Community schema
+versions are accepted; unknown schemas fail before mutation. See `docs/community-upgrade.md` for
+the current cutover boundary and `docs/mail-bridge.md` for bridge preview limits.
 
 ## Production operations
 
