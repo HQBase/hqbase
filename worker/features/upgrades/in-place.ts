@@ -127,13 +127,14 @@ export async function completeInPlaceUpgrade(
   if (entitlement.state === "unlicensed" || entitlement.state === "inactive") {
     throw new AppError("UPGRADE_ENTITLEMENT_INACTIVE", "The Pro entitlement is not active.", 409);
   }
+  const upgradeColumns = await env.DB.prepare("PRAGMA table_info(community_pro_upgrades)").all<{
+    name: string;
+  }>();
+  const hasContinuationCiphertext = upgradeColumns.results.some(
+    (column) => column.name === "continuation_ciphertext"
+  );
   await env.DB.batch([
-    env.DB.prepare(
-      `UPDATE community_pro_upgrades
-       SET state = 'complete', completed_at = datetime('now'), updated_at = datetime('now'),
-           error_code = NULL, recovery_action = NULL
-       WHERE id = ? AND state = 'promoted'`
-    ).bind(upgrade.id),
+    env.DB.prepare(completionUpgradeSql(hasContinuationCiphertext)).bind(upgrade.id),
     env.DB.prepare(
       `UPDATE pro_upgrade_lifecycle
        SET state = 'cutover_verified', deployed_at = COALESCE(deployed_at, datetime('now')),
@@ -156,6 +157,13 @@ export async function completeInPlaceUpgrade(
       "set-cookie": "hqb_pro_upgrade=; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0"
     }
   });
+}
+
+export function completionUpgradeSql(hasContinuationCiphertext: boolean): string {
+  return `UPDATE community_pro_upgrades
+          SET state = 'complete', completed_at = datetime('now'), updated_at = datetime('now'),
+              error_code = NULL, recovery_action = NULL${hasContinuationCiphertext ? ", continuation_ciphertext = NULL" : ""}
+          WHERE id = ? AND state = 'promoted'`;
 }
 
 async function currentUpgrade(db: D1Database, states: string[]): Promise<UpgradeRow> {
