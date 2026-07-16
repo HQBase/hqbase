@@ -58,17 +58,32 @@ const assets = files(resolve(root, "dist")).map((path) => {
     contentBase64: contents.toString("base64")
   };
 });
-const migrations = files(resolve(root, "migrations"))
-  .filter((path) => /\/00(?:0[2-9]|1[0-9])_.*\.sql$/.test(path))
-  .sort()
-  .map((path) => {
-    const sql = readFileSync(path, "utf8");
-    return {
-      name: `pro/${relative(resolve(root, "migrations"), path).replaceAll("\\", "/")}`,
-      sha256: createHash("sha256").update(sql).digest("hex"),
-      sql
-    };
-  });
+const migrationsRoot = resolve(root, "migrations");
+const migrations = [
+  {
+    path: resolve(root, "community-upgrade/0000_preserve_message_attachments.sql"),
+    name: "pro/community-upgrade/0000_preserve_message_attachments.sql"
+  },
+  ...files(migrationsRoot)
+    .filter((path) => /\/00(?:0[2-9]|1[0-9])_.*\.sql$/.test(path))
+    .sort()
+    .map((path) => ({
+      path,
+      // These names are a durable migration identity. Do not change their prefix.
+      name: `pro/${relative(migrationsRoot, path).replaceAll("\\", "/")}`
+    })),
+  {
+    path: resolve(root, "community-upgrade/9999_restore_message_attachments.sql"),
+    name: "pro/community-upgrade/9999_restore_message_attachments.sql"
+  }
+].map(({ path, name }) => {
+  const sql = readFileSync(path, "utf8");
+  return {
+    name,
+    sha256: createHash("sha256").update(sql).digest("hex"),
+    sql
+  };
+});
 writeFileSync(
   deploymentArtifactFile,
   `${JSON.stringify({

@@ -145,7 +145,8 @@ export async function completeInPlaceUpgrade(
       `INSERT INTO community_pro_upgrade_audit
        (id, upgrade_id, transition, outcome, metadata_json, occurred_at)
        VALUES (?, ?, 'promoted->complete', 'success', '{}', datetime('now'))`
-    ).bind(crypto.randomUUID(), upgrade.id)
+    ).bind(crypto.randomUUID(), upgrade.id),
+    env.DB.prepare("DROP TABLE IF EXISTS _hqbase_upgrade_message_attachments")
   ]);
   try {
     await deleteTemporarySecrets(upgrade, token, fetcher);
