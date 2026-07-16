@@ -75,7 +75,7 @@ export async function verifyPromotedService(
       `/accounts/${upgrade.account_id}/workers/domains`,
       fetcher
     ),
-    cf<Array<{ id?: string }>>(
+    cf<{ items?: Array<{ id?: string }> }>(
       token,
       `/accounts/${upgrade.account_id}/workers/scripts/${upgrade.worker_name}/versions`,
       fetcher
@@ -94,7 +94,7 @@ export async function verifyPromotedService(
       409
     );
   }
-  if (!serviceVersions.some((version) => version.id === upgrade.active_version_id)) {
+  if (!serviceVersions.items?.some((version) => version.id === upgrade.active_version_id)) {
     throw new AppError(
       "UPGRADE_ROLLBACK_VERSION_MISSING",
       "The previous Community Worker version is not available for recovery.",
