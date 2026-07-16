@@ -81,7 +81,8 @@ async function updatePreviewMutation(
     .prepare(
       `UPDATE community_pro_upgrades
        SET created_resources_json = ?, updated_at = datetime('now')
-       WHERE id = ? AND state IN ('migration_complete', 'resources_prepared')`
+       WHERE id = ? AND state IN
+         ('resources_prepared', 'candidate_uploaded', 'migration_started', 'migration_complete')`
     )
     .bind(JSON.stringify({ ...prepared, previewUrlsChanged: changed }), upgrade.id)
     .run();

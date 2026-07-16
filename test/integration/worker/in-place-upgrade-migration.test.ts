@@ -194,7 +194,14 @@ describe("in-place Community to Pro migration", () => {
 
     await enableCandidatePreview(env as WorkerEnv, upgrade, "temporary-token", fetcher);
     expect((await readPreparedResources(env.DB, upgrade.id)).previewUrlsChanged).toBe(true);
-    await restoreCandidatePreview(env as WorkerEnv, upgrade, "temporary-token", fetcher);
+    await env.DB.prepare(
+      "UPDATE community_pro_upgrades SET state = 'candidate_uploaded' WHERE id = ?"
+    )
+      .bind(upgrade.id)
+      .run();
+    const uploaded = await getUpgrade(env.DB, upgrade.id);
+    if (!uploaded) throw new Error("Uploaded candidate record missing.");
+    await restoreCandidatePreview(env as WorkerEnv, uploaded, "temporary-token", fetcher);
     expect((await readPreparedResources(env.DB, upgrade.id)).previewUrlsChanged).toBe(false);
     expect(bodies).toEqual([
       { enabled: false, previews_enabled: true },

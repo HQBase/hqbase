@@ -7,6 +7,7 @@ import { resolveUpgradeDraft } from "./continuation";
 import { promoteCandidate, uploadProCandidate } from "./deployment";
 import { migrateToPro, verifyProCandidate } from "./migration";
 import { revokeUpgradeGrant } from "./oauth";
+import { enableCandidatePreview, restoreCandidatePreview } from "./preview";
 import { auditTransition, getUpgrade, recordUpgradeError, transitionUpgrade } from "./queries";
 import { downloadVerifiedProBundle } from "./release";
 import { prepareProResources } from "./resources";
@@ -90,6 +91,20 @@ export async function advanceUpgrade(request: Request, env: WorkerEnv): Promise<
     const code = error instanceof AppError ? error.code : "UPGRADE_STEP_FAILED";
     const action = recoveryAction(code);
     await recordUpgradeError(env.DB, upgrade.id, code, action);
+    const current = await getUpgrade(env.DB, upgrade.id);
+    if (
+      current &&
+      [
+        "resources_prepared",
+        "candidate_uploaded",
+        "migration_started",
+        "migration_complete"
+      ].includes(current.state)
+    ) {
+      await restoreCandidatePreview(env, current, token).catch(async () => {
+        await auditTransition(env.DB, upgrade.id, "preview_urls_restore_failed", "failure");
+      });
+    }
     throw error;
   }
 }
@@ -153,14 +168,22 @@ async function advanceOneState(
       );
     }
     const bundle = await downloadVerifiedProBundle(env, upgrade, draft.licenseKey);
-    return uploadProCandidate(
-      env,
-      upgrade,
-      token,
-      draft.licenseKey,
-      draft.orchestrationSecret,
-      bundle
-    );
+    await enableCandidatePreview(env, upgrade, token);
+    try {
+      return await uploadProCandidate(
+        env,
+        upgrade,
+        token,
+        draft.licenseKey,
+        draft.orchestrationSecret,
+        bundle
+      );
+    } catch (error) {
+      await restoreCandidatePreview(env, upgrade, token).catch(async () => {
+        await auditTransition(env.DB, upgrade.id, "preview_urls_restore_failed", "failure");
+      });
+      throw error;
+    }
   }
   if (upgrade.state === "candidate_uploaded") {
     return transitionUpgrade(env.DB, upgrade.id, "candidate_uploaded", "migration_started");
