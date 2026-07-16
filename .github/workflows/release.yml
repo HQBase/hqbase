@@ -69,7 +69,21 @@ jobs:
             "https://billing.hqbase.io/v1/releases/community/${release_version}/artifact")
           case "$status" in
             200)
-              cmp "release/community-${release_version}.tar.gz" /tmp/existing-community-release.tar.gz
+              curl --fail --silent --show-error \
+                https://billing.hqbase.io/v1/releases/community/stable \
+                --output /tmp/existing-community-stable.json
+              node --input-type=module -e '
+                import { createHash, createPublicKey, verify } from "node:crypto";
+                import { readFileSync, statSync } from "node:fs";
+                const version = process.env.HQBASE_RELEASE_VERSION.replace(/^v/, "");
+                const envelope = JSON.parse(readFileSync("/tmp/existing-community-stable.json", "utf8"));
+                const key = createPublicKey({ key: Buffer.from("MCowBQYDK2VwAyEAsVwKniCvpHDwbbnjTPP0SuIIG97cRL+iFBQvay9OrU4=", "base64"), format: "der", type: "spki" });
+                if (!verify(null, Buffer.from(envelope.payload, "base64url"), key, Buffer.from(envelope.signature, "base64url"))) process.exit(1);
+                const payload = JSON.parse(Buffer.from(envelope.payload, "base64url").toString("utf8"));
+                const file = "/tmp/existing-community-release.tar.gz";
+                const sha256 = createHash("sha256").update(readFileSync(file)).digest("hex");
+                if (payload.edition !== "community" || payload.version !== version || payload.artifact?.sha256 !== sha256 || payload.artifact?.size !== statSync(file).size) process.exit(1);
+              '
               echo "exists=true" >> "$GITHUB_OUTPUT"
               ;;
             404)
@@ -90,11 +104,12 @@ jobs:
           export HQBASE_RELEASE_VERSION="${HQBASE_RELEASE_VERSION#v}"
           if [ "$HQBASE_ARTIFACT_EXISTS" != "true" ]; then
             pnpm exec wrangler r2 object put "hqbase-releases/artifacts/community/${HQBASE_RELEASE_VERSION}.tar.gz" --file "release/community-${HQBASE_RELEASE_VERSION}.tar.gz" --remote
+            pnpm exec wrangler r2 object put "hqbase-releases/manifests/community/stable.json" --file release/stable.json --remote
           fi
-          pnpm exec wrangler r2 object put "hqbase-releases/manifests/community/stable.json" --file release/stable.json --remote
       - name: Verify published artifact and signed manifest
         env:
           HQBASE_RELEASE_VERSION: ${{ inputs.version }}
+          HQBASE_ARTIFACT_EXISTS: ${{ steps.immutable-artifact.outputs.exists }}
         run: |
           release_version="${HQBASE_RELEASE_VERSION#v}"
           for attempt in $(seq 1 30); do
@@ -106,21 +121,30 @@ jobs:
             test "$attempt" -lt 30
             sleep 2
           done
-          cmp "release/community-${release_version}.tar.gz" /tmp/published-community.tar.gz
           for attempt in $(seq 1 30); do
             if curl --fail --silent --show-error \
               https://billing.hqbase.io/v1/releases/community/stable \
-              --output /tmp/live-community-stable.json && \
-              node -e 'const fs = require("node:fs"); const expected = JSON.parse(fs.readFileSync("release/stable.json", "utf8")); const actual = JSON.parse(fs.readFileSync("/tmp/live-community-stable.json", "utf8")); process.exit(expected.payload === actual.payload && expected.signature === actual.signature ? 0 : 1)'; then
+              --output /tmp/live-community-stable.json; then
               break
             fi
             test "$attempt" -lt 30
             sleep 2
           done
           node --input-type=module -e '
-            import { createPublicKey, verify } from "node:crypto";
-            import { readFileSync } from "node:fs";
+            import { createHash, createPublicKey, verify } from "node:crypto";
+            import { readFileSync, statSync } from "node:fs";
             const envelope = JSON.parse(readFileSync("/tmp/live-community-stable.json", "utf8"));
             const key = createPublicKey({ key: Buffer.from("MCowBQYDK2VwAyEAsVwKniCvpHDwbbnjTPP0SuIIG97cRL+iFBQvay9OrU4=", "base64"), format: "der", type: "spki" });
             if (!verify(null, Buffer.from(envelope.payload, "base64url"), key, Buffer.from(envelope.signature, "base64url"))) process.exit(1);
+            const payload = JSON.parse(Buffer.from(envelope.payload, "base64url").toString("utf8"));
+            const version = process.env.HQBASE_RELEASE_VERSION.replace(/^v/, "");
+            const file = "/tmp/published-community.tar.gz";
+            const sha256 = createHash("sha256").update(readFileSync(file)).digest("hex");
+            if (payload.edition !== "community" || payload.version !== version || payload.artifact?.sha256 !== sha256 || payload.artifact?.size !== statSync(file).size) process.exit(1);
+            if (process.env.HQBASE_ARTIFACT_EXISTS !== "true") {
+              const expected = JSON.parse(readFileSync("release/stable.json", "utf8"));
+              if (expected.payload !== envelope.payload || expected.signature !== envelope.signature) process.exit(1);
+              const local = `release/community-${version}.tar.gz`;
+              if (createHash("sha256").update(readFileSync(local)).digest("hex") !== sha256 || statSync(local).size !== statSync(file).size) process.exit(1);
+            }
           '
