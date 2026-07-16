@@ -18,6 +18,7 @@ import { SetupPage } from "@/features/setup/setup-page";
 import type { SetupStatus } from "@/features/setup/types";
 import { getUpdateStatus } from "@/features/updates/api";
 import type { UpdateStatus } from "@/features/updates/types";
+import { UpgradeExperience } from "@/features/upgrades/upgrade-experience";
 import { listUsers } from "@/features/users/api";
 import type { WorkspaceUser } from "@/features/users/types";
 import type { FolderId } from "@/lib/routes";
@@ -153,6 +154,7 @@ export function App(): React.ReactElement {
 
   return (
     <>
+      <UpgradeExperience />
       <AppShell
         activeFolder={activeFolder}
         mailboxId={mailboxId}

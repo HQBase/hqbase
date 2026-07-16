@@ -6,6 +6,8 @@ import { attachmentRoutes, messageRoutes } from "../features/messages/routes";
 import { sendRoutes } from "../features/send/routes";
 import { setupRoutes } from "../features/setup/routes";
 import { updateRoutes } from "../features/updates/routes";
+import { proUpgradeRoutes } from "../features/upgrades/routes";
+import { enforceUpgradeWritePause } from "../features/upgrades/write-pause";
 import { userRoutes } from "../features/users/routes";
 import type { HonoApp } from "../lib/env";
 import { errorBody, toAppError } from "../lib/errors";
@@ -15,6 +17,8 @@ import { healthRoutes } from "./health";
 import { meRoutes } from "./me";
 
 export const apiRoutes = new Hono<HonoApp>();
+
+apiRoutes.use("*", enforceUpgradeWritePause);
 
 apiRoutes.onError((error, _c) => {
   const appError = toAppError(error);
@@ -33,6 +37,7 @@ apiRoutes.route("/api/messages", messageRoutes);
 apiRoutes.route("/api/attachments", attachmentRoutes);
 apiRoutes.route("/api/users", userRoutes);
 apiRoutes.route("/api/updates", updateRoutes);
+apiRoutes.route("/api/upgrades/pro", proUpgradeRoutes);
 apiRoutes.route("/api", sendRoutes);
 
 apiRoutes.all("/api/auth/*", async (c) => {

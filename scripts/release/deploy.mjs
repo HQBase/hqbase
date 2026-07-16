@@ -218,7 +218,14 @@ export function deploySource(cwd, options = {}) {
   const attempt = options.attempt ?? attemptRun;
   const workersCi = options.workersCi ?? process.env.WORKERS_CI === "1";
   const workerName = options.workerName ?? workerNameFromConfigFile(resolve(cwd, "wrangler.jsonc"));
-  const deployArgs = ["exec", "wrangler", "deploy", "--var", `HQBASE_WORKER_NAME:${workerName}`];
+  const deployArgs = [
+    "exec",
+    "wrangler",
+    "deploy",
+    "--keep-vars",
+    "--var",
+    `HQBASE_WORKER_NAME:${workerName}`
+  ];
 
   if (!workersCi) {
     execute("pnpm", deployArgs, cwd);
@@ -241,6 +248,11 @@ export function deploySource(cwd, options = {}) {
     execute("pnpm", deployArgs, cwd);
     return;
   }
+
+  deployArgs.push(
+    "--var",
+    `HQBASE_INSTALLATION_ID:${options.randomUUID?.() ?? crypto.randomUUID()}`
+  );
 
   const workspace = mkdtempSync(resolve(tmpdir(), "hqbase-community-secrets-"));
   const secretsFile = resolve(workspace, "secrets.json");
