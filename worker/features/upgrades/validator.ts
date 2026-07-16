@@ -110,8 +110,26 @@ export async function deleteCandidateValidators(
   fetcher: typeof fetch = fetch
 ): Promise<void> {
   if (!upgrade.accountId) return;
-  const prepared = await readPreparedResources(env.DB, upgrade.id);
-  for (const resource of prepared.resources) {
+  const row = await env.DB.prepare(
+    "SELECT created_resources_json FROM community_pro_upgrades WHERE id = ?"
+  )
+    .bind(upgrade.id)
+    .first<{ created_resources_json: string | null }>();
+  if (!row?.created_resources_json) return;
+  const parsed = JSON.parse(row.created_resources_json) as unknown;
+  if (Array.isArray(parsed) && parsed.length === 0) return;
+  const prepared = parsed as {
+    resources?: unknown;
+  };
+  if (!Array.isArray(prepared.resources)) {
+    throw new Error("The Pro resource inventory is malformed.");
+  }
+  for (const resource of prepared.resources as Array<{
+    type?: string;
+    name?: string;
+    ownership?: string;
+    disposition?: string;
+  }>) {
     if (
       resource.type !== "worker" ||
       resource.ownership !== "created" ||
@@ -119,6 +137,7 @@ export async function deleteCandidateValidators(
     ) {
       continue;
     }
+    if (!resource.name) throw new Error("A disposable validator name is missing.");
     const response = await fetcher(
       `${apiBase}/accounts/${upgrade.accountId}/workers/scripts/${encodeURIComponent(resource.name)}`,
       { method: "DELETE", headers: { authorization: `Bearer ${token}` } }

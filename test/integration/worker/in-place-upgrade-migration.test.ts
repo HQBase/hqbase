@@ -19,6 +19,7 @@ import {
 } from "../../../worker/features/upgrades/resources";
 import type { UpgradeRecord } from "../../../worker/features/upgrades/types";
 import {
+  deleteCandidateValidators,
   ensureCandidateValidator,
   validatorName
 } from "../../../worker/features/upgrades/validator";
@@ -350,6 +351,34 @@ describe("in-place Community to Pro migration", () => {
     expect(source).toContain('custom-community=\\"candidate-version\\"');
     expect(source).toContain("https://mail.example.com/api/upgrades/pro/candidate/verify");
     expect(source).not.toContain("temporary-token");
+  });
+
+  it("treats expiry before resource preparation as validator-clean", async () => {
+    const row = await env.DB.prepare(
+      "SELECT id FROM community_pro_upgrades ORDER BY created_at DESC LIMIT 1"
+    ).first<{ id: string }>();
+    expect(row?.id).toBeTruthy();
+    await env.DB.prepare(
+      "UPDATE community_pro_upgrades SET created_resources_json = '[]' WHERE id = ?"
+    )
+      .bind(row?.id)
+      .run();
+    const requests: string[] = [];
+    await expect(
+      deleteCandidateValidators(
+        env as WorkerEnv,
+        {
+          id: row?.id ?? "",
+          accountId: "account-1"
+        } as UpgradeRecord,
+        "temporary-token",
+        async (input) => {
+          requests.push(String(input));
+          return Response.json({ success: true, result: null });
+        }
+      )
+    ).resolves.toBeUndefined();
+    expect(requests).toEqual([]);
   });
 
   it("resumes the exact active installation without a browser cookie", async () => {
