@@ -59,7 +59,7 @@ export async function discoverCommunityInstallation(
   token: string,
   expected: { installationId: string; workerName: string; workspaceOrigin: string },
   fetcher: typeof fetch = fetch
-): Promise<{ inventory: UpgradeInventory; legacyRecovery: boolean }> {
+): Promise<UpgradeInventory> {
   const accounts = await cloudflare<Array<{ id: string }>>(
     token,
     "/accounts?per_page=100",
@@ -133,7 +133,7 @@ export async function discoverCommunityInstallation(
         `/accounts/${accountId}/workers/scripts/${expected.workerName}/subdomain`,
         {},
         fetcher
-      ).catch(() => null),
+      ),
       cloudflare<{ subdomain?: string }>(
         token,
         `/accounts/${accountId}/workers/subdomain`,
@@ -163,8 +163,8 @@ export async function discoverCommunityInstallation(
   const bucketName = stringField(r2, "bucket_name");
   if (!accountSubdomain.subdomain) {
     throw new AppError(
-      "UPGRADE_PREVIEW_UNAVAILABLE",
-      "Cloudflare Preview URLs are not available for this account.",
+      "UPGRADE_WORKERS_DEV_SUBDOMAIN_UNAVAILABLE",
+      "The Cloudflare account workers.dev subdomain is unavailable for isolated validation.",
       409
     );
   }
@@ -182,10 +182,12 @@ export async function discoverCommunityInstallation(
     installationBinding?.type === "plain_text" && typeof installationBinding.text === "string"
       ? installationBinding.text
       : null;
-  if (installedId && installedId !== expected.installationId) {
+  if (installedId !== expected.installationId) {
     throw new AppError(
       "UPGRADE_INSTALLATION_MISMATCH",
-      "The discovered Worker belongs to a different HQBase installation.",
+      installedId
+        ? "The discovered Worker belongs to a different HQBase installation."
+        : "The discovered Worker is missing its HQBase installation identity.",
       409
     );
   }
@@ -217,25 +219,22 @@ export async function discoverCommunityInstallation(
     expected.workspaceOrigin
   );
   return {
-    legacyRecovery: installedId === null,
-    inventory: {
-      accountId,
-      workerName: expected.workerName,
-      installationId: installedId,
-      activeVersionId: active[0].version_id,
-      bindings,
-      secretNames: secrets.flatMap((secret) => (secret.name ? [secret.name] : [])).sort(),
-      d1DatabaseId: databaseId,
-      d1DatabaseName: database.name,
-      r2BucketName: bucketName,
-      compatibilityDate: settings.compatibility_date ?? null,
-      compatibilityFlags: settings.compatibility_flags ?? [],
-      routes,
-      customDomains,
-      assets: settings.assets ?? null,
-      subdomain,
-      accountSubdomain: accountSubdomain.subdomain
-    }
+    accountId,
+    workerName: expected.workerName,
+    installationId: installedId,
+    activeVersionId: active[0].version_id,
+    bindings,
+    secretNames: secrets.flatMap((secret) => (secret.name ? [secret.name] : [])).sort(),
+    d1DatabaseId: databaseId,
+    d1DatabaseName: database.name,
+    r2BucketName: bucketName,
+    compatibilityDate: settings.compatibility_date ?? null,
+    compatibilityFlags: settings.compatibility_flags ?? [],
+    routes,
+    customDomains,
+    assets: settings.assets ?? null,
+    subdomain,
+    accountSubdomain: accountSubdomain.subdomain
   };
 }
 

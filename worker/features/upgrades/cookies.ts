@@ -42,10 +42,6 @@ export async function writeUpgradeDraft(
   );
 }
 
-export function clearUpgradeDraft(): string {
-  return secureCookie(COOKIE_NAME, "", 0);
-}
-
 export async function sealUpgradeContinuation(
   continuation: UpgradeContinuation,
   betterAuthSecret: string

@@ -11,6 +11,7 @@ import {
 } from "../../../worker/features/upgrades/continuation";
 import { stageCandidateForValidation } from "../../../worker/features/upgrades/deployment";
 import { fetchCandidateVerification } from "../../../worker/features/upgrades/migration";
+import { disableWorkerPreviewUrls } from "../../../worker/features/upgrades/preview-policy";
 import { ensureInstallationIdentity } from "../../../worker/features/upgrades/queries";
 import {
   readPreparedResources,
@@ -44,16 +45,26 @@ beforeAll(async () => {
 
 describe("in-place Community to Pro migration", () => {
   it("stores one durable installation identity and rejects Worker drift", async () => {
-    const created = await ensureInstallationIdentity(env.DB, "custom-community");
-    expect(created.installationId).toMatch(/^[0-9a-f-]{36}$/);
+    const installationId = "00000000-0000-4000-8000-000000000123";
+    const created = await ensureInstallationIdentity(env.DB, "custom-community", installationId);
+    expect(created.installationId).toBe(installationId);
     await expect(
       ensureInstallationIdentity(env.DB, "custom-community", created.installationId)
     ).resolves.toEqual(created);
-    await expect(ensureInstallationIdentity(env.DB, "other-worker")).rejects.toThrow("Worker name");
+    await expect(
+      ensureInstallationIdentity(env.DB, "other-worker", installationId)
+    ).rejects.toThrow("Worker name");
+    await expect(ensureInstallationIdentity(env.DB, "custom-community")).rejects.toThrow(
+      "HQBASE_INSTALLATION_ID"
+    );
   });
 
   it("enforces a durable single-upgrade lock without storing credentials", async () => {
-    const identity = await ensureInstallationIdentity(env.DB, "custom-community");
+    const identity = await ensureInstallationIdentity(
+      env.DB,
+      "custom-community",
+      "00000000-0000-4000-8000-000000000123"
+    );
     const values = [
       crypto.randomUUID(),
       identity.installationId,
@@ -132,7 +143,7 @@ describe("in-place Community to Pro migration", () => {
     expect(JSON.stringify(stored)).not.toContain("secret-value");
   });
 
-  it("durably binds migration and preview verification to the signed candidate release", async () => {
+  it("durably binds migration and smoke testing to the signed Pro release", async () => {
     const prepared = {
       jobsQueue: "custom-pro-jobs",
       deadLetterQueue: "custom-pro-dlq",
@@ -160,12 +171,9 @@ describe("in-place Community to Pro migration", () => {
       workerName: "custom-community",
       workspaceOrigin: "https://mail.example.com",
       state: "candidate_uploaded",
-      legacyRecovery: false,
-      legacyConfirmedAt: null,
       accountId: "account-1",
       activeVersionId: "community-version",
       candidateVersionId: "candidate-version",
-      previewAlias: null,
       d1DatabaseId: "database-1",
       r2BucketName: "mail-objects",
       checkpointBookmark: "bookmark-1",
@@ -213,6 +221,45 @@ describe("in-place Community to Pro migration", () => {
         })
       )
     ).rejects.toThrow("active Community version changed");
+  });
+
+  it("disables Preview URLs without changing the workers.dev route", async () => {
+    const row = await env.DB.prepare(
+      "SELECT id FROM community_pro_upgrades ORDER BY created_at DESC LIMIT 1"
+    ).first<{ id: string }>();
+    const upgrade = { id: row?.id ?? "" } as UpgradeRecord;
+    const requests: Array<Record<string, unknown>> = [];
+    await disableWorkerPreviewUrls(
+      env as WorkerEnv,
+      upgrade,
+      {
+        accountId: "account-1",
+        workerName: "custom-community",
+        installationId: "installation-1",
+        activeVersionId: "community-version",
+        bindings: [],
+        secretNames: [],
+        d1DatabaseId: "database-1",
+        d1DatabaseName: "custom-community-db",
+        r2BucketName: "mail-objects",
+        compatibilityDate: "2026-06-28",
+        compatibilityFlags: ["nodejs_compat"],
+        routes: [],
+        customDomains: [],
+        assets: null,
+        subdomain: { enabled: true, previews_enabled: true },
+        accountSubdomain: "test-account"
+      },
+      "temporary-token",
+      async (_input, init) => {
+        requests.push(JSON.parse(String(init?.body)) as Record<string, unknown>);
+        return Response.json({
+          success: true,
+          result: { enabled: true, previews_enabled: false }
+        });
+      }
+    );
+    expect(requests).toEqual([{ enabled: true, previews_enabled: false }]);
   });
 
   it("pins candidate checks to a zero-percent version override", async () => {
@@ -274,20 +321,22 @@ describe("in-place Community to Pro migration", () => {
     const row = await env.DB.prepare(
       "SELECT id FROM community_pro_upgrades ORDER BY created_at DESC LIMIT 1"
     ).first<{ id: string }>();
-    const installationId = (await ensureInstallationIdentity(env.DB, "custom-community"))
-      .installationId;
+    const installationId = (
+      await ensureInstallationIdentity(
+        env.DB,
+        "custom-community",
+        "00000000-0000-4000-8000-000000000123"
+      )
+    ).installationId;
     const upgrade = {
       id: row?.id ?? "",
       installationId,
       workerName: "custom-community",
       workspaceOrigin: "https://mail.example.com",
       state: "migration_complete",
-      legacyRecovery: false,
-      legacyConfirmedAt: null,
       accountId: "account-1",
       activeVersionId: "community-version",
       candidateVersionId: "candidate-version",
-      previewAlias: null,
       d1DatabaseId: "database-1",
       r2BucketName: "mail-objects",
       checkpointBookmark: "bookmark-1",
@@ -394,6 +443,7 @@ describe("in-place Community to Pro migration", () => {
     const upgradeEnv = {
       ...env,
       BETTER_AUTH_SECRET: "test-better-auth-secret",
+      HQBASE_INSTALLATION_ID: "00000000-0000-4000-8000-000000000123",
       HQBASE_WORKER_NAME: "custom-community"
     } as WorkerEnv;
     await persistUpgradeContinuation(upgradeEnv, row?.id ?? "", {

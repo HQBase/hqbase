@@ -7,7 +7,6 @@ import { resolveUpgradeDraft } from "./continuation";
 import { promoteCandidate, stageCandidateForValidation, uploadProCandidate } from "./deployment";
 import { migrateToPro, verifyProCandidate } from "./migration";
 import { revokeUpgradeGrant } from "./oauth";
-import { restoreCandidatePreview } from "./preview";
 import { auditTransition, getUpgrade, recordUpgradeError, transitionUpgrade } from "./queries";
 import { downloadVerifiedProBundle } from "./release";
 import { prepareProResources } from "./resources";
@@ -42,32 +41,6 @@ export async function getUpgradeStatus(request: Request, env: WorkerEnv): Promis
   return Response.json(publicStatus(upgrade), { headers: { "cache-control": "no-store" } });
 }
 
-export async function confirmLegacyTarget(request: Request, env: WorkerEnv): Promise<Response> {
-  const { auth, upgrade } = await requireOwnedUpgrade(request, env, true);
-  const body = (await request.json().catch(() => null)) as { confirm?: boolean } | null;
-  if (!body?.confirm || upgrade.state !== "target_verified" || !upgrade.legacyRecovery) {
-    throw new AppError(
-      "UPGRADE_CONFIRMATION_INVALID",
-      "The guarded legacy installation confirmation is not available.",
-      409
-    );
-  }
-  await env.DB.prepare(
-    `UPDATE community_pro_upgrades
-     SET legacy_confirmed_at = datetime('now'), updated_at = datetime('now')
-     WHERE id = ? AND state = 'target_verified' AND legacy_recovery = 1
-       AND legacy_confirmed_at IS NULL`
-  )
-    .bind(upgrade.id)
-    .run();
-  await auditTransition(env.DB, upgrade.id, "legacy_target_confirmed", "success", {
-    actorId: auth.user.id
-  });
-  const current = await getUpgrade(env.DB, upgrade.id);
-  if (!current) throw new Error("Upgrade record disappeared.");
-  return Response.json(publicStatus(current), { headers: { "cache-control": "no-store" } });
-}
-
 export async function advanceUpgrade(request: Request, env: WorkerEnv): Promise<Response> {
   const { upgrade, draft } = await requireOwnedUpgrade(request, env, true);
   const token = draft.cloudflareAccessToken;
@@ -92,20 +65,6 @@ export async function advanceUpgrade(request: Request, env: WorkerEnv): Promise<
     const code = error instanceof AppError ? error.code : "UPGRADE_STEP_FAILED";
     const action = recoveryAction(code);
     await recordUpgradeError(env.DB, upgrade.id, code, action);
-    const current = await getUpgrade(env.DB, upgrade.id);
-    if (
-      current &&
-      [
-        "resources_prepared",
-        "candidate_uploaded",
-        "migration_started",
-        "migration_complete"
-      ].includes(current.state)
-    ) {
-      await restoreCandidatePreview(env, current, token).catch(async () => {
-        await auditTransition(env.DB, upgrade.id, "preview_urls_restore_failed", "failure");
-      });
-    }
     throw error;
   }
 }
@@ -120,15 +79,13 @@ async function advanceOneState(
   token: string
 ): Promise<UpgradeRecord> {
   if (upgrade.state === "cloudflare_authorized") {
-    const discovered = await discoverCommunityInstallation(env, token, {
+    const inventory = await discoverCommunityInstallation(env, token, {
       installationId: upgrade.installationId,
       workerName: upgrade.workerName,
       workspaceOrigin: upgrade.workspaceOrigin
     });
-    const inventory = discovered.inventory;
     const counts = await preflightCounts(env.DB);
     return transitionUpgrade(env.DB, upgrade.id, "cloudflare_authorized", "target_verified", {
-      legacy_recovery: discovered.legacyRecovery ? 1 : 0,
       account_id: inventory.accountId,
       active_version_id: inventory.activeVersionId,
       d1_database_id: inventory.d1DatabaseId,
@@ -140,13 +97,6 @@ async function advanceOneState(
     });
   }
   if (upgrade.state === "target_verified") {
-    if (upgrade.legacyRecovery && !upgrade.legacyConfirmedAt) {
-      throw new AppError(
-        "UPGRADE_LEGACY_CONFIRMATION_REQUIRED",
-        "Confirm the verified legacy Worker before HQBase changes any Cloudflare resource.",
-        409
-      );
-    }
     if (!draft.licenseKey) {
       throw new AppError(
         "UPGRADE_SESSION_MISSING",
@@ -169,7 +119,6 @@ async function advanceOneState(
       );
     }
     const bundle = await downloadVerifiedProBundle(env, upgrade, draft.licenseKey);
-    await restoreCandidatePreview(env, upgrade, token);
     return uploadProCandidate(
       env,
       upgrade,
@@ -180,7 +129,6 @@ async function advanceOneState(
     );
   }
   if (upgrade.state === "candidate_uploaded") {
-    await restoreCandidatePreview(env, upgrade, token);
     await stageCandidateForValidation(upgrade, token);
     await auditTransition(env.DB, upgrade.id, "candidate_staged_at_zero_percent", "success");
     return transitionUpgrade(env.DB, upgrade.id, "candidate_uploaded", "migration_started");
@@ -235,7 +183,7 @@ async function requireOwnedUpgrade(request: Request, env: WorkerEnv, recent: boo
       403
     );
   }
-  return { auth, draft, upgrade };
+  return { draft, upgrade };
 }
 
 async function preflightCounts(db: D1Database): Promise<Record<string, number>> {
@@ -259,8 +207,6 @@ function publicStatus(upgrade: UpgradeRecord) {
   return {
     id: upgrade.id,
     state: upgrade.state,
-    legacyConfirmationRequired:
-      upgrade.state === "target_verified" && upgrade.legacyRecovery && !upgrade.legacyConfirmedAt,
     errorCode: upgrade.errorCode,
     recoveryAction: upgrade.recoveryAction,
     updatedAt: upgrade.updatedAt,
@@ -271,9 +217,6 @@ function publicStatus(upgrade: UpgradeRecord) {
 function recoveryAction(code: string): string {
   if (code.includes("REAUTH") || code.includes("CLOUDFLARE")) {
     return "Authorize Cloudflare again, then resume the upgrade.";
-  }
-  if (code === "UPGRADE_LEGACY_CONFIRMATION_REQUIRED") {
-    return "Review and confirm the verified legacy Worker before continuing.";
   }
   return "Retry this step. If it fails again, keep Community online and contact HQBase support.";
 }

@@ -148,8 +148,8 @@ export async function fetchCandidateVerification(
   wait: (milliseconds: number) => Promise<void> = delay
 ): Promise<Response> {
   const attempts = 12;
-  let lastError: unknown;
-  for (let attempt = 0; attempt < attempts; attempt += 1) {
+  let attempt = 0;
+  while (true) {
     try {
       const response = await fetcher(url, {
         method: "POST",
@@ -161,12 +161,11 @@ export async function fetchCandidateVerification(
       if (response.status !== 404 && response.status < 500) return response;
       if (attempt === attempts - 1) return response;
     } catch (error) {
-      lastError = error;
       if (attempt === attempts - 1) throw error;
     }
+    attempt += 1;
     await wait(1_000);
   }
-  throw lastError ?? new Error("Candidate preview did not become reachable.");
 }
 
 function delay(milliseconds: number): Promise<void> {

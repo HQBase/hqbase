@@ -6,12 +6,9 @@ type UpgradeRow = {
   worker_name: string;
   workspace_origin: string;
   state: UpgradeState;
-  legacy_recovery: number;
-  legacy_confirmed_at: string | null;
   account_id: string | null;
   active_version_id: string | null;
   candidate_version_id: string | null;
-  preview_alias: string | null;
   d1_database_id: string | null;
   r2_bucket_name: string | null;
   checkpoint_bookmark: string | null;
@@ -34,9 +31,7 @@ const transitionFields = new Set([
   "d1_database_id",
   "error_code",
   "inventory_json",
-  "legacy_recovery",
   "preflight_counts_json",
-  "preview_alias",
   "r2_bucket_name",
   "recovery_action"
 ]);
@@ -46,11 +41,14 @@ export async function ensureInstallationIdentity(
   workerName: string,
   configuredInstallationId?: string
 ): Promise<{ installationId: string; workerName: string }> {
+  if (!configuredInstallationId) {
+    throw new Error("HQBASE_INSTALLATION_ID is required before starting an upgrade.");
+  }
   const current = await db
     .prepare("SELECT installation_id, worker_name FROM installation_identity WHERE singleton = 1")
     .first<{ installation_id: string; worker_name: string }>();
   if (current) {
-    if (configuredInstallationId && current.installation_id !== configuredInstallationId) {
+    if (current.installation_id !== configuredInstallationId) {
       throw new Error("Installation identity does not match the Worker variable.");
     }
     if (current.worker_name !== workerName) {
@@ -58,7 +56,7 @@ export async function ensureInstallationIdentity(
     }
     return { installationId: current.installation_id, workerName: current.worker_name };
   }
-  const installationId = configuredInstallationId || crypto.randomUUID();
+  const installationId = configuredInstallationId;
   await db
     .prepare(
       `INSERT INTO installation_identity
@@ -124,24 +122,6 @@ export async function transitionUpgrade(
   return updated;
 }
 
-export async function markUpgradeFailure(
-  db: D1Database,
-  id: string,
-  state: "failed" | "recovery_required",
-  errorCode: string,
-  recoveryAction: string
-): Promise<void> {
-  await db
-    .prepare(
-      `UPDATE community_pro_upgrades
-       SET state = ?, error_code = ?, recovery_action = ?, updated_at = datetime('now')
-       WHERE id = ? AND state <> 'complete'`
-    )
-    .bind(state, errorCode.slice(0, 64), recoveryAction.slice(0, 240), id)
-    .run();
-  await auditTransition(db, id, state, "failure", { errorCode: errorCode.slice(0, 64) });
-}
-
 export async function recordUpgradeError(
   db: D1Database,
   id: string,
@@ -189,12 +169,9 @@ function mapUpgrade(row: UpgradeRow): UpgradeRecord {
     workerName: row.worker_name,
     workspaceOrigin: row.workspace_origin,
     state: row.state,
-    legacyRecovery: row.legacy_recovery === 1,
-    legacyConfirmedAt: row.legacy_confirmed_at,
     accountId: row.account_id,
     activeVersionId: row.active_version_id,
     candidateVersionId: row.candidate_version_id,
-    previewAlias: row.preview_alias,
     d1DatabaseId: row.d1_database_id,
     r2BucketName: row.r2_bucket_name,
     checkpointBookmark: row.checkpoint_bookmark,

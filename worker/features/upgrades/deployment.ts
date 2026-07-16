@@ -1,6 +1,7 @@
 import type { WorkerEnv } from "../../lib/env";
 import { AppError } from "../../lib/errors";
 import { cloudflare } from "./cloudflare";
+import { disableWorkerPreviewUrls } from "./preview-policy";
 import { transitionUpgrade } from "./queries";
 import type { ProWorkerBundle } from "./release";
 import { readPreparedResources, recordPreparedSecretOwnership } from "./resources";
@@ -27,6 +28,7 @@ export async function uploadProCandidate(
   fetcher: typeof fetch = fetch
 ): Promise<UpgradeRecord> {
   const inventory = await readInventory(env.DB, upgrade.id);
+  await disableWorkerPreviewUrls(env, upgrade, inventory, token, fetcher);
   let resources = await readPreparedResources(env.DB, upgrade.id);
   resources = await recordPreparedSecretOwnership(
     env.DB,
@@ -50,7 +52,6 @@ export async function uploadProCandidate(
     fetcher
   );
   const assetsJwt = await uploadAssets(token, inventory, bundle, fetcher);
-  const alias = `u${upgrade.id.replaceAll("-", "").slice(0, 8)}`;
   const excluded = new Set([
     "ASSETS",
     "PRO_JOBS",
@@ -102,7 +103,6 @@ export async function uploadProCandidate(
       }
     },
     annotations: {
-      "workers/alias": alias,
       "workers/message": `HQBase Pro ${bundle.version} in-place upgrade candidate`,
       "workers/tag": `hqbase-upgrade-${upgrade.installationId}`
     }
@@ -138,7 +138,6 @@ export async function uploadProCandidate(
   };
   return transitionUpgrade(env.DB, upgrade.id, "resources_prepared", "candidate_uploaded", {
     candidate_version_id: candidate.id,
-    preview_alias: alias,
     created_resources_json: JSON.stringify(resources),
     error_code: null,
     recovery_action: null

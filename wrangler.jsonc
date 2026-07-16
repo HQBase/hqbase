@@ -2,6 +2,7 @@
   "$schema": "./node_modules/wrangler/config-schema.json",
   "name": "hqbase",
   "main": "worker/index.ts",
+  "preview_urls": false,
   "compatibility_date": "2026-06-28",
   "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
   "assets": {

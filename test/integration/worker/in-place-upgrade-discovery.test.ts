@@ -60,8 +60,7 @@ describe("automatic Community installation discovery", () => {
       { installationId, workerName, workspaceOrigin: "https://mail.example.com" },
       cloudflareFixture()
     );
-    expect(result.legacyRecovery).toBe(false);
-    expect(result.inventory).toMatchObject({
+    expect(result).toMatchObject({
       accountId: "account-a",
       workerName,
       installationId,
@@ -72,7 +71,7 @@ describe("automatic Community installation discovery", () => {
       customDomains: ["mail.example.com"],
       routes: [{ id: "route-a", pattern: "mail.example.com/*" }]
     });
-    expect(result.inventory.secretNames).toEqual(["BETTER_AUTH_SECRET", "EXISTING_CUSTOM_SECRET"]);
+    expect(result.secretNames).toEqual(["BETTER_AUTH_SECRET", "EXISTING_CUSTOM_SECRET"]);
   });
 
   it("fails closed when the same Worker name exists in more than one authorized account", async () => {
@@ -103,6 +102,17 @@ describe("automatic Community installation discovery", () => {
         cloudflareFixture({ missingR2: true })
       )
     ).rejects.toMatchObject({ code: "UPGRADE_BINDING_INVALID" });
+  });
+
+  it("rejects a Worker without the purchase-bound installation identity", async () => {
+    await expect(
+      discoverCommunityInstallation(
+        discoveryEnv(),
+        "temporary-token",
+        { installationId, workerName, workspaceOrigin: "https://mail.example.com" },
+        cloudflareFixture({ missingInstallationId: true })
+      )
+    ).rejects.toMatchObject({ code: "UPGRADE_INSTALLATION_MISMATCH" });
   });
 
   it("rejects a forged Community release envelope", async () => {
@@ -151,6 +161,7 @@ function cloudflareFixture(
     installationId?: string;
     invalidRelease?: boolean;
     invalidReleaseTag?: boolean;
+    missingInstallationId?: boolean;
     missingR2?: boolean;
   } = {}
 ): typeof fetch {
@@ -188,11 +199,15 @@ function cloudflareFixture(
                 }
               ]),
           { name: "MAIL_SENDER", type: "send_email" },
-          {
-            name: "HQBASE_INSTALLATION_ID",
-            type: "plain_text",
-            text: options.installationId ?? installationId
-          },
+          ...(options.missingInstallationId
+            ? []
+            : [
+                {
+                  name: "HQBASE_INSTALLATION_ID",
+                  type: "plain_text",
+                  text: options.installationId ?? installationId
+                }
+              ]),
           { name: "HQBASE_APP_VERSION", type: "plain_text", text: "0.1.3" },
           { name: "HQBASE_RELEASE_PUBLIC_KEY", type: "plain_text", text: releaseKey }
         ]

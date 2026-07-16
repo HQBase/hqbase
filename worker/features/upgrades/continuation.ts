@@ -77,13 +77,6 @@ export async function persistUpgradeContinuation(
   if ((result.meta.changes ?? 0) !== 1) throw new Error("Upgrade continuation is not resumable.");
 }
 
-export async function clearUpgradeContinuation(db: D1Database, upgradeId: string): Promise<void> {
-  await db
-    .prepare("UPDATE community_pro_upgrades SET continuation_ciphertext = NULL WHERE id = ?")
-    .bind(upgradeId)
-    .run();
-}
-
 async function readUpgradeContinuation(
   env: WorkerEnv,
   upgradeId: string

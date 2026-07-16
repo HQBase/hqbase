@@ -1,8 +1,10 @@
 import { apiGet, apiPost } from "@/lib/api-client";
-import type { UpgradeStatus } from "./types";
+import type { ProUpgradePlacement, UpgradeStatus } from "./types";
 
-export function startProUpgrade(): Promise<{ checkoutUrl: string; upgradeId: string }> {
-  return apiPost("/api/upgrades/pro/purchase");
+export function startProUpgrade(
+  placement: ProUpgradePlacement
+): Promise<{ checkoutUrl: string; upgradeId: string }> {
+  return apiPost("/api/upgrades/pro/purchase", { placement });
 }
 
 export function startProUpgradeOAuth(): Promise<{ authorizeUrl: string }> {
@@ -15,10 +17,6 @@ export function getProUpgradeStatus(): Promise<UpgradeStatus> {
 
 export function advanceProUpgrade(): Promise<UpgradeStatus> {
   return apiPost("/api/upgrades/pro/advance");
-}
-
-export function confirmLegacyProUpgrade(): Promise<UpgradeStatus> {
-  return apiPost("/api/upgrades/pro/confirm-legacy", { confirm: true });
 }
 
 export function completeProUpgrade(): Promise<{ state: string }> {

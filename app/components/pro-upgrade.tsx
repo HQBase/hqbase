@@ -12,8 +12,8 @@ import {
   CardTitle
 } from "@/components/ui/card";
 import { startProUpgrade } from "@/features/upgrades/api";
+import type { ProUpgradePlacement } from "@/features/upgrades/types";
 import { cn } from "@/lib/cn";
-import type { ProCheckoutPlacement } from "@/lib/pro-checkout";
 
 export function ProUpgradeCard({
   description,
@@ -22,7 +22,7 @@ export function ProUpgradeCard({
 }: {
   description: string;
   dismissible?: boolean;
-  placement: ProCheckoutPlacement;
+  placement: ProUpgradePlacement;
   title: string;
 }): React.ReactElement | null {
   const storageKey = `hqbase-pro-dismissed:${placement}`;
@@ -79,7 +79,7 @@ export function ProUpgradeCard({
             disabled={pending}
             size="sm"
             type="button"
-            onClick={() => void beginUpgrade(setPending, setCheckoutUrl)}
+            onClick={() => void beginUpgrade(placement, setPending, setCheckoutUrl)}
           >
             {pending ? "Preparing secure checkout…" : "Upgrade to Pro"}
             <ArrowUpRight data-icon="inline-end" />
@@ -97,7 +97,7 @@ export function ProUpgradeLink({
 }: {
   children: React.ReactNode;
   className?: string;
-  placement: ProCheckoutPlacement;
+  placement: ProUpgradePlacement;
 }): React.ReactElement {
   return (
     <button
@@ -107,7 +107,7 @@ export function ProUpgradeLink({
       )}
       type="button"
       data-placement={placement}
-      onClick={() => void beginUpgrade(() => undefined)}
+      onClick={() => void beginUpgrade(placement, () => undefined)}
     >
       {children}
       <ArrowUpRight data-icon="inline-end" />
@@ -116,12 +116,13 @@ export function ProUpgradeLink({
 }
 
 async function beginUpgrade(
+  placement: ProUpgradePlacement,
   setPending: (pending: boolean) => void,
   setCheckoutUrl?: (url: string) => void
 ): Promise<void> {
   setPending(true);
   try {
-    const purchase = await startProUpgrade();
+    const purchase = await startProUpgrade(placement);
     setCheckoutUrl?.(purchase.checkoutUrl);
     setPending(false);
     window.location.assign(purchase.checkoutUrl);

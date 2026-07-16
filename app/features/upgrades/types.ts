@@ -14,10 +14,16 @@ export type UpgradeState =
   | "failed"
   | "recovery_required";
 
+export type ProUpgradePlacement =
+  | "onboarding-domains"
+  | "user-permissions"
+  | "mail-clients"
+  | "composer"
+  | "settings-mailboxes";
+
 export type UpgradeStatus = {
   id: string;
   state: UpgradeState;
-  legacyConfirmationRequired: boolean;
   errorCode: string | null;
   recoveryAction: string | null;
   updatedAt: string;

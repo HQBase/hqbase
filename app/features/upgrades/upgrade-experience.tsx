@@ -7,7 +7,6 @@ import { ApiRequestError } from "@/lib/api-client";
 import {
   advanceProUpgrade,
   completeProUpgrade,
-  confirmLegacyProUpgrade,
   getProUpgradeStatus,
   startProUpgradeOAuth
 } from "./api";
@@ -53,8 +52,7 @@ export function UpgradeExperience(): React.ReactElement | null {
   }, [result]);
 
   React.useEffect(() => {
-    if (!status || busy || error || status.legacyConfirmationRequired || terminal(status.state))
-      return;
+    if (!status || busy || error || terminal(status.state)) return;
     const timer = window.setTimeout(() => {
       setBusy(true);
       setError(null);
@@ -142,27 +140,6 @@ export function UpgradeExperience(): React.ReactElement | null {
           );
         })}
       </ol>
-      {status?.legacyConfirmationRequired ? (
-        <div className="grid gap-3 rounded-md border p-3 text-sm">
-          <p>
-            This older installation has no Worker installation variable. HQBase verified its Worker
-            name, signed release, origin, account, and Community schema. Confirm before any
-            mutation.
-          </p>
-          <Button
-            type="button"
-            onClick={() => {
-              setBusy(true);
-              void confirmLegacyProUpgrade()
-                .then(setStatus)
-                .catch((reason) => captureError(reason, setError, setErrorCode))
-                .finally(() => setBusy(false));
-            }}
-          >
-            Confirm this Community Worker
-          </Button>
-        </div>
-      ) : null}
       {error ? (
         <div className="grid gap-2 rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm">
           <p>{error}</p>

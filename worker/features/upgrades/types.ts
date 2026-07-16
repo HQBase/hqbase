@@ -23,12 +23,9 @@ export type UpgradeRecord = {
   workerName: string;
   workspaceOrigin: string;
   state: UpgradeState;
-  legacyRecovery: boolean;
-  legacyConfirmedAt: string | null;
   accountId: string | null;
   activeVersionId: string | null;
   candidateVersionId: string | null;
-  previewAlias: string | null;
   d1DatabaseId: string | null;
   r2BucketName: string | null;
   checkpointBookmark: string | null;
@@ -44,7 +41,7 @@ export type UpgradeRecord = {
 export type UpgradeInventory = {
   accountId: string;
   workerName: string;
-  installationId: string | null;
+  installationId: string;
   activeVersionId: string;
   bindings: Array<Record<string, unknown> & { name: string; type: string }>;
   secretNames: string[];
@@ -56,6 +53,6 @@ export type UpgradeInventory = {
   routes: Array<{ id: string; pattern: string }>;
   customDomains: string[];
   assets: Record<string, unknown> | null;
-  subdomain: { enabled: boolean; previews_enabled: boolean } | null;
+  subdomain: { enabled: boolean; previews_enabled: boolean };
   accountSubdomain: string;
 };
