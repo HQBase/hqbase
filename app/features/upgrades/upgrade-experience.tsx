@@ -155,7 +155,7 @@ export function UpgradeExperience(): React.ReactElement | null {
               Authorize Cloudflare again
             </Button>
           ) : null}
-          {errorCode === "RECENT_AUTH_REQUIRED" ? (
+          {requiresUpgradeSignIn(errorCode) ? (
             <Button
               disabled={busy}
               type="button"
@@ -167,18 +167,24 @@ export function UpgradeExperience(): React.ReactElement | null {
               Sign in again
             </Button>
           ) : null}
-          <Button
-            disabled={busy}
-            type="button"
-            variant="outline"
-            onClick={() => retryUpgradeStep(setError, setErrorCode, setStatus)}
-          >
-            Retry
-          </Button>
+          {!requiresUpgradeSignIn(errorCode) ? (
+            <Button
+              disabled={busy}
+              type="button"
+              variant="outline"
+              onClick={() => retryUpgradeStep(setError, setErrorCode, setStatus)}
+            >
+              Retry
+            </Button>
+          ) : null}
         </div>
       ) : null}
     </UpgradeFrame>
   );
+}
+
+export function requiresUpgradeSignIn(errorCode: string | null): boolean {
+  return errorCode === "UNAUTHENTICATED" || errorCode === "RECENT_AUTH_REQUIRED";
 }
 
 export function retryUpgradeStep(

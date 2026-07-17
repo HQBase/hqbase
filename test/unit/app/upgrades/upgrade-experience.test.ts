@@ -1,8 +1,23 @@
 import { describe, expect, it, vi } from "vitest";
 import type { UpgradeStatus } from "../../../../app/features/upgrades/types";
-import { retryUpgradeStep } from "../../../../app/features/upgrades/upgrade-experience";
+import {
+  requiresUpgradeSignIn,
+  retryUpgradeStep
+} from "../../../../app/features/upgrades/upgrade-experience";
 
 describe("Pro upgrade retry", () => {
+  it.each([
+    "UNAUTHENTICATED",
+    "RECENT_AUTH_REQUIRED"
+  ])("requires an explicit sign-in action for %s", (errorCode) => {
+    expect(requiresUpgradeSignIn(errorCode)).toBe(true);
+  });
+
+  it("keeps ordinary upgrade failures retryable", () => {
+    expect(requiresUpgradeSignIn("CLOUDFLARE_UPGRADE_API_ERROR")).toBe(false);
+    expect(requiresUpgradeSignIn(null)).toBe(false);
+  });
+
   it("clears the local error gate and restarts the persisted step loop", () => {
     const setError = vi.fn();
     const setErrorCode = vi.fn();

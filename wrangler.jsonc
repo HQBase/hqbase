@@ -25,7 +25,7 @@
     "HQBASE_UPGRADE_CLOUDFLARE_OAUTH_CLIENT_ID": "1c413f324b518b452096929b847e6703",
     "HQBASE_UPGRADE_CLOUDFLARE_OAUTH_REDIRECT_URI": "https://auth.hqbase.io/upgrade/oauth/callback",
     "HQBASE_BILLING_URL": "https://billing.hqbase.io",
-    "HQBASE_APP_VERSION": "0.1.19",
+    "HQBASE_APP_VERSION": "0.1.20",
     "HQBASE_RELEASE_PUBLIC_KEY": "MCowBQYDK2VwAyEAsVwKniCvpHDwbbnjTPP0SuIIG97cRL+iFBQvay9OrU4=",
     "HQBASE_RELEASES_URL": "https://billing.hqbase.io/v1/releases",
     "HQBASE_WORKER_NAME": "hqbase"
