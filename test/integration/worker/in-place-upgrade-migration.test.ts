@@ -260,7 +260,7 @@ describe("in-place Community to Pro migration", () => {
       if (url.endsWith("/versions?page=1&per_page=100")) {
         return Response.json({
           success: true,
-          result: [{ id: "community-version", number: 3 }]
+          result: { items: [{ id: "community-version", number: 3 }] }
         });
       }
       if (url.includes("/versions?") && init?.body instanceof FormData) {
@@ -316,13 +316,29 @@ describe("in-place Community to Pro migration", () => {
       requireRecordedCommunityVersionIsLatest(inventory, "temporary-cloudflare-token", async () =>
         Response.json({
           success: true,
-          result: [
-            { id: "recorded-active-version", number: 3 },
-            { id: "newer-inactive-version", number: 4 }
-          ]
+          result: {
+            items: [
+              { id: "newer-inactive-version", number: 4 },
+              { id: "recorded-active-version", number: 3 }
+            ]
+          }
         })
       )
     ).rejects.toThrow("latest uploaded Worker version");
+  });
+
+  it("fails safely when Cloudflare omits the paginated versions envelope", async () => {
+    const inventory = {
+      accountId: "account-1",
+      workerName: "custom-community",
+      activeVersionId: "recorded-active-version"
+    } as Parameters<typeof requireRecordedCommunityVersionIsLatest>[0];
+
+    await expect(
+      requireRecordedCommunityVersionIsLatest(inventory, "temporary-cloudflare-token", async () =>
+        Response.json({ success: true, result: [] })
+      )
+    ).rejects.toThrow("invalid Worker versions response");
   });
 
   it("stages the candidate at zero percent without changing Community traffic", async () => {

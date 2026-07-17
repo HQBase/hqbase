@@ -153,25 +153,29 @@ export async function requireRecordedCommunityVersionIsLatest(
   token: string,
   fetcher: typeof fetch = fetch
 ): Promise<void> {
-  const versions = await cloudflare<
-    Array<{ id?: string; number?: number; metadata?: { created_on?: string } }>
-  >(
+  const result = await cloudflare<{
+    items?: Array<{ id?: string; number?: number; metadata?: { created_on?: string } }>;
+  }>(
     token,
     `/accounts/${inventory.accountId}/workers/scripts/${inventory.workerName}/versions?page=1&per_page=100`,
     {},
     fetcher
   );
-  const latest = versions
-    .filter(
-      (
-        version
-      ): version is {
-        id: string;
-        number: number;
-        metadata?: { created_on?: string };
-      } => typeof version.id === "string" && Number.isInteger(version.number)
-    )
-    .sort((left, right) => right.number - left.number)[0];
+  if (!Array.isArray(result.items)) {
+    throw new AppError(
+      "UPGRADE_VERSIONS_RESPONSE_INVALID",
+      "Cloudflare returned an invalid Worker versions response. Retry the upgrade.",
+      502
+    );
+  }
+  const latest = result.items[0];
+  if (latest && (typeof latest.id !== "string" || !Number.isInteger(latest.number))) {
+    throw new AppError(
+      "UPGRADE_VERSIONS_RESPONSE_INVALID",
+      "Cloudflare returned an invalid Worker versions response. Retry the upgrade.",
+      502
+    );
+  }
   if (!latest || latest.id !== inventory.activeVersionId) {
     throw new AppError(
       "UPGRADE_LATEST_VERSION_CHANGED",
