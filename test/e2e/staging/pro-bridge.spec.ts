@@ -60,6 +60,24 @@ test("Pro app password works through real IMAPS and SMTPS", async ({ page, reque
   await expect(compose).toBeVisible();
   const expectedUpdate = process.env.HQBASE_PRO_STAGING_EXPECT_UPDATE_VERSION;
   if (expectedUpdate) {
+    await expect
+      .poll(
+        async () => {
+          const response = await request.get("/api/updates");
+          if (!response.ok()) return null;
+          const update = (await response.json()) as {
+            available?: boolean;
+            release?: { version?: string };
+          };
+          return {
+            available: update.available,
+            version: update.release?.version
+          };
+        },
+        { timeout: 60_000 }
+      )
+      .toEqual({ available: true, version: expectedUpdate });
+    await page.reload();
     await expect(page.getByText("Update available", { exact: true })).toBeVisible();
     await expect(page.getByText(`HQBase ${expectedUpdate}`, { exact: false })).toBeVisible();
   }
