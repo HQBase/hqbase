@@ -4,8 +4,16 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { signOut } from "@/features/auth/api";
 import { ApiRequestError } from "@/lib/api-client";
-import { advanceProUpgrade, getProUpgradeStatus, startProUpgradeOAuth } from "./api";
+import {
+  advanceProUpgrade,
+  completeProUpgrade,
+  getProUpgradeStatus,
+  startProUpgradeOAuth
+} from "./api";
 import type { UpgradeState, UpgradeStatus } from "./types";
+
+const promotionHandoffRetryLimit = 30;
+const promotionHandoffRetryDelayMs = 1_000;
 
 const stateOrder: UpgradeState[] = [
   "created",
@@ -48,10 +56,7 @@ export function UpgradeExperience(): React.ReactElement | null {
 
   React.useEffect(() => {
     if (!status || busy || error || terminal(status.state)) return;
-    if (shouldReloadForProCompletion(status.state)) {
-      const timer = window.setTimeout(() => window.location.reload(), 500);
-      return () => window.clearTimeout(timer);
-    }
+    if (shouldCompleteWithProRuntime(status.state)) return;
     const timer = window.setTimeout(() => {
       setBusy(true);
       setError(null);
@@ -68,6 +73,23 @@ export function UpgradeExperience(): React.ReactElement | null {
     }, 500);
     return () => window.clearTimeout(timer);
   }, [busy, error, status]);
+
+  React.useEffect(() => {
+    if (status?.state !== "promoted" || error) return;
+    let cancelled = false;
+    void completePromotedUpgrade(completeProUpgrade, delay, () => cancelled)
+      .then((completed) => {
+        if (completed && !cancelled) {
+          window.location.replace(proCompletionUrl());
+        }
+      })
+      .catch((reason) => {
+        if (!cancelled) captureError(reason, setError, setErrorCode);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [error, status?.state]);
 
   if (!result) return null;
   if (result === "authorize") {
@@ -173,8 +195,41 @@ export function requiresUpgradeSignIn(errorCode: string | null): boolean {
   return errorCode === "UNAUTHENTICATED" || errorCode === "RECENT_AUTH_REQUIRED";
 }
 
-export function shouldReloadForProCompletion(state: UpgradeState): boolean {
+export function shouldCompleteWithProRuntime(state: UpgradeState): boolean {
   return state === "promoted";
+}
+
+export function isPromotionHandoffPending(error: unknown): boolean {
+  return error instanceof ApiRequestError && error.code === "UPGRADE_RUNTIME_HANDOFF_PENDING";
+}
+
+export function proCompletionUrl(now = Date.now()): string {
+  return `/settings?upgrade=complete&cutover=${now}`;
+}
+
+export async function completePromotedUpgrade(
+  request: () => Promise<unknown>,
+  wait: (milliseconds: number) => Promise<void>,
+  cancelled: () => boolean = () => false,
+  retryLimit = promotionHandoffRetryLimit
+): Promise<boolean> {
+  for (let attempt = 0; attempt < retryLimit; attempt += 1) {
+    if (cancelled()) return false;
+    try {
+      await request();
+      return !cancelled();
+    } catch (error) {
+      if (!isPromotionHandoffPending(error)) throw error;
+      if (attempt === retryLimit - 1) {
+        throw new ApiRequestError(
+          "UPGRADE_RUNTIME_HANDOFF_TIMEOUT",
+          "HQBase Pro is active, but this browser has not switched to it yet. Retry the final handoff."
+        );
+      }
+    }
+    await wait(promotionHandoffRetryDelayMs);
+  }
+  return false;
 }
 
 export function retryUpgradeStep(
@@ -223,6 +278,10 @@ function captureError(
 ): void {
   setError(message(error));
   setErrorCode(error instanceof ApiRequestError ? error.code : null);
+}
+
+function delay(milliseconds: number): Promise<void> {
+  return new Promise((resolve) => window.setTimeout(resolve, milliseconds));
 }
 
 async function beginCloudflareAuthorization(

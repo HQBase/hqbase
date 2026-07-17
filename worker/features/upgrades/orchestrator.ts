@@ -69,6 +69,25 @@ export async function advanceUpgrade(request: Request, env: WorkerEnv): Promise<
   }
 }
 
+export async function pendingProRuntimeHandoff(
+  request: Request,
+  env: WorkerEnv
+): Promise<Response> {
+  const { upgrade } = await requireOwnedUpgrade(request, env, true);
+  if (!["promoted", "complete"].includes(upgrade.state)) {
+    throw new AppError(
+      "UPGRADE_RUNTIME_HANDOFF_NOT_READY",
+      "The Pro runtime handoff is not ready.",
+      409
+    );
+  }
+  throw new AppError(
+    "UPGRADE_RUNTIME_HANDOFF_PENDING",
+    "HQBase Pro is still becoming active. Retrying final verification.",
+    409
+  );
+}
+
 async function advanceOneState(
   env: WorkerEnv,
   upgrade: UpgradeRecord,
