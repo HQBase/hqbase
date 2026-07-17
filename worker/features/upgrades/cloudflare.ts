@@ -25,14 +25,15 @@ export async function cloudflare<T>(
   const response = await fetcher(`${apiBase}${path}`, { ...init, headers });
   const payload = (await safeJson(response)) as Envelope<T> | null;
   if (!response.ok || !payload?.success) {
+    const apiCode = payload?.errors?.[0]?.code;
     console.warn("community_pro_upgrade_cloudflare_api_error", {
-      apiCode: payload?.errors?.[0]?.code ?? null,
+      apiCode: apiCode ?? null,
       operation: cloudflareOperation(path),
       status: response.status
     });
     throw new AppError(
-      "CLOUDFLARE_UPGRADE_API_ERROR",
-      publicCloudflareError(path, payload?.errors?.[0]?.code),
+      apiCode === 10000 ? "UPGRADE_CLOUDFLARE_REAUTH_REQUIRED" : "CLOUDFLARE_UPGRADE_API_ERROR",
+      publicCloudflareError(path, apiCode),
       response.status >= 400 && response.status < 500 ? response.status : 502
     );
   }
@@ -47,6 +48,8 @@ function cloudflareOperation(path: string): string {
   if (path.endsWith("/secrets")) return "list_worker_secrets";
   if (path.endsWith("/workers/domains")) return "list_worker_domains";
   if (path.endsWith("/subdomain")) return "read_worker_subdomain";
+  if (path.endsWith("/assets-upload-session")) return "create_assets_upload_session";
+  if (/\/versions(?:\?|$)/u.test(path)) return "upload_or_list_worker_versions";
   if (path.endsWith("/query")) return "query_d1_database";
   if (path.includes("/d1/database")) return "list_d1_databases";
   if (/^\/zones(?:\?|$)/u.test(path)) return "list_zones";
@@ -362,9 +365,9 @@ function stringField(value: Record<string, unknown>, ...names: string[]): string
 }
 
 function publicCloudflareError(path: string, code?: number): string {
+  if (code === 10000) return "Cloudflare authorization expired. Authorize again to resume.";
   if (path.includes("/d1/")) return "Cloudflare could not verify the Community database.";
   if (path.includes("/queues")) return "Cloudflare could not prepare the Pro job queues.";
-  if (code === 10000) return "Cloudflare authorization expired. Authorize again to resume.";
   return "Cloudflare could not complete this upgrade step.";
 }
 

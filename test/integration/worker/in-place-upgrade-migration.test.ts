@@ -10,6 +10,7 @@ import {
   resolveUpgradeDraft
 } from "../../../worker/features/upgrades/continuation";
 import {
+  requireRecordedCommunityVersionIsLatest,
   stageCandidateForValidation,
   uploadProCandidate
 } from "../../../worker/features/upgrades/deployment";
@@ -256,6 +257,12 @@ describe("in-place Community to Pro migration", () => {
       if (url.endsWith("/assets-upload-session")) {
         return Response.json({ success: true, result: { jwt: "assets-jwt", buckets: [] } });
       }
+      if (url.endsWith("/versions?page=1&per_page=100")) {
+        return Response.json({
+          success: true,
+          result: [{ id: "community-version", number: 3 }]
+        });
+      }
       if (url.includes("/versions?") && init?.body instanceof FormData) {
         candidateMetadata.push(JSON.parse(String(init.body.get("metadata"))));
         return Response.json({ success: true, result: { id: "candidate-version" } });
@@ -279,12 +286,12 @@ describe("in-place Community to Pro migration", () => {
     expect(bindings).toContainEqual({
       name: "BETTER_AUTH_SECRET",
       type: "inherit",
-      version_id: "community-version"
+      version_id: "latest"
     });
     expect(bindings).toContainEqual({
       name: "PRO_BRIDGE_TOKEN",
       type: "inherit",
-      version_id: "community-version"
+      version_id: "latest"
     });
     expect(bindings).toContainEqual({
       name: "PRO_LICENSE_KEY",
@@ -296,6 +303,26 @@ describe("in-place Community to Pro migration", () => {
       type: "secret_text",
       text: "temporary-cloudflare-token"
     });
+  });
+
+  it("fails closed when latest cannot inherit from the recorded active Community version", async () => {
+    const inventory = {
+      accountId: "account-1",
+      workerName: "custom-community",
+      activeVersionId: "recorded-active-version"
+    } as Parameters<typeof requireRecordedCommunityVersionIsLatest>[0];
+
+    await expect(
+      requireRecordedCommunityVersionIsLatest(inventory, "temporary-cloudflare-token", async () =>
+        Response.json({
+          success: true,
+          result: [
+            { id: "recorded-active-version", number: 3 },
+            { id: "newer-inactive-version", number: 4 }
+          ]
+        })
+      )
+    ).rejects.toThrow("latest uploaded Worker version");
   });
 
   it("stages the candidate at zero percent without changing Community traffic", async () => {

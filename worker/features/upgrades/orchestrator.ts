@@ -218,8 +218,11 @@ function recoveryAction(code: string): string {
   if (code === "UPGRADE_RELEASE_UNSUPPORTED") {
     return "Return to Settings, apply the current signed Community update, then retry the Pro upgrade.";
   }
-  if (code.includes("REAUTH") || code.includes("CLOUDFLARE")) {
+  if (code.includes("REAUTH")) {
     return "Authorize Cloudflare again, then resume the upgrade.";
+  }
+  if (code === "UPGRADE_LATEST_VERSION_CHANGED" || code === "UPGRADE_ACTIVE_VERSION_CHANGED") {
+    return "Verify the signed active Community release, then retry the upgrade.";
   }
   return "Retry this step. If it fails again, keep Community online and contact HQBase support.";
 }

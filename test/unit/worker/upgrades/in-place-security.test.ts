@@ -58,6 +58,21 @@ describe("in-place upgrade secret boundary", () => {
     ).resolves.toEqual({ id: "candidate-version" });
   });
 
+  it("requests Cloudflare reauthorization only for an expired grant", async () => {
+    const failed = (code: number) => async () =>
+      Response.json(
+        { success: false, errors: [{ code, message: "provider detail" }] },
+        { status: 400 }
+      );
+
+    await expect(
+      cloudflare("expired-token", "/accounts/account/workers/scripts", {}, failed(10000))
+    ).rejects.toMatchObject({ code: "UPGRADE_CLOUDFLARE_REAUTH_REQUIRED" });
+    await expect(
+      cloudflare("valid-token", "/accounts/account/workers/scripts", {}, failed(10057))
+    ).rejects.toMatchObject({ code: "CLOUDFLARE_UPGRADE_API_ERROR" });
+  });
+
   it("allows authentication needed to resume while ordinary writes remain paused", () => {
     expect(bypassUpgradeWritePause("POST", "/api/auth/sign-in/email")).toBe(true);
     expect(bypassUpgradeWritePause("POST", "/api/auth/sign-out")).toBe(true);

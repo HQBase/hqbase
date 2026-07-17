@@ -63,14 +63,14 @@ export async function uploadProCandidate(
     .map((binding) => ({
       name: binding.name,
       type: "inherit",
-      version_id: inventory.activeVersionId
+      version_id: "latest"
     }));
   const existingSecretNames = new Set(inventory.secretNames);
   for (const name of proUpgradeSecretNames) {
     if (bindings.some((binding) => binding.name === name)) continue;
     bindings.push(
       existingSecretNames.has(name)
-        ? { name, type: "inherit", version_id: inventory.activeVersionId }
+        ? { name, type: "inherit", version_id: "latest" }
         : { name, type: "secret_text", text: secretValues[name] }
     );
   }
@@ -119,6 +119,7 @@ export async function uploadProCandidate(
     }),
     bundle.main.name
   );
+  await requireRecordedCommunityVersionIsLatest(inventory, token, fetcher);
   const candidate = await cloudflare<{ id?: string }>(
     token,
     `/accounts/${inventory.accountId}/workers/scripts/${inventory.workerName}/versions?bindings_inherit=strict`,
@@ -145,6 +146,39 @@ export async function uploadProCandidate(
     error_code: null,
     recovery_action: null
   });
+}
+
+export async function requireRecordedCommunityVersionIsLatest(
+  inventory: UpgradeInventory,
+  token: string,
+  fetcher: typeof fetch = fetch
+): Promise<void> {
+  const versions = await cloudflare<
+    Array<{ id?: string; number?: number; metadata?: { created_on?: string } }>
+  >(
+    token,
+    `/accounts/${inventory.accountId}/workers/scripts/${inventory.workerName}/versions?page=1&per_page=100`,
+    {},
+    fetcher
+  );
+  const latest = versions
+    .filter(
+      (
+        version
+      ): version is {
+        id: string;
+        number: number;
+        metadata?: { created_on?: string };
+      } => typeof version.id === "string" && Number.isInteger(version.number)
+    )
+    .sort((left, right) => right.number - left.number)[0];
+  if (!latest || latest.id !== inventory.activeVersionId) {
+    throw new AppError(
+      "UPGRADE_LATEST_VERSION_CHANGED",
+      "The latest uploaded Worker version is not the verified active Community version. Verify the signed Community release before retrying.",
+      409
+    );
+  }
 }
 
 export async function stageCandidateForValidation(
