@@ -42,6 +42,17 @@ pnpm dev
 
 Open `http://localhost:8787/setup`.
 
+For presentation-only onboarding work, run the deterministic UI gallery without a purchase,
+Cloudflare authorization, or local database:
+
+```sh
+pnpm dev:setup-ui
+```
+
+Open `http://127.0.0.1:5173/__ui/setup`. Use the state control to inspect every setup step, loading,
+validation, failure, submission, and completion. Add `controls=0` to capture the clean canvas. The
+gallery is development-only and the production build fails if its markers reach `dist`.
+
 ## Quality gate
 
 ```sh

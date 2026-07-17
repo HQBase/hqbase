@@ -23,15 +23,19 @@ export type WizardStep = {
 export function WizardLayout({
   activeStep,
   children,
+  failed = false,
+  isComplete = false,
   onStepSelect,
   steps
 }: {
   activeStep: number;
   children: React.ReactNode;
+  failed?: boolean;
+  isComplete?: boolean;
   onStepSelect: (index: number) => void;
   steps: WizardStep[];
 }): React.ReactElement {
-  const current = activeStep === 0 ? "authorize" : "configure";
+  const current = isComplete ? "ready" : activeStep === 0 ? "authorize" : "configure";
   const [openStep, setOpenStep] = React.useState(current);
   React.useEffect(() => setOpenStep(current), [current]);
   const configureStep = steps[activeStep];
@@ -47,7 +51,7 @@ export function WizardLayout({
         if (value) setOpenStep(value);
       }}
     >
-      <SetupAccordionItem
+      <OnboardingStep
         description="Checkout was verified and the license was carried into this Worker."
         icon={Check}
         status="complete"
@@ -58,8 +62,8 @@ export function WizardLayout({
           HQBase Billing issued a short-lived install claim. The full license is stored only as a
           masked secret in your Cloudflare account.
         </p>
-      </SetupAccordionItem>
-      <SetupAccordionItem
+      </OnboardingStep>
+      <OnboardingStep
         description="The Worker, database, mail bucket, and queues are in your Cloudflare account."
         icon={Check}
         status="complete"
@@ -69,15 +73,15 @@ export function WizardLayout({
         <p className="text-sm text-muted-foreground">
           The licensed build is running under the Worker name selected during Deploy to Cloudflare.
         </p>
-      </SetupAccordionItem>
-      <SetupAccordionItem
+      </OnboardingStep>
+      <OnboardingStep
         description={
           activeStep === 0
             ? (steps[0]?.description ?? "Checking the temporary grant")
             : "Installation access verified"
         }
         icon={Cloud}
-        status={activeStep === 0 ? "current" : "complete"}
+        status={activeStep === 0 ? (failed ? "failed" : "current") : "complete"}
         title="Authorize and install"
         value="authorize"
       >
@@ -89,16 +93,20 @@ export function WizardLayout({
             verified.
           </p>
         )}
-      </SetupAccordionItem>
-      <SetupAccordionItem
+      </OnboardingStep>
+      <OnboardingStep
         description={
-          activeStep > 0
-            ? `${configureStep?.title ?? "Workspace"} · ${activeStep} of 3`
-            : "Domain, owner, and mailboxes"
+          isComplete
+            ? "Domain, owner, and shared addresses configured"
+            : activeStep > 0
+              ? `${configureStep?.title ?? "Workspace"} · ${activeStep} of 3`
+              : "Domain, owner, and mailboxes"
         }
-        disabled={activeStep === 0}
+        disabled={activeStep === 0 || isComplete}
         icon={Settings2}
-        status={activeStep > 0 ? "current" : "upcoming"}
+        status={
+          isComplete ? "complete" : activeStep > 0 ? (failed ? "failed" : "current") : "upcoming"
+        }
         title="Configure workspace"
         value="configure"
         onOpen={() => {
@@ -106,20 +114,24 @@ export function WizardLayout({
         }}
       >
         {activeStep > 0 ? <div className="[&>section>header]:sr-only">{children}</div> : null}
-      </SetupAccordionItem>
-      <SetupAccordionItem
-        description="Sign in to your self-hosted Pro workspace."
-        disabled
-        icon={Circle}
-        status="upcoming"
+      </OnboardingStep>
+      <OnboardingStep
+        description={
+          isComplete ? "Workspace setup is complete." : "Sign in to your self-hosted Pro workspace."
+        }
+        disabled={!isComplete}
+        icon={isComplete ? Check : Circle}
+        status={isComplete ? "current" : "upcoming"}
         title="Ready"
         value="ready"
-      />
+      >
+        {isComplete ? <div className="[&>section>header]:sr-only">{children}</div> : null}
+      </OnboardingStep>
     </Accordion>
   );
 }
 
-function SetupAccordionItem({
+export function OnboardingStep({
   children,
   description,
   disabled = false,
@@ -156,7 +168,8 @@ function SetupAccordionItem({
         <span
           className={cn(
             "flex size-8 shrink-0 items-center justify-center rounded-md border bg-background",
-            status === "complete" && "bg-foreground text-background"
+            status === "complete" && "bg-foreground text-background",
+            status === "failed" && "border-destructive/40 text-destructive"
           )}
         >
           <Icon className="size-4" />
@@ -197,8 +210,8 @@ export function WizardPanel({
         </h2>
         <p className="mt-1.5 max-w-2xl text-sm leading-6 text-muted-foreground">{description}</p>
       </header>
-      <div className="flex flex-col gap-5 py-5">{children}</div>
-      {actions ? <footer className="border-t pt-4">{actions}</footer> : null}
+      <div className="flex flex-col gap-6 py-6">{children}</div>
+      {actions ? <footer className="border-t border-border/80 pt-5">{actions}</footer> : null}
     </section>
   );
 }

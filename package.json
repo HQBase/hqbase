@@ -10,7 +10,8 @@
   "scripts": {
     "dev": "wrangler dev --port 8787",
     "dev:vite": "vite --host 127.0.0.1 --port 5173",
-    "build": "vite build",
+    "dev:setup-ui": "vite --host 127.0.0.1 --port 5173 --open /__ui/setup?state=access",
+    "build": "vite build && node scripts/check-setup-preview-boundary.mjs",
     "deploy": "pnpm build && node scripts/hqbase-pro/deploy.mjs && pnpm hqbase-pro postdeploy",
     "db:migrate:local": "wrangler d1 migrations apply DB --local",
     "db:migrate:remote": "wrangler d1 migrations apply DB --remote",
