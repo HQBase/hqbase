@@ -37,20 +37,15 @@ export async function uploadProCandidate(
     inventory.secretNames,
     proUpgradeSecretNames
   );
-  await provisionSecrets(
-    token,
-    inventory,
-    {
-      PRO_APP_PASSWORD_PEPPER: randomSecret(),
-      PRO_BRIDGE_TOKEN: randomSecret(),
-      PRO_SESSION_SECRET: randomSecret(),
-      PRO_ENTITLEMENT_SECRET: randomSecret(),
-      PRO_LICENSE_KEY: licenseKey,
-      PRO_UPGRADE_ORCHESTRATION_SECRET: orchestrationSecret,
-      HQBASE_SETUP_OAUTH_ACCESS_TOKEN: token
-    },
-    fetcher
-  );
+  const secretValues: Record<(typeof proUpgradeSecretNames)[number], string> = {
+    PRO_APP_PASSWORD_PEPPER: randomSecret(),
+    PRO_BRIDGE_TOKEN: randomSecret(),
+    PRO_SESSION_SECRET: randomSecret(),
+    PRO_ENTITLEMENT_SECRET: randomSecret(),
+    PRO_LICENSE_KEY: licenseKey,
+    PRO_UPGRADE_ORCHESTRATION_SECRET: orchestrationSecret,
+    HQBASE_SETUP_OAUTH_ACCESS_TOKEN: token
+  };
   const assetsJwt = await uploadAssets(token, inventory, bundle, fetcher);
   const excluded = new Set([
     "ASSETS",
@@ -65,11 +60,19 @@ export async function uploadProCandidate(
   ]);
   const bindings: Array<Record<string, unknown>> = inventory.bindings
     .filter((binding) => !excluded.has(binding.name))
-    .map((binding) => ({ name: binding.name, type: "inherit", version_id: "latest" }));
+    .map((binding) => ({
+      name: binding.name,
+      type: "inherit",
+      version_id: inventory.activeVersionId
+    }));
+  const existingSecretNames = new Set(inventory.secretNames);
   for (const name of proUpgradeSecretNames) {
-    if (!bindings.some((binding) => binding.name === name)) {
-      bindings.push({ name, type: "inherit", version_id: "latest" });
-    }
+    if (bindings.some((binding) => binding.name === name)) continue;
+    bindings.push(
+      existingSecretNames.has(name)
+        ? { name, type: "inherit", version_id: inventory.activeVersionId }
+        : { name, type: "secret_text", text: secretValues[name] }
+    );
   }
   bindings.push(
     { name: "ASSETS", type: "assets" },
@@ -260,27 +263,6 @@ export async function promoteCandidate(
     error_code: null,
     recovery_action: null
   });
-}
-
-async function provisionSecrets(
-  token: string,
-  inventory: UpgradeInventory,
-  values: Record<(typeof proUpgradeSecretNames)[number], string>,
-  fetcher: typeof fetch
-): Promise<void> {
-  const existing = new Set(inventory.secretNames);
-  for (const name of proUpgradeSecretNames) {
-    if (existing.has(name)) continue;
-    await cloudflare(
-      token,
-      `/accounts/${inventory.accountId}/workers/scripts/${inventory.workerName}/secrets`,
-      {
-        method: "PUT",
-        body: JSON.stringify({ name, text: values[name], type: "secret_text" })
-      },
-      fetcher
-    );
-  }
 }
 
 async function uploadAssets(

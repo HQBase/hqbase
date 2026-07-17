@@ -9,10 +9,14 @@ import {
   persistUpgradeContinuation,
   resolveUpgradeDraft
 } from "../../../worker/features/upgrades/continuation";
-import { stageCandidateForValidation } from "../../../worker/features/upgrades/deployment";
+import {
+  stageCandidateForValidation,
+  uploadProCandidate
+} from "../../../worker/features/upgrades/deployment";
 import { fetchCandidateVerification } from "../../../worker/features/upgrades/migration";
 import { disableWorkerPreviewUrls } from "../../../worker/features/upgrades/preview-policy";
 import { ensureInstallationIdentity } from "../../../worker/features/upgrades/queries";
+import type { ProWorkerBundle } from "../../../worker/features/upgrades/release";
 import {
   readPreparedResources,
   recordPreparedSecretOwnership,
@@ -164,6 +168,136 @@ describe("in-place Community to Pro migration", () => {
     ).toThrow("candidate identity");
   });
 
+  it("adds Pro secrets only to the isolated candidate version", async () => {
+    const row = await env.DB.prepare(
+      "SELECT id FROM community_pro_upgrades ORDER BY created_at DESC LIMIT 1"
+    ).first<{ id: string }>();
+    const upgradeId = row?.id ?? "";
+    const inventory = {
+      accountId: "account-1",
+      workerName: "custom-community",
+      installationId: "00000000-0000-4000-8000-000000000123",
+      activeVersionId: "community-version",
+      bindings: [
+        { name: "BETTER_AUTH_SECRET", type: "secret_text" },
+        { name: "PRO_BRIDGE_TOKEN", type: "secret_text" },
+        { name: "DB", type: "d1", database_id: "database-1" },
+        { name: "MAIL_OBJECTS", type: "r2_bucket", bucket_name: "mail-objects" },
+        { name: "MAIL_SENDER", type: "send_email" }
+      ],
+      secretNames: ["BETTER_AUTH_SECRET", "PRO_BRIDGE_TOKEN"],
+      d1DatabaseId: "database-1",
+      d1DatabaseName: "custom-community-db",
+      r2BucketName: "mail-objects",
+      compatibilityDate: "2026-06-28",
+      compatibilityFlags: ["nodejs_compat"],
+      routes: [],
+      customDomains: [],
+      assets: null,
+      subdomain: { enabled: true, previews_enabled: false },
+      accountSubdomain: "test-account"
+    };
+    const prepared = {
+      jobsQueue: "custom-pro-jobs",
+      deadLetterQueue: "custom-pro-dlq",
+      resources: []
+    };
+    await env.DB.prepare(
+      `UPDATE community_pro_upgrades
+       SET state = 'resources_prepared', account_id = ?, active_version_id = ?,
+           inventory_json = ?, created_resources_json = ?, error_code = NULL,
+           recovery_action = NULL WHERE id = ?`
+    )
+      .bind(
+        inventory.accountId,
+        inventory.activeVersionId,
+        JSON.stringify(inventory),
+        JSON.stringify(prepared),
+        upgradeId
+      )
+      .run();
+    const upgrade = {
+      id: upgradeId,
+      installationId: inventory.installationId,
+      workerName: inventory.workerName,
+      workspaceOrigin: "https://custom-community.test-account.workers.dev",
+      state: "resources_prepared",
+      accountId: inventory.accountId,
+      activeVersionId: inventory.activeVersionId,
+      candidateVersionId: null,
+      d1DatabaseId: inventory.d1DatabaseId,
+      r2BucketName: inventory.r2BucketName,
+      checkpointBookmark: "bookmark-1",
+      backupR2Key: "_hqbase/backups/upgrade.sql",
+      errorCode: null,
+      recoveryAction: null,
+      createdAt: new Date().toISOString(),
+      expiresAt: new Date(Date.now() + 60_000).toISOString(),
+      updatedAt: new Date().toISOString(),
+      completedAt: null
+    } satisfies UpgradeRecord;
+    const bundle = {
+      format: "hqbase-worker-bundle-v1",
+      edition: "pro",
+      version: "0.1.8",
+      schemaVersion: 8,
+      compatibilityDate: "2026-07-11",
+      compatibilityFlags: ["nodejs_compat"],
+      communityUpgrade: { sourceSchemaVersions: [5], targetSchemaVersion: 8 },
+      main: { name: "index.js", sha256: "a".repeat(64), contentBase64: btoa("export default {}") },
+      assets: [],
+      migrations: []
+    } satisfies ProWorkerBundle;
+    const candidateMetadata: Array<{ bindings?: Array<Record<string, unknown>> }> = [];
+    const requests: string[] = [];
+    const fetcher = async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      requests.push(url);
+      if (url.endsWith("/assets-upload-session")) {
+        return Response.json({ success: true, result: { jwt: "assets-jwt", buckets: [] } });
+      }
+      if (url.includes("/versions?") && init?.body instanceof FormData) {
+        candidateMetadata.push(JSON.parse(String(init.body.get("metadata"))));
+        return Response.json({ success: true, result: { id: "candidate-version" } });
+      }
+      return Response.json({ success: false, errors: [{ code: 1000 }] }, { status: 404 });
+    };
+
+    await uploadProCandidate(
+      env as WorkerEnv,
+      upgrade,
+      "temporary-cloudflare-token",
+      "test-license-key",
+      "test-orchestration-secret",
+      bundle,
+      fetcher
+    );
+
+    expect(requests.some((url) => url.endsWith("/secrets"))).toBe(false);
+    expect(candidateMetadata).toHaveLength(1);
+    const bindings = candidateMetadata[0]?.bindings ?? [];
+    expect(bindings).toContainEqual({
+      name: "BETTER_AUTH_SECRET",
+      type: "inherit",
+      version_id: "community-version"
+    });
+    expect(bindings).toContainEqual({
+      name: "PRO_BRIDGE_TOKEN",
+      type: "inherit",
+      version_id: "community-version"
+    });
+    expect(bindings).toContainEqual({
+      name: "PRO_LICENSE_KEY",
+      type: "secret_text",
+      text: "test-license-key"
+    });
+    expect(bindings).toContainEqual({
+      name: "HQBASE_SETUP_OAUTH_ACCESS_TOKEN",
+      type: "secret_text",
+      text: "temporary-cloudflare-token"
+    });
+  });
+
   it("stages the candidate at zero percent without changing Community traffic", async () => {
     const upgrade = {
       id: "upgrade-1",
@@ -307,14 +441,14 @@ describe("in-place Community to Pro migration", () => {
       "orchestration-secret",
       async () => {
         propagationAttempts += 1;
-        return propagationAttempts === 12
+        return propagationAttempts === 30
           ? Response.json({ ok: true, edition: "pro", version: "0.1.6" })
           : new Response("not ready", { status: 404 });
       },
       async () => undefined
     );
     expect(eventuallyReady.status).toBe(200);
-    expect(propagationAttempts).toBe(12);
+    expect(propagationAttempts).toBe(30);
   });
 
   it("creates and inventories a no-secret disposable validator Worker", async () => {

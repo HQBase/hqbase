@@ -147,7 +147,7 @@ export async function fetchCandidateVerification(
   fetcher: typeof fetch = fetch,
   wait: (milliseconds: number) => Promise<void> = delay
 ): Promise<Response> {
-  const attempts = 12;
+  const attempts = 45;
   let attempt = 0;
   while (true) {
     try {

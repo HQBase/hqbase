@@ -171,7 +171,7 @@ export function UpgradeExperience(): React.ReactElement | null {
             disabled={busy}
             type="button"
             variant="outline"
-            onClick={() => setStatus((current) => (current ? { ...current } : current))}
+            onClick={() => retryUpgradeStep(setError, setErrorCode, setStatus)}
           >
             Retry
           </Button>
@@ -179,6 +179,16 @@ export function UpgradeExperience(): React.ReactElement | null {
       ) : null}
     </UpgradeFrame>
   );
+}
+
+export function retryUpgradeStep(
+  setError: React.Dispatch<React.SetStateAction<string | null>>,
+  setErrorCode: React.Dispatch<React.SetStateAction<string | null>>,
+  setStatus: React.Dispatch<React.SetStateAction<UpgradeStatus | null>>
+): void {
+  setError(null);
+  setErrorCode(null);
+  setStatus((current) => (current ? { ...current } : current));
 }
 
 function UpgradeFrame({ children }: { children: React.ReactNode }): React.ReactElement {
