@@ -55,6 +55,7 @@ export function parseActiveCommunityRelease(deployment, version) {
     (candidate) => candidate?.name === "HQBASE_APP_VERSION" && candidate?.type === "plain_text"
   );
   if (typeof binding?.text !== "string" || !/^\d+\.\d+\.\d+/.test(binding.text)) {
+    if (isDeployButtonBootstrap(deployment, version)) return null;
     throw new Error("The active Community Worker is missing its installed version binding.");
   }
   return {
@@ -65,6 +66,20 @@ export function parseActiveCommunityRelease(deployment, version) {
         ? version.annotations["workers/tag"]
         : null
   };
+}
+
+export function isDeployButtonBootstrap(deployment, version) {
+  const bindings = version?.resources?.bindings;
+  return (
+    deployment?.source === "dash_template" &&
+    deployment?.annotations?.["workers/triggered_by"] === "upload" &&
+    version?.metadata?.source === "dash" &&
+    version?.annotations?.["workers/triggered_by"] === "upload" &&
+    version?.resources?.script?.last_deployed_from === "dash_template" &&
+    Array.isArray(bindings) &&
+    bindings.length === 0 &&
+    typeof version?.annotations?.["workers/tag"] !== "string"
+  );
 }
 
 export function isWorkerNotFound(result) {

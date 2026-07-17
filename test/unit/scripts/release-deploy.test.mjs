@@ -3,6 +3,7 @@ import { existsSync, readFileSync, statSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
   inspectActiveCommunityRelease,
+  isDeployButtonBootstrap,
   parseActiveCommunityRelease
 } from "../../../scripts/release/active-version.mjs";
 import {
@@ -127,6 +128,41 @@ describe("Community release deployment", () => {
           })
       })
     ).toMatchObject({ versionId: "active-version", version: "0.1.14" });
+  });
+  it("recognizes only the empty Deploy to Cloudflare service shell as uninstalled", () => {
+    const deployment = {
+      source: "dash_template",
+      annotations: { "workers/triggered_by": "upload" },
+      versions: [{ version_id: "bootstrap-version", percentage: 100 }]
+    };
+    const version = {
+      id: "bootstrap-version",
+      number: 2,
+      metadata: { source: "dash", has_preview: true },
+      annotations: { "workers/triggered_by": "upload" },
+      resources: {
+        script: { handlers: ["fetch"], last_deployed_from: "dash_template" },
+        bindings: []
+      }
+    };
+
+    expect(isDeployButtonBootstrap(deployment, version)).toBe(true);
+    expect(parseActiveCommunityRelease(deployment, version)).toBeNull();
+    expect(
+      isDeployButtonBootstrap(deployment, {
+        ...version,
+        resources: {
+          ...version.resources,
+          bindings: [{ name: "UNRELATED", type: "plain_text", text: "present" }]
+        }
+      })
+    ).toBe(false);
+    expect(() =>
+      parseActiveCommunityRelease(
+        { ...deployment, source: "wrangler" },
+        { ...version, resources: { ...version.resources, bindings: [] } }
+      )
+    ).toThrow("missing its installed version binding");
   });
   it("uses the configured Worker name as the runtime automation identity", () => {
     expect(workerNameFromConfig({ name: "hqbase-deeptake-test" })).toBe("hqbase-deeptake-test");
