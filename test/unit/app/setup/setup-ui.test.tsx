@@ -30,7 +30,7 @@ describe("setup UI", () => {
     expect(html).toContain("Authorize Cloudflare");
     expect(html).toContain("h-8 rounded-md px-3 text-xs");
     expect(html).toContain('aria-labelledby="setup-step-title" class="w-full"');
-    expect(html).not.toContain("max-w-2xl");
+    expect(html).toContain("max-w-2xl text-sm leading-6 text-muted-foreground");
     expect(html).toContain("<details");
     expect(html).toContain("Use an API token instead");
     expect(html).not.toContain(">Cloudflare</p>");

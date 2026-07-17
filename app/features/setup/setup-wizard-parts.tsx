@@ -47,7 +47,7 @@ export function WizardLayout({
         if (value) setOpenStep(value);
       }}
     >
-      <SetupAccordionItem
+      <OnboardingStep
         description="Workers Paid for outbound mail, R2 enabled, and an active domain on Cloudflare DNS."
         icon={Check}
         status="complete"
@@ -66,8 +66,8 @@ export function WizardLayout({
             recipients
           </li>
         </ul>
-      </SetupAccordionItem>
-      <SetupAccordionItem
+      </OnboardingStep>
+      <OnboardingStep
         description="The Community Worker and customer-owned storage are deployed."
         icon={Check}
         status="complete"
@@ -77,8 +77,8 @@ export function WizardLayout({
         <p className="text-sm text-muted-foreground">
           Cloudflare created this Worker, its D1 database, and its R2 mail bucket in your account.
         </p>
-      </SetupAccordionItem>
-      <SetupAccordionItem
+      </OnboardingStep>
+      <OnboardingStep
         description={
           activeStep === 0 ? (steps[0]?.description ?? "Authorize once") : "Access verified"
         }
@@ -95,8 +95,8 @@ export function WizardLayout({
             in this step.
           </p>
         )}
-      </SetupAccordionItem>
-      <SetupAccordionItem
+      </OnboardingStep>
+      <OnboardingStep
         description={
           activeStep > 0
             ? `${configureStep?.title ?? "Workspace"} · ${activeStep} of 3`
@@ -113,8 +113,8 @@ export function WizardLayout({
         }}
       >
         {activeStep > 0 ? <div className="[&>section>header]:sr-only">{children}</div> : null}
-      </SetupAccordionItem>
-      <SetupAccordionItem
+      </OnboardingStep>
+      <OnboardingStep
         description="Sign in to your self-hosted workspace."
         disabled
         icon={Circle}
@@ -126,7 +126,7 @@ export function WizardLayout({
   );
 }
 
-function SetupAccordionItem({
+export function OnboardingStep({
   children,
   description,
   disabled = false,
@@ -163,7 +163,8 @@ function SetupAccordionItem({
         <span
           className={cn(
             "flex size-8 shrink-0 items-center justify-center rounded-md border bg-background",
-            status === "complete" && "bg-foreground text-background"
+            status === "complete" && "bg-foreground text-background",
+            status === "failed" && "border-destructive/40 text-destructive"
           )}
         >
           <Icon className="size-4" />
@@ -202,7 +203,7 @@ export function WizardPanel({
         <h2 id="setup-step-title" className="text-xl font-medium tracking-tight sm:text-2xl">
           {title}
         </h2>
-        <p className="mt-1.5 max-w-xl text-sm leading-6 text-muted-foreground">{description}</p>
+        <p className="mt-1.5 max-w-2xl text-sm leading-6 text-muted-foreground">{description}</p>
       </header>
       <div className="flex flex-col gap-6 py-6">{children}</div>
       {actions ? <footer className="border-t border-border/80 pt-5">{actions}</footer> : null}
