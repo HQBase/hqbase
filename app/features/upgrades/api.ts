@@ -18,7 +18,3 @@ export function getProUpgradeStatus(): Promise<UpgradeStatus> {
 export function advanceProUpgrade(): Promise<UpgradeStatus> {
   return apiPost("/api/upgrades/pro/advance");
 }
-
-export function completeProUpgrade(): Promise<{ state: string }> {
-  return apiPost("/api/upgrades/pro/complete");
-}

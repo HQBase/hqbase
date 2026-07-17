@@ -2,7 +2,8 @@ import { describe, expect, it, vi } from "vitest";
 import type { UpgradeStatus } from "../../../../app/features/upgrades/types";
 import {
   requiresUpgradeSignIn,
-  retryUpgradeStep
+  retryUpgradeStep,
+  shouldReloadForProCompletion
 } from "../../../../app/features/upgrades/upgrade-experience";
 
 describe("Pro upgrade retry", () => {
@@ -16,6 +17,12 @@ describe("Pro upgrade retry", () => {
   it("keeps ordinary upgrade failures retryable", () => {
     expect(requiresUpgradeSignIn("CLOUDFLARE_UPGRADE_API_ERROR")).toBe(false);
     expect(requiresUpgradeSignIn(null)).toBe(false);
+  });
+
+  it("reloads at promotion so the active Pro bundle owns completion", () => {
+    expect(shouldReloadForProCompletion("candidate_verified")).toBe(false);
+    expect(shouldReloadForProCompletion("promoted")).toBe(true);
+    expect(shouldReloadForProCompletion("complete")).toBe(false);
   });
 
   it("clears the local error gate and restarts the persisted step loop", () => {

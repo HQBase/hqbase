@@ -4,12 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { signOut } from "@/features/auth/api";
 import { ApiRequestError } from "@/lib/api-client";
-import {
-  advanceProUpgrade,
-  completeProUpgrade,
-  getProUpgradeStatus,
-  startProUpgradeOAuth
-} from "./api";
+import { advanceProUpgrade, getProUpgradeStatus, startProUpgradeOAuth } from "./api";
 import type { UpgradeState, UpgradeStatus } from "./types";
 
 const stateOrder: UpgradeState[] = [
@@ -53,25 +48,16 @@ export function UpgradeExperience(): React.ReactElement | null {
 
   React.useEffect(() => {
     if (!status || busy || error || terminal(status.state)) return;
+    if (shouldReloadForProCompletion(status.state)) {
+      const timer = window.setTimeout(() => window.location.reload(), 500);
+      return () => window.clearTimeout(timer);
+    }
     const timer = window.setTimeout(() => {
       setBusy(true);
       setError(null);
       setErrorCode(null);
-      const operation =
-        status.state === "promoted"
-          ? completeProUpgrade().then(() => {
-              window.location.assign("/settings?upgrade=complete");
-              return status;
-            })
-          : advanceProUpgrade();
-      void operation
-        .then(async (next) => {
-          setStatus(next);
-          if (next.state === "promoted") {
-            // The same-service deployment can take a moment to reach this browser.
-            // The next persisted loop calls the Pro completion endpoint.
-          }
-        })
+      void advanceProUpgrade()
+        .then(setStatus)
         .catch(async (reason) => {
           captureError(reason, setError, setErrorCode);
           await getProUpgradeStatus()
@@ -185,6 +171,10 @@ export function UpgradeExperience(): React.ReactElement | null {
 
 export function requiresUpgradeSignIn(errorCode: string | null): boolean {
   return errorCode === "UNAUTHENTICATED" || errorCode === "RECENT_AUTH_REQUIRED";
+}
+
+export function shouldReloadForProCompletion(state: UpgradeState): boolean {
+  return state === "promoted";
 }
 
 export function retryUpgradeStep(
