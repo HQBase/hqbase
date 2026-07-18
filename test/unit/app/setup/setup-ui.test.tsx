@@ -1,38 +1,120 @@
+import { Globe2, Inbox, UserRound } from "lucide-react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
 import { AccessStep } from "@/features/setup/setup-access-screen";
 import { SetupFrame } from "@/features/setup/setup-frame";
 import { WizardLayout } from "@/features/setup/setup-wizard-parts";
+import { MailboxStep } from "@/features/setup/setup-workspace-screens";
 
 describe("setup UI", () => {
-  it("uses a direct step title without eyebrow copy", () => {
+  it("shows Cloudflare verification as an inline loading state", () => {
     const html = renderToStaticMarkup(
-      <AccessStep error={null} isLoading={false} onNext={() => undefined} />
+      <AccessStep error={null} isLoading onNext={() => undefined} />
     );
 
-    expect(html).toContain("Verifying installation");
-    expect(html).not.toContain("Continue with Cloudflare");
-    expect(html).not.toContain(">Cloudflare</p>");
-    expect(html).not.toContain("uppercase tracking");
+    expect(html).toContain("Checking Cloudflare access to set up the workspace…");
+    expect(html).toContain("animate-spin");
+    expect(html).not.toContain("Temporary delegated access");
+    expect(html).not.toContain("revoke the grant");
   });
 
-  it("uses the shared product frame and exposes a reviewable completed state", () => {
+  it("shows Cloudflare verification errors without a nested alert card", () => {
     const html = renderToStaticMarkup(
-      <SetupFrame description="Configure the workspace." progress="4 / 4" title="HQBase Pro setup">
-        <WizardLayout activeStep={3} isComplete onStepSelect={() => undefined} steps={[]}>
-          <p>Open workspace</p>
+      <AccessStep
+        error="The delegated Cloudflare grant expired before setup finished."
+        isLoading={false}
+        onNext={() => undefined}
+      />
+    );
+
+    expect(html).not.toContain("Installation access needs attention");
+    expect(html).toContain("The delegated Cloudflare grant expired before setup finished.");
+    expect(html).toContain("Retry verification");
+    expect(html).not.toContain("relative w-full rounded-lg border");
+  });
+
+  it("uses an installation timeline until Cloudflare access is ready", () => {
+    const html = renderToStaticMarkup(
+      <SetupFrame description="Complete installation." title="Set up HQBase Pro">
+        <WizardLayout activePhase={2} activeStep={0} steps={[]}>
+          <AccessStep error={null} isLoading onNext={() => undefined} />
         </WizardLayout>
       </SetupFrame>
     );
 
-    expect(html).toContain("HQBase Pro setup");
-    expect(html).toContain("4 / 4");
-    expect(html).toContain('aria-label="Setup progress"');
-    expect(html).toContain("Purchase Pro");
-    expect(html).toContain("Deploy resources");
+    expect(html).toContain('aria-label="Installation steps"');
+    expect(html).toContain("Purchase Pro and deploy resources");
+    expect(html).toContain("Licensed Worker and storage");
+    expect(html).toContain("Complete");
     expect(html).toContain("Authorize and install");
+    expect(html).toContain("In progress");
+    expect(html).toContain("Checking Cloudflare access to set up the workspace…");
+    expect(html).not.toContain('aria-label="Workspace configuration steps"');
+  });
+
+  it("ends setup in the third step without a separate ready step", () => {
+    const html = renderToStaticMarkup(
+      <SetupFrame description="Configure the workspace." title="Configure workspace">
+        <WizardLayout
+          activePhase={3}
+          activeStep={3}
+          steps={[
+            { icon: Globe2, title: "Domain" },
+            { icon: UserRound, title: "Owner account" },
+            { icon: Inbox, title: "Mailboxes" }
+          ]}
+        >
+          <p>Complete setup</p>
+        </WizardLayout>
+      </SetupFrame>
+    );
+
     expect(html).toContain("Configure workspace");
-    expect(html).toContain("Open workspace");
+    expect(html).toContain('role="progressbar"');
+    expect(html).toContain('aria-label="Domain: complete"');
+    expect(html).toContain('aria-label="Mailboxes: active"');
+    expect(html).not.toContain("<header");
+    expect(html).not.toContain(">HQBase</span>");
+    expect(html).toContain("Configure workspace");
+    expect(html).toContain("Domain");
+    expect(html).toContain("Owner account");
+    expect(html).toContain("Mailboxes");
+    expect(html).toContain("Complete setup");
+    expect(html).not.toContain(">Ready<");
+    expect(html).toContain('aria-label="Workspace configuration steps"');
+    expect(html).not.toContain('aria-label="Installation steps"');
+    expect(html).not.toContain("Authorize and install");
+  });
+
+  it("shows mailboxes in one compact editable table", () => {
+    const mailboxes = [
+      { address: "support@northstar.example", displayName: "Support" },
+      { address: "privacy@northstar.example", displayName: "Privacy" },
+      { address: "support@fieldnotes.example", displayName: "Support" },
+      { address: "privacy@fieldnotes.example", displayName: "Privacy" }
+    ];
+    const html = renderToStaticMarkup(
+      <MailboxStep
+        errors={{ rows: mailboxes.map(() => ({})) }}
+        isPending={false}
+        mailboxes={mailboxes}
+        onAdd={() => undefined}
+        onBack={() => undefined}
+        onComplete={() => undefined}
+        onRemove={() => undefined}
+        onUpdate={() => undefined}
+        submitError={null}
+      />
+    );
+
+    expect(html).toContain('aria-label="Mailboxes"');
+    expect(html).toContain("<table");
+    expect(html).toContain("support@northstar.example");
+    expect(html).toContain("privacy@fieldnotes.example");
+    expect(html).toContain("Add mailbox");
+    expect(html).not.toContain("Add shared addresses");
+    expect(html).not.toContain(">Review<");
+    expect(html).not.toContain(">Mailbox 1<");
   });
 });

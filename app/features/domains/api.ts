@@ -22,3 +22,9 @@ export const changePortal = (input: {
   workerName?: string;
   hostname: string;
 }) => apiPut<{ hostname: string }>("/api/pro/domains/portal", input);
+export const changeServiceOrigin = (input: {
+  apiToken: string;
+  zoneId: string;
+  workerName?: string;
+  hostname: string;
+}) => apiPut<{ hostname: string }>("/api/pro/domains/service", input);

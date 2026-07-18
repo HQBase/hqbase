@@ -74,7 +74,11 @@ export function SettingsPage({
           </TabsContent>
           {canManage ? (
             <TabsContent className="mt-5" value="domains">
-              <DomainSettings portalHostname={setup.portalHostname} onChanged={onRefresh} />
+              <DomainSettings
+                portalHostname={setup.portalHostname}
+                serviceHostname={setup.serviceHostname}
+                onChanged={onRefresh}
+              />
             </TabsContent>
           ) : null}
           {canManage ? (

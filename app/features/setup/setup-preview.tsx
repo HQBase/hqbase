@@ -12,15 +12,16 @@ import {
 } from "@/components/ui/select";
 
 import { SetupFrame } from "./setup-frame";
+import { defaultMailboxesForDomains } from "./setup-helpers";
 import {
   type PreviewState,
+  phaseForPreviewState,
   previewStates,
   renderPreviewFixture,
   stepForPreviewState,
   steps,
   zones
 } from "./setup-preview-fixtures";
-import { ACCESS_STEP } from "./setup-steps";
 import type { MailboxDraft } from "./setup-validation";
 import { WizardLayout } from "./setup-wizard-parts";
 
@@ -31,15 +32,14 @@ export function SetupPreview(): React.ReactElement {
   const [ownerName, setOwnerName] = React.useState("Alex Morgan");
   const [ownerEmail, setOwnerEmail] = React.useState("alex@northstar.example");
   const [ownerPassword, setOwnerPassword] = React.useState("preview-password");
-  const [appSubdomain, setAppSubdomain] = React.useState("inbox");
-  const [serviceSubdomain, setServiceSubdomain] = React.useState("hqbase-api");
+  const [appSubdomain, setAppSubdomain] = React.useState("hqbase");
   const [portalZoneId, setPortalZoneId] = React.useState(zones[0]?.id ?? "zone-primary");
   const [selectedZoneIds, setSelectedZoneIds] = React.useState(zones.map((zone) => zone.id));
-  const [mailboxes, setMailboxes] = React.useState<MailboxDraft[]>([
-    { address: "support@northstar.example", displayName: "Support" },
-    { address: "privacy@northstar.example", displayName: "Privacy" }
-  ]);
+  const [mailboxes, setMailboxes] = React.useState<MailboxDraft[]>(() =>
+    defaultMailboxesForDomains(zones.map((zone) => zone.name))
+  );
   const activeStep = stepForPreviewState(state);
+  const activePhase = phaseForPreviewState(state);
   const selectedZones = zones.filter((zone) => selectedZoneIds.includes(zone.id));
   const portalZone = zones.find((zone) => zone.id === portalZoneId) ?? null;
 
@@ -105,15 +105,17 @@ export function SetupPreview(): React.ReactElement {
         </Button>
       )}
       <SetupFrame
-        description="Your purchase and deployment carry into this resumable workspace setup."
-        progress={state === "completed" ? "5 / 5" : `${activeStep === ACCESS_STEP ? 3 : 4} / 5`}
-        title="Set up HQBase Pro"
+        description={
+          activePhase === 3
+            ? "Add your domain, owner account, and mailboxes."
+            : "Complete installation before configuring your workspace."
+        }
+        title={activePhase === 3 ? "Configure workspace" : "Set up HQBase Pro"}
       >
         <WizardLayout
+          activePhase={activePhase}
           activeStep={activeStep}
           failed={state === "failure" || state === "validation"}
-          isComplete={state === "completed"}
-          onStepSelect={() => undefined}
           steps={steps}
         >
           {renderPreviewFixture({
@@ -127,7 +129,6 @@ export function SetupPreview(): React.ReactElement {
             portalZoneId,
             selectedZoneIds,
             selectedZones,
-            serviceSubdomain,
             setAppSubdomain,
             setMailboxes,
             setOwnerEmail,
@@ -135,7 +136,6 @@ export function SetupPreview(): React.ReactElement {
             setOwnerPassword,
             setPortalZoneId,
             setSelectedZoneIds,
-            setServiceSubdomain,
             state
           })}
         </WizardLayout>
@@ -146,7 +146,7 @@ export function SetupPreview(): React.ReactElement {
 
 function readPreviewState(): PreviewState {
   const value = new URLSearchParams(window.location.search).get("state");
-  return previewStates.some(([state]) => state === value) ? (value as PreviewState) : "access";
+  return previewStates.some(([state]) => state === value) ? (value as PreviewState) : "loading";
 }
 
 function readControls(): boolean {

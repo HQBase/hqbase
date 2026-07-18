@@ -12,7 +12,14 @@ import {
   CardHeader,
   CardTitle
 } from "@/components/ui/card";
-import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
+import {
+  Field,
+  FieldDescription,
+  FieldError,
+  FieldGroup,
+  FieldLabel,
+  FieldLabelRow
+} from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { activateEntitlement, refreshEntitlement } from "./api";
 import type { EntitlementStatus } from "./types";
@@ -119,7 +126,12 @@ export function BillingSettings({
         >
           <FieldGroup>
             <Field data-invalid={Boolean(activationError)}>
-              <FieldLabel htmlFor="pro-license-key">License key</FieldLabel>
+              <FieldLabelRow>
+                <FieldLabel htmlFor="pro-license-key">License key</FieldLabel>
+                {activationError ? (
+                  <FieldError id={activationErrorId}>{activationError}</FieldError>
+                ) : null}
+              </FieldLabelRow>
               <Input
                 aria-describedby={activationError ? activationErrorId : undefined}
                 aria-invalid={Boolean(activationError)}
@@ -138,9 +150,6 @@ export function BillingSettings({
               <FieldDescription>
                 The key is encrypted before storage and is never written to logs.
               </FieldDescription>
-              {activationError ? (
-                <FieldError id={activationErrorId}>{activationError}</FieldError>
-              ) : null}
             </Field>
             <Button disabled={isPending} type="submit">
               {pendingAction === "activate"

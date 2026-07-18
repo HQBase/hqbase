@@ -10,11 +10,12 @@ import {
   configureCloudflareDomain,
   inspectCloudflareDomain
 } from "../setup/cloudflare";
-import { upsertWorkspaceHost } from "../setup/queries";
+import { getSetupStatus, upsertWorkspaceHost } from "../setup/queries";
 import { getUpgradeLifecycle } from "../upgrades/queries";
 import { listMailDomains, updateMailDomainSettings, upsertMailDomain } from "./queries";
 import {
   changePortalHostnameSchema,
+  changeServiceHostnameSchema,
   createMailDomainSchema,
   provisionMailDomainSchema,
   updateMailDomainSchema
@@ -113,6 +114,50 @@ domainRoutes.put("/portal", async (c) => {
     outcome: "success"
   });
   return c.json({ hostname: input.hostname, canonical: true });
+});
+
+domainRoutes.put("/service", async (c) => {
+  const auth = await requireAuthContext(c.env, c.req.raw);
+  requireRole(auth, ["owner", "admin"]);
+  requireRecentSession(auth);
+  const input = parseWith(changeServiceHostnameSchema, await readJson(c.req.raw));
+  const setup = await getSetupStatus(c.env.DB);
+  if (input.hostname === setup.portalHostname) {
+    throw new AppError(
+      "SERVICE_HOSTNAME_CONFLICT",
+      "The bridge origin must differ from the workspace portal.",
+      409
+    );
+  }
+  const inspected = await inspectCloudflareDomain({
+    apiToken: input.apiToken,
+    workerName: c.env.HQBASE_WORKER_NAME ?? input.workerName,
+    zoneId: input.zoneId
+  });
+  const upgrade = await getUpgradeLifecycle(c.env.DB);
+  await attachWorkerCustomDomain({
+    apiToken: input.apiToken,
+    hostname: input.hostname,
+    replaceWorkerName: upgrade?.sourceWorkerName ?? undefined,
+    workerName: inspected.workerName,
+    zone: inspected.zone
+  });
+  await upsertWorkspaceHost(c.env.DB, {
+    hostname: input.hostname,
+    zoneId: input.zoneId,
+    kind: "service",
+    canonical: false
+  });
+  await recordAudit(c.env.DB, {
+    correlationId: c.get("correlationId"),
+    actorType: "user",
+    actorId: auth.user.id,
+    action: "service_origin.change",
+    resourceType: "workspace_host",
+    resourceId: input.hostname,
+    outcome: "success"
+  });
+  return c.json({ hostname: input.hostname });
 });
 
 domainRoutes.patch("/:id", async (c) => {

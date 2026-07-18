@@ -1,16 +1,15 @@
-import { CheckCircle2, CircleAlert, Globe2, Link2 } from "lucide-react";
+import { CheckCircle2, Circle, CircleAlert } from "lucide-react";
 import type * as React from "react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Field, FieldDescription, FieldError, FieldLabel } from "@/components/ui/field";
 import {
-  InputGroup,
-  InputGroupAddon,
-  InputGroupInput,
-  InputGroupText
-} from "@/components/ui/input-group";
+  Field,
+  FieldDescription,
+  FieldError,
+  FieldLabel,
+  FieldLabelRow
+} from "@/components/ui/field";
+import { InputGroup, InputGroupInput } from "@/components/ui/input-group";
 import {
   Select,
   SelectContent,
@@ -38,15 +37,12 @@ export function DomainStep(props: {
   results: ConfiguredDomain[];
   selectedZoneIds: string[];
   selectedZones: CloudflareZone[];
-  serviceHostname: string;
-  serviceSubdomain: string;
   setAppSubdomain: (value: string) => void;
   setPortalZoneId: (value: string) => void;
-  setServiceSubdomain: (value: string) => void;
   zones: CloudflareZone[];
 }): React.ReactElement {
-  const failed = props.results.some(({ result }) =>
-    result.steps.some((step) => step.status === "failed")
+  const failed = props.results.some(
+    ({ result }) => !result.status.ready || result.steps.some((step) => step.status === "failed")
   );
   return (
     <WizardPanel
@@ -58,41 +54,108 @@ export function DomainStep(props: {
           onNext={props.onConnect}
         />
       }
-      description="Connect every domain this workspace receives or sends email for."
-      title="Connect email domains"
+      ariaLabel="Domain configuration"
+      description=""
+      showHeader={false}
+      title=""
     >
+      {props.connectionError ? (
+        <Alert variant="destructive">
+          <CircleAlert />
+          <AlertTitle>Could not connect every domain</AlertTitle>
+          <AlertDescription>{props.connectionError}</AlertDescription>
+        </Alert>
+      ) : null}
       <Field data-invalid={Boolean(props.errors.selectedZoneIds)}>
-        <FieldLabel>Email domains</FieldLabel>
-        <div className="grid gap-2 rounded-md border p-3 sm:grid-cols-2">
-          {props.zones.map((zone) => (
-            <label
-              className="flex cursor-pointer items-center gap-3 rounded-md px-2 py-2 hover:bg-muted/50"
-              htmlFor={`domain-${zone.id}`}
-              key={zone.id}
-            >
-              <Checkbox
-                checked={props.selectedZoneIds.includes(zone.id)}
-                id={`domain-${zone.id}`}
-                onCheckedChange={(checked) => props.onToggleZone(zone.id, checked === true)}
-              />
-              <span className="min-w-0 text-sm">
-                <span className="block truncate font-medium">{zone.name}</span>
-                <span className="text-xs text-muted-foreground">{zone.status}</span>
-              </span>
-            </label>
-          ))}
+        <FieldLabelRow>
+          <FieldLabel>Select email domains</FieldLabel>
+          {props.errors.selectedZoneIds ? (
+            <FieldError>{props.errors.selectedZoneIds}</FieldError>
+          ) : null}
+        </FieldLabelRow>
+        <div className="flex flex-col">
+          {props.zones.map((zone) => {
+            const configured = props.results.find((item) => item.zone.id === zone.id)?.result;
+            const hasError = configured ? !isDomainReady(configured) : false;
+            return (
+              <div className="border-b py-1.5 last:border-b-0" key={zone.id}>
+                <label
+                  className="flex cursor-pointer items-center gap-2.5 rounded-md px-1 py-1 hover:bg-muted/50"
+                  htmlFor={`domain-${zone.id}`}
+                >
+                  <Checkbox
+                    checked={props.selectedZoneIds.includes(zone.id)}
+                    id={`domain-${zone.id}`}
+                    onCheckedChange={(checked) => props.onToggleZone(zone.id, checked === true)}
+                  />
+                  <span className="flex min-w-0 flex-1 items-center justify-between gap-3 text-sm">
+                    <span className="truncate font-medium">{zone.name}</span>
+                    <span
+                      className={
+                        hasError
+                          ? "shrink-0 text-xs text-destructive"
+                          : "shrink-0 text-xs text-muted-foreground"
+                      }
+                    >
+                      {hasError ? "error" : zone.status}
+                    </span>
+                  </span>
+                </label>
+                {configured ? <CompactDomainChecks result={configured} /> : null}
+              </div>
+            );
+          })}
         </div>
-        <FieldDescription>One deployment can serve all selected domains.</FieldDescription>
-        {props.errors.selectedZoneIds ? (
-          <FieldError>{props.errors.selectedZoneIds}</FieldError>
-        ) : null}
       </Field>
 
-      <Field data-invalid={Boolean(props.errors.portalZoneId)}>
-        <FieldLabel htmlFor="portal-domain">Workspace portal domain</FieldLabel>
-        <Select value={props.portalZoneId} onValueChange={props.setPortalZoneId}>
-          <SelectTrigger id="portal-domain">
-            <SelectValue placeholder="Choose a selected domain" />
+      <WorkspaceUrlField
+        domainError={props.errors.portalZoneId}
+        hostname={props.appHostname}
+        portalZoneId={props.portalZoneId}
+        selectedZones={props.selectedZones}
+        subdomainError={props.errors.appSubdomain}
+        value={props.appSubdomain}
+        onChange={props.setAppSubdomain}
+        onDomainChange={props.setPortalZoneId}
+      />
+    </WizardPanel>
+  );
+}
+
+function WorkspaceUrlField(props: {
+  domainError?: string | undefined;
+  hostname: string;
+  portalZoneId: string;
+  selectedZones: CloudflareZone[];
+  subdomainError?: string | undefined;
+  value: string;
+  onChange: (value: string) => void;
+  onDomainChange: (value: string) => void;
+}) {
+  const invalid = Boolean(props.domainError || props.subdomainError);
+  return (
+    <Field data-invalid={invalid}>
+      <FieldLabelRow>
+        <FieldLabel htmlFor="workspace-subdomain">Workspace URL</FieldLabel>
+        <div className="flex flex-col items-end gap-0.5">
+          {props.subdomainError ? <FieldError>{props.subdomainError}</FieldError> : null}
+          {props.domainError ? <FieldError>{props.domainError}</FieldError> : null}
+        </div>
+      </FieldLabelRow>
+      <InputGroup data-invalid={invalid}>
+        <InputGroupInput
+          aria-invalid={invalid}
+          autoCapitalize="none"
+          id="workspace-subdomain"
+          value={props.value}
+          onChange={(event) => props.onChange(event.target.value)}
+        />
+        <Select value={props.portalZoneId} onValueChange={props.onDomainChange}>
+          <SelectTrigger
+            aria-label="Workspace URL domain"
+            className="h-full w-auto max-w-[65%] shrink-0 rounded-l-none border-0 border-l bg-muted/45 shadow-none focus:ring-0"
+          >
+            <SelectValue placeholder="Choose domain" />
           </SelectTrigger>
           <SelectContent>
             <SelectGroup>
@@ -104,119 +167,91 @@ export function DomainStep(props: {
             </SelectGroup>
           </SelectContent>
         </Select>
-        <FieldDescription>
-          Admins can move the portal later. Email domains stay attached.
-        </FieldDescription>
-        {props.errors.portalZoneId ? <FieldError>{props.errors.portalZoneId}</FieldError> : null}
-      </Field>
-
-      <HostnameField
-        id="app-subdomain"
-        label="Workspace address"
-        value={props.appSubdomain}
-        suffix={props.portalZone?.name}
-        hostname={props.appHostname}
-        error={props.errors.appSubdomain}
-        onChange={props.setAppSubdomain}
-      />
-      <HostnameField
-        id="service-subdomain"
-        label="Stable bridge origin"
-        value={props.serviceSubdomain}
-        suffix={props.portalZone?.name}
-        hostname={props.serviceHostname}
-        error={props.errors.serviceSubdomain}
-        onChange={props.setServiceSubdomain}
-      />
-
-      <Card className="bg-background/40 shadow-none">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-sm font-medium">Automatic setup per domain</CardTitle>
-        </CardHeader>
-        <CardContent className="grid gap-2 text-sm sm:grid-cols-2">
-          <SetupOutcome icon={Globe2} text="Email Routing + DNS" />
-          <SetupOutcome icon={Link2} text="Catch-all → HQBase" />
-          <SetupOutcome icon={CheckCircle2} text="Outbound sending" />
-          <SetupOutcome icon={CheckCircle2} text="Readiness check" />
-        </CardContent>
-      </Card>
-      {props.connectionError ? (
-        <Alert variant="destructive">
-          <CircleAlert />
-          <AlertTitle>Could not connect every domain</AlertTitle>
-          <AlertDescription>{props.connectionError}</AlertDescription>
-        </Alert>
-      ) : null}
-      {props.results.map(({ result, zone }) => (
-        <ConnectionResult key={zone.id} result={result} title={zone.name} />
-      ))}
-    </WizardPanel>
-  );
-}
-
-function HostnameField(props: {
-  id: string;
-  label: string;
-  value: string;
-  suffix?: string | undefined;
-  hostname: string;
-  error?: string | undefined;
-  onChange: (value: string) => void;
-}) {
-  return (
-    <Field data-invalid={Boolean(props.error)}>
-      <FieldLabel htmlFor={props.id}>{props.label}</FieldLabel>
-      <InputGroup data-invalid={Boolean(props.error)}>
-        <InputGroupInput
-          aria-invalid={Boolean(props.error)}
-          autoCapitalize="none"
-          id={props.id}
-          value={props.value}
-          onChange={(event) => props.onChange(event.target.value)}
-        />
-        <InputGroupAddon align="inline-end">
-          <InputGroupText>.{props.suffix ?? "yourdomain.com"}</InputGroupText>
-        </InputGroupAddon>
       </InputGroup>
-      <FieldDescription>{props.hostname || `${props.value}.yourdomain.com`}</FieldDescription>
-      {props.error ? <FieldError>{props.error}</FieldError> : null}
+      <FieldDescription>
+        Your webmail UI will be available at {props.hostname || `${props.value}.yourdomain.com`}.
+      </FieldDescription>
     </Field>
   );
 }
 
-function SetupOutcome({ icon: Icon, text }: { icon: typeof Globe2; text: string }) {
+function CompactDomainChecks({ result }: { result: CloudflareConfigureResult }) {
+  const checks = [
+    ...result.steps.map((step) => ({
+      label: compactStepLabel(step.id, step.label),
+      message: step.status === "failed" ? step.message : null,
+      status: step.status
+    })),
+    {
+      label: "Readiness check",
+      message: result.status.ready ? null : describeReadinessFailure(result.status),
+      status: result.status.ready ? ("success" as const) : ("failed" as const)
+    }
+  ];
+
   return (
-    <div className="flex items-center gap-2 rounded-md bg-muted/55 px-3 py-2.5">
-      <Icon className="size-3.5 shrink-0 text-muted-foreground" />
-      <span>{text}</span>
+    <div className="ml-8 flex flex-col gap-1 pb-1 pt-1">
+      {checks.map((check) => (
+        <div className="flex items-start gap-2 text-xs" key={check.label}>
+          {check.status === "failed" ? (
+            <CircleAlert className="mt-0.5 size-3.5 shrink-0 text-destructive" />
+          ) : check.status === "skipped" ? (
+            <Circle className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
+          ) : (
+            <CheckCircle2 className="mt-0.5 size-3.5 shrink-0 text-primary" />
+          )}
+          <div className="min-w-0">
+            <p
+              className={
+                check.status === "failed"
+                  ? "text-xs leading-4 text-destructive"
+                  : "text-xs leading-4 text-foreground"
+              }
+            >
+              {check.label}
+            </p>
+            {check.message ? (
+              <p className="mt-0.5 break-words text-xs leading-4 text-muted-foreground">
+                {check.message}
+              </p>
+            ) : null}
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
-function ConnectionResult({ result, title }: { result: CloudflareConfigureResult; title: string }) {
-  const ready = result.status.ready && result.steps.every((step) => step.status !== "failed");
-  return (
-    <Card>
-      <CardHeader className="flex-row items-center justify-between gap-3">
-        <CardTitle className="text-sm font-medium">{title}</CardTitle>
-        <Badge variant={ready ? "secondary" : "outline"}>
-          {ready ? "Ready" : "Needs attention"}
-        </Badge>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-3 text-sm">
-        {result.steps.map((step) => (
-          <div className="flex items-start gap-2" key={step.id}>
-            {step.status === "failed" ? (
-              <CircleAlert className="mt-0.5 size-4 shrink-0 text-destructive" />
-            ) : (
-              <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-primary" />
-            )}
-            <div>
-              <p className="font-medium">{step.label}</p>
-              <p className="break-words leading-5 text-muted-foreground">{step.message}</p>
-            </div>
-          </div>
-        ))}
-      </CardContent>
-    </Card>
-  );
+
+function isDomainReady(result: CloudflareConfigureResult): boolean {
+  return result.status.ready && result.steps.every((step) => step.status !== "failed");
+}
+
+function compactStepLabel(id: string, fallback: string): string {
+  if (id === "custom-domain") return "Attach app URL";
+  if (id === "service-domain") return "Attach service URL";
+  if (id === "routing") return "Email Routing + DNS";
+  if (id === "catch-all") return "Catch-all → HQBase";
+  if (id === "sending") return "Outbound sending";
+  return fallback;
+}
+
+function describeReadinessFailure(status: CloudflareConfigureResult["status"]): string {
+  const issues: string[] = [];
+  if (status.zone.status !== "active") issues.push("The Cloudflare domain is not active.");
+  if (!status.routing.enabled) {
+    issues.push(status.routing.error ?? "Email Routing is not enabled.");
+  } else if (!status.routing.dnsReady) {
+    issues.push(
+      status.routing.missingRecords > 0
+        ? `Cloudflare still reports ${status.routing.missingRecords} missing Email Routing DNS records.`
+        : (status.routing.error ?? "Email Routing DNS is not ready yet.")
+    );
+  }
+  if (!status.catchAll.enabled || !status.catchAll.configuredForWorker) {
+    issues.push(status.catchAll.error ?? "Catch-all is not routing to this HQBase Worker.");
+  }
+  if (!status.sending.enabled) {
+    issues.push(status.sending.error ?? "Email Sending is not enabled.");
+  }
+  return issues.join(" ") || "Cloudflare has not reported this domain as ready yet.";
 }

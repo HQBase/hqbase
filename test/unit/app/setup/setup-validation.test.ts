@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { buildDomainAddress } from "@/features/setup/setup-helpers";
+import {
+  buildDomainAddress,
+  defaultMailboxesForDomains,
+  syncMailboxesForDomains
+} from "@/features/setup/setup-helpers";
 import {
   hasErrors,
   hasMailboxErrors,
@@ -24,6 +28,34 @@ describe("setup form validation", () => {
   it("builds the owner sign-in address from the editable local part and selected domain", () => {
     expect(buildDomainAddress(" Oleg ", "Example.COM")).toBe("oleg@example.com");
     expect(buildDomainAddress("", "example.com")).toBe("");
+  });
+
+  it("creates the default mailbox set for every selected domain", () => {
+    expect(defaultMailboxesForDomains(["Example.com", "team.example"])).toEqual([
+      { address: "support@example.com", displayName: "Support" },
+      { address: "privacy@example.com", displayName: "Privacy" },
+      { address: "support@team.example", displayName: "Support" },
+      { address: "privacy@team.example", displayName: "Privacy" }
+    ]);
+  });
+
+  it("syncs generated defaults while preserving edited and custom mailboxes", () => {
+    expect(
+      syncMailboxesForDomains(
+        [
+          { address: "support@old.example", displayName: "Support" },
+          { address: "privacy@old.example", displayName: "Legal" },
+          { address: "hello@old.example", displayName: "Hello" }
+        ],
+        ["old.example"],
+        ["new.example"]
+      )
+    ).toEqual([
+      { address: "privacy@old.example", displayName: "Legal" },
+      { address: "hello@old.example", displayName: "Hello" },
+      { address: "support@new.example", displayName: "Support" },
+      { address: "privacy@new.example", displayName: "Privacy" }
+    ]);
   });
 
   it("blocks invalid owner details before the mailbox step", () => {
@@ -58,13 +90,11 @@ describe("setup form validation", () => {
     expect(
       validateDomain({
         appSubdomain: "bad subdomain",
-        serviceSubdomain: "bad service",
         selectedZones: [],
         portalZone: null
       })
     ).toEqual({
       appSubdomain: "Use one DNS label, such as hqbase or inbox.",
-      serviceSubdomain: "Use one DNS label, such as hqbase-api.",
       selectedZoneIds: "Choose at least one email domain.",
       portalZoneId: "Choose which selected domain hosts the workspace portal."
     });
@@ -73,12 +103,23 @@ describe("setup form validation", () => {
       hasErrors(
         validateDomain({
           appSubdomain: "hqbase",
-          serviceSubdomain: "hqbase-api",
           selectedZones: [activeZone],
           portalZone: activeZone
         })
       )
     ).toBe(false);
+
+    expect(
+      validateDomain({
+        appSubdomain: "hqbase",
+        selectedZones: Array.from({ length: 11 }, (_, index) => ({
+          ...activeZone,
+          id: `zone-${index}`,
+          name: `domain-${index}.example`
+        })),
+        portalZone: activeZone
+      })
+    ).toMatchObject({ selectedZoneIds: "Choose up to 10 email domains during setup." });
   });
 
   it("rejects values that do not look like Cloudflare tokens", () => {

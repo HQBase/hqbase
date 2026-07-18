@@ -1,216 +1,226 @@
 import type { LucideIcon } from "lucide-react";
-import { ArrowLeft, ArrowRight, Check, Circle, Cloud, Loader2, Settings2 } from "lucide-react";
-import * as React from "react";
+import { ArrowLeft, ArrowRight, Check, Circle, CircleAlert, Loader2 } from "lucide-react";
+import type * as React from "react";
 
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger
-} from "@/components/ui/accordion";
 import { Button } from "@/components/ui/button";
+import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/cn";
 
+export type SetupPhase = 1 | 2 | 3;
+
 export type WizardStep = {
-  canOpen: boolean;
-  description: string;
   icon: LucideIcon;
-  id: string;
-  isComplete: boolean;
   title: string;
 };
 
 export function WizardLayout({
+  activePhase,
   activeStep,
   children,
   failed = false,
-  isComplete = false,
-  onStepSelect,
   steps
 }: {
+  activePhase: SetupPhase;
   activeStep: number;
   children: React.ReactNode;
   failed?: boolean;
-  isComplete?: boolean;
-  onStepSelect: (index: number) => void;
   steps: WizardStep[];
 }): React.ReactElement {
-  const current = isComplete ? "ready" : activeStep === 0 ? "authorize" : "configure";
-  const [openStep, setOpenStep] = React.useState(current);
-  React.useEffect(() => setOpenStep(current), [current]);
-  const configureStep = steps[activeStep];
+  if (activePhase !== 3) {
+    return (
+      <InstallationTimeline activePhase={activePhase} failed={failed}>
+        {children}
+      </InstallationTimeline>
+    );
+  }
 
   return (
-    <Accordion
-      aria-label="Setup progress"
-      className="flex flex-col gap-2"
-      collapsible
-      type="single"
-      value={openStep}
-      onValueChange={(value) => {
-        if (value) setOpenStep(value);
-      }}
-    >
-      <OnboardingStep
-        description="Checkout was verified and the license was carried into this Worker."
-        icon={Check}
-        status="complete"
-        title="Purchase Pro"
-        value="purchase"
-      >
-        <p className="text-sm text-muted-foreground">
-          HQBase Billing issued a short-lived install claim. The full license is stored only as a
-          masked secret in your Cloudflare account.
-        </p>
-      </OnboardingStep>
-      <OnboardingStep
-        description="The Worker, database, mail bucket, and queues are in your Cloudflare account."
-        icon={Check}
-        status="complete"
-        title="Deploy resources"
-        value="deploy"
-      >
-        <p className="text-sm text-muted-foreground">
-          The licensed build is running under the Worker name selected during Deploy to Cloudflare.
-        </p>
-      </OnboardingStep>
-      <OnboardingStep
-        description={
-          activeStep === 0
-            ? (steps[0]?.description ?? "Checking the temporary grant")
-            : "Installation access verified"
-        }
-        icon={Cloud}
-        status={activeStep === 0 ? (failed ? "failed" : "current") : "complete"}
-        title="Authorize and install"
-        value="authorize"
-      >
-        {activeStep === 0 ? (
-          <div className="[&>section>header]:sr-only">{children}</div>
-        ) : (
-          <p className="text-sm text-muted-foreground">
-            The purchase, Worker identity, licensed build, and temporary setup grant have been
-            verified.
-          </p>
-        )}
-      </OnboardingStep>
-      <OnboardingStep
-        description={
-          isComplete
-            ? "Domain, owner, and shared addresses configured"
-            : activeStep > 0
-              ? `${configureStep?.title ?? "Workspace"} · ${activeStep} of 3`
-              : "Domain, owner, and mailboxes"
-        }
-        disabled={activeStep === 0 || isComplete}
-        icon={Settings2}
-        status={
-          isComplete ? "complete" : activeStep > 0 ? (failed ? "failed" : "current") : "upcoming"
-        }
-        title="Configure workspace"
-        value="configure"
-        onOpen={() => {
-          if (activeStep > 0) onStepSelect(activeStep);
-        }}
-      >
-        {activeStep > 0 ? <div className="[&>section>header]:sr-only">{children}</div> : null}
-      </OnboardingStep>
-      <OnboardingStep
-        description={
-          isComplete ? "Workspace setup is complete." : "Sign in to your self-hosted Pro workspace."
-        }
-        disabled={!isComplete}
-        icon={isComplete ? Check : Circle}
-        status={isComplete ? "current" : "upcoming"}
-        title="Ready"
-        value="ready"
-      >
-        {isComplete ? <div className="[&>section>header]:sr-only">{children}</div> : null}
-      </OnboardingStep>
-    </Accordion>
+    <section aria-label="Configure workspace" className="py-6">
+      <ConfigurationProgress activeStep={activeStep} failed={failed} steps={steps} />
+      <div className="mt-8">{children}</div>
+    </section>
   );
 }
 
-export function OnboardingStep({
+function InstallationTimeline({
+  activePhase,
+  children,
+  failed
+}: {
+  activePhase: 1 | 2;
+  children: React.ReactNode;
+  failed: boolean;
+}): React.ReactElement {
+  return (
+    <ol aria-label="Installation steps" className="mt-6 space-y-6">
+      <InstallationTimelineStep
+        activity={activePhase === 1 ? "In progress" : "Complete"}
+        description="Licensed Worker and storage"
+        isLast={false}
+        status={activePhase === 1 ? "current" : "complete"}
+        title="Purchase Pro and deploy resources"
+      >
+        {activePhase === 1 ? children : null}
+      </InstallationTimelineStep>
+      <InstallationTimelineStep
+        activity={activePhase === 1 ? "Upcoming" : failed ? "Needs attention" : "In progress"}
+        description="Temporary installation access"
+        isLast
+        status={activePhase === 1 ? "upcoming" : failed ? "failed" : "current"}
+        title="Authorize and install"
+      >
+        {activePhase === 2 ? children : null}
+      </InstallationTimelineStep>
+    </ol>
+  );
+}
+
+function InstallationTimelineStep({
+  activity,
   children,
   description,
-  disabled = false,
-  icon: Icon,
-  onOpen,
+  isLast,
   status,
-  title,
-  value
+  title
 }: {
+  activity: string;
   children?: React.ReactNode;
   description: string;
-  disabled?: boolean;
-  icon: LucideIcon;
-  onOpen?: () => void;
+  isLast: boolean;
   status: "complete" | "current" | "upcoming" | "failed";
   title: string;
-  value: string;
 }): React.ReactElement {
-  const label =
-    status === "complete"
-      ? "Complete"
-      : status === "current"
-        ? "Current"
-        : status === "failed"
-          ? "Needs attention"
-          : "Upcoming";
   return (
-    <AccordionItem
-      className="overflow-hidden rounded-lg border bg-card px-4 data-[state=open]:border-foreground/20"
-      disabled={disabled}
-      value={value}
-    >
-      <AccordionTrigger className="gap-3 py-4 hover:no-underline" onClick={onOpen}>
-        <span
-          className={cn(
-            "flex size-8 shrink-0 items-center justify-center rounded-md border bg-background",
-            status === "complete" && "bg-foreground text-background",
-            status === "failed" && "border-destructive/40 text-destructive"
+    <li className="relative flex gap-x-3">
+      <div
+        className={cn(
+          "absolute left-0 top-0 flex w-6 justify-center",
+          isLast ? "h-6" : "-bottom-6"
+        )}
+      >
+        <span aria-hidden="true" className="w-px bg-border" />
+      </div>
+      <div className="flex items-start space-x-2.5">
+        <div className="relative flex size-6 flex-none items-center justify-center bg-background">
+          {status === "complete" ? (
+            <Check aria-hidden="true" className="size-5 text-primary" />
+          ) : status === "current" ? (
+            <span
+              aria-hidden="true"
+              className="size-2.5 rounded-full bg-primary ring-4 ring-background"
+            />
+          ) : status === "failed" ? (
+            <CircleAlert
+              aria-hidden="true"
+              className="size-4 bg-background text-destructive ring-4 ring-background"
+            />
+          ) : (
+            <span
+              aria-hidden="true"
+              className="size-3 rounded-full border border-border bg-background ring-4 ring-background"
+            />
           )}
-        >
-          <Icon className="size-4" />
-        </span>
-        <span className="min-w-0 flex-1 text-left">
-          <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
-            <span className="font-medium">{title}</span>
-            <span className="font-mono text-[10px] uppercase tracking-wide text-muted-foreground">
-              {label}
+        </div>
+        <div className="min-w-0">
+          <p className="mt-0.5 text-sm font-medium text-foreground">
+            {title}{" "}
+            <span
+              className={cn(
+                "font-normal text-muted-foreground/60",
+                status === "failed" && "text-destructive"
+              )}
+            >
+              · {activity}
             </span>
-          </span>
-          <span className="mt-0.5 block text-xs font-normal leading-5 text-muted-foreground">
-            {description}
-          </span>
-        </span>
-      </AccordionTrigger>
-      {children ? <AccordionContent className="border-t pt-5">{children}</AccordionContent> : null}
-    </AccordionItem>
+          </p>
+          <p className="mt-0.5 text-sm leading-6 text-muted-foreground">{description}</p>
+          {children ? <div className="mt-3">{children}</div> : null}
+        </div>
+      </div>
+    </li>
+  );
+}
+
+function ConfigurationProgress({
+  activeStep,
+  failed,
+  steps
+}: {
+  activeStep: number;
+  failed: boolean;
+  steps: WizardStep[];
+}): React.ReactElement {
+  const activeIndex = Math.max(0, activeStep - 1);
+
+  return (
+    <ol aria-label="Workspace configuration steps" className="grid grid-cols-3 gap-2">
+      {steps.map((step, index) => {
+        const status =
+          index < activeIndex ? "complete" : index === activeIndex ? "active" : "upcoming";
+        const isFailed = failed && status === "active";
+        const StepIcon = step.icon;
+
+        return (
+          <li className="min-w-0" key={step.title}>
+            <Progress
+              aria-label={`${step.title}: ${isFailed ? "needs attention" : status}`}
+              className={cn("h-1.5", status === "active" && !isFailed && "animate-pulse")}
+              value={status === "complete" ? 100 : status === "active" ? 50 : 0}
+            />
+            <div className="mt-2 flex min-w-0 items-start gap-1.5">
+              {status === "complete" ? (
+                <Check aria-hidden="true" className="size-4 shrink-0 text-primary" />
+              ) : status === "active" ? (
+                <StepIcon aria-hidden="true" className="size-4 shrink-0 text-primary" />
+              ) : (
+                <Circle aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" />
+              )}
+              <span
+                className={cn(
+                  "min-w-0 text-xs leading-4 text-muted-foreground",
+                  status === "active" && "font-medium text-foreground"
+                )}
+              >
+                {step.title}
+              </span>
+            </div>
+          </li>
+        );
+      })}
+    </ol>
   );
 }
 
 export function WizardPanel({
   actions,
+  ariaLabel,
   children,
   description,
+  showHeader = true,
   title
 }: {
   actions: React.ReactNode;
+  ariaLabel?: string;
   children: React.ReactNode;
   description: string;
+  showHeader?: boolean;
   title: string;
 }): React.ReactElement {
   return (
-    <section aria-labelledby="setup-step-title" className="w-full">
-      <header className="border-b border-border/80 pb-6">
-        <h2 id="setup-step-title" className="text-xl font-medium tracking-tight sm:text-2xl">
-          {title}
-        </h2>
-        <p className="mt-1.5 max-w-2xl text-sm leading-6 text-muted-foreground">{description}</p>
-      </header>
-      <div className="flex flex-col gap-6 py-6">{children}</div>
+    <section
+      aria-label={showHeader ? undefined : (ariaLabel ?? "Setup step")}
+      aria-labelledby={showHeader ? "setup-step-title" : undefined}
+      className="w-full"
+    >
+      {showHeader ? (
+        <header className="border-b border-border/80 pb-6">
+          <h2 id="setup-step-title" className="text-xl font-medium tracking-tight sm:text-2xl">
+            {title}
+          </h2>
+          <p className="mt-1.5 max-w-2xl text-sm leading-6 text-muted-foreground">{description}</p>
+        </header>
+      ) : null}
+      <div className={cn("flex flex-col gap-6", showHeader ? "py-6" : "pb-6")}>{children}</div>
       {actions ? <footer className="border-t border-border/80 pt-5">{actions}</footer> : null}
     </section>
   );

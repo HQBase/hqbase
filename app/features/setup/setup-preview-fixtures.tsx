@@ -1,27 +1,27 @@
-import { CheckCircle2, Globe2, Inbox, KeyRound, UserRound } from "lucide-react";
+import { Globe2, Inbox, UserRound } from "lucide-react";
 import type * as React from "react";
 
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/spinner";
 
 import { AccessStep } from "./setup-access-screen";
 import { DomainStep } from "./setup-domain-screen";
 import { ACCESS_STEP, DOMAIN_STEP, MAILBOX_STEP, OWNER_STEP } from "./setup-steps";
 import type { MailboxDraft } from "./setup-validation";
-import { WizardPanel, type WizardStep } from "./setup-wizard-parts";
+import type { SetupPhase, WizardStep } from "./setup-wizard-parts";
 import { MailboxStep, OwnerStep } from "./setup-workspace-screens";
 import type { CloudflareZone } from "./types";
+import type { ConfiguredDomain } from "./use-setup-cloudflare";
 
 export const previewStates = [
-  ["access", "Access ready"],
+  ["deploying", "Purchase and deployment"],
   ["loading", "Access loading"],
   ["failure", "Access failure"],
   ["domain", "Domain selection"],
+  ["domain-error", "Domain readiness error"],
   ["owner", "Owner account"],
   ["validation", "Validation errors"],
-  ["mailboxes", "Shared addresses"],
-  ["submitting", "Submitting workspace"],
-  ["completed", "Setup complete"]
+  ["mailboxes", "Mailboxes"],
+  ["submitting", "Submitting workspace"]
 ] as const;
 
 export type PreviewState = (typeof previewStates)[number][0];
@@ -47,35 +47,15 @@ export const zones: CloudflareZone[] = [
 
 export const steps: WizardStep[] = [
   {
-    canOpen: true,
-    description: "Installation grant",
-    icon: KeyRound,
-    id: "access",
-    isComplete: true,
-    title: "Cloudflare access"
-  },
-  {
-    canOpen: true,
-    description: zones[0]?.name ?? "northstar.example",
     icon: Globe2,
-    id: "domain",
-    isComplete: true,
     title: "Domain"
   },
   {
-    canOpen: true,
-    description: "alex@northstar.example",
     icon: UserRound,
-    id: "owner",
-    isComplete: true,
     title: "Owner account"
   },
   {
-    canOpen: true,
-    description: "2 shared addresses",
     icon: Inbox,
-    id: "mailboxes",
-    isComplete: true,
     title: "Mailboxes"
   }
 ];
@@ -91,7 +71,6 @@ type FixtureInput = {
   portalZoneId: string;
   selectedZoneIds: string[];
   selectedZones: CloudflareZone[];
-  serviceSubdomain: string;
   setAppSubdomain: (value: string) => void;
   setMailboxes: React.Dispatch<React.SetStateAction<MailboxDraft[]>>;
   setOwnerEmail: (value: string) => void;
@@ -99,12 +78,21 @@ type FixtureInput = {
   setOwnerPassword: (value: string) => void;
   setPortalZoneId: (value: string) => void;
   setSelectedZoneIds: React.Dispatch<React.SetStateAction<string[]>>;
-  setServiceSubdomain: (value: string) => void;
   state: PreviewState;
 };
 
 export function renderPreviewFixture(input: FixtureInput): React.ReactNode {
-  if (input.state === "completed") return <CompletedStep />;
+  if (input.state === "deploying") {
+    return (
+      <div
+        className="flex items-center gap-2.5 py-1 text-sm text-muted-foreground"
+        aria-live="polite"
+      >
+        <Spinner className="text-foreground" />
+        <span>Deploying HQBase Pro resources to Cloudflare…</span>
+      </div>
+    );
+  }
   if (input.activeStep === ACCESS_STEP) {
     return (
       <AccessStep
@@ -119,11 +107,14 @@ export function renderPreviewFixture(input: FixtureInput): React.ReactNode {
     );
   }
   if (input.activeStep === DOMAIN_STEP) {
+    const readinessError = input.state === "domain-error";
     return (
       <DomainStep
         appHostname={`${input.appSubdomain}.${input.portalZone?.name}`}
         appSubdomain={input.appSubdomain}
-        connectionError={null}
+        connectionError={
+          readinessError ? "Cloudflare needs attention on one or more checks below." : null
+        }
         errors={{}}
         isLoading={false}
         onBack={() => undefined}
@@ -135,14 +126,11 @@ export function renderPreviewFixture(input: FixtureInput): React.ReactNode {
         }
         portalZone={input.portalZone}
         portalZoneId={input.portalZoneId}
-        results={[]}
+        results={readinessError ? readinessFailureFixture() : []}
         selectedZoneIds={input.selectedZoneIds}
         selectedZones={input.selectedZones}
-        serviceHostname={`${input.serviceSubdomain}.${input.portalZone?.name}`}
-        serviceSubdomain={input.serviceSubdomain}
         setAppSubdomain={input.setAppSubdomain}
         setPortalZoneId={input.setPortalZoneId}
-        setServiceSubdomain={input.setServiceSubdomain}
         zones={zones}
       />
     );
@@ -178,8 +166,6 @@ export function renderPreviewFixture(input: FixtureInput): React.ReactNode {
       onAdd={() => input.setMailboxes((current) => [...current, { address: "", displayName: "" }])}
       onBack={() => undefined}
       onComplete={() => undefined}
-      onEditDomain={() => undefined}
-      onEditOwner={() => undefined}
       onRemove={(index) =>
         input.setMailboxes((current) => current.filter((_, itemIndex) => itemIndex !== index))
       }
@@ -190,35 +176,82 @@ export function renderPreviewFixture(input: FixtureInput): React.ReactNode {
           )
         )
       }
-      ownerEmail={input.ownerEmail}
-      primaryDomain={input.portalZone?.name ?? "northstar.example"}
       submitError={null}
     />
   );
 }
 
 export function stepForPreviewState(state: PreviewState): number {
-  if (["access", "loading", "failure"].includes(state)) return ACCESS_STEP;
-  if (state === "domain") return DOMAIN_STEP;
+  if (["deploying", "loading", "failure"].includes(state)) return ACCESS_STEP;
+  if (["domain", "domain-error"].includes(state)) return DOMAIN_STEP;
   if (["owner", "validation"].includes(state)) return OWNER_STEP;
   return MAILBOX_STEP;
 }
 
-function CompletedStep(): React.ReactElement {
-  return (
-    <WizardPanel
-      actions={null}
-      description="The workspace is configured and ready for its first sign-in."
-      title="Workspace ready"
-    >
-      <Alert>
-        <CheckCircle2 />
-        <AlertTitle>HQBase Pro is ready</AlertTitle>
-        <AlertDescription>
-          Your domains, owner account, and shared addresses are configured.
-        </AlertDescription>
-      </Alert>
-      <Button type="button">Open workspace</Button>
-    </WizardPanel>
-  );
+function readinessFailureFixture(): ConfiguredDomain[] {
+  const zone = zones[0];
+  if (!zone) return [];
+
+  return [
+    {
+      zone,
+      result: {
+        steps: [
+          {
+            id: "custom-domain",
+            label: "Attach app URL",
+            message: "hqbase.northstar.example routes to the HQBase Worker.",
+            status: "success"
+          },
+          {
+            id: "routing",
+            label: "Enable Email Routing DNS",
+            message: "Cloudflare accepted the Email Routing DNS configuration.",
+            status: "success"
+          },
+          {
+            id: "catch-all",
+            label: "Route catch-all to Worker",
+            message: "Catch-all routes to the HQBase Worker.",
+            status: "success"
+          },
+          {
+            id: "sending",
+            label: "Enable Email Sending",
+            message: "Email Sending is enabled for this domain.",
+            status: "success"
+          }
+        ],
+        status: {
+          zone,
+          workerName: "hqbase-pro-preview",
+          routing: {
+            enabled: true,
+            status: "active",
+            dnsReady: false,
+            missingRecords: 2,
+            error: null
+          },
+          catchAll: {
+            enabled: true,
+            configuredForWorker: true,
+            workerNames: ["hqbase-pro-preview"],
+            error: null
+          },
+          sending: {
+            enabled: true,
+            subdomains: [zone.name],
+            error: null
+          },
+          ready: false
+        }
+      }
+    }
+  ];
+}
+
+export function phaseForPreviewState(state: PreviewState): SetupPhase {
+  if (state === "deploying") return 1;
+  if (["loading", "failure"].includes(state)) return 2;
+  return 3;
 }

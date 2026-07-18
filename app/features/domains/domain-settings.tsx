@@ -13,13 +13,21 @@ import {
 } from "@/components/ui/select";
 import { listCloudflareZones } from "@/features/setup/api";
 import type { CloudflareZone } from "@/features/setup/types";
-import { changePortal, listDomains, provisionDomain, updateDomain } from "./api";
+import {
+  changePortal,
+  changeServiceOrigin,
+  listDomains,
+  provisionDomain,
+  updateDomain
+} from "./api";
 import type { MailDomain } from "./types";
 export function DomainSettings({
   portalHostname,
+  serviceHostname,
   onChanged
 }: {
   portalHostname: string | null;
+  serviceHostname: string | null;
   onChanged: () => void;
 }) {
   const [domains, setDomains] = React.useState<MailDomain[]>([]);
@@ -28,6 +36,7 @@ export function DomainSettings({
   const [zoneId, setZoneId] = React.useState("");
   const [name, setName] = React.useState("");
   const [hostname, setHostname] = React.useState(portalHostname ?? "");
+  const [bridgeHostname, setBridgeHostname] = React.useState(serviceHostname ?? "");
   const refresh = React.useCallback(
     () =>
       void listDomains()
@@ -83,6 +92,26 @@ export function DomainSettings({
       toast.success("Portal address changed.");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Portal change failed.");
+    }
+  }
+  async function service(e: React.FormEvent) {
+    e.preventDefault();
+    if (bridgeHostname === portalHostname)
+      return toast.error("The bridge origin must differ from the workspace portal.");
+    const domain = domains.find((item) => bridgeHostname.endsWith(`.${item.name}`));
+    if (!domain?.zoneId)
+      return toast.error("The bridge origin must use a connected domain with a Cloudflare zone.");
+    try {
+      await changeServiceOrigin({
+        apiToken: token,
+        zoneId: domain.zoneId,
+        hostname: bridgeHostname
+      });
+      setToken("");
+      onChanged();
+      toast.success("Bridge origin changed.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Bridge origin change failed.");
     }
   }
   return (
@@ -174,6 +203,15 @@ export function DomainSettings({
               onChange={(e) => setHostname(e.target.value)}
             />
             <Button type="submit">Change portal</Button>
+          </form>
+          <form className="grid gap-2 sm:grid-cols-[1fr_auto]" onSubmit={(e) => void service(e)}>
+            <Input
+              required
+              placeholder="bridge.example.com"
+              value={bridgeHostname}
+              onChange={(e) => setBridgeHostname(e.target.value)}
+            />
+            <Button type="submit">Change bridge origin</Button>
           </form>
         </CardContent>
       </Card>

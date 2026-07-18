@@ -3,7 +3,13 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Field, FieldDescription, FieldError, FieldLabel } from "@/components/ui/field";
+import {
+  Field,
+  FieldDescription,
+  FieldError,
+  FieldLabel,
+  FieldLabelRow
+} from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { applyUpdate, getUpdateStatus } from "./api";
 import type { UpdateStatus } from "./types";
@@ -128,9 +134,12 @@ export function UpdateSettings({
           <CardContent>
             <form className="flex flex-col gap-4" onSubmit={(event) => void apply(event)}>
               <Field data-invalid={Boolean(applyError)}>
-                <FieldLabel htmlFor="update-cloudflare-token">
-                  Temporary Cloudflare API token
-                </FieldLabel>
+                <FieldLabelRow>
+                  <FieldLabel htmlFor="update-cloudflare-token">
+                    Temporary Cloudflare API token
+                  </FieldLabel>
+                  {applyError ? <FieldError id={tokenErrorId}>{applyError}</FieldError> : null}
+                </FieldLabelRow>
                 <Input
                   aria-describedby={`${tokenDescriptionId}${applyError ? ` ${tokenErrorId}` : ""}`}
                   aria-invalid={Boolean(applyError)}
@@ -150,7 +159,6 @@ export function UpdateSettings({
                   Required permissions: Workers Scripts Read, Workers Builds Configuration Edit, and
                   Zone Read. The token is used for this request and is never stored.
                 </FieldDescription>
-                {applyError ? <FieldError id={tokenErrorId}>{applyError}</FieldError> : null}
               </Field>
               {!status.compatible ? (
                 <Alert variant="destructive">

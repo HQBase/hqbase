@@ -10,18 +10,18 @@ import { useSetupFlow } from "./use-setup-flow";
 
 export function SetupPage({ onComplete }: { onComplete: () => void }): React.ReactElement {
   const flow = useSetupFlow(onComplete);
+  const activePhase = flow.activeStep === ACCESS_STEP ? 2 : 3;
 
   return (
     <SetupFrame
-      description="Your purchase and deployment carry into this resumable workspace setup."
-      progress={`${flow.activeStep === ACCESS_STEP ? 3 : 4} / 5`}
-      title="Set up HQBase Pro"
+      description={
+        activePhase === 3
+          ? "Add your domain, owner account, and shared addresses."
+          : "Complete installation before configuring your workspace."
+      }
+      title={activePhase === 3 ? "Configure workspace" : "Set up HQBase Pro"}
     >
-      <WizardLayout
-        activeStep={flow.activeStep}
-        steps={flow.steps}
-        onStepSelect={flow.onStepSelect}
-      >
+      <WizardLayout activePhase={activePhase} activeStep={flow.activeStep} steps={flow.steps}>
         {flow.activeStep === ACCESS_STEP ? <AccessStep {...flow.access} /> : null}
         {flow.activeStep === DOMAIN_STEP ? <DomainStep {...flow.domain} /> : null}
         {flow.activeStep === OWNER_STEP ? <OwnerStep {...flow.owner} /> : null}

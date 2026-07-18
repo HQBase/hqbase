@@ -1,10 +1,24 @@
-import { CircleAlert, Plus, Trash2 } from "lucide-react";
-import type * as React from "react";
+import { CircleAlert, Eye, EyeOff, Plus, Trash2 } from "lucide-react";
+import * as React from "react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
+import {
+  Field,
+  FieldDescription,
+  FieldError,
+  FieldGroup,
+  FieldLabel,
+  FieldLabelRow
+} from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow
+} from "@/components/ui/table";
 import type { MailboxDraft, MailboxErrors, OwnerErrors } from "./setup-validation";
 import { WizardActions, WizardPanel } from "./setup-wizard-parts";
 
@@ -31,15 +45,22 @@ export function OwnerStep({
   setOwnerName: (value: string) => void;
   setOwnerPassword: (value: string) => void;
 }): React.ReactElement {
+  const [passwordVisible, setPasswordVisible] = React.useState(false);
+
   return (
     <WizardPanel
       actions={<WizardActions nextLabel="Continue" onBack={onBack} onNext={onNext} />}
-      description="The first workspace administrator. Login email can be on any domain."
-      title="Create your login"
+      ariaLabel="Owner account"
+      description=""
+      showHeader={false}
+      title=""
     >
       <FieldGroup>
         <Field data-invalid={Boolean(errors.name)}>
-          <FieldLabel htmlFor="owner-name">Name</FieldLabel>
+          <FieldLabelRow>
+            <FieldLabel htmlFor="owner-name">Name</FieldLabel>
+            {errors.name ? <FieldError>{errors.name}</FieldError> : null}
+          </FieldLabelRow>
           <Input
             aria-invalid={Boolean(errors.name)}
             autoComplete="name"
@@ -48,11 +69,13 @@ export function OwnerStep({
             value={ownerName}
             onChange={(event) => setOwnerName(event.target.value)}
           />
-          {errors.name ? <FieldError>{errors.name}</FieldError> : null}
         </Field>
 
         <Field data-invalid={Boolean(errors.email)}>
-          <FieldLabel htmlFor="owner-email">Login address</FieldLabel>
+          <FieldLabelRow>
+            <FieldLabel htmlFor="owner-email">Login email</FieldLabel>
+            {errors.email ? <FieldError>{errors.email}</FieldError> : null}
+          </FieldLabelRow>
           <Input
             aria-invalid={Boolean(errors.email)}
             autoCapitalize="none"
@@ -66,22 +89,41 @@ export function OwnerStep({
           <FieldDescription>
             This address is for authentication, not mailbox routing.
           </FieldDescription>
-          {errors.email ? <FieldError>{errors.email}</FieldError> : null}
         </Field>
 
         <Field data-invalid={Boolean(errors.password)}>
-          <FieldLabel htmlFor="owner-password">Password</FieldLabel>
-          <Input
-            aria-invalid={Boolean(errors.password)}
-            autoComplete="new-password"
-            id="owner-password"
-            minLength={8}
-            type="password"
-            value={ownerPassword}
-            onChange={(event) => setOwnerPassword(event.target.value)}
-          />
+          <FieldLabelRow>
+            <FieldLabel htmlFor="owner-password">Password</FieldLabel>
+            {errors.password ? <FieldError>{errors.password}</FieldError> : null}
+          </FieldLabelRow>
+          <div className="relative">
+            <Input
+              aria-invalid={Boolean(errors.password)}
+              autoComplete="new-password"
+              className="pr-10"
+              id="owner-password"
+              minLength={8}
+              type={passwordVisible ? "text" : "password"}
+              value={ownerPassword}
+              onChange={(event) => setOwnerPassword(event.target.value)}
+            />
+            <Button
+              aria-label={passwordVisible ? "Hide password" : "Show password"}
+              aria-pressed={passwordVisible}
+              className="absolute right-1 top-1/2 size-7 -translate-y-1/2"
+              size="icon"
+              type="button"
+              variant="ghost"
+              onClick={() => setPasswordVisible((visible) => !visible)}
+            >
+              {passwordVisible ? (
+                <EyeOff aria-hidden="true" className="size-4" />
+              ) : (
+                <Eye aria-hidden="true" className="size-4" />
+              )}
+            </Button>
+          </div>
           <FieldDescription>8+ characters.</FieldDescription>
-          {errors.password ? <FieldError>{errors.password}</FieldError> : null}
         </Field>
       </FieldGroup>
     </WizardPanel>
@@ -95,12 +137,8 @@ export function MailboxStep({
   onAdd,
   onBack,
   onComplete,
-  onEditDomain,
-  onEditOwner,
   onRemove,
   onUpdate,
-  ownerEmail,
-  primaryDomain,
   submitError
 }: {
   errors: MailboxErrors;
@@ -109,12 +147,8 @@ export function MailboxStep({
   onAdd: () => void;
   onBack: () => void;
   onComplete: () => void;
-  onEditDomain: () => void;
-  onEditOwner: () => void;
   onRemove: (index: number) => void;
   onUpdate: (index: number, patch: Partial<MailboxDraft>) => void;
-  ownerEmail: string;
-  primaryDomain: string;
   submitError: string | null;
 }): React.ReactElement {
   return (
@@ -122,39 +156,83 @@ export function MailboxStep({
       actions={
         <WizardActions
           isLoading={isPending}
-          nextLabel="Create workspace"
+          nextLabel="Complete setup"
           onBack={onBack}
           onNext={onComplete}
         />
       }
-      description="Addresses your team sends and receives from."
-      title="Add shared addresses"
+      ariaLabel="Mailboxes"
+      description=""
+      showHeader={false}
+      title=""
     >
-      <Card className="bg-background/40 shadow-none">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-sm font-medium">Review</CardTitle>
-        </CardHeader>
-        <CardContent className="grid gap-3 sm:grid-cols-2">
-          <SummaryItem label="Email domain" value={primaryDomain} onEdit={onEditDomain} />
-          <SummaryItem label="Owner sign-in" value={ownerEmail} onEdit={onEditOwner} />
-        </CardContent>
-      </Card>
-
-      <div className="flex flex-col gap-3">
-        {mailboxes.map((mailbox, index) => (
-          <MailboxCard
-            error={errors.rows[index] ?? {}}
-            index={index}
-            key={index}
-            mailbox={mailbox}
-            canRemove={mailboxes.length > 1}
-            onRemove={() => onRemove(index)}
-            onUpdate={(patch) => onUpdate(index, patch)}
-          />
-        ))}
+      <div className="overflow-hidden rounded-md border">
+        <Table aria-label="Mailboxes" className="table-fixed">
+          <TableHeader className="bg-muted/35">
+            <TableRow className="hover:bg-transparent">
+              <TableHead className="h-8 w-10 px-2 text-center text-xs">#</TableHead>
+              <TableHead className="h-8 px-2 text-xs">Email address</TableHead>
+              <TableHead className="h-8 w-[34%] px-2 text-xs">Display name</TableHead>
+              <TableHead className="h-8 w-10 px-1">
+                <span className="sr-only">Actions</span>
+              </TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {mailboxes.map((mailbox, index) => {
+              const error = errors.rows[index] ?? {};
+              return (
+                <TableRow key={index}>
+                  <TableCell className="px-2 py-1.5 text-center text-xs text-muted-foreground">
+                    {index + 1}
+                  </TableCell>
+                  <TableCell className="p-1.5">
+                    <Field className="gap-1" data-invalid={Boolean(error.address)}>
+                      {error.address ? <FieldError>{error.address}</FieldError> : null}
+                      <Input
+                        aria-label={`Mailbox ${index + 1} email address`}
+                        aria-invalid={Boolean(error.address)}
+                        className="h-8 shadow-none"
+                        type="email"
+                        value={mailbox.address}
+                        onChange={(event) => onUpdate(index, { address: event.target.value })}
+                      />
+                    </Field>
+                  </TableCell>
+                  <TableCell className="p-1.5">
+                    <Field className="gap-1" data-invalid={Boolean(error.displayName)}>
+                      {error.displayName ? <FieldError>{error.displayName}</FieldError> : null}
+                      <Input
+                        aria-label={`Mailbox ${index + 1} display name`}
+                        aria-invalid={Boolean(error.displayName)}
+                        className="h-8 shadow-none"
+                        placeholder="Support"
+                        value={mailbox.displayName}
+                        onChange={(event) => onUpdate(index, { displayName: event.target.value })}
+                      />
+                    </Field>
+                  </TableCell>
+                  <TableCell className="px-1 py-1.5 text-center">
+                    <Button
+                      aria-label={`Remove mailbox ${index + 1}`}
+                      className="size-8"
+                      disabled={mailboxes.length <= 1}
+                      size="icon"
+                      type="button"
+                      variant="ghost"
+                      onClick={() => onRemove(index)}
+                    >
+                      <Trash2 aria-hidden="true" />
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
       </div>
 
-      <Button className="w-fit" type="button" variant="outline" onClick={onAdd}>
+      <Button className="w-fit" size="sm" type="button" variant="outline" onClick={onAdd}>
         <Plus data-icon="inline-start" />
         Add mailbox
       </Button>
@@ -168,87 +246,5 @@ export function MailboxStep({
         </Alert>
       ) : null}
     </WizardPanel>
-  );
-}
-
-function MailboxCard({
-  canRemove,
-  error,
-  index,
-  mailbox,
-  onRemove,
-  onUpdate
-}: {
-  canRemove: boolean;
-  error: NonNullable<MailboxErrors["rows"][number]>;
-  index: number;
-  mailbox: MailboxDraft;
-  onRemove: () => void;
-  onUpdate: (patch: Partial<MailboxDraft>) => void;
-}): React.ReactElement {
-  return (
-    <Card className="bg-background/40 shadow-none">
-      <CardHeader className="flex-row items-center justify-between gap-3 pb-3">
-        <CardTitle className="text-sm font-medium">Mailbox {index + 1}</CardTitle>
-        <Button
-          aria-label={`Remove mailbox ${index + 1}`}
-          disabled={!canRemove}
-          size="icon"
-          type="button"
-          variant="ghost"
-          onClick={onRemove}
-        >
-          <Trash2 data-icon="inline-start" />
-        </Button>
-      </CardHeader>
-      <CardContent>
-        <FieldGroup className="grid gap-4 sm:grid-cols-[1fr_0.72fr]">
-          <Field data-invalid={Boolean(error.address)}>
-            <FieldLabel htmlFor={`mailbox-address-${index}`}>Email address</FieldLabel>
-            <Input
-              aria-invalid={Boolean(error.address)}
-              id={`mailbox-address-${index}`}
-              type="email"
-              value={mailbox.address}
-              onChange={(event) => onUpdate({ address: event.target.value })}
-            />
-            {error.address ? <FieldError>{error.address}</FieldError> : null}
-          </Field>
-          <Field data-invalid={Boolean(error.displayName)}>
-            <FieldLabel htmlFor={`mailbox-name-${index}`}>Display name</FieldLabel>
-            <Input
-              aria-invalid={Boolean(error.displayName)}
-              id={`mailbox-name-${index}`}
-              placeholder="Support"
-              value={mailbox.displayName}
-              onChange={(event) => onUpdate({ displayName: event.target.value })}
-            />
-            {error.displayName ? <FieldError>{error.displayName}</FieldError> : null}
-          </Field>
-        </FieldGroup>
-      </CardContent>
-    </Card>
-  );
-}
-
-function SummaryItem({
-  label,
-  onEdit,
-  value
-}: {
-  label: string;
-  onEdit: () => void;
-  value: string;
-}): React.ReactElement {
-  return (
-    <div className="flex items-center justify-between gap-3 rounded-md bg-muted/55 px-3 py-2.5">
-      <div className="min-w-0">
-        <p className="text-xs font-medium text-muted-foreground">{label}</p>
-        <p className="truncate text-sm font-semibold">{value}</p>
-      </div>
-      <Button size="sm" type="button" variant="ghost" onClick={onEdit}>
-        Edit
-      </Button>
-    </div>
   );
 }

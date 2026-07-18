@@ -55,6 +55,12 @@ export async function upsertWorkspaceHost(
   if (input.kind === "portal" && input.canonical !== false) {
     await db.prepare("UPDATE workspace_hosts SET is_canonical = 0 WHERE kind = 'portal'").run();
   }
+  if (input.kind === "service") {
+    await db
+      .prepare("DELETE FROM workspace_hosts WHERE kind = 'service' AND hostname <> ?")
+      .bind(input.hostname)
+      .run();
+  }
   await db
     .prepare(
       `INSERT INTO workspace_hosts

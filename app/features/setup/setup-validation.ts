@@ -25,7 +25,6 @@ export type MailboxErrors = {
 
 export type DomainErrors = {
   appSubdomain?: string;
-  serviceSubdomain?: string;
   selectedZoneIds?: string;
   portalZoneId?: string;
 };
@@ -42,7 +41,6 @@ export function validateToken(apiToken: string): string | null {
 
 export function validateDomain(input: {
   appSubdomain: string;
-  serviceSubdomain: string;
   selectedZones: CloudflareZone[];
   portalZone: CloudflareZone | null;
 }): DomainErrors {
@@ -50,6 +48,8 @@ export function validateDomain(input: {
 
   if (input.selectedZones.length === 0) {
     errors.selectedZoneIds = "Choose at least one email domain.";
+  } else if (input.selectedZones.length > 10) {
+    errors.selectedZoneIds = "Choose up to 10 email domains during setup.";
   } else if (input.selectedZones.some((zone) => zone.status !== "active")) {
     errors.selectedZoneIds = "Every selected email domain must be active.";
   }
@@ -61,13 +61,6 @@ export function validateDomain(input: {
   if (!appSubdomainPattern.test(subdomain)) {
     errors.appSubdomain = "Use one DNS label, such as hqbase or inbox.";
   }
-  const serviceSubdomain = input.serviceSubdomain.trim().toLowerCase();
-  if (!appSubdomainPattern.test(serviceSubdomain)) {
-    errors.serviceSubdomain = "Use one DNS label, such as hqbase-api.";
-  } else if (serviceSubdomain === subdomain) {
-    errors.serviceSubdomain = "The stable service origin must differ from the portal address.";
-  }
-
   return errors;
 }
 

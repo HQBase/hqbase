@@ -1,8 +1,6 @@
-import { Cloud, Loader2, ShieldCheck } from "lucide-react";
 import type * as React from "react";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { WizardPanel } from "./setup-wizard-parts";
+import { Spinner } from "@/components/ui/spinner";
 
 export function AccessStep({
   error,
@@ -14,36 +12,24 @@ export function AccessStep({
   onNext: () => void;
 }): React.ReactElement {
   return (
-    <WizardPanel
-      actions={null}
-      description="Checking the purchase-bound license, deployed Worker, and temporary Cloudflare grant."
-      title="Verifying installation"
-    >
-      <Alert>
-        <ShieldCheck />
-        <AlertTitle>Temporary delegated access</AlertTitle>
-        <AlertDescription>
-          HQBase is verifying the access approved during installation. It will revoke the grant
-          after domain and email setup is complete.
-        </AlertDescription>
-      </Alert>
-      <div className="flex items-center gap-3 rounded-md border bg-background/40 p-4 text-sm text-muted-foreground">
-        {isLoading ? (
-          <Loader2 className="size-5 animate-spin text-foreground" />
-        ) : (
-          <Cloud className="size-5 text-foreground" />
-        )}
-        {isLoading ? "Checking Cloudflare resources…" : "Installation access is ready."}
-      </div>
+    <div className="flex flex-col gap-4">
+      {isLoading || !error ? (
+        <div
+          className="flex items-center gap-2.5 py-1 text-sm text-muted-foreground"
+          aria-live="polite"
+        >
+          <Spinner className="text-foreground" />
+          <span>Checking Cloudflare access to set up the workspace…</span>
+        </div>
+      ) : null}
       {error ? (
-        <Alert variant="destructive">
-          <AlertTitle>Installation access needs attention</AlertTitle>
-          <AlertDescription>{error}</AlertDescription>
-          <Button className="mt-3" size="sm" type="button" variant="outline" onClick={onNext}>
+        <div className="flex flex-col items-start gap-2 py-1" role="alert">
+          <p className="text-sm leading-6 text-muted-foreground">{error}</p>
+          <Button className="mt-1" size="sm" type="button" variant="outline" onClick={onNext}>
             Retry verification
           </Button>
-        </Alert>
+        </div>
       ) : null}
-    </WizardPanel>
+    </div>
   );
 }
