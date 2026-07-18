@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -41,6 +42,10 @@ const proTables = [
 ];
 
 describe("Deploy lifecycle", () => {
+  it("keeps product constants out of deployment configuration", () => {
+    expect(JSON.parse(readFileSync("wrangler.jsonc", "utf8"))).not.toHaveProperty("vars");
+  });
+
   it("classifies fresh, Community, and Pro databases and rejects unknown data", () => {
     expect(classifyDatabaseTables(["d1_migrations"])).toBe("fresh");
     expect(classifyDatabaseTables(communityTables)).toBe("community");

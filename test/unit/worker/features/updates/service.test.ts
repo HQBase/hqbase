@@ -2,7 +2,6 @@ import { compareVersions, getUpdateStatus, triggerUpdate } from "@worker/feature
 import type { WorkerEnv } from "@worker/lib/env";
 import { describe, expect, it, vi } from "vitest";
 
-const publicKey = "MCowBQYDK2VwAyEAsVwKniCvpHDwbbnjTPP0SuIIG97cRL+iFBQvay9OrU4=";
 const envelope = {
   payload:
     "eyJmb3JtYXQiOiJocWJhc2UtcmVsZWFzZS12MSIsImVkaXRpb24iOiJwcm8iLCJjaGFubmVsIjoic3RhYmxlIiwidmVyc2lvbiI6IjAuMS4wIiwic2NoZW1hVmVyc2lvbiI6OSwibWluVmVyc2lvbiI6IjAuMS4wIiwicHVibGlzaGVkQXQiOiIyMDI2LTA3LTEyVDAwOjAwOjAwLjAwMFoiLCJub3Rlc1VybCI6Imh0dHBzOi8vZ2l0aHViLmNvbS9IUUJhc2UvaHFiYXNlLXByby1kZXBsb3kvcmVsZWFzZXMvdGFnL3YwLjEuMCIsImFydGlmYWN0Ijp7InVybCI6Imh0dHBzOi8vYmlsbGluZy5ocWJhc2UuaW8vdjEvcmVsZWFzZXMvcHJvLzAuMS4wL2FydGlmYWN0Iiwic2hhMjU2IjoiMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMCIsInNpemUiOjB9LCJrZXlJZCI6ImhxYmFzZS1yZWxlYXNlLTIwMjYtMDEifQ",
@@ -12,10 +11,7 @@ const envelope = {
 
 describe("Pro updates", () => {
   it("verifies signed manifests", async () => {
-    const status = await getUpdateStatus(
-      { HQBASE_RELEASE_PUBLIC_KEY: publicKey } as WorkerEnv,
-      async () => Response.json(envelope)
-    );
+    const status = await getUpdateStatus({} as WorkerEnv, async () => Response.json(envelope));
     expect(status).toMatchObject({
       edition: "pro",
       installedVersion: "0.1.1",
@@ -26,7 +22,7 @@ describe("Pro updates", () => {
   });
   it("rejects a tampered manifest", async () => {
     await expect(
-      getUpdateStatus({ HQBASE_RELEASE_PUBLIC_KEY: publicKey } as WorkerEnv, async () =>
+      getUpdateStatus({} as WorkerEnv, async () =>
         Response.json({ ...envelope, signature: `A${envelope.signature.slice(1)}` })
       )
     ).rejects.toThrow("signature");

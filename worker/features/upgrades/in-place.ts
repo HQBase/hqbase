@@ -1,5 +1,6 @@
 import type { WorkerEnv } from "../../lib/env";
 import { AppError } from "../../lib/errors";
+import { hqbaseProProductConfig } from "../../lib/product-config";
 import { getEntitlementStatus } from "../billing/queries";
 import { activateWorkspace } from "../billing/service";
 import {
@@ -162,7 +163,12 @@ export async function completeInPlaceUpgrade(
   try {
     await deleteTemporarySecrets(upgrade, token, fetcher);
   } finally {
-    await revokeGrant(token, env.CLOUDFLARE_UPGRADE_OAUTH_CLIENT_ID, fetcher);
+    await revokeGrant(
+      token,
+      env.CLOUDFLARE_UPGRADE_OAUTH_CLIENT_ID?.trim() ||
+        hqbaseProProductConfig.cloudflareOAuthClientId,
+      fetcher
+    );
   }
   return Response.json(completionStatus(), {
     headers: {

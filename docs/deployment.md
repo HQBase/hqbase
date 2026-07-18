@@ -32,6 +32,11 @@ zone is Active before completing `/setup`.
 
 ### Cloudflare deploy form guidance
 
+The form exposes only customer-owned resource names. HQBase OAuth identifiers and callbacks,
+Billing and release endpoints, and the release verification key are compiled public product
+constants. The selected Worker name and licensed release version are injected by the customer-owned
+build after the form.
+
 - Git repository: let Cloudflare create the customer-owned copy of `HQBase/hqbase-pro-deploy`.
   Make the generated repository private when the source-control provider offers that choice.
 - Project name: keep `hqbase-pro`, or choose another unique Worker/project name.
@@ -44,7 +49,7 @@ zone is Active before completing `/setup`.
   In-place upgrades create or reuse installation-owned queue names automatically.
 - Secrets: do not add `BETTER_AUTH_SECRET`, app-password, bridge, session, entitlement, license, or
   setup-token values in the deploy form. The installer generates or stores them as masked values
-  after OAuth. `BETTER_AUTH_URL` normally remains unset because Pro derives the request origin.
+  after OAuth. Pro derives the request origin, so the form does not expose `BETTER_AUTH_URL`.
 - Build/deploy command: keep the public bootstrap repository's `pnpm run deploy` command. It has no
   standalone `pnpm run build` script. The first run deploys the installer; the licensed build
   verifies the signed artifact, applies migrations, deploys Pro, and prints the setup link.

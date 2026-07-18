@@ -1,4 +1,5 @@
 import type { WorkerEnv } from "../../lib/env";
+import { hqbaseProProductConfig } from "../../lib/product-config";
 
 export async function revokeSetupGrant(
   env: WorkerEnv,
@@ -19,7 +20,8 @@ export async function revokeSetupGrant(
     headers: { "content-type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({
       token,
-      ...(env.CLOUDFLARE_OAUTH_CLIENT_ID ? { client_id: env.CLOUDFLARE_OAUTH_CLIENT_ID } : {})
+      client_id:
+        env.CLOUDFLARE_OAUTH_CLIENT_ID?.trim() || hqbaseProProductConfig.cloudflareOAuthClientId
     })
   });
 }

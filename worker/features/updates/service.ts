@@ -2,11 +2,11 @@ import { z } from "zod";
 import { getSetting } from "../../db/client";
 import type { WorkerEnv } from "../../lib/env";
 import { AppError } from "../../lib/errors";
+import { hqbaseProProductConfig } from "../../lib/product-config";
 import type { ReleaseManifest, UpdateStatus } from "./types";
 
 const edition = "pro" as const;
 const installedSchemaVersion = 11;
-const defaultReleaseUrl = "https://billing.hqbase.io/v1/releases";
 const envelopeSchema = z.object({ payload: z.string().min(1), signature: z.string().min(1) });
 const manifestSchema = z.object({
   format: z.literal("hqbase-release-v1"),
@@ -31,13 +31,18 @@ export async function getUpdateStatus(
 ): Promise<UpdateStatus> {
   const installedVersion = env.HQBASE_APP_VERSION ?? "0.1.1";
   const response = await fetcher(
-    `${env.HQBASE_RELEASES_URL ?? defaultReleaseUrl}/${edition}/stable`,
+    `${env.HQBASE_RELEASES_URL?.trim() || hqbaseProProductConfig.releasesUrl}/${edition}/stable`,
     { headers: { accept: "application/json" }, signal: AbortSignal.timeout(5_000) }
   );
   if (!response.ok)
     throw new AppError("UPDATE_CHECK_FAILED", "Update service is unavailable.", 503);
   const envelope = envelopeSchema.parse(await response.json());
-  if (!(await verifyEnvelope(envelope, env.HQBASE_RELEASE_PUBLIC_KEY)))
+  if (
+    !(await verifyEnvelope(
+      envelope,
+      env.HQBASE_RELEASE_PUBLIC_KEY?.trim() || hqbaseProProductConfig.releasePublicKey
+    ))
+  )
     throw new AppError("UPDATE_SIGNATURE_INVALID", "Release signature verification failed.", 503);
   const release = manifestSchema.parse(JSON.parse(decodeBase64Url(envelope.payload)));
   if (release.edition !== edition)

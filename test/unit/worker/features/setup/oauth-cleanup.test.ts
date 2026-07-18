@@ -17,7 +17,6 @@ describe("setup OAuth cleanup", () => {
 
     await revokeSetupGrant(
       {
-        CLOUDFLARE_OAUTH_CLIENT_ID: "client",
         HQBASE_SETUP_OAUTH_ACCESS_TOKEN: "access-token",
         HQBASE_WORKER_NAME: "hqbase-pro"
       } as WorkerEnv,
@@ -29,5 +28,6 @@ describe("setup OAuth cleanup", () => {
       "https://dash.cloudflare.com/oauth2/revoke"
     ]);
     expect(String(requests[1]?.init?.body)).toContain("token=access-token");
+    expect(String(requests[1]?.init?.body)).toContain("client_id=1c413f324b518b452096929b847e6703");
   });
 });

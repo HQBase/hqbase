@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { WorkerEnv } from "../../lib/env";
 import { AppError } from "../../lib/errors";
+import { hqbaseProProductConfig } from "../../lib/product-config";
 import { decryptLicenseKey, encryptLicenseKey } from "./crypto";
 import {
   ensureEntitlement,
@@ -20,7 +21,6 @@ const responseSchema = z.object({
   checkedAt: z.string().datetime()
 });
 
-const billingUrl = "https://billing.hqbase.io";
 const graceMilliseconds = 7 * 24 * 60 * 60 * 1000;
 
 export async function activateWorkspace(
@@ -126,7 +126,10 @@ async function callBilling(
   };
   const response = env.BILLING
     ? await env.BILLING.fetch(new Request(`https://billing.internal${path}`, init))
-    : await fetcher(`${env.HQBASE_BILLING_URL ?? billingUrl}${path}`, init);
+    : await fetcher(
+        `${env.HQBASE_BILLING_URL?.trim() || hqbaseProProductConfig.billingUrl}${path}`,
+        init
+      );
   if (!response.ok) {
     const invalid = response.status === 400 || response.status === 403 || response.status === 404;
     throw new AppError(
