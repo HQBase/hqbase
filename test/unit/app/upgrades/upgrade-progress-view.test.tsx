@@ -16,7 +16,7 @@ describe("upgrade progress UI", () => {
     expect(html).toContain('aria-label="Upgrade progress"');
     expect(html).toContain("Authorize Cloudflare and upgrade");
     expect(html).toContain("Community installation found");
-    expect(html).toContain("1 / 7");
+    expect(html).not.toContain('class="product-header"');
   });
 
   it("keeps an authentication failure inside the resumable checkpoint", () => {
@@ -24,7 +24,6 @@ describe("upgrade progress UI", () => {
       <UpgradeProgressView
         active="migration_complete"
         busy={false}
-        completed={4}
         error="Sign in is required."
         needsSignIn
         status={{

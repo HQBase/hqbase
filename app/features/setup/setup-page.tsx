@@ -5,26 +5,34 @@ import { DomainStep } from "./setup-domain-screen";
 import { SetupFrame } from "./setup-frame";
 import { WizardLayout } from "./setup-wizard-parts";
 import { MailboxStep, OwnerStep } from "./setup-workspace-screens";
-import { ACCESS_STEP, DOMAIN_STEP, MAILBOX_STEP, OWNER_STEP, useSetupFlow } from "./use-setup-flow";
+import { useSetupFlow } from "./use-setup-flow";
 
 export function SetupPage({ onComplete }: { onComplete: () => void }): React.ReactElement {
   const flow = useSetupFlow(onComplete);
+  const screens = [
+    <AccessStep key="access" {...flow.access} />,
+    <DomainStep key="domain" {...flow.domain} />,
+    <OwnerStep key="owner" {...flow.owner} />,
+    <MailboxStep key="mailboxes" {...flow.mailboxes} />
+  ];
+  const screen = flow.accessReady ? screens[flow.activeStep] : screens[0];
 
   return (
     <SetupFrame
-      description="Community onboarding resumes from the last completed setup step."
-      progress={`${flow.activeStep === ACCESS_STEP ? 3 : 4} / 5`}
-      title="Set up HQBase"
+      description={
+        flow.accessReady
+          ? "Add your domain, owner account, and mailboxes."
+          : "Complete installation before configuring your workspace."
+      }
+      title={flow.accessReady ? "Configure workspace" : "Set up HQBase Community"}
     >
       <WizardLayout
+        accessFailed={flow.accessFailed}
+        accessReady={flow.accessReady}
         activeStep={flow.activeStep}
         steps={flow.steps}
-        onStepSelect={flow.onStepSelect}
       >
-        {flow.activeStep === ACCESS_STEP ? <AccessStep {...flow.access} /> : null}
-        {flow.activeStep === DOMAIN_STEP ? <DomainStep {...flow.domain} /> : null}
-        {flow.activeStep === OWNER_STEP ? <OwnerStep {...flow.owner} /> : null}
-        {flow.activeStep === MAILBOX_STEP ? <MailboxStep {...flow.mailboxes} /> : null}
+        {screen}
       </WizardLayout>
     </SetupFrame>
   );

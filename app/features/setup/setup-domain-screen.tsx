@@ -1,10 +1,15 @@
-import { CheckCircle2, CircleAlert, Globe2, Link2 } from "lucide-react";
+import { CheckCircle2, Circle, CircleAlert } from "lucide-react";
 import type * as React from "react";
+
 import { ProUpgradeCard } from "@/components/pro-upgrade";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Field, FieldDescription, FieldError, FieldLabel } from "@/components/ui/field";
+import {
+  Field,
+  FieldDescription,
+  FieldError,
+  FieldLabel,
+  FieldLabelRow
+} from "@/components/ui/field";
 import {
   InputGroup,
   InputGroupAddon,
@@ -43,7 +48,7 @@ export function DomainStep({
   connectionError: string | null;
   errors: DomainErrors;
   isLoading: boolean;
-  onBack: () => void;
+  onBack: (() => void) | null;
   onConnect: () => void;
   onSelect: (zoneId: string) => void;
   result: CloudflareConfigureResult | null;
@@ -52,24 +57,36 @@ export function DomainStep({
   setAppSubdomain: (value: string) => void;
   zones: CloudflareZone[];
 }): React.ReactElement {
-  const failed = result?.steps.some((step) => step.status === "failed") ?? false;
-  const nextLabel = isLoading ? "Connecting..." : failed ? "Retry" : "Connect domain";
+  const failed = result ? !isDomainReady(result) : false;
 
   return (
     <WizardPanel
       actions={
         <WizardActions
           isLoading={isLoading}
-          nextLabel={nextLabel}
+          nextLabel={isLoading ? "Connecting..." : failed ? "Retry" : "Connect domain"}
           onBack={onBack}
           onNext={onConnect}
         />
       }
-      description="Choose the domain for mail and your HQBase URL."
-      title="Connect a domain"
+      ariaLabel="Domain configuration"
+      description=""
+      showHeader={false}
+      title=""
     >
+      {connectionError ? (
+        <Alert variant="destructive">
+          <CircleAlert />
+          <AlertTitle>Could not connect the domain</AlertTitle>
+          <AlertDescription>{connectionError}</AlertDescription>
+        </Alert>
+      ) : null}
+
       <Field data-invalid={Boolean(errors.selectedZoneId)}>
-        <FieldLabel htmlFor="setup-domain">Cloudflare domain</FieldLabel>
+        <FieldLabelRow>
+          <FieldLabel htmlFor="setup-domain">Select email domain</FieldLabel>
+          {errors.selectedZoneId ? <FieldError>{errors.selectedZoneId}</FieldError> : null}
+        </FieldLabelRow>
         <Select value={selectedZoneId} onValueChange={onSelect}>
           <SelectTrigger id="setup-domain" aria-invalid={Boolean(errors.selectedZoneId)}>
             <SelectValue placeholder="Choose a domain" />
@@ -87,37 +104,27 @@ export function DomainStep({
         <FieldDescription>
           Shared mailboxes use this domain. Missing? Add it in Cloudflare, then reverify.
         </FieldDescription>
-        {errors.selectedZoneId ? <FieldError>{errors.selectedZoneId}</FieldError> : null}
+        {result ? <CompactDomainChecks result={result} /> : null}
       </Field>
 
       {zones.length > 1 ? (
         <ProUpgradeCard
-          description="Connect every domain in this Cloudflare account, choose the portal domain separately, and manage all addresses from one workspace."
+          description="Connect every domain in this Cloudflare account and manage all addresses from one workspace."
           placement="onboarding-domains"
           title={`You have ${zones.length} domains. Pro can connect them together.`}
         />
       ) : null}
 
-      <Card className="bg-background/40 shadow-none">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-sm font-medium">Automatic setup</CardTitle>
-        </CardHeader>
-        <CardContent className="grid gap-2 text-sm sm:grid-cols-2">
-          <SetupOutcome icon={Globe2} text="Email Routing + DNS" />
-          <SetupOutcome icon={Link2} text="Catch-all → HQBase" />
-          <SetupOutcome icon={CheckCircle2} text="Outbound sending" />
-          <SetupOutcome icon={CheckCircle2} text="Readiness check" />
-        </CardContent>
-      </Card>
-
       <Field data-invalid={Boolean(errors.appSubdomain)}>
-        <FieldLabel htmlFor="app-subdomain">Workspace address</FieldLabel>
+        <FieldLabelRow>
+          <FieldLabel htmlFor="app-subdomain">Workspace URL</FieldLabel>
+          {errors.appSubdomain ? <FieldError>{errors.appSubdomain}</FieldError> : null}
+        </FieldLabelRow>
         <InputGroup data-invalid={Boolean(errors.appSubdomain)}>
           <InputGroupInput
             aria-invalid={Boolean(errors.appSubdomain)}
             autoCapitalize="none"
             id="app-subdomain"
-            placeholder="workspace"
             value={appSubdomain}
             onChange={(event) => setAppSubdomain(event.target.value)}
           />
@@ -125,60 +132,91 @@ export function DomainStep({
             <InputGroupText>.{selectedZone?.name ?? "yourdomain.com"}</InputGroupText>
           </InputGroupAddon>
         </InputGroup>
-        <FieldDescription>URL: {appHostname || "workspace.yourdomain.com"}</FieldDescription>
-        {errors.appSubdomain ? <FieldError>{errors.appSubdomain}</FieldError> : null}
+        <FieldDescription>
+          Your webmail UI will be available at {appHostname || `${appSubdomain}.yourdomain.com`}.
+        </FieldDescription>
       </Field>
-
-      {connectionError ? (
-        <Alert variant="destructive">
-          <CircleAlert />
-          <AlertTitle>Could not connect the domain</AlertTitle>
-          <AlertDescription>{connectionError}</AlertDescription>
-        </Alert>
-      ) : null}
-
-      {result ? <ConnectionResult result={result} /> : null}
     </WizardPanel>
   );
 }
 
-function SetupOutcome({ icon: Icon, text }: { icon: typeof Globe2; text: string }) {
+function CompactDomainChecks({ result }: { result: CloudflareConfigureResult }) {
+  const checks = [
+    ...result.steps.map((step) => ({
+      label: compactStepLabel(step.id, step.label),
+      message: step.status === "failed" ? step.message : null,
+      status: step.status
+    })),
+    {
+      label: "Readiness check",
+      message: result.status.ready ? null : describeReadinessFailure(result.status),
+      status: result.status.ready ? ("success" as const) : ("failed" as const)
+    }
+  ];
+
   return (
-    <div className="flex items-center gap-2 rounded-md bg-muted/55 px-3 py-2.5">
-      <Icon className="size-3.5 shrink-0 text-muted-foreground" />
-      <span>{text}</span>
+    <div className="flex flex-col gap-1 pt-2">
+      {checks.map((check) => (
+        <div className="flex items-start gap-2 text-xs" key={check.label}>
+          {check.status === "failed" ? (
+            <CircleAlert className="mt-0.5 size-3.5 shrink-0 text-destructive" />
+          ) : check.status === "skipped" ? (
+            <Circle className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
+          ) : (
+            <CheckCircle2 className="mt-0.5 size-3.5 shrink-0 text-primary" />
+          )}
+          <div className="min-w-0">
+            <p
+              className={
+                check.status === "failed"
+                  ? "text-xs leading-4 text-destructive"
+                  : "text-xs leading-4 text-foreground"
+              }
+            >
+              {check.label}
+            </p>
+            {check.message ? (
+              <p className="mt-0.5 break-words text-xs leading-4 text-muted-foreground">
+                {check.message}
+              </p>
+            ) : null}
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
 
-function ConnectionResult({ result }: { result: CloudflareConfigureResult }): React.ReactElement {
-  const ready = result.status.ready && result.steps.every((step) => step.status !== "failed");
-  return (
-    <Card>
-      <CardHeader className="flex-row items-center justify-between gap-3">
-        <CardTitle className="text-sm font-medium">Connection checks</CardTitle>
-        <Badge variant={ready ? "secondary" : "outline"}>
-          {ready ? "Ready" : "Needs attention"}
-        </Badge>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-3 text-sm">
-        {result.steps.map((step) => {
-          const ok = step.status === "success" || step.status === "skipped";
-          return (
-            <div className="flex items-start gap-2" key={step.id}>
-              {ok ? (
-                <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-primary" />
-              ) : (
-                <CircleAlert className="mt-0.5 size-4 shrink-0 text-destructive" />
-              )}
-              <div className="min-w-0">
-                <p className="font-medium">{step.label}</p>
-                <p className="break-words leading-5 text-muted-foreground">{step.message}</p>
-              </div>
-            </div>
-          );
-        })}
-      </CardContent>
-    </Card>
-  );
+function isDomainReady(result: CloudflareConfigureResult): boolean {
+  return result.status.ready && result.steps.every((step) => step.status !== "failed");
+}
+
+function compactStepLabel(id: string, fallback: string): string {
+  if (id === "custom-domain") return "Attach app URL";
+  if (id === "service-domain") return "Attach service URL";
+  if (id === "routing") return "Email Routing + DNS";
+  if (id === "catch-all") return "Catch-all → HQBase";
+  if (id === "sending") return "Outbound sending";
+  return fallback;
+}
+
+function describeReadinessFailure(status: CloudflareConfigureResult["status"]): string {
+  const issues: string[] = [];
+  if (status.zone.status !== "active") issues.push("The Cloudflare domain is not active.");
+  if (!status.routing.enabled) {
+    issues.push(status.routing.error ?? "Email Routing is not enabled.");
+  } else if (!status.routing.dnsReady) {
+    issues.push(
+      status.routing.missingRecords > 0
+        ? `Cloudflare still reports ${status.routing.missingRecords} missing Email Routing DNS records.`
+        : (status.routing.error ?? "Email Routing DNS is not ready yet.")
+    );
+  }
+  if (!status.catchAll.enabled || !status.catchAll.configuredForWorker) {
+    issues.push(status.catchAll.error ?? "Catch-all is not routing to this HQBase Worker.");
+  }
+  if (!status.sending.enabled) {
+    issues.push(status.sending.error ?? "Email Sending is not enabled.");
+  }
+  return issues.join(" ") || "Cloudflare has not reported this domain as ready yet.";
 }

@@ -1,130 +1,16 @@
 import type { LucideIcon } from "lucide-react";
-import { ArrowLeft, ArrowRight, Check, Circle, Cloud, Loader2, Settings2 } from "lucide-react";
-import * as React from "react";
+import { ArrowLeft, ArrowRight, Check, Circle, CircleAlert, Loader2 } from "lucide-react";
+import type * as React from "react";
 
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger
-} from "@/components/ui/accordion";
+import { AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Button } from "@/components/ui/button";
+import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/cn";
 
 export type WizardStep = {
-  canOpen: boolean;
-  description: string;
   icon: LucideIcon;
-  id: string;
-  isComplete: boolean;
   title: string;
 };
-
-export function WizardLayout({
-  activeStep,
-  children,
-  onStepSelect,
-  steps
-}: {
-  activeStep: number;
-  children: React.ReactNode;
-  onStepSelect: (index: number) => void;
-  steps: WizardStep[];
-}): React.ReactElement {
-  const current = activeStep === 0 ? "cloudflare" : "configure";
-  const [openStep, setOpenStep] = React.useState(current);
-  React.useEffect(() => setOpenStep(current), [current]);
-  const configureStep = steps[activeStep];
-
-  return (
-    <Accordion
-      aria-label="Setup progress"
-      className="flex flex-col gap-2"
-      collapsible
-      type="single"
-      value={openStep}
-      onValueChange={(value) => {
-        if (value) setOpenStep(value);
-      }}
-    >
-      <OnboardingStep
-        description="Workers Paid for outbound mail, R2 enabled, and an active domain on Cloudflare DNS."
-        icon={Check}
-        status="complete"
-        title="Requirements"
-        value="requirements"
-      >
-        <ul className="grid gap-2 text-sm text-muted-foreground sm:grid-cols-3">
-          <li className="rounded-md border bg-background/40 p-3">
-            <strong className="block text-foreground">Active domain</strong>Using Cloudflare DNS
-          </li>
-          <li className="rounded-md border bg-background/40 p-3">
-            <strong className="block text-foreground">R2</strong>Enabled for mail storage
-          </li>
-          <li className="rounded-md border bg-background/40 p-3">
-            <strong className="block text-foreground">Workers Paid</strong>Required for arbitrary
-            recipients
-          </li>
-        </ul>
-      </OnboardingStep>
-      <OnboardingStep
-        description="The Community Worker and customer-owned storage are deployed."
-        icon={Check}
-        status="complete"
-        title="Deploy resources"
-        value="deploy"
-      >
-        <p className="text-sm text-muted-foreground">
-          Cloudflare created this Worker, its D1 database, and its R2 mail bucket in your account.
-        </p>
-      </OnboardingStep>
-      <OnboardingStep
-        description={
-          activeStep === 0 ? (steps[0]?.description ?? "Authorize once") : "Access verified"
-        }
-        icon={Cloud}
-        status={activeStep === 0 ? "current" : "complete"}
-        title="Connect Cloudflare"
-        value="cloudflare"
-      >
-        {activeStep === 0 ? (
-          <div className="[&>section>header]:sr-only">{children}</div>
-        ) : (
-          <p className="text-sm text-muted-foreground">
-            The temporary setup authorization is connected. You can review its permission boundary
-            in this step.
-          </p>
-        )}
-      </OnboardingStep>
-      <OnboardingStep
-        description={
-          activeStep > 0
-            ? `${configureStep?.title ?? "Workspace"} · ${activeStep} of 3`
-            : "Domain, owner, and mailboxes"
-        }
-        disabled={activeStep === 0}
-        icon={Settings2}
-        status={activeStep > 0 ? "current" : "upcoming"}
-        title="Configure workspace"
-        value="configure"
-        onOpen={() => {
-          if (activeStep === 0) return;
-          onStepSelect(activeStep);
-        }}
-      >
-        {activeStep > 0 ? <div className="[&>section>header]:sr-only">{children}</div> : null}
-      </OnboardingStep>
-      <OnboardingStep
-        description="Sign in to your self-hosted workspace."
-        disabled
-        icon={Circle}
-        status="upcoming"
-        title="Ready"
-        value="ready"
-      />
-    </Accordion>
-  );
-}
 
 export function OnboardingStep({
   children,
@@ -186,26 +72,198 @@ export function OnboardingStep({
   );
 }
 
-export function WizardPanel({
-  actions,
+export function WizardLayout({
+  accessFailed = false,
+  accessReady,
+  activeStep,
+  children,
+  steps
+}: {
+  accessFailed?: boolean;
+  accessReady: boolean;
+  activeStep: number;
+  children: React.ReactNode;
+  steps: WizardStep[];
+}): React.ReactElement {
+  if (!accessReady) {
+    return <InstallationTimeline failed={accessFailed}>{children}</InstallationTimeline>;
+  }
+
+  return (
+    <section aria-label="Configure workspace" className="py-6">
+      <ConfigurationProgress activeStep={activeStep} steps={steps} />
+      <div className="mt-8">{children}</div>
+    </section>
+  );
+}
+
+function InstallationTimeline({
+  children,
+  failed
+}: {
+  children: React.ReactNode;
+  failed: boolean;
+}): React.ReactElement {
+  return (
+    <ol aria-label="Installation steps" className="mt-6 space-y-6">
+      <InstallationTimelineStep
+        activity="Complete"
+        description="Community Worker and storage"
+        isLast={false}
+        status="complete"
+        title="Deploy resources"
+      />
+      <InstallationTimelineStep
+        activity={failed ? "Needs attention" : "In progress"}
+        description="Temporary setup access"
+        isLast
+        status={failed ? "failed" : "current"}
+        title="Authorize Cloudflare"
+      >
+        {children}
+      </InstallationTimelineStep>
+    </ol>
+  );
+}
+
+function InstallationTimelineStep({
+  activity,
   children,
   description,
+  isLast,
+  status,
   title
 }: {
-  actions: React.ReactNode;
-  children: React.ReactNode;
+  activity: string;
+  children?: React.ReactNode;
   description: string;
+  isLast: boolean;
+  status: "complete" | "current" | "failed";
   title: string;
 }): React.ReactElement {
   return (
-    <section aria-labelledby="setup-step-title" className="w-full">
-      <header className="border-b border-border/80 pb-6">
-        <h2 id="setup-step-title" className="text-xl font-medium tracking-tight sm:text-2xl">
-          {title}
-        </h2>
-        <p className="mt-1.5 max-w-2xl text-sm leading-6 text-muted-foreground">{description}</p>
-      </header>
-      <div className="flex flex-col gap-6 py-6">{children}</div>
+    <li className="relative flex gap-x-3">
+      <div
+        className={cn(
+          "absolute left-0 top-0 flex w-6 justify-center",
+          isLast ? "h-6" : "-bottom-6"
+        )}
+      >
+        <span aria-hidden="true" className="w-px bg-border" />
+      </div>
+      <div className="flex items-start space-x-2.5">
+        <div className="relative flex size-6 flex-none items-center justify-center bg-background">
+          {status === "complete" ? (
+            <Check aria-hidden="true" className="size-5 text-primary" />
+          ) : status === "failed" ? (
+            <CircleAlert
+              aria-hidden="true"
+              className="size-4 bg-background text-destructive ring-4 ring-background"
+            />
+          ) : (
+            <span
+              aria-hidden="true"
+              className="size-2.5 rounded-full bg-primary ring-4 ring-background"
+            />
+          )}
+        </div>
+        <div className="min-w-0">
+          <p className="mt-0.5 text-sm font-medium text-foreground">
+            {title}{" "}
+            <span
+              className={cn(
+                "font-normal text-muted-foreground/60",
+                status === "failed" && "text-destructive"
+              )}
+            >
+              · {activity}
+            </span>
+          </p>
+          <p className="mt-0.5 text-sm leading-6 text-muted-foreground">{description}</p>
+          {children ? <div className="mt-3">{children}</div> : null}
+        </div>
+      </div>
+    </li>
+  );
+}
+
+function ConfigurationProgress({
+  activeStep,
+  steps
+}: {
+  activeStep: number;
+  steps: WizardStep[];
+}): React.ReactElement {
+  const activeIndex = Math.max(0, activeStep - 1);
+
+  return (
+    <ol aria-label="Workspace configuration steps" className="grid grid-cols-3 gap-2">
+      {steps.map((step, index) => {
+        const status =
+          index < activeIndex ? "complete" : index === activeIndex ? "active" : "upcoming";
+        const StepIcon = step.icon;
+
+        return (
+          <li className="min-w-0" key={step.title}>
+            <Progress
+              aria-label={`${step.title}: ${status}`}
+              className={cn("h-1.5", status === "active" && "animate-pulse")}
+              value={status === "complete" ? 100 : status === "active" ? 50 : 0}
+            />
+            <div className="mt-2 flex min-w-0 items-start gap-1.5">
+              {status === "complete" ? (
+                <Check aria-hidden="true" className="size-4 shrink-0 text-primary" />
+              ) : status === "active" ? (
+                <StepIcon aria-hidden="true" className="size-4 shrink-0 text-primary" />
+              ) : (
+                <Circle aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" />
+              )}
+              <span
+                className={cn(
+                  "min-w-0 text-xs leading-4 text-muted-foreground",
+                  status === "active" && "font-medium text-foreground"
+                )}
+              >
+                {step.title}
+              </span>
+            </div>
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
+
+export function WizardPanel({
+  actions,
+  ariaLabel,
+  children,
+  description,
+  showHeader = true,
+  title
+}: {
+  actions: React.ReactNode;
+  ariaLabel?: string;
+  children: React.ReactNode;
+  description: string;
+  showHeader?: boolean;
+  title: string;
+}): React.ReactElement {
+  return (
+    <section
+      aria-label={showHeader ? undefined : (ariaLabel ?? "Setup step")}
+      aria-labelledby={showHeader ? "setup-step-title" : undefined}
+      className="w-full"
+    >
+      {showHeader ? (
+        <header className="border-b border-border/80 pb-6">
+          <h2 id="setup-step-title" className="text-xl font-medium tracking-tight sm:text-2xl">
+            {title}
+          </h2>
+          <p className="mt-1.5 max-w-2xl text-sm leading-6 text-muted-foreground">{description}</p>
+        </header>
+      ) : null}
+      <div className={cn("flex flex-col gap-6", showHeader ? "py-6" : "pb-6")}>{children}</div>
       {actions ? <footer className="border-t border-border/80 pt-5">{actions}</footer> : null}
     </section>
   );

@@ -10,11 +10,9 @@ import {
 import type { UpgradeState, UpgradeStatus } from "./types";
 import {
   activeProgress,
-  reached,
   UpgradeAttentionView,
   UpgradeAuthorizeView,
-  UpgradeProgressView,
-  upgradeProgress
+  UpgradeProgressView
 } from "./upgrade-progress-view";
 
 const promotionHandoffRetryLimit = 30;
@@ -85,14 +83,10 @@ export function UpgradeExperience(): React.ReactElement | null {
     return <UpgradeAttentionView onReturn={() => window.location.assign("/")} />;
   }
   const active = activeProgress(status);
-  const completed = upgradeProgress.filter(
-    ([, required]) => status && reached(status.state, required)
-  ).length;
   return (
     <UpgradeProgressView
       active={active}
       busy={busy}
-      completed={completed}
       error={error}
       needsSignIn={requiresUpgradeSignIn(errorCode)}
       status={status}

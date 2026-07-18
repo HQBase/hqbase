@@ -1,6 +1,6 @@
 {
   "name": "hqbase",
-  "version": "0.1.22",
+  "version": "0.1.23",
   "private": true,
   "type": "module",
   "packageManager": "pnpm@11.7.0",
@@ -10,7 +10,8 @@
   "scripts": {
     "dev": "wrangler dev --port 8787",
     "dev:vite": "vite --host 127.0.0.1 --port 5173",
-    "build": "vite build",
+    "dev:setup-ui": "vite --host 127.0.0.1 --port 5173 --open /__ui/setup?state=loading",
+    "build": "vite build && node scripts/check-setup-preview-boundary.mjs",
     "deploy": "node scripts/release/deploy.mjs",
     "db:migrate:local": "wrangler d1 migrations apply DB --local",
     "db:migrate:remote": "wrangler d1 migrations apply DB --remote",
