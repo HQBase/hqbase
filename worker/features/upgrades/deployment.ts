@@ -86,11 +86,6 @@ export async function uploadProCandidate(
       name: "HQBASE_UPGRADE_WORKSPACE_HOSTNAME",
       type: "plain_text",
       text: new URL(upgrade.workspaceOrigin).hostname
-    },
-    {
-      name: "CLOUDFLARE_UPGRADE_OAUTH_CLIENT_ID",
-      type: "plain_text",
-      text: env.HQBASE_UPGRADE_CLOUDFLARE_OAUTH_CLIENT_ID ?? ""
     }
   );
   const metadata = {

@@ -11,7 +11,14 @@ The README includes a Deploy to Cloudflare button. Before publishing, point it a
 pnpm hqbase:button --repo-url https://github.com/OWNER/REPO
 ```
 
-Cloudflare's deploy flow clones the repository, prompts for configured variables, provisions supported resources from `wrangler.jsonc`, and runs the deploy command. That command verifies and deploys the current signed Community stable artifact instead of treating the cloned source as a released Worker. On the first customer-owned build, it generates a unique `BETTER_AUTH_SECRET`, uploads it as a masked Worker secret, and deletes the temporary local file. Later builds preserve the existing value instead of rotating it.
+Cloudflare's deploy flow clones the repository, prompts only for customer-owned resource names,
+provisions supported resources from `wrangler.jsonc`, and runs the deploy command. HQBase OAuth
+identifiers and callbacks, service endpoints, and the release verification key are compiled public
+product constants rather than editable form fields. The deploy command derives the selected Worker
+name and verified release version after the form, then deploys the signed Community stable artifact
+instead of treating the cloned source as a released Worker. On the first customer-owned build, it
+generates a unique `BETTER_AUTH_SECRET`, uploads it as a masked Worker secret, and deletes the
+temporary local file. Later builds preserve the existing value instead of rotating it.
 
 Cloudflare may rewrite `wrangler.jsonc.name` when the installer chooses a custom
 project name. `pnpm deploy` treats that configured name as the source of truth
@@ -35,7 +42,6 @@ domain Active before completing `/setup`.
 - D1 read replication: leave disabled for the MVP.
 - R2 bucket: choose Create new. Keep `hqbase-mail`, or rename it for the target environment.
 - R2 location hint: leave blank/automatic unless the deployer has a specific data-location requirement.
-- `BETTER_AUTH_URL`: normally leave unset. HQBase derives the request origin at runtime.
 - Build command: keep `pnpm run build`.
 - Deploy command: keep `pnpm run deploy`; this runs the build, applies D1 migrations by the `DB` binding, deploys the Worker, and prints the setup link.
 
@@ -99,7 +105,9 @@ pnpm check
 pnpm deploy:dry-run
 ```
 
-The dry run should show these bindings: `DB`, `MAIL_OBJECTS`, `MAIL_SENDER`, and `ASSETS`.
+The dry run should show these bindings: `DB`, `MAIL_OBJECTS`, `MAIL_SENDER`, and `ASSETS`. The
+checked-in deploy-button configuration intentionally has no editable `vars`; deployment metadata is
+added by the verified deploy command.
 
 ## Setup After Deploy
 

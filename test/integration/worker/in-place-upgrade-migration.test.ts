@@ -303,6 +303,9 @@ describe("in-place Community to Pro migration", () => {
       type: "secret_text",
       text: "temporary-cloudflare-token"
     });
+    expect(bindings.some((binding) => binding.name === "CLOUDFLARE_UPGRADE_OAUTH_CLIENT_ID")).toBe(
+      false
+    );
   });
 
   it("fails closed when latest cannot inherit from the recorded active Community version", async () => {
