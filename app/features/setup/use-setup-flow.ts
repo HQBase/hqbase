@@ -1,4 +1,4 @@
-import { Globe2, Inbox, KeyRound, UserRound } from "lucide-react";
+import { Globe2, Inbox, UserRound } from "lucide-react";
 import * as React from "react";
 import { toast } from "sonner";
 
@@ -16,7 +16,6 @@ export const MAILBOX_STEP = 3;
 
 export function useSetupFlow(onComplete: () => void) {
   const [activeStep, setActiveStep] = React.useState(ACCESS_STEP);
-  const [furthestStep, setFurthestStep] = React.useState(ACCESS_STEP);
   const [ownerName, setOwnerName] = React.useState("");
   const [ownerEmail, setOwnerEmail] = React.useState("");
   const [ownerPassword, setOwnerPassword] = React.useState("");
@@ -34,7 +33,6 @@ export function useSetupFlow(onComplete: () => void) {
     const saved = readSetupDraft();
     if (!saved) return;
     setActiveStep(saved.activeStep);
-    setFurthestStep(saved.furthestStep);
     setOwnerName(saved.ownerName);
     setOwnerEmail(saved.ownerEmail);
     setCreateOwnerMailbox(saved.createOwnerMailbox);
@@ -47,21 +45,20 @@ export function useSetupFlow(onComplete: () => void) {
       JSON.stringify({
         activeStep,
         createOwnerMailbox,
-        furthestStep,
         mailboxes,
         ownerEmail,
         ownerName
       })
     );
-  }, [activeStep, createOwnerMailbox, furthestStep, mailboxes, ownerEmail, ownerName]);
+  }, [activeStep, createOwnerMailbox, mailboxes, ownerEmail, ownerName]);
 
   const cloudflare = useSetupCloudflare({
-    onConnectionInvalidated: () => setFurthestStep((current) => Math.min(current, DOMAIN_STEP)),
+    onConnectionInvalidated: () => setActiveStep((current) => Math.min(current, DOMAIN_STEP)),
     onDomainChanged: (previousDomain, domain) =>
       setMailboxes((current) => retargetMailboxes(current, previousDomain, domain)),
     onDomainConnected: () => advanceTo(OWNER_STEP),
-    onTokenChanged: () => setFurthestStep(ACCESS_STEP),
-    onTokenVerified: () => advanceTo(DOMAIN_STEP)
+    onTokenChanged: () => setActiveStep(ACCESS_STEP),
+    onTokenVerified: () => setActiveStep(DOMAIN_STEP)
   });
   const ownerDraft = { email: ownerEmail, name: ownerName, password: ownerPassword };
   const ownerMailboxDraft = buildOwnerMailboxDraft(ownerEmail, ownerName, cloudflare.primaryDomain);
@@ -69,56 +66,19 @@ export function useSetupFlow(onComplete: () => void) {
     createOwnerMailbox && ownerMailboxDraft ? [...mailboxes, ownerMailboxDraft] : mailboxes;
   const currentOwnerErrors = validateOwner(ownerDraft);
   const currentMailboxErrors = validateMailboxes(submittedMailboxes, cloudflare.primaryDomain);
-  const ownerReady = !hasErrors(currentOwnerErrors);
-  const mailboxesReady = !hasMailboxErrors(currentMailboxErrors);
   const ownerErrors = ownerAttempted ? currentOwnerErrors : {};
   const mailboxErrors = mailboxAttempted
     ? currentMailboxErrors
     : emptyMailboxErrors(submittedMailboxes.length);
 
   const steps = [
-    {
-      canOpen: furthestStep >= ACCESS_STEP,
-      description: cloudflare.tokenReady ? "Access verified" : "Authorize once",
-      icon: KeyRound,
-      id: "access",
-      isComplete: isWizardStepComplete(ACCESS_STEP, furthestStep, cloudflare.tokenReady),
-      title: "Cloudflare access"
-    },
-    {
-      canOpen: furthestStep >= DOMAIN_STEP,
-      description: cloudflare.domainConnected
-        ? cloudflare.primaryDomain
-        : "Choose and connect a domain",
-      icon: Globe2,
-      id: "domain",
-      isComplete: isWizardStepComplete(DOMAIN_STEP, furthestStep, cloudflare.domainConnected),
-      title: "Domain"
-    },
-    {
-      canOpen: furthestStep >= OWNER_STEP,
-      description: ownerReady ? ownerEmail : "Create your sign-in",
-      icon: UserRound,
-      id: "owner",
-      isComplete: isWizardStepComplete(OWNER_STEP, furthestStep, ownerReady),
-      title: "Owner account"
-    },
-    {
-      canOpen: furthestStep >= MAILBOX_STEP,
-      description:
-        furthestStep >= MAILBOX_STEP && mailboxesReady
-          ? `${submittedMailboxes.length} shared addresses`
-          : "Add shared addresses",
-      icon: Inbox,
-      id: "mailboxes",
-      isComplete: isWizardStepComplete(MAILBOX_STEP, furthestStep, mailboxesReady),
-      title: "Mailboxes"
-    }
+    { icon: Globe2, title: "Domain" },
+    { icon: UserRound, title: "Owner account" },
+    { icon: Inbox, title: "Mailboxes" }
   ];
 
   function advanceTo(step: number) {
     setActiveStep(step);
-    setFurthestStep((current) => Math.max(current, step));
   }
 
   function handleOwnerNext() {
@@ -164,25 +124,6 @@ export function useSetupFlow(onComplete: () => void) {
     }
   }
 
-  function handleStepSelect(step: number) {
-    if (step > furthestStep) return;
-    if (step >= DOMAIN_STEP && !cloudflare.tokenReady) {
-      setActiveStep(ACCESS_STEP);
-      return;
-    }
-    if (step >= OWNER_STEP && !cloudflare.domainConnected) {
-      cloudflare.requireConnection();
-      setActiveStep(DOMAIN_STEP);
-      return;
-    }
-    if (step >= MAILBOX_STEP && hasErrors(validateOwner(ownerDraft))) {
-      setOwnerAttempted(true);
-      setActiveStep(OWNER_STEP);
-      return;
-    }
-    setActiveStep(step);
-  }
-
   function updateOwner(update: () => void) {
     update();
     setSubmitError(null);
@@ -211,22 +152,20 @@ export function useSetupFlow(onComplete: () => void) {
 
   return {
     access: cloudflare.access,
+    accessFailed: Boolean(cloudflare.access.error),
+    accessReady: cloudflare.tokenReady,
     activeStep,
-    domain: { ...cloudflare.domain, onBack: () => setActiveStep(ACCESS_STEP) },
+    domain: { ...cloudflare.domain, onBack: null },
     mailboxes: {
       createOwnerMailbox,
       errors: mailboxErrors,
       isPending,
       mailboxes,
       ownerMailboxDraft,
-      ownerEmail,
-      primaryDomain: cloudflare.primaryDomain,
       submitError,
       onAdd: addMailbox,
       onBack: () => setActiveStep(OWNER_STEP),
       onComplete: () => void handleComplete(),
-      onEditDomain: () => setActiveStep(DOMAIN_STEP),
-      onEditOwner: () => setActiveStep(OWNER_STEP),
       onRemove: removeMailbox,
       onSetCreateOwnerMailbox: (checked: boolean) => {
         setCreateOwnerMailbox(checked);
@@ -245,15 +184,13 @@ export function useSetupFlow(onComplete: () => void) {
       onBack: () => setActiveStep(DOMAIN_STEP),
       onNext: handleOwnerNext
     },
-    steps,
-    onStepSelect: handleStepSelect
+    steps
   };
 }
 
 function readSetupDraft(): {
   activeStep: number;
   createOwnerMailbox: boolean;
-  furthestStep: number;
   mailboxes: MailboxDraft[];
   ownerEmail: string;
   ownerName: string;
@@ -266,7 +203,6 @@ function readSetupDraft(): {
     return {
       activeStep: Math.min(MAILBOX_STEP, Math.max(ACCESS_STEP, Number(value.activeStep) || 0)),
       createOwnerMailbox: value.createOwnerMailbox === true,
-      furthestStep: Math.min(MAILBOX_STEP, Math.max(ACCESS_STEP, Number(value.furthestStep) || 0)),
       mailboxes: value.mailboxes
         .filter((item): item is MailboxDraft =>
           Boolean(item && typeof item === "object" && "address" in item && "displayName" in item)
@@ -278,12 +214,4 @@ function readSetupDraft(): {
   } catch {
     return null;
   }
-}
-
-export function isWizardStepComplete(
-  step: number,
-  furthestStep: number,
-  isReady: boolean
-): boolean {
-  return isReady && furthestStep > step;
 }

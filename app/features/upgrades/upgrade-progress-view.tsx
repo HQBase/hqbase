@@ -31,7 +31,7 @@ export function UpgradeAuthorizeView({
   onAuthorize: () => void;
 }): React.ReactElement {
   return (
-    <UpgradeShell progress="1 / 7">
+    <UpgradeShell>
       <Accordion aria-label="Upgrade progress" type="single" value="authorize" collapsible>
         <OnboardingStep
           description="Checkout verified by HQBase Billing."
@@ -81,7 +81,7 @@ export function UpgradeAuthorizeView({
 
 export function UpgradeAttentionView({ onReturn }: { onReturn: () => void }): React.ReactElement {
   return (
-    <UpgradeShell progress="1 / 7">
+    <UpgradeShell>
       <Accordion aria-label="Upgrade progress" type="single" value="session" collapsible>
         <OnboardingStep
           description="The purchase or authorization session expired."
@@ -108,7 +108,6 @@ export function UpgradeAttentionView({ onReturn }: { onReturn: () => void }): Re
 export function UpgradeProgressView({
   active,
   busy,
-  completed,
   error,
   needsSignIn,
   onAuthorize,
@@ -118,7 +117,6 @@ export function UpgradeProgressView({
 }: {
   active: string;
   busy: boolean;
-  completed: number;
   error: string | null;
   needsSignIn: boolean;
   onAuthorize: () => void;
@@ -127,7 +125,7 @@ export function UpgradeProgressView({
   status: UpgradeStatus | null;
 }): React.ReactElement {
   return (
-    <UpgradeShell progress={`${completed} / ${upgradeProgress.length}`}>
+    <UpgradeShell>
       <Accordion aria-label="Upgrade progress" type="single" value={active} collapsible>
         {upgradeProgress.map(([label, required]) => {
           const done = status ? reached(status.state, required) : false;
@@ -219,18 +217,11 @@ function StepFeedback({
   );
 }
 
-function UpgradeShell({
-  children,
-  progress
-}: {
-  children: React.ReactNode;
-  progress: string;
-}): React.ReactElement {
+function UpgradeShell({ children }: { children: React.ReactNode }): React.ReactElement {
   return (
     <div className="fixed inset-0 z-50 overflow-auto bg-background">
       <SetupFrame
         description="Your users, mail, domains, and Cloudflare resources stay attached throughout this resumable upgrade."
-        progress={progress}
         title="Upgrade this workspace to Pro"
       >
         {children}

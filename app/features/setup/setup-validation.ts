@@ -67,7 +67,7 @@ export function validateOwner(owner: OwnerDraft): OwnerErrors {
 
   const normalizedEmail = owner.email.trim().toLowerCase();
   if (!emailSchema.safeParse(normalizedEmail).success) {
-    errors.email = "Enter a valid account email.";
+    errors.email = "Enter a valid login email.";
   }
 
   if (owner.password.length < 8) {

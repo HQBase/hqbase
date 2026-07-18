@@ -31,7 +31,7 @@ describe("setup form validation", () => {
 
   it("blocks invalid owner details before the mailbox step", () => {
     expect(validateOwner({ email: "not-an-email", name: "", password: "short" })).toEqual({
-      email: "Enter a valid account email.",
+      email: "Enter a valid login email.",
       name: "Enter your name.",
       password: "Use at least 8 characters."
     });
