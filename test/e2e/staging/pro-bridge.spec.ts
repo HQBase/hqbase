@@ -13,6 +13,27 @@ const acceptanceBinary = required("HQBASE_BRIDGE_ACCEPTANCE_BIN");
 const stagingUrl = required("HQBASE_PRO_STAGING_URL");
 
 test("Pro app password works through real IMAPS and SMTPS", async ({ page, request }) => {
+  const appOrigin = new URL(stagingUrl).origin;
+  const appShellErrors: string[] = [];
+  const recordAppShellError = (message: string): void => {
+    if (appShellErrors.length < 20) appShellErrors.push(message);
+  };
+  page.on("pageerror", (error) => recordAppShellError(`pageerror: ${error.message}`));
+  page.on("requestfailed", (failedRequest) => {
+    const url = new URL(failedRequest.url());
+    if (url.origin === appOrigin) {
+      recordAppShellError(
+        `requestfailed: ${url.pathname} (${failedRequest.failure()?.errorText ?? "unknown"})`
+      );
+    }
+  });
+  page.on("response", (response) => {
+    const url = new URL(response.url());
+    if (url.origin === appOrigin && response.status() >= 400) {
+      recordAppShellError(`response: ${response.status()} ${url.pathname}`);
+    }
+  });
+
   await expect
     .poll(
       async () => {
@@ -50,19 +71,30 @@ test("Pro app password works through real IMAPS and SMTPS", async ({ page, reque
   expect(login.ok()).toBeTruthy();
   const compose = page.getByRole("button", { name: "Compose" });
   const loginEmail = page.getByLabel("Email");
-  await expect
-    .poll(
-      async () => {
-        await page.goto("/", { waitUntil: "domcontentloaded" });
-        return (await loginEmail.isVisible()) || (await compose.isVisible());
-      },
-      {
-        intervals: [1_000, 2_000, 3_000, 5_000],
-        message: "Pro app shell becomes renderable after Worker asset propagation",
-        timeout: 60_000
-      }
-    )
-    .toBe(true);
+  try {
+    await expect
+      .poll(
+        async () => {
+          await page.goto("/", { waitUntil: "domcontentloaded" });
+          return (await loginEmail.isVisible()) || (await compose.isVisible());
+        },
+        {
+          intervals: [1_000, 2_000, 3_000, 5_000],
+          message: "Pro app shell becomes renderable after Worker asset propagation",
+          timeout: 60_000
+        }
+      )
+      .toBe(true);
+  } catch (error) {
+    const shell = await page.evaluate(() => ({
+      path: window.location.pathname,
+      rootChildren: document.querySelector("#root")?.childElementCount ?? -1,
+      scripts: [...document.scripts].map((script) => new URL(script.src).pathname),
+      title: document.title
+    }));
+    console.error("Pro app shell diagnostics", { appShellErrors, shell });
+    throw error;
+  }
   if (await loginEmail.isVisible()) {
     await loginEmail.fill(email);
     await page.getByLabel("Password").fill(password);
