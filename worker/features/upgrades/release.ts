@@ -1,5 +1,6 @@
 import type { WorkerEnv } from "../../lib/env";
 import { AppError } from "../../lib/errors";
+import { hqbaseProductConfig } from "../../lib/product-config";
 import type { UpgradeRecord } from "./types";
 
 export type ProWorkerBundle = {
@@ -38,7 +39,7 @@ export async function downloadVerifiedProBundle(
   licenseKey: string,
   fetcher: typeof fetch = fetch
 ): Promise<ProWorkerBundle> {
-  const releases = env.HQBASE_RELEASES_URL ?? "https://billing.hqbase.io/v1/releases";
+  const releases = env.HQBASE_RELEASES_URL?.trim() || hqbaseProductConfig.releasesUrl;
   const envelopeResponse = await fetcher(`${releases}/pro/stable`, {
     headers: { accept: "application/json" }
   });
@@ -50,7 +51,11 @@ export async function downloadVerifiedProBundle(
       503
     );
   }
-  await verifyEnvelope(envelope.payload, envelope.signature, env.HQBASE_RELEASE_PUBLIC_KEY);
+  await verifyEnvelope(
+    envelope.payload,
+    envelope.signature,
+    env.HQBASE_RELEASE_PUBLIC_KEY?.trim() || hqbaseProductConfig.releasePublicKey
+  );
   const manifest = JSON.parse(fromBase64UrlText(envelope.payload)) as ReleaseManifest;
   if (
     manifest.format !== "hqbase-release-v1" ||
@@ -66,7 +71,7 @@ export async function downloadVerifiedProBundle(
       409
     );
   }
-  const billing = env.HQBASE_BILLING_URL ?? "https://billing.hqbase.io";
+  const billing = env.HQBASE_BILLING_URL?.trim() || hqbaseProductConfig.billingUrl;
   const authorization = await fetcher(
     `${billing}/v1/releases/pro/${encodeURIComponent(manifest.version)}/authorize`,
     {

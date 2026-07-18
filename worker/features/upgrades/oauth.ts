@@ -1,6 +1,7 @@
 import { requireAuthContext, requireRecentSession, requireRole } from "../../auth/session";
 import type { WorkerEnv } from "../../lib/env";
 import { AppError } from "../../lib/errors";
+import { hqbaseProductConfig } from "../../lib/product-config";
 import { persistUpgradeContinuation, resolveUpgradeDraft } from "./continuation";
 import { readUpgradeDraft, writeUpgradeDraft } from "./cookies";
 import { auditTransition, getUpgrade, transitionUpgrade } from "./queries";
@@ -143,16 +144,14 @@ export async function revokeUpgradeGrant(
 }
 
 function oauthConfig(env: WorkerEnv): { clientId: string; redirectUri: string; relayUrl: string } {
-  const clientId = env.HQBASE_UPGRADE_CLOUDFLARE_OAUTH_CLIENT_ID?.trim();
-  const redirectUri = env.HQBASE_UPGRADE_CLOUDFLARE_OAUTH_REDIRECT_URI?.trim();
-  const relayUrl = env.HQBASE_CLOUDFLARE_OAUTH_RELAY_URL?.trim();
-  if (!clientId || !redirectUri || !relayUrl) {
-    throw new AppError(
-      "UPGRADE_OAUTH_NOT_CONFIGURED",
-      "Cloudflare authorization is not configured for this HQBase release.",
-      503
-    );
-  }
+  const clientId =
+    env.HQBASE_UPGRADE_CLOUDFLARE_OAUTH_CLIENT_ID?.trim() ||
+    hqbaseProductConfig.upgradeOAuthClientId;
+  const redirectUri =
+    env.HQBASE_UPGRADE_CLOUDFLARE_OAUTH_REDIRECT_URI?.trim() ||
+    hqbaseProductConfig.upgradeOAuthRedirectUri;
+  const relayUrl =
+    env.HQBASE_CLOUDFLARE_OAUTH_RELAY_URL?.trim() || hqbaseProductConfig.cloudflareOAuthRelayUrl;
   return { clientId, redirectUri, relayUrl };
 }
 

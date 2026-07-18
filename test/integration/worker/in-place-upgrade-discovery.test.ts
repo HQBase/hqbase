@@ -211,8 +211,7 @@ function cloudflareFixture(
                   text: options.installationId ?? installationId
                 }
               ]),
-          { name: "HQBASE_APP_VERSION", type: "plain_text", text: "0.1.4" },
-          { name: "HQBASE_RELEASE_PUBLIC_KEY", type: "plain_text", text: releaseKey }
+          { name: "HQBASE_APP_VERSION", type: "plain_text", text: "0.1.4" }
         ]
       };
     } else if (path.endsWith(`/workers/scripts/${workerName}/deployments`)) {

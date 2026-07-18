@@ -1,5 +1,6 @@
 import type { WorkerEnv } from "../../lib/env";
 import { AppError } from "../../lib/errors";
+import { hqbaseProductConfig } from "../../lib/product-config";
 import type { UpgradeInventory } from "./types";
 
 export async function verifySignedCommunityRelease(
@@ -9,29 +10,22 @@ export async function verifySignedCommunityRelease(
   fetcher: typeof fetch
 ): Promise<void> {
   const editionVersion = bindings.find((binding) => binding.name === "HQBASE_APP_VERSION");
-  const releaseKey = bindings.find((binding) => binding.name === "HQBASE_RELEASE_PUBLIC_KEY");
   const version = editionVersion?.type === "plain_text" ? editionVersion.text : null;
-  const key = releaseKey?.type === "plain_text" ? releaseKey.text : null;
-  if (
-    typeof version !== "string" ||
-    typeof key !== "string" ||
-    key !== env.HQBASE_RELEASE_PUBLIC_KEY
-  ) {
-    throw unsupportedRelease();
-  }
+  if (typeof version !== "string") throw unsupportedRelease();
+
+  const releasePublicKey =
+    env.HQBASE_RELEASE_PUBLIC_KEY?.trim() || hqbaseProductConfig.releasePublicKey;
 
   const response = await fetcher(
-    `${env.HQBASE_RELEASES_URL ?? "https://billing.hqbase.io/v1/releases"}/community/${encodeURIComponent(version)}/manifest`,
+    `${env.HQBASE_RELEASES_URL?.trim() || hqbaseProductConfig.releasesUrl}/community/${encodeURIComponent(version)}/manifest`,
     { headers: { accept: "application/json" } }
   );
   const envelope = (await safeJson(response)) as { payload?: string; signature?: string } | null;
-  if (!response.ok || !envelope?.payload || !envelope.signature || !env.HQBASE_RELEASE_PUBLIC_KEY) {
-    throw unsupportedRelease();
-  }
+  if (!response.ok || !envelope?.payload || !envelope.signature) throw unsupportedRelease();
   try {
     const publicKey = await crypto.subtle.importKey(
       "spki",
-      arrayBuffer(fromBase64(env.HQBASE_RELEASE_PUBLIC_KEY)),
+      arrayBuffer(fromBase64(releasePublicKey)),
       { name: "Ed25519" },
       false,
       ["verify"]

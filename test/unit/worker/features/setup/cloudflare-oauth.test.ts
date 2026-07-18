@@ -128,6 +128,14 @@ describe("Cloudflare setup OAuth", () => {
     expect(request?.[0]).toBe("https://dash.cloudflare.com/oauth2/revoke");
     expect(String(request?.[1]?.body)).toBe("client_id=community-client&token=oauth-access-secret");
   });
+
+  it("uses the compiled Community OAuth client when no override is supplied", async () => {
+    const revokeFetch = vi.fn<typeof fetch>(() => Promise.resolve(new Response(null)));
+    await revokeCloudflareGrant("oauth-access-secret", {}, revokeFetch);
+
+    const request = revokeFetch.mock.calls[0];
+    expect(String(request?.[1]?.body)).toContain("client_id=535c017cff7e0e5ed60bc99e57c69eb1");
+  });
 });
 
 function cookieValue(serialized: string, name: string): string {

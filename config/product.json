@@ -1,0 +1,10 @@
+{
+  "communityOAuthClientId": "535c017cff7e0e5ed60bc99e57c69eb1",
+  "communityOAuthRedirectUri": "https://auth.hqbase.io/community/oauth/callback",
+  "cloudflareOAuthRelayUrl": "https://auth.hqbase.io",
+  "upgradeOAuthClientId": "1c413f324b518b452096929b847e6703",
+  "upgradeOAuthRedirectUri": "https://auth.hqbase.io/upgrade/oauth/callback",
+  "billingUrl": "https://billing.hqbase.io",
+  "releasesUrl": "https://billing.hqbase.io/v1/releases",
+  "releasePublicKey": "MCowBQYDK2VwAyEAsVwKniCvpHDwbbnjTPP0SuIIG97cRL+iFBQvay9OrU4="
+}

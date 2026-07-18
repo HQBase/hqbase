@@ -5,7 +5,6 @@ import { rootDir } from "./paths.mjs";
 
 const rootFromDeployment = "../../..";
 const appVersion = JSON.parse(fs.readFileSync(`${rootDir}/package.json`, "utf8")).version;
-const releasePublicKey = "MCowBQYDK2VwAyEAsVwKniCvpHDwbbnjTPP0SuIIG97cRL+iFBQvay9OrU4=";
 
 export function writeWranglerConfig(manifest, options = {}) {
   if (options.dryRun) {
@@ -58,16 +57,8 @@ export function createWranglerConfig(manifest) {
       }
     ],
     vars: {
-      HQBASE_CLOUDFLARE_OAUTH_CLIENT_ID: "535c017cff7e0e5ed60bc99e57c69eb1",
-      HQBASE_CLOUDFLARE_OAUTH_REDIRECT_URI: "https://auth.hqbase.io/community/oauth/callback",
-      HQBASE_CLOUDFLARE_OAUTH_RELAY_URL: "https://auth.hqbase.io",
-      HQBASE_UPGRADE_CLOUDFLARE_OAUTH_CLIENT_ID: "1c413f324b518b452096929b847e6703",
-      HQBASE_UPGRADE_CLOUDFLARE_OAUTH_REDIRECT_URI: "https://auth.hqbase.io/upgrade/oauth/callback",
-      HQBASE_BILLING_URL: "https://billing.hqbase.io",
       HQBASE_APP_VERSION: appVersion,
       HQBASE_INSTALLATION_ID: manifest.installationId,
-      HQBASE_RELEASE_PUBLIC_KEY: releasePublicKey,
-      HQBASE_RELEASES_URL: "https://billing.hqbase.io/v1/releases",
       HQBASE_WORKER_NAME: manifest.worker.name
     }
   };

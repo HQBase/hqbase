@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { WorkerEnv } from "../../lib/env";
 import { AppError } from "../../lib/errors";
+import { hqbaseProductConfig } from "../../lib/product-config";
 
 const VERIFIER_COOKIE = "hqb_cf_oauth_verifier";
 const STATE_COOKIE = "hqb_cf_oauth_state";
@@ -135,14 +136,8 @@ export async function revokeCloudflareGrant(
   env: Pick<OAuthConfigEnv, "HQBASE_CLOUDFLARE_OAUTH_CLIENT_ID">,
   fetcher: typeof fetch = fetch
 ): Promise<void> {
-  const clientId = env.HQBASE_CLOUDFLARE_OAUTH_CLIENT_ID?.trim();
-  if (!clientId) {
-    throw new AppError(
-      "CLOUDFLARE_OAUTH_NOT_CONFIGURED",
-      "Cloudflare OAuth is not configured for this HQBase release.",
-      503
-    );
-  }
+  const clientId =
+    env.HQBASE_CLOUDFLARE_OAUTH_CLIENT_ID?.trim() || hqbaseProductConfig.communityOAuthClientId;
   const response = await fetcher(REVOKE_ENDPOINT, {
     body: new URLSearchParams({
       client_id: clientId,
@@ -179,16 +174,13 @@ function oauthConfig(env: OAuthConfigEnv): {
   redirectUri: string;
   relayUrl: string;
 } {
-  const clientId = env.HQBASE_CLOUDFLARE_OAUTH_CLIENT_ID?.trim();
-  const redirectUri = env.HQBASE_CLOUDFLARE_OAUTH_REDIRECT_URI?.trim();
-  const relayUrl = env.HQBASE_CLOUDFLARE_OAUTH_RELAY_URL?.trim();
-  if (!clientId || !redirectUri || !relayUrl) {
-    throw new AppError(
-      "CLOUDFLARE_OAUTH_NOT_CONFIGURED",
-      "Cloudflare OAuth is not configured for this HQBase release.",
-      503
-    );
-  }
+  const clientId =
+    env.HQBASE_CLOUDFLARE_OAUTH_CLIENT_ID?.trim() || hqbaseProductConfig.communityOAuthClientId;
+  const redirectUri =
+    env.HQBASE_CLOUDFLARE_OAUTH_REDIRECT_URI?.trim() ||
+    hqbaseProductConfig.communityOAuthRedirectUri;
+  const relayUrl =
+    env.HQBASE_CLOUDFLARE_OAUTH_RELAY_URL?.trim() || hqbaseProductConfig.cloudflareOAuthRelayUrl;
   return { clientId, redirectUri, relayUrl };
 }
 

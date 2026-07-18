@@ -1,6 +1,7 @@
 import { requireAuthContext, requireRecentSession, requireRole } from "../../auth/session";
 import type { WorkerEnv } from "../../lib/env";
 import { AppError } from "../../lib/errors";
+import { hqbaseProductConfig } from "../../lib/product-config";
 import { persistUpgradeContinuation } from "./continuation";
 import { readUpgradeDraft, writeUpgradeDraft } from "./cookies";
 import {
@@ -11,7 +12,6 @@ import {
 } from "./queries";
 
 const UPGRADE_TTL_MS = 24 * 60 * 60 * 1000;
-const billingDefault = "https://billing.hqbase.io";
 
 export async function startUpgradePurchase(
   request: Request,
@@ -69,7 +69,10 @@ export async function startUpgradePurchase(
   }
   await auditTransition(env.DB, id, "created", "success", { actorId: auth.user.id });
 
-  const checkout = new URL("/buy/pro", env.HQBASE_BILLING_URL ?? billingDefault);
+  const checkout = new URL(
+    "/buy/pro",
+    env.HQBASE_BILLING_URL?.trim() || hqbaseProductConfig.billingUrl
+  );
   checkout.searchParams.set("mode", "community_upgrade");
   checkout.searchParams.set("source", "hqbase-community");
   checkout.searchParams.set("placement", boundedPlacement(placement));
@@ -116,7 +119,7 @@ export async function finishUpgradePurchase(
   }
   const callback = `${url.origin}/api/upgrades/pro/purchase/callback`;
   const response = await fetcher(
-    new URL("/v1/install/token", env.HQBASE_BILLING_URL ?? billingDefault),
+    new URL("/v1/install/token", env.HQBASE_BILLING_URL?.trim() || hqbaseProductConfig.billingUrl),
     {
       method: "POST",
       headers: { "content-type": "application/json" },

@@ -244,9 +244,13 @@ describe("Community release deployment", () => {
       run_worker_first: ["/api/*"]
     });
   });
-  it("keeps the deploy configuration version aligned with the package release", () => {
-    const packageJson = JSON.parse(readFileSync("package.json", "utf8"));
+  it("keeps HQBase product constants out of the Deploy to Cloudflare form", () => {
     const wranglerConfig = JSON.parse(readFileSync("wrangler.jsonc", "utf8"));
-    expect(wranglerConfig.vars.HQBASE_APP_VERSION).toBe(packageJson.version);
+    expect(wranglerConfig).not.toHaveProperty("vars");
+    const normalized = normalizeConfig(wranglerConfig, "0.1.23", "b".repeat(64));
+    expect(normalized.vars).toMatchObject({
+      HQBASE_APP_VERSION: "0.1.23",
+      HQBASE_WORKER_NAME: wranglerConfig.name
+    });
   });
 });
