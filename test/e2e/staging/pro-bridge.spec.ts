@@ -62,7 +62,16 @@ test("Pro app password works through real IMAPS and SMTPS", async ({ page, reque
       }
     });
     expect(bootstrap.status()).toBe(201);
+    await expect(bootstrap.json()).resolves.toMatchObject({ setup: { isComplete: true } });
   }
+
+  await expect
+    .poll(async () => {
+      const response = await request.get("/api/setup/status");
+      if (!response.ok()) return false;
+      return ((await response.json()) as { isComplete: boolean }).isComplete;
+    })
+    .toBe(true);
 
   const login = await request.post("/api/auth/sign-in/email", {
     data: { email, password, rememberMe: false },
@@ -72,19 +81,11 @@ test("Pro app password works through real IMAPS and SMTPS", async ({ page, reque
   const compose = page.getByRole("button", { name: "Compose" });
   const loginEmail = page.getByLabel("Email");
   try {
-    await expect
-      .poll(
-        async () => {
-          await page.goto("/", { waitUntil: "domcontentloaded" });
-          return (await loginEmail.isVisible()) || (await compose.isVisible());
-        },
-        {
-          intervals: [1_000, 2_000, 3_000, 5_000],
-          message: "Pro app shell becomes renderable after Worker asset propagation",
-          timeout: 60_000
-        }
-      )
-      .toBe(true);
+    await page.goto("/", { waitUntil: "domcontentloaded" });
+    await expect(
+      loginEmail.or(compose),
+      "Pro app shell renders its authenticated state"
+    ).toBeVisible({ timeout: 60_000 });
   } catch (error) {
     const shell = await page.evaluate(() => ({
       path: window.location.pathname,
