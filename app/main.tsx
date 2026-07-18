@@ -1,6 +1,7 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 
+import { PwaLifecycle } from "./features/pwa/pwa-lifecycle";
 import "./styles.css";
 
 async function render() {
@@ -12,6 +13,7 @@ async function render() {
   ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
     <React.StrictMode>
       <Component />
+      <PwaLifecycle />
     </React.StrictMode>
   );
 }

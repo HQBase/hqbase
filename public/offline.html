@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#09090b" />
+    <link rel="icon" href="/icons/icon-192.png" type="image/png" />
+    <title>HQBase is offline</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        font-family: Geist, ui-sans-serif, system-ui, sans-serif;
+        background: #09090b;
+        color: #fafafa;
+      }
+      body {
+        min-height: 100vh;
+        margin: 0;
+        display: grid;
+        place-items: center;
+        padding: 24px;
+        box-sizing: border-box;
+      }
+      main {
+        width: min(100%, 420px);
+        text-align: center;
+      }
+      img {
+        width: 104px;
+        height: auto;
+        margin-bottom: 28px;
+      }
+      h1 {
+        margin: 0 0 10px;
+        font-size: 24px;
+        line-height: 1.25;
+      }
+      p {
+        margin: 0 auto 24px;
+        color: #a1a1aa;
+        font-size: 14px;
+        line-height: 1.6;
+      }
+      button {
+        min-height: 44px;
+        border: 1px solid #27272a;
+        border-radius: 6px;
+        padding: 0 18px;
+        background: #fafafa;
+        color: #09090b;
+        font: inherit;
+        font-weight: 600;
+        cursor: pointer;
+      }
+      button:focus-visible {
+        outline: 2px solid #ff9300;
+        outline-offset: 3px;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <img alt="HQBase" src="/logo.svg" />
+      <h1>You're offline</h1>
+      <p>
+        Reconnect to load your inbox. HQBase does not store mail or account data in the offline
+        cache.
+      </p>
+      <button type="button" onclick="window.location.reload()">Try again</button>
+    </main>
+    <script>
+      window.addEventListener("online", () => window.location.reload());
+    </script>
+  </body>
+</html>
