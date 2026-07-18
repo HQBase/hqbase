@@ -48,10 +48,21 @@ test("Pro app password works through real IMAPS and SMTPS", async ({ page, reque
     headers: { origin: stagingUrl }
   });
   expect(login.ok()).toBeTruthy();
-  await page.goto("/");
   const compose = page.getByRole("button", { name: "Compose" });
   const loginEmail = page.getByLabel("Email");
-  await expect(loginEmail.or(compose)).toBeVisible();
+  await expect
+    .poll(
+      async () => {
+        await page.goto("/", { waitUntil: "domcontentloaded" });
+        return (await loginEmail.isVisible()) || (await compose.isVisible());
+      },
+      {
+        intervals: [1_000, 2_000, 3_000, 5_000],
+        message: "Pro app shell becomes renderable after Worker asset propagation",
+        timeout: 60_000
+      }
+    )
+    .toBe(true);
   if (await loginEmail.isVisible()) {
     await loginEmail.fill(email);
     await page.getByLabel("Password").fill(password);
