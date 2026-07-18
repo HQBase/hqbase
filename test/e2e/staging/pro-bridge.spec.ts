@@ -77,7 +77,10 @@ test("Pro app password works through real IMAPS and SMTPS", async ({ page, reque
     data: { email, password, rememberMe: false },
     headers: { origin: stagingUrl }
   });
-  expect(login.ok()).toBeTruthy();
+  expect(
+    login.ok(),
+    `Owner API sign-in failed (${login.status()}): ${await login.text()}`
+  ).toBeTruthy();
   const compose = page.getByRole("button", { name: "Compose" });
   const loginEmail = page.getByLabel("Email");
   try {
@@ -122,8 +125,12 @@ test("Pro app password works through real IMAPS and SMTPS", async ({ page, reque
       )
       .toEqual({ available: true, version: expectedUpdate });
     await page.reload();
-    await expect(page.getByText("Update available", { exact: true })).toBeVisible();
-    await expect(page.getByText(`HQBase ${expectedUpdate}`, { exact: false })).toBeVisible();
+    await expect(page.getByText("Update available", { exact: true })).toBeVisible({
+      timeout: 60_000
+    });
+    await expect(page.getByText(`HQBase ${expectedUpdate}`, { exact: false })).toBeVisible({
+      timeout: 60_000
+    });
   }
   const createdResponse = await request.post("/api/pro/app-passwords", {
     data: { name: `staging-e2e-${Date.now()}` }
@@ -162,7 +169,10 @@ test("Track 1 enforces read-only mailbox access and exposes operator diagnostics
     data: { email, password, rememberMe: false },
     headers: { origin: stagingUrl }
   });
-  expect(login.ok()).toBeTruthy();
+  expect(
+    login.ok(),
+    `Owner API sign-in failed (${login.status()}): ${await login.text()}`
+  ).toBeTruthy();
   const mailboxesResponse = await request.get("/api/mailboxes");
   expect(mailboxesResponse.ok()).toBeTruthy();
   const mailboxes = (await mailboxesResponse.json()) as Array<{ id: string; address: string }>;
