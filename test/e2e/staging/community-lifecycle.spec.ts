@@ -90,10 +90,12 @@ test("fresh Community installation can create an owner and send mail", async ({
         { timeout: 60_000 }
       )
       .toEqual({ available: true, status: 200, version: expectedUpdate });
-    await page.reload();
-    await expect(page.getByText("Update available", { exact: true })).toBeVisible({
-      timeout: 60_000
-    });
+    await expect(async () => {
+      await page.reload();
+      await expect(page.getByText("Update available", { exact: true })).toBeVisible({
+        timeout: 15_000
+      });
+    }).toPass({ intervals: [2_000, 5_000, 10_000], timeout: 60_000 });
     await expect(page.getByText(`HQBase ${expectedUpdate}`, { exact: false })).toBeVisible({
       timeout: 60_000
     });
