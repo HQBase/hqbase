@@ -1,7 +1,14 @@
 name: Staging E2E
 
+run-name: Staging E2E · ${{ inputs.candidate_ref || github.event.workflow_run.head_sha || github.sha }}
+
 on:
   workflow_dispatch:
+    inputs:
+      candidate_ref:
+        description: Reviewed Community commit or ref to validate
+        required: false
+        default: main
   workflow_run:
     workflows: [CI]
     types: [completed]
@@ -31,7 +38,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          ref: ${{ inputs.candidate_ref || github.event.workflow_run.head_sha || github.sha }}
       - uses: pnpm/action-setup@v4
         with:
           version: 11.7.0
@@ -39,6 +46,12 @@ jobs:
         with:
           node-version: 24
           cache: pnpm
+      - name: Cache Playwright Chromium
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-${{ runner.arch }}-playwright-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: ${{ runner.os }}-${{ runner.arch }}-playwright-
       - run: pnpm install --frozen-lockfile
       - run: pnpm exec playwright install --with-deps chromium
       - name: Verify staging isolation
@@ -61,6 +74,8 @@ jobs:
           --domain "$HQBASE_STAGING_EMAIL_DOMAIN"
           --no-email
           --app-domain "${HQBASE_STAGING_URL#https://}"
+      - name: Fail fast on PWA and app-shell readiness
+        run: pnpm test:e2e:staging:smoke
       - name: Resolve the checked-in release compatibility window
         id: release-versions
         run: |
@@ -102,7 +117,7 @@ jobs:
       - name: Exercise setup, update discovery, and outbound mail
         env:
           HQBASE_STAGING_EXPECT_UPDATE_VERSION: ${{ steps.release-versions.outputs.candidate_released == 'true' && steps.release-versions.outputs.current || '' }}
-        run: pnpm test:e2e:staging
+        run: pnpm test:e2e:staging:lifecycle
       - name: Apply the signed Community N-1 update
         if: steps.release-versions.outputs.candidate_released == 'true'
         run: |
@@ -123,7 +138,7 @@ jobs:
             <<<"$history"
       - name: Exercise outbound mail after the signed update
         if: steps.release-versions.outputs.candidate_released == 'true'
-        run: pnpm test:e2e:staging
+        run: pnpm test:e2e:staging:continuity
       - name: Destroy disposable installation
         if: always()
         run: |
