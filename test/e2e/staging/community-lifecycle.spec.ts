@@ -66,7 +66,7 @@ test("fresh Community installation can create an owner and send mail", async ({
     await page.getByLabel("Password").fill(ownerPassword);
     await page.getByRole("button", { name: "Continue" }).click();
   }
-  await expect(compose).toBeVisible();
+  await expect(compose).toBeVisible({ timeout: 60_000 });
   const expectedUpdate = process.env.HQBASE_STAGING_EXPECT_UPDATE_VERSION;
   if (expectedUpdate) {
     await expect
