@@ -13,6 +13,7 @@ const schemaVersion = 11;
 const packageJson = JSON.parse(readFileSync(resolve(root, "package.json"), "utf8"));
 const version = process.env.HQBASE_RELEASE_VERSION ?? packageJson.version;
 const minVersion = process.env.HQBASE_MIN_VERSION || packageJson.hqbaseRelease?.minimumVersion;
+const releaseNotesAnchor = version.toLowerCase().replaceAll(".", "");
 const privateKeyValue = process.env.HQBASE_RELEASE_PRIVATE_KEY_FILE
   ? readFileSync(process.env.HQBASE_RELEASE_PRIVATE_KEY_FILE, "utf8")
   : process.env.HQBASE_RELEASE_PRIVATE_KEY;
@@ -112,7 +113,7 @@ const manifest = {
   schemaVersion,
   minVersion,
   publishedAt: new Date().toISOString(),
-  notesUrl: "https://github.com/HQBase/hqbase-pro-deploy/releases",
+  notesUrl: `https://github.com/HQBase/hqbase-pro-deploy/blob/main/RELEASE_NOTES.md#${releaseNotesAnchor}`,
   artifact: {
     url: `https://billing.hqbase.io/v1/releases/${edition}/${version}/artifact`,
     sha256: createHash("sha256").update(bytes).digest("hex"),

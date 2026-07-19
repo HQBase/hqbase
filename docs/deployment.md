@@ -11,11 +11,11 @@ README's Deploy to Cloudflare button. Cloudflare clones that repository into the
 control account and connects it to Workers Builds. The private `HQBase/hqbase-pro` repository is
 the product source and is not a deployment template.
 
-The bootstrap first deploys a small installer. After the customer enters a Pro license and approves
-the Cloudflare OAuth flow, the customer-owned Worker stores the license as a masked build variable,
-generates the runtime secrets as masked Worker secrets, downloads the licensed signed Pro artifact,
-and deploys it through the connected build. Customers do not copy product source or paste a
-Cloudflare API token into HQBase.
+The bootstrap first deploys a small installer. It claims the verified purchase from Billing, then
+the customer approves the Cloudflare OAuth flow. The customer-owned Worker receives the license
+directly, stores it as a masked build variable, generates runtime secrets, downloads the signed Pro
+artifact, and deploys it through the connected build. Normal installation never asks the customer
+to paste a license key, Worker name, or Cloudflare API token.
 
 Community upgrades start inside the authenticated existing workspace. The Community Worker
 discovers and verifies its own D1 and R2 bindings, backs them up, and uploads a signed Pro candidate

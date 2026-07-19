@@ -77,6 +77,8 @@ the current cutover boundary and `docs/mail-bridge.md` for bridge preview limits
 - `docs/access-control.md`: mailbox grant matrix and enforcement boundary.
 - `docs/operations.md`: doctor, backup, restore, queues, retention, and incident order.
 - `docs/updates.md`: signed releases, licensed downloads, notification, and recovery.
+- [Public Pro release history](https://github.com/HQBase/hqbase-pro-deploy/blob/main/RELEASE_NOTES.md):
+  version-specific changes without exposing private product source.
 
 Pushes to `main` run the full quality gate and automatically start Pro's deployed staging E2E.
 Signed publication remains an explicit tag or workflow-dispatch decision; packaging, signing, and

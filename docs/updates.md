@@ -13,8 +13,9 @@ Before a Pro-to-Pro migration the updater records D1 Time Travel and the active 
 The artifact signature and SHA-256 digest are verified before extraction. Migrations run before the
 Worker replacement, and exact D1 and Worker recovery commands are printed on failure.
 
-The 0.1.7 release supports direct Pro updates from 0.1.3. Its supported in-place Community-to-Pro
-sources use recognized Community schema 5 and preserve attachment references across the Pro
-messages-table migration. The temporary recovery snapshot remains available until promoted-service
-verification succeeds. The customer-account candidate validator is deleted before the temporary
-grant is revoked. Older Community or Pro installations must first reach 0.1.3.
+Each signed release declares its minimum supported source version and schema. Version-specific
+compatibility and migration details live in that release's notes rather than this current-state
+guide. Unsupported installations stop before mutation with an explicit update path.
+
+Public version-specific history lives in
+[`HQBase/hqbase-pro-deploy/RELEASE_NOTES.md`](https://github.com/HQBase/hqbase-pro-deploy/blob/main/RELEASE_NOTES.md).
