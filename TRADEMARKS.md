@@ -32,7 +32,8 @@ Unofficial forks should use a distinct name and should clearly state that they a
 
 ## Commercial Offerings
 
-Commercial HQBase offerings, including future HQBase Pro packages or paid support services, may use HQBase branding only when offered by the project owner or with written permission.
+Commercial HQBase products and paid services may use HQBase branding only when offered by the
+project owner or with written permission.
 
 ## Questions
 

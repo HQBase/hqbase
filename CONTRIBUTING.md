@@ -26,4 +26,4 @@ Tests live under `test/unit`, `test/integration`, `test/migrations`, and `test/e
 
 Do not add per-mailbox permissions, private inboxes, assignments, internal notes, audit/compliance features, advanced automations, bridge APIs, or other reserved Pro implementation to this repository. Foundational tests, security, accessibility, performance, and deployment improvements remain welcome.
 
-See `docs/open-core-boundary.md` and `TRADEMARKS.md` for the public edition and brand policies.
+See `docs/product-boundary.md` and `TRADEMARKS.md` for the Community product and brand policies.
