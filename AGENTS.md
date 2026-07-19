@@ -5,7 +5,7 @@ Complete, independently evolving HQBase Pro product. Source-available under the 
 ## Boundaries
 
 - Support fresh Pro installation and explicitly supported Community upgrades.
-- Do not configure Community as an upstream or depend on routine cross-edition merges.
+- Do not configure Community as an upstream or depend on routine cross-product merges.
 - Record every schema change as a migration with fresh-install and upgrade tests.
 - Keep app-password verification, entitlement, authorization, and persistent IMAP identity in Pro.
 - Never log credentials or mail content.

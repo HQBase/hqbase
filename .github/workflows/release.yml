@@ -53,6 +53,19 @@ jobs:
           release_version="${HQBASE_RELEASE_VERSION#v}"
           package_version=$(node -p "require('./package.json').version")
           test "$release_version" = "$package_version"
+      - name: Verify public release notes
+        env:
+          HQBASE_RELEASE_VERSION: ${{ inputs.version }}
+        run: |
+          release_version="${HQBASE_RELEASE_VERSION#v}"
+          curl --fail --silent --show-error \
+            https://raw.githubusercontent.com/HQBase/hqbase-pro-deploy/main/RELEASE_NOTES.md \
+            --output /tmp/hqbase-pro-release-notes.md
+          RELEASE_VERSION="$release_version" node --input-type=module -e '
+            import { readFileSync } from "node:fs";
+            const notes = readFileSync("/tmp/hqbase-pro-release-notes.md", "utf8");
+            if (!notes.includes(`## ${process.env.RELEASE_VERSION}\n`)) process.exit(1);
+          '
       - name: Package and sign
         env:
           HQBASE_RELEASE_PRIVATE_KEY: ${{ secrets.HQBASE_RELEASE_PRIVATE_KEY }}
