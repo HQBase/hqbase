@@ -1,8 +1,14 @@
 name: Staging E2E
 
+run-name: Staging E2E · ${{ inputs.candidate_ref || github.event.workflow_run.head_sha || github.sha }}
+
 on:
   workflow_dispatch:
     inputs:
+      candidate_ref:
+        description: Reviewed Pro commit or ref to validate
+        required: false
+        default: main
       community_ref:
         description: Reviewed Community commit or ref for upgrade QA
         required: false
@@ -30,7 +36,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          ref: ${{ inputs.candidate_ref || github.event.workflow_run.head_sha || github.sha }}
       - uses: pnpm/action-setup@v4
         with:
           version: 11.7.0
@@ -110,7 +116,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          ref: ${{ inputs.candidate_ref || github.event.workflow_run.head_sha || github.sha }}
       - uses: pnpm/action-setup@v4
         with:
           version: 11.7.0
@@ -118,21 +124,14 @@ jobs:
         with:
           node-version: 24
           cache: pnpm
-      - uses: actions/setup-go@v5
+      - name: Cache Playwright Chromium
+        uses: actions/cache@v4
         with:
-          go-version: "1.26.x"
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-${{ runner.arch }}-playwright-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: ${{ runner.os }}-${{ runner.arch }}-playwright-
       - run: pnpm install --frozen-lockfile
       - run: pnpm exec playwright install --with-deps chromium
-      - name: Check out the pinned bridge implementation
-        uses: actions/checkout@v4
-        with:
-          repository: HQBase/hqbase-mail-bridge
-          ref: 5416175d622ffcfcfc093f583ce5c26fc25c70e2
-          path: .staging/bridge
-          ssh-key: ${{ secrets.HQBASE_BRIDGE_REPO_DEPLOY_KEY }}
-      - name: Build the headless IMAPS/SMTPS acceptance client
-        working-directory: .staging/bridge
-        run: go build -o "$HQBASE_BRIDGE_ACCEPTANCE_BIN" ./cmd/acceptance
       - name: Deploy disposable Pro installation
         run: >-
           pnpm hqbase-pro install
@@ -155,6 +154,29 @@ jobs:
           done
           echo "Disposable Pro custom domain was not healthy within 300 seconds"
           exit 1
+      - name: Fail fast on PWA and app-shell readiness
+        run: pnpm test:e2e:staging:smoke
+      - name: Check out the pinned bridge implementation
+        uses: actions/checkout@v4
+        with:
+          repository: HQBase/hqbase-mail-bridge
+          ref: 5416175d622ffcfcfc093f583ce5c26fc25c70e2
+          path: .staging/bridge
+          ssh-key: ${{ secrets.HQBASE_BRIDGE_REPO_DEPLOY_KEY }}
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.26.x"
+          cache-dependency-path: .staging/bridge/go.sum
+      - name: Cache the pinned bridge acceptance client
+        id: bridge-acceptance-cache
+        uses: actions/cache@v4
+        with:
+          path: /tmp/hqbase-bridge-acceptance
+          key: ${{ runner.os }}-${{ runner.arch }}-hqbase-bridge-acceptance-5416175d622ffcfcfc093f583ce5c26fc25c70e2
+      - name: Build the headless IMAPS/SMTPS acceptance client
+        if: steps.bridge-acceptance-cache.outputs.cache-hit != 'true'
+        working-directory: .staging/bridge
+        run: go build -o "$HQBASE_BRIDGE_ACCEPTANCE_BIN" ./cmd/acceptance
       - name: Prepare an N-1 Pro installation
         id: release-versions
         run: |
@@ -211,7 +233,7 @@ jobs:
       - name: Exercise Pro app passwords through real IMAPS and SMTPS
         env:
           HQBASE_PRO_STAGING_EXPECT_UPDATE_VERSION: ${{ steps.release-versions.outputs.candidate_released == 'true' && steps.release-versions.outputs.current || '' }}
-        run: pnpm test:e2e:staging
+        run: pnpm test:e2e:staging:lifecycle
       - name: Apply the guarded Pro N-1 update while the bridge remains running
         run: |
           current_version=$(node -p "require('./package.json').version")
@@ -254,7 +276,7 @@ jobs:
             "$HQBASE_PRO_STAGING_URL/api/pro/mail-bridge/v2/ready" | jq -e '.ready == true'
           curl --fail --silent --show-error "https://$HQBASE_PRO_STAGING_BRIDGE_HOST/ready" >/dev/null
       - name: Exercise the still-running bridge after Pro redeploy
-        run: pnpm test:e2e:staging
+        run: pnpm test:e2e:staging:continuity
       - name: Exercise populated remote backup and restore
         run: |
           config=".hqbase-pro/deployments/$DEPLOYMENT_NAME/wrangler.jsonc"
@@ -274,7 +296,7 @@ jobs:
             "$HQBASE_PRO_STAGING_URL/api/health" >/dev/null
           curl --fail --silent --show-error "https://$HQBASE_PRO_STAGING_BRIDGE_HOST/ready" >/dev/null
       - name: Exercise the still-running bridge after restore
-        run: pnpm test:e2e:staging
+        run: pnpm test:e2e:staging:continuity
       - name: Verify the successful run is a healthy persistent staging anchor
         run: |
           config=".hqbase-pro/deployments/$DEPLOYMENT_NAME/wrangler.jsonc"
