@@ -12,6 +12,7 @@ import upgradeLifecycleMigration from "../../../migrations/0008_upgrade_lifecycl
 import updatesMigration from "../../../migrations/0009_updates.sql?raw";
 import remoteMediaMigration from "../../../migrations/0010_remote_media_preferences.sql?raw";
 import inPlaceUpgradeMigration from "../../../migrations/0011_in_place_community_upgrade.sql?raw";
+import mcpMigration from "../../../migrations/0012_mcp_oauth.sql?raw";
 import { appPasswordHash } from "../../../worker/features/app-passwords/crypto";
 import {
   insertAppPassword,
@@ -105,6 +106,7 @@ beforeAll(async () => {
   await applyMigration(updatesMigration);
   await applyMigration(remoteMediaMigration);
   await applyMigration(inPlaceUpgradeMigration);
+  await applyMigration(mcpMigration);
 });
 
 beforeEach(async () => {
@@ -138,6 +140,9 @@ describe("Community to Pro migration", () => {
       ).first()
     ).resolves.toMatchObject({ value: "0011" });
     await expect(
+      env.DB.prepare("SELECT value FROM pro_schema_state WHERE key = 'mcp_oauth'").first()
+    ).resolves.toMatchObject({ value: "0012" });
+    await expect(
       env.DB.prepare(
         "SELECT COUNT(*) AS count FROM sqlite_schema WHERE type = 'table' AND name IN ('installation_identity', 'community_pro_upgrades', 'pro_applied_migrations')"
       ).first()
@@ -149,7 +154,7 @@ describe("Community to Pro migration", () => {
     ).resolves.toMatchObject({
       edition: "pro",
       installed_version: "0.1.1",
-      installed_schema_version: 11
+      installed_schema_version: 12
     });
     await expect(
       env.DB.prepare("SELECT edition FROM app_release_state WHERE singleton = 1").first()

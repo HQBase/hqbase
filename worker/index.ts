@@ -1,5 +1,6 @@
 import { handleInboundEmail } from "./email/inbound";
 import { refreshWorkspaceEntitlement } from "./features/billing/service";
+import { handleMcpRoute } from "./features/mcp/route";
 import { consumeJobs } from "./jobs/consumer";
 import type { WorkerEnv } from "./lib/env";
 import { apiRoutes } from "./routes";
@@ -7,6 +8,8 @@ import { apiRoutes } from "./routes";
 export default {
   async fetch(request: Request, env: WorkerEnv, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
+    const mcpResponse = await handleMcpRoute(request, env, ctx);
+    if (mcpResponse) return mcpResponse;
     if (url.pathname.startsWith("/api/")) {
       return apiRoutes.fetch(request, env, ctx);
     }

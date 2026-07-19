@@ -16,6 +16,7 @@ import type {
 
 export type ListMessageFilters = {
   folder?: string | undefined;
+  limit?: number | undefined;
   mailboxId?: string | undefined;
   search?: string | undefined;
   mailboxIds?: string[] | undefined;
@@ -172,8 +173,10 @@ export async function listMessages(
     params.push(like, like, like, like, like);
   }
 
+  const limit = Math.min(Math.max(filters.limit ?? 100, 1), 100);
   const sql = `SELECT * FROM messages ${where.length ? `WHERE ${where.join(" AND ")}` : ""}
-    ORDER BY COALESCE(received_at, sent_at, created_at) DESC LIMIT 100`;
+    ORDER BY COALESCE(received_at, sent_at, created_at) DESC LIMIT ?`;
+  params.push(limit);
 
   const result = await db
     .prepare(sql)

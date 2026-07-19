@@ -14,6 +14,9 @@ attachment-aware composer, migrations, app-password management, persistent IMAP 
 API, and staging E2E orchestration. The Fly-hosted `hqbase-mail-bridge` connects through
 authenticated HTTPS and never receives Cloudflare credentials.
 
+Pro also exposes an OAuth-protected remote MCP server at `/mcp`. Its baseline read, organize, send,
+and reply tools can never exceed the connected user's live mailbox grants. See `docs/mcp.md`.
+
 The basic production launch is a web-first beta. IMAP/SMTP and app-password setup remain a private
 preview backed by dedicated preview bridge deployments; they are not generally available or part
 of the launch purchase promise. See `docs/mail-bridge.md`.
@@ -75,6 +78,7 @@ the current cutover boundary and `docs/mail-bridge.md` for bridge preview limits
 ## Production operations
 
 - `docs/access-control.md`: mailbox grant matrix and enforcement boundary.
+- `docs/mcp.md`: MCP connection, scopes, tools, and grant enforcement.
 - `docs/operations.md`: doctor, backup, restore, queues, retention, and incident order.
 - `docs/updates.md`: signed releases, licensed downloads, notification, and recovery.
 - [Public Pro release history](https://github.com/HQBase/hqbase-pro-deploy/blob/main/RELEASE_NOTES.md):

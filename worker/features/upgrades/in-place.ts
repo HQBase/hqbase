@@ -221,7 +221,7 @@ async function verifySchema(db: D1Database): Promise<void> {
   const release = await db
     .prepare("SELECT edition, installed_schema_version FROM pro_release_state WHERE singleton = 1")
     .first<{ edition: string; installed_schema_version: number }>();
-  if (release?.edition !== "pro" || release.installed_schema_version !== 11) {
+  if (release?.edition !== "pro" || release.installed_schema_version !== 12) {
     throw new AppError("UPGRADE_SCHEMA_INCOMPLETE", "The Pro database schema is incomplete.", 409);
   }
 }

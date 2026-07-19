@@ -9,7 +9,7 @@ export default defineConfig({
       },
       miniflare: {
         bindings: {
-          BETTER_AUTH_SECRET: "integration-auth-secret",
+          BETTER_AUTH_SECRET: "integration-auth-secret-A7x9Q2m4V8p6L1s3",
           PRO_APP_PASSWORD_PEPPER: "integration-app-password-pepper",
           PRO_BRIDGE_TOKEN: "integration-bridge-token",
           PRO_SESSION_SECRET: "integration-session-secret",

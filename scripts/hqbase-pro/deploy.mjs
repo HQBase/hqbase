@@ -207,7 +207,7 @@ export function runDeployLifecycle(options = {}) {
         "DB",
         "--remote",
         "--command",
-        `UPDATE pro_release_state SET installed_version = ${sqlValue(process.env.HQBASE_TARGET_VERSION)}, installed_schema_version = 11, updated_at = datetime('now') WHERE singleton = 1; UPDATE pro_update_history SET state = 'verified', completed_at = datetime('now') WHERE state = 'started' AND to_version = ${sqlValue(process.env.HQBASE_TARGET_VERSION)}`
+        `UPDATE pro_release_state SET installed_version = ${sqlValue(process.env.HQBASE_TARGET_VERSION)}, installed_schema_version = 12, updated_at = datetime('now') WHERE singleton = 1; UPDATE pro_update_history SET state = 'verified', completed_at = datetime('now') WHERE state = 'started' AND to_version = ${sqlValue(process.env.HQBASE_TARGET_VERSION)}`
       ]);
     }
 
