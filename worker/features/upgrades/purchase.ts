@@ -2,6 +2,7 @@ import { requireAuthContext, requireRecentSession, requireRole } from "../../aut
 import type { WorkerEnv } from "../../lib/env";
 import { AppError } from "../../lib/errors";
 import { hqbaseProductConfig } from "../../lib/product-config";
+import { getSetupStatus } from "../setup/queries";
 import { persistUpgradeContinuation } from "./continuation";
 import { readUpgradeDraft, writeUpgradeDraft } from "./cookies";
 import {
@@ -95,6 +96,17 @@ export async function startUpgradePurchase(
       }
     }
   );
+}
+
+export async function requireCompletedCommunitySetup(db: D1Database): Promise<void> {
+  const setup = await getSetupStatus(db);
+  if (!setup.isComplete) {
+    throw new AppError(
+      "UPGRADE_SETUP_INCOMPLETE",
+      "Complete Community setup before upgrading to Pro.",
+      409
+    );
+  }
 }
 
 export async function finishUpgradePurchase(

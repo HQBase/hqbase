@@ -5,6 +5,7 @@ import updatesMigration from "../../../migrations/0002_updates.sql?raw";
 import preferencesMigration from "../../../migrations/0003_remote_media_preferences.sql?raw";
 import upgradeMigration from "../../../migrations/0004_in_place_pro_upgrade.sql?raw";
 import resumeMigration from "../../../migrations/0005_durable_upgrade_resume.sql?raw";
+import { setSetupComplete } from "../../../worker/features/setup/queries";
 import {
   persistUpgradeContinuation,
   resolveUpgradeDraft
@@ -16,6 +17,7 @@ import {
 } from "../../../worker/features/upgrades/deployment";
 import { fetchCandidateVerification } from "../../../worker/features/upgrades/migration";
 import { disableWorkerPreviewUrls } from "../../../worker/features/upgrades/preview-policy";
+import { requireCompletedCommunitySetup } from "../../../worker/features/upgrades/purchase";
 import { ensureInstallationIdentity } from "../../../worker/features/upgrades/queries";
 import type { ProWorkerBundle } from "../../../worker/features/upgrades/release";
 import {
@@ -49,6 +51,17 @@ beforeAll(async () => {
 });
 
 describe("in-place Community to Pro migration", () => {
+  it("rejects an upgrade until Community setup is complete", async () => {
+    await expect(requireCompletedCommunitySetup(env.DB)).rejects.toMatchObject({
+      code: "UPGRADE_SETUP_INCOMPLETE",
+      status: 409
+    });
+
+    await setSetupComplete(env.DB, true);
+    await expect(requireCompletedCommunitySetup(env.DB)).resolves.toBeUndefined();
+    await setSetupComplete(env.DB, false);
+  });
+
   it("stores one durable installation identity and rejects Worker drift", async () => {
     const installationId = "00000000-0000-4000-8000-000000000123";
     const created = await ensureInstallationIdentity(env.DB, "custom-community", installationId);
