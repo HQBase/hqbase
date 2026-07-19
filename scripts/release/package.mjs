@@ -11,6 +11,14 @@ const schemaVersion = 5;
 const packageJson = JSON.parse(readFileSync(resolve(root, "package.json"), "utf8"));
 const version = process.env.HQBASE_RELEASE_VERSION ?? packageJson.version;
 const minVersion = process.env.HQBASE_MIN_VERSION || packageJson.hqbaseRelease?.minimumVersion;
+const releaseNotes = readFileSync(resolve(root, "CHANGELOG.md"), "utf8");
+if (!releaseNotes.includes(`## ${version}\n`))
+  throw new Error(`CHANGELOG.md is missing release notes for ${version}.`);
+const sourceCommit = execFileSync("git", ["rev-parse", "HEAD"], {
+  cwd: root,
+  encoding: "utf8"
+}).trim();
+const releaseNotesAnchor = version.toLowerCase().replaceAll(".", "");
 const privateKeyValue = process.env.HQBASE_RELEASE_PRIVATE_KEY_FILE
   ? readFileSync(process.env.HQBASE_RELEASE_PRIVATE_KEY_FILE, "utf8")
   : process.env.HQBASE_RELEASE_PRIVATE_KEY;
@@ -36,7 +44,7 @@ const manifest = {
   schemaVersion,
   minVersion,
   publishedAt: new Date().toISOString(),
-  notesUrl: `https://github.com/HQBase/hqbase/releases/tag/v${version}`,
+  notesUrl: `https://github.com/HQBase/hqbase/blob/${sourceCommit}/CHANGELOG.md#${releaseNotesAnchor}`,
   artifact: {
     url: `https://billing.hqbase.io/v1/releases/${edition}/${version}/artifact`,
     sha256: createHash("sha256").update(bytes).digest("hex"),
