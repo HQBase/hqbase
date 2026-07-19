@@ -72,7 +72,7 @@ test("fresh Community installation can create an owner and send mail", async ({
     await expect
       .poll(
         async () => {
-          const response = await request.get("/api/updates");
+          const response = await page.request.get("/api/updates");
           const body = await response.text();
           if (!response.ok()) {
             return { body, status: response.status() };
