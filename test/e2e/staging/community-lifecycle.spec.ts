@@ -73,19 +73,23 @@ test("fresh Community installation can create an owner and send mail", async ({
       .poll(
         async () => {
           const response = await request.get("/api/updates");
-          if (!response.ok()) return null;
-          const update = (await response.json()) as {
+          const body = await response.text();
+          if (!response.ok()) {
+            return { body, status: response.status() };
+          }
+          const update = JSON.parse(body) as {
             available?: boolean;
             release?: { version?: string };
           };
           return {
             available: update.available,
+            status: response.status(),
             version: update.release?.version
           };
         },
         { timeout: 60_000 }
       )
-      .toEqual({ available: true, version: expectedUpdate });
+      .toEqual({ available: true, status: 200, version: expectedUpdate });
     await page.reload();
     await expect(page.getByText("Update available", { exact: true })).toBeVisible({
       timeout: 60_000
