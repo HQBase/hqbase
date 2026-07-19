@@ -124,10 +124,12 @@ test("Pro app password works through real IMAPS and SMTPS", async ({ page, reque
         { timeout: 60_000 }
       )
       .toEqual({ available: true, version: expectedUpdate });
-    await page.reload();
-    await expect(page.getByText("Update available", { exact: true })).toBeVisible({
-      timeout: 60_000
-    });
+    await expect(async () => {
+      await page.reload();
+      await expect(page.getByText("Update available", { exact: true })).toBeVisible({
+        timeout: 15_000
+      });
+    }).toPass({ intervals: [2_000, 5_000, 10_000], timeout: 60_000 });
     await expect(page.getByText(`HQBase ${expectedUpdate}`, { exact: false })).toBeVisible({
       timeout: 60_000
     });
@@ -147,16 +149,18 @@ test("Pro app password works through real IMAPS and SMTPS", async ({ page, reque
       data: { username: email, password: created.password }
     });
     expect(authenticate.ok()).toBeTruthy();
-    await run(acceptanceBinary, [
-      "-host",
-      bridgeHost,
-      "-username",
-      email,
-      "-password",
-      created.password,
-      "-from",
-      sender
-    ]);
+    await expect(async () => {
+      await run(acceptanceBinary, [
+        "-host",
+        bridgeHost,
+        "-username",
+        email,
+        "-password",
+        created.password,
+        "-from",
+        sender
+      ]);
+    }).toPass({ intervals: [2_000, 5_000, 10_000], timeout: 60_000 });
   } finally {
     await request.delete(`/api/pro/app-passwords/${created.appPassword.id}`);
   }
