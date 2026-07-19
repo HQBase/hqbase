@@ -15,7 +15,6 @@ export type UpgradeState =
   | "recovery_required";
 
 export type ProUpgradePlacement =
-  | "onboarding-domains"
   | "user-permissions"
   | "mail-clients"
   | "composer"

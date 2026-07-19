@@ -1,7 +1,6 @@
 import { CheckCircle2, Circle, CircleAlert } from "lucide-react";
 import type * as React from "react";
 
-import { ProUpgradeCard } from "@/components/pro-upgrade";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
   Field,
@@ -106,14 +105,6 @@ export function DomainStep({
         </FieldDescription>
         {result ? <CompactDomainChecks result={result} /> : null}
       </Field>
-
-      {zones.length > 1 ? (
-        <ProUpgradeCard
-          description="Connect every domain in this Cloudflare account and manage all addresses from one workspace."
-          placement="onboarding-domains"
-          title={`You have ${zones.length} domains. Pro can connect them together.`}
-        />
-      ) : null}
 
       <Field data-invalid={Boolean(errors.appSubdomain)}>
         <FieldLabelRow>

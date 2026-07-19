@@ -2,9 +2,18 @@ import { Hono } from "hono";
 import type { HonoApp } from "../../lib/env";
 import { finishUpgradeOAuth, startUpgradeOAuth } from "./oauth";
 import { advanceUpgrade, getUpgradeStatus, pendingProRuntimeHandoff } from "./orchestrator";
-import { finishUpgradePurchase, startUpgradePurchase } from "./purchase";
+import {
+  finishUpgradePurchase,
+  requireCompletedCommunitySetup,
+  startUpgradePurchase
+} from "./purchase";
 
 export const proUpgradeRoutes = new Hono<HonoApp>();
+
+proUpgradeRoutes.use("*", async (c, next) => {
+  await requireCompletedCommunitySetup(c.env.DB);
+  return next();
+});
 
 proUpgradeRoutes.post("/purchase", async (c) => {
   const body: { placement?: unknown } = await c.req.raw

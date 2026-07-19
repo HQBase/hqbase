@@ -3,6 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
 import { AccessStep } from "@/features/setup/setup-access-screen";
+import { DomainStep } from "@/features/setup/setup-domain-screen";
 import { WizardLayout } from "@/features/setup/setup-wizard-parts";
 import { MailboxStep, OwnerStep } from "@/features/setup/setup-workspace-screens";
 
@@ -56,6 +57,48 @@ describe("setup UI", () => {
     expect(html).toContain('aria-label="Owner account: active"');
     expect(html).toContain('aria-label="Mailboxes: upcoming"');
     expect(html).not.toContain("Deploy resources");
+  });
+
+  it("does not offer a Pro upgrade before Community setup is complete", () => {
+    const zones = [
+      {
+        id: "zone-1",
+        name: "example.com",
+        status: "active",
+        type: "full",
+        accountId: "account-1",
+        accountName: "Example"
+      },
+      {
+        id: "zone-2",
+        name: "example.net",
+        status: "active",
+        type: "full",
+        accountId: "account-1",
+        accountName: "Example"
+      }
+    ];
+    const html = renderToStaticMarkup(
+      <DomainStep
+        appHostname="hqbase.example.com"
+        appSubdomain="hqbase"
+        connectionError={null}
+        errors={{}}
+        isLoading={false}
+        onBack={null}
+        onConnect={() => undefined}
+        onSelect={() => undefined}
+        result={null}
+        selectedZone={zones[0] ?? null}
+        selectedZoneId="zone-1"
+        setAppSubdomain={() => undefined}
+        zones={zones}
+      />
+    );
+
+    expect(html).toContain("Connect domain");
+    expect(html).not.toContain("Upgrade to Pro");
+    expect(html).not.toContain("Upgrade this workspace to Pro");
   });
 
   it("keeps owner validation beside labels and offers password reveal", () => {
