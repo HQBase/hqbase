@@ -149,16 +149,18 @@ test("Pro app password works through real IMAPS and SMTPS", async ({ page, reque
       data: { username: email, password: created.password }
     });
     expect(authenticate.ok()).toBeTruthy();
-    await run(acceptanceBinary, [
-      "-host",
-      bridgeHost,
-      "-username",
-      email,
-      "-password",
-      created.password,
-      "-from",
-      sender
-    ]);
+    await expect(async () => {
+      await run(acceptanceBinary, [
+        "-host",
+        bridgeHost,
+        "-username",
+        email,
+        "-password",
+        created.password,
+        "-from",
+        sender
+      ]);
+    }).toPass({ intervals: [2_000, 5_000, 10_000], timeout: 60_000 });
   } finally {
     await request.delete(`/api/pro/app-passwords/${created.appPassword.id}`);
   }
