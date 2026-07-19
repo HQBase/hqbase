@@ -18,7 +18,11 @@ export function LoginPage({ onLogin }: LoginPageProps): React.ReactElement {
     event.preventDefault();
     setIsPending(true);
     try {
-      await signIn(email, password);
+      const redirectUrl = await signIn(email, password);
+      if (redirectUrl) {
+        window.location.assign(redirectUrl);
+        return;
+      }
       onLogin();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Sign in failed.");

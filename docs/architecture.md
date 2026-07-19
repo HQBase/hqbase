@@ -10,6 +10,15 @@ Static assets are built by Vite into `dist` and served by the Worker assets bind
 
 Better Auth is mounted at `/api/auth/*` and stores users, sessions, accounts, and verification records in D1. Public signup is blocked at the HTTP route. The setup route creates the first owner through Better Auth internally. The owner's account email is an authentication and recovery identity independent of the workspace domain and never creates a mailbox implicitly. Owner/admin users can create more users.
 
+## MCP Flow
+
+The installed Worker exposes a stateless Streamable HTTP MCP endpoint at `/mcp`. Better Auth is the
+OAuth 2.1 authorization server for public MCP clients, with PKCE, dynamic registration, explicit
+consent, and hashed opaque access tokens stored in the workspace. MCP tools reuse the same D1
+queries, validation, and outbound mail services as the web API. Community mailboxes remain shared;
+MCP does not add mailbox ACLs.
+See [MCP](mcp.md).
+
 ## Inbound Email Flow
 
 Cloudflare Email Routing delivers mail to the Worker `email(message, env, ctx)` handler. HQBase uses the SMTP envelope recipient, not only the `To:` header. Raw `.eml` is written to R2, metadata is parsed with Postal MIME, attachments are written to R2, and message metadata is written to D1.

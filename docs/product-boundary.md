@@ -13,6 +13,7 @@ runtime add-on, hidden feature flag, or permanently tracking fork of Community.
 - Shared users and domain mailboxes in one workspace.
 - Inbound and outbound mail, D1 metadata, and R2 mail objects.
 - Basic owner, admin, and member roles with shared mailbox access.
+- OAuth-protected baseline MCP access to the same shared mailbox behavior.
 - Signed updates and operator tooling for development deployments.
 - Generic, auditable purchase and in-place promotion orchestration that contains no Pro source,
   schema logic, licensing, or entitlement enforcement.
@@ -38,4 +39,3 @@ welcome. An AGPL fork may implement different behavior if it complies with the l
 misrepresent itself as official HQBase.
 
 The code license does not grant rights to HQBase names or branding. See `TRADEMARKS.md`.
-

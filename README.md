@@ -12,6 +12,7 @@ mail, D1 metadata, and R2 mail and attachment storage.
 - Multiple shared domain mailboxes like `hello@example.com` and `support@example.com`.
 - All users can view all mailboxes and send from active mailboxes.
 - Owner/admin users can manage users and mailboxes.
+- OAuth-protected MCP access for reading, organizing, sending, and replying through the shared inbox.
 - No IMAP, calendar, billing, multi-tenant SaaS, mailbox ACLs, or external email providers.
 
 ## Architecture
@@ -20,6 +21,7 @@ mail, D1 metadata, and R2 mail and attachment storage.
 - Frontend: Vite, React, TypeScript, Tailwind CSS, shadcn-style components.
 - API router: Hono under `/api/*`.
 - Auth: Better Auth email/password with D1-backed tables.
+- Automation: OAuth 2.1 and Streamable HTTP MCP at `/mcp`.
 - Database: Cloudflare D1 for settings, users, mailboxes, message metadata, threads, and attachments metadata.
 - Object storage: Cloudflare R2 for raw `.eml`, HTML bodies, and attachments.
 - Email: Worker `email()` handler for inbound and `send_email` binding for outbound.
@@ -58,6 +60,13 @@ boundary, and guarded Workers Builds action. The temporary Cloudflare API token 
 update is never stored. See [docs/updates.md](docs/updates.md).
 
 Version-specific changes are recorded in [CHANGELOG.md](CHANGELOG.md).
+
+## MCP
+
+Connect a remote MCP client to `https://<your-workspace-host>/mcp`. The client discovers HQBase's
+OAuth endpoints, opens the installed workspace for sign-in and consent, and receives only the
+approved `mail:read`, `mail:write`, and `mail:send` scopes. See [docs/mcp.md](docs/mcp.md) for the
+tools and security boundary.
 
 Pushes to `main` run the full quality gate and automatically start deployed Community staging E2E.
 Signed publication remains an explicit tag or workflow-dispatch decision; packaging, signing, and
