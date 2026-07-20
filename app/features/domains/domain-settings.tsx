@@ -1,6 +1,5 @@
 import * as React from "react";
 import { toast } from "sonner";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -8,6 +7,7 @@ import { Separator } from "@/components/ui/separator";
 import { SettingsSection } from "@/features/settings/settings-section";
 import { changePortal, listDomains, revokeCloudflareAuthorization, updateDomain } from "./api";
 import { ConnectDomainDialog } from "./connect-domain-dialog";
+import { DomainTable } from "./domain-table";
 import type { MailDomain } from "./types";
 
 const PENDING_OPERATION_KEY = "hqb_pro_cloudflare_operation_v1";
@@ -28,6 +28,7 @@ export function DomainSettings({
   const [connectOpen, setConnectOpen] = React.useState(false);
   const [connectAuthorized, setConnectAuthorized] = React.useState(false);
   const [changePending, setChangePending] = React.useState(false);
+  const [pendingDomainId, setPendingDomainId] = React.useState<string | null>(null);
   const resumedRef = React.useRef(false);
 
   const refresh = React.useCallback(
@@ -98,6 +99,19 @@ export function DomainSettings({
     window.location.assign("/api/pro/domains/cloudflare/oauth/start");
   }
 
+  async function toggleDomain(domain: MailDomain) {
+    setPendingDomainId(domain.id);
+    try {
+      await updateDomain(domain.id, { isEnabled: !domain.isEnabled });
+      refresh();
+      toast.success(`${domain.name} ${domain.isEnabled ? "disabled" : "enabled"}.`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Domain could not be updated.");
+    } finally {
+      setPendingDomainId(null);
+    }
+  }
+
   return (
     <SettingsSection
       action={
@@ -126,37 +140,11 @@ export function DomainSettings({
       description="Domains group infrastructure; access remains attached to mailboxes"
       title="Email domains"
     >
-      <div className="grid gap-3">
-        {domains.map((domain) => (
-          <div
-            className="flex flex-wrap items-center justify-between gap-3 rounded-md border p-3"
-            key={domain.id}
-          >
-            <div>
-              <p className="font-medium">{domain.name}</p>
-              <p className="text-xs text-muted-foreground">
-                Receive {domain.receivingStatus} · Send {domain.sendingStatus} · DNS{" "}
-                {domain.dnsStatus}
-              </p>
-            </div>
-            <div className="flex items-center gap-2">
-              <Badge variant={domain.isEnabled ? "secondary" : "outline"}>
-                {domain.isEnabled ? "Enabled" : "Disabled"}
-              </Badge>
-              <Button
-                size="sm"
-                type="button"
-                variant="outline"
-                onClick={() =>
-                  void updateDomain(domain.id, { isEnabled: !domain.isEnabled }).then(refresh)
-                }
-              >
-                {domain.isEnabled ? "Disable" : "Enable"}
-              </Button>
-            </div>
-          </div>
-        ))}
-      </div>
+      <DomainTable
+        domains={domains}
+        pendingDomainId={pendingDomainId}
+        onToggle={(domain) => void toggleDomain(domain)}
+      />
 
       <Separator />
 

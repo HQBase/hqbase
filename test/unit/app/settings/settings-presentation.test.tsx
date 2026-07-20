@@ -1,6 +1,8 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { DomainSettings } from "@/features/domains/domain-settings";
+import { DomainTable } from "@/features/domains/domain-table";
+import type { MailDomain } from "@/features/domains/types";
 import { formatMailboxAccessSummary } from "@/features/mailbox-access/mailbox-access-policies";
 import { MailboxSettings } from "@/features/mailboxes/mailbox-settings";
 import type { Mailbox } from "@/features/mailboxes/types";
@@ -44,6 +46,20 @@ const member: WorkspaceUser = {
   role: "member",
   banned: false,
   createdAt: "2026-07-20T00:00:00.000Z"
+};
+
+const connectedDomain: MailDomain = {
+  id: "domain-1",
+  name: "example.com",
+  zoneId: "zone-1",
+  accountId: "account-1",
+  receivingStatus: "ready",
+  sendingStatus: "degraded",
+  dnsStatus: "pending",
+  catchAllPolicy: "reject",
+  catchAllMailboxId: null,
+  isEnabled: true,
+  updatedAt: "2026-07-20T00:00:00.000Z"
 };
 
 describe("settings presentation", () => {
@@ -127,8 +143,27 @@ describe("settings presentation", () => {
     expect(html).toContain("Connect domain");
     expect(html).not.toContain('type="password"');
     expect(html).not.toContain("API token");
+    expect(html).toContain('class="relative w-full overflow-auto rounded-lg border"');
+    expect(html).toContain("No domains connected.");
     expect(html).toContain("Authorize and change portal");
     expect(html).not.toContain("Bridge origin");
+  });
+
+  it("renders connected domains in the compact settings table", () => {
+    const html = renderToStaticMarkup(
+      <DomainTable domains={[connectedDomain]} pendingDomainId={null} onToggle={() => undefined} />
+    );
+
+    expect(html).toContain(">Domain<");
+    expect(html).toContain(">Receive<");
+    expect(html).toContain(">Send<");
+    expect(html).toContain(">DNS<");
+    expect(html).toContain(">Status<");
+    expect(html).toContain("example.com");
+    expect(html).toContain("Ready");
+    expect(html).toContain("Degraded");
+    expect(html).toContain("Pending");
+    expect(html).toContain('aria-label="Disable example.com"');
   });
 
   it("replaces General and Upgrade with Debug as the final tab", () => {
