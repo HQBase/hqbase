@@ -1,7 +1,6 @@
 import { Plus } from "lucide-react";
 import * as React from "react";
 import { toast } from "sonner";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -16,23 +15,21 @@ import {
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow
-} from "@/components/ui/table";
-import { DomainAccessDialog } from "@/features/mailbox-access/domain-access-dialog";
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from "@/components/ui/select";
+import { BulkMailboxAccessDialog } from "@/features/mailbox-access/bulk-mailbox-access-dialog";
 import { useMailboxAccessPolicies } from "@/features/mailbox-access/mailbox-access-policies";
-import {
-  MailboxAccessCell,
-  MailboxAccessPolicyDialog
-} from "@/features/mailbox-access/mailbox-access-policy";
+import { MailboxAccessPolicyDialog } from "@/features/mailbox-access/mailbox-access-policy";
 import { SettingsSection } from "@/features/settings/settings-section";
 import type { WorkspaceUser } from "@/features/users/types";
 import { addMailboxAddress, createMailbox, removeMailboxAddress, updateMailbox } from "./api";
 import { MailboxAliasDialog } from "./mailbox-alias-dialog";
+import { MailboxTable } from "./mailbox-table";
 import type { Mailbox } from "./types";
 
 type MailboxSettingsProps = {
@@ -53,10 +50,20 @@ export function MailboxSettings({
   const [createOpen, setCreateOpen] = React.useState(false);
   const [aliasMailbox, setAliasMailbox] = React.useState<Mailbox | null>(null);
   const [accessMailbox, setAccessMailbox] = React.useState<Mailbox | null>(null);
-  const [domainAccessOpen, setDomainAccessOpen] = React.useState(false);
+  const [bulkAccessOpen, setBulkAccessOpen] = React.useState(false);
+  const [domainFilter, setDomainFilter] = React.useState("all");
+  const [selectedMailboxIds, setSelectedMailboxIds] = React.useState<string[]>([]);
   const [aliasAddress, setAliasAddress] = React.useState("");
   const [pendingAction, setPendingAction] = React.useState<"mailbox" | "alias" | null>(null);
   const accessPolicies = useMailboxAccessPolicies(canManage);
+  const domains = mailboxDomains(mailboxes);
+  const activeDomain = domains.includes(domainFilter) ? domainFilter : "all";
+  const visibleMailboxes =
+    activeDomain === "all"
+      ? mailboxes
+      : mailboxes.filter((mailbox) => mailboxMatchesDomain(mailbox, activeDomain));
+  const selectedMailboxIdSet = new Set(selectedMailboxIds);
+  const selectedMailboxes = mailboxes.filter((mailbox) => selectedMailboxIdSet.has(mailbox.id));
 
   async function handleCreate(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -109,160 +116,110 @@ export function MailboxSettings({
     <SettingsSection
       action={
         canManage ? (
-          <div className="flex flex-wrap gap-2">
-            <Button type="button" variant="outline" onClick={() => setDomainAccessOpen(true)}>
-              Set access by domain
-            </Button>
-            <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-              <DialogTrigger asChild>
-                <Button type="button">
-                  <Plus data-icon="inline-start" />
-                  Add mailbox
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="w-[min(92vw,480px)]">
-                <DialogHeader>
-                  <DialogTitle>Add mailbox</DialogTitle>
-                  <DialogDescription>Create a shared address for this workspace.</DialogDescription>
-                </DialogHeader>
-                <form
-                  className="flex flex-col gap-5"
-                  onSubmit={(event) => void handleCreate(event)}
-                >
-                  <FieldGroup>
-                    <Field>
-                      <FieldLabel htmlFor="new-mailbox-address">Email address</FieldLabel>
-                      <Input
-                        id="new-mailbox-address"
-                        placeholder="support@example.com"
-                        required
-                        type="email"
-                        value={address}
-                        onChange={(event) => setAddress(event.target.value)}
-                      />
-                    </Field>
-                    <Field>
-                      <FieldLabel htmlFor="new-mailbox-name">Display name</FieldLabel>
-                      <Input
-                        id="new-mailbox-name"
-                        placeholder="Support"
-                        required
-                        value={displayName}
-                        onChange={(event) => setDisplayName(event.target.value)}
-                      />
-                    </Field>
-                  </FieldGroup>
-                  <DialogFooter>
-                    <DialogClose asChild>
-                      <Button type="button" variant="outline">
-                        Cancel
-                      </Button>
-                    </DialogClose>
-                    <Button disabled={pendingAction !== null} type="submit">
-                      {pendingAction === "mailbox" ? "Adding mailbox…" : "Add mailbox"}
+          <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+            <DialogTrigger asChild>
+              <Button type="button">
+                <Plus data-icon="inline-start" />
+                Add mailbox
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="w-[min(92vw,480px)]">
+              <DialogHeader>
+                <DialogTitle>Add mailbox</DialogTitle>
+                <DialogDescription>Create a shared address for this workspace.</DialogDescription>
+              </DialogHeader>
+              <form className="flex flex-col gap-5" onSubmit={(event) => void handleCreate(event)}>
+                <FieldGroup>
+                  <Field>
+                    <FieldLabel htmlFor="new-mailbox-address">Email address</FieldLabel>
+                    <Input
+                      id="new-mailbox-address"
+                      placeholder="support@example.com"
+                      required
+                      type="email"
+                      value={address}
+                      onChange={(event) => setAddress(event.target.value)}
+                    />
+                  </Field>
+                  <Field>
+                    <FieldLabel htmlFor="new-mailbox-name">Display name</FieldLabel>
+                    <Input
+                      id="new-mailbox-name"
+                      placeholder="Support"
+                      required
+                      value={displayName}
+                      onChange={(event) => setDisplayName(event.target.value)}
+                    />
+                  </Field>
+                </FieldGroup>
+                <DialogFooter>
+                  <DialogClose asChild>
+                    <Button type="button" variant="outline">
+                      Cancel
                     </Button>
-                  </DialogFooter>
-                </form>
-              </DialogContent>
-            </Dialog>
-          </div>
+                  </DialogClose>
+                  <Button disabled={pendingAction !== null} type="submit">
+                    {pendingAction === "mailbox" ? "Adding mailbox…" : "Add mailbox"}
+                  </Button>
+                </DialogFooter>
+              </form>
+            </DialogContent>
+          </Dialog>
         ) : null
       }
       description="Shared addresses across your connected domains"
       title="Mailboxes"
     >
-      <Table containerClassName="rounded-lg border">
-        <TableHeader className="bg-muted/40">
-          <TableRow className="hover:bg-transparent">
-            <TableHead>Address</TableHead>
-            <TableHead className="hidden sm:table-cell">Name</TableHead>
-            <TableHead className="w-28">Status</TableHead>
-            {canManage ? <TableHead className="w-56">Access</TableHead> : null}
-            {canManage && (
-              <TableHead className="w-px text-right">
-                <span className="sr-only">Actions</span>
-              </TableHead>
-            )}
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {mailboxes.length === 0 ? (
-            <TableRow>
-              <TableCell
-                className="h-24 text-center text-muted-foreground"
-                colSpan={canManage ? 5 : 3}
-              >
-                No mailboxes yet.
-              </TableCell>
-            </TableRow>
-          ) : null}
-          {mailboxes.map((mailbox) => (
-            <TableRow key={mailbox.id}>
-              <TableCell className="max-w-52">
-                <span className="block truncate">{mailbox.address}</span>
-                {mailbox.addresses
-                  ?.filter((item) => !item.isPrimary)
-                  .map((item) => (
-                    <span
-                      className="mt-1 flex items-center gap-1 text-xs text-muted-foreground"
-                      key={item.id}
-                    >
-                      {item.address}
-                      {canManage ? (
-                        <Button
-                          className="h-5 px-1"
-                          type="button"
-                          variant="ghost"
-                          onClick={() => void handleRemoveAlias(mailbox, item.id)}
-                        >
-                          Remove
-                        </Button>
-                      ) : null}
-                    </span>
+      {canManage && mailboxes.length > 0 && (domains.length > 1 || selectedMailboxes.length > 0) ? (
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          {domains.length > 1 ? (
+            <Select
+              value={activeDomain}
+              onValueChange={(value) => {
+                setDomainFilter(value);
+                setSelectedMailboxIds([]);
+              }}
+            >
+              <SelectTrigger aria-label="Filter mailboxes by domain" className="w-56 shadow-none">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectGroup>
+                  <SelectItem value="all">All domains</SelectItem>
+                  {domains.map((domain) => (
+                    <SelectItem key={domain} value={domain}>
+                      {domain}
+                    </SelectItem>
                   ))}
-              </TableCell>
-              <TableCell className="hidden sm:table-cell">{mailbox.displayName}</TableCell>
-              <TableCell>
-                <Badge variant={mailbox.isActive ? "secondary" : "outline"}>
-                  {mailbox.isActive ? "Active" : "Disabled"}
-                </Badge>
-              </TableCell>
-              {canManage ? (
-                <TableCell>
-                  <MailboxAccessCell
-                    mailbox={mailbox}
-                    policies={accessPolicies}
-                    users={users}
-                    onManage={() => setAccessMailbox(mailbox)}
-                  />
-                </TableCell>
-              ) : null}
-              {canManage && (
-                <TableCell className="whitespace-nowrap pl-1 text-right">
-                  <Button
-                    className="mr-2 px-2"
-                    size="sm"
-                    type="button"
-                    variant="ghost"
-                    onClick={() => setAliasMailbox(mailbox)}
-                  >
-                    Add alias
-                  </Button>
-                  <Button
-                    className="px-2"
-                    size="sm"
-                    type="button"
-                    variant="outline"
-                    onClick={() => void handleToggle(mailbox)}
-                  >
-                    {mailbox.isActive ? "Disable" : "Enable"}
-                  </Button>
-                </TableCell>
-              )}
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
+                </SelectGroup>
+              </SelectContent>
+            </Select>
+          ) : null}
+          {selectedMailboxes.length > 0 ? (
+            <div className="ml-auto flex items-center gap-3">
+              <span className="text-sm text-muted-foreground">
+                {selectedMailboxes.length} selected
+              </span>
+              <Button size="sm" type="button" onClick={() => setBulkAccessOpen(true)}>
+                Set access
+              </Button>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+
+      <MailboxTable
+        canManage={canManage}
+        mailboxes={visibleMailboxes}
+        policies={accessPolicies}
+        selectedIds={selectedMailboxIds}
+        users={users}
+        onAddAlias={setAliasMailbox}
+        onManageAccess={setAccessMailbox}
+        onRemoveAlias={(mailbox, addressId) => void handleRemoveAlias(mailbox, addressId)}
+        onSelectionChange={setSelectedMailboxIds}
+        onToggle={(mailbox) => void handleToggle(mailbox)}
+      />
 
       <MailboxAliasDialog
         address={aliasAddress}
@@ -285,13 +242,34 @@ export function MailboxSettings({
         }}
       />
 
-      <DomainAccessDialog
-        mailboxes={mailboxes}
-        open={domainAccessOpen}
+      <BulkMailboxAccessDialog
+        mailboxes={selectedMailboxes}
+        open={bulkAccessOpen}
         policies={accessPolicies}
         users={users}
-        onOpenChange={setDomainAccessOpen}
+        onApplied={() => setSelectedMailboxIds([])}
+        onOpenChange={setBulkAccessOpen}
       />
     </SettingsSection>
+  );
+}
+
+function mailboxDomains(mailboxes: Mailbox[]): string[] {
+  return Array.from(
+    new Set(
+      mailboxes.flatMap((mailbox) =>
+        (mailbox.addresses.length ? mailbox.addresses : [{ address: mailbox.address }]).map(
+          (identity) => identity.address.split("@")[1] ?? ""
+        )
+      )
+    )
+  )
+    .filter(Boolean)
+    .sort();
+}
+
+function mailboxMatchesDomain(mailbox: Mailbox, domain: string): boolean {
+  return (mailbox.addresses.length ? mailbox.addresses : [{ address: mailbox.address }]).some(
+    (identity) => identity.address.endsWith(`@${domain}`)
   );
 }

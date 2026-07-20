@@ -1,6 +1,5 @@
 import * as React from "react";
 import { toast } from "sonner";
-import type { Mailbox } from "@/features/mailboxes/types";
 import type { WorkspaceUser } from "@/features/users/types";
 import { listMailboxGrants, revokeMailboxGrant, setMailboxGrant } from "./api";
 import type { MailboxAccessLevel, MailboxGrant } from "./types";
@@ -11,11 +10,10 @@ export type MailboxAccessPolicies = {
   grants: MailboxGrant[];
   busy: string | null;
   loading: boolean;
-  applyDomain: (input: {
-    mailboxes: Mailbox[];
+  applyMany: (input: {
+    mailboxIds: string[];
     userId: string;
-    domain: string;
-    accessLevel: MailboxAccessLevel;
+    accessLevel: AccessChoice;
   }) => Promise<boolean>;
   change: (mailboxId: string, userId: string, value: AccessChoice) => Promise<void>;
 };
@@ -55,40 +53,42 @@ export function useMailboxAccessPolicies(enabled: boolean): MailboxAccessPolicie
     }
   }
 
-  async function applyDomain({
-    mailboxes,
+  async function applyMany({
+    mailboxIds,
     userId,
-    domain,
     accessLevel
   }: {
-    mailboxes: Mailbox[];
+    mailboxIds: string[];
     userId: string;
-    domain: string;
-    accessLevel: MailboxAccessLevel;
+    accessLevel: AccessChoice;
   }): Promise<boolean> {
-    const targets = mailboxes.filter((mailbox) =>
-      (mailbox.addresses.length ? mailbox.addresses : [{ address: mailbox.address }]).some(
-        (identity) => identity.address.endsWith(`@${domain}`)
-      )
-    );
-    if (!userId || !domain || targets.length === 0) return false;
+    const targets = Array.from(new Set(mailboxIds));
+    if (!userId || targets.length === 0) return false;
     setBusy("bulk");
     try {
       await Promise.all(
-        targets.map((mailbox) => setMailboxGrant({ mailboxId: mailbox.id, userId, accessLevel }))
+        targets.map((mailboxId) =>
+          accessLevel === "none"
+            ? revokeMailboxGrant(mailboxId, userId)
+            : setMailboxGrant({ mailboxId, userId, accessLevel })
+        )
       );
       await reload();
-      toast.success(`Explicit grants written for ${targets.length} mailboxes.`);
+      toast.success(
+        accessLevel === "none"
+          ? `Access removed from ${targets.length} ${targets.length === 1 ? "mailbox" : "mailboxes"}.`
+          : `Access updated for ${targets.length} ${targets.length === 1 ? "mailbox" : "mailboxes"}.`
+      );
       return true;
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Could not apply domain access.");
+      toast.error(error instanceof Error ? error.message : "Could not update mailbox access.");
       return false;
     } finally {
       setBusy(null);
     }
   }
 
-  return { grants, busy, loading, applyDomain, change };
+  return { grants, busy, loading, applyMany, change };
 }
 
 export function formatMailboxAccessSummary(

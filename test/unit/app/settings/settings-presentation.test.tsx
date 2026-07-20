@@ -30,6 +30,13 @@ const mailbox: Mailbox = {
   updatedAt: "2026-07-20T00:00:00.000Z"
 };
 
+const secondDomainMailbox: Mailbox = {
+  ...mailbox,
+  id: "mailbox-2",
+  address: "privacy@example.net",
+  displayName: "Privacy"
+};
+
 const member: WorkspaceUser = {
   id: "user-1",
   name: "Avery Stone",
@@ -46,10 +53,10 @@ describe("settings presentation", () => {
     );
 
     expect(html).toContain("<section");
-    expect(html).toContain("Set access by domain");
     expect(html).toContain("Add mailbox");
     expect(html).toContain('class="relative w-full overflow-auto rounded-lg border"');
     expect(html).toContain("No mailboxes yet.");
+    expect(html).not.toContain("Set access by domain");
     expect(html).not.toContain("support@example.com");
   });
 
@@ -73,10 +80,14 @@ describe("settings presentation", () => {
     );
 
     expect(html).toContain('class="relative w-full overflow-auto rounded-lg border"');
+    expect(html).toContain('aria-label="Select all visible mailboxes"');
+    expect(html).toContain('aria-label="Select support@example.com"');
+    expect(html).not.toContain('aria-label="Filter mailboxes by domain"');
     expect(html).toContain(">Access<");
     expect(html).toContain("Manage access for support@example.com");
     expect(html).toContain(">Manage access<");
     expect(html).not.toContain("Apply to domain");
+    expect(html).not.toContain("Set access by domain");
     expect(
       formatMailboxAccessSummary(
         mailbox.id,
@@ -93,6 +104,19 @@ describe("settings presentation", () => {
         false
       )
     ).toBe("Owner + 1 user");
+  });
+
+  it("shows the domain filter only when there are multiple domains", () => {
+    const html = renderToStaticMarkup(
+      <MailboxSettings
+        canManage
+        mailboxes={[mailbox, secondDomainMailbox]}
+        users={[member]}
+        onChanged={() => undefined}
+      />
+    );
+
+    expect(html).toContain('aria-label="Filter mailboxes by domain"');
   });
 
   it("keeps domain additions in a modal and never asks for a Cloudflare credential", () => {
