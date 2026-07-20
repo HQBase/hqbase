@@ -142,17 +142,24 @@ export function UserSettings({ users, onChanged }: UserSettingsProps): React.Rea
       description="Workspace access"
       title="Users"
     >
-      <Table className="overflow-hidden rounded-md border">
-        <TableHeader>
-          <TableRow>
+      <Table containerClassName="rounded-lg border">
+        <TableHeader className="bg-muted/40">
+          <TableRow className="hover:bg-transparent">
             <TableHead className="hidden sm:table-cell">Name</TableHead>
             <TableHead>Email</TableHead>
-            <TableHead>Role</TableHead>
+            <TableHead className="w-40">Role</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
+          {users.length === 0 ? (
+            <TableRow>
+              <TableCell className="h-24 text-center text-muted-foreground" colSpan={3}>
+                No users yet.
+              </TableCell>
+            </TableRow>
+          ) : null}
           {users.map((user) => (
-            <TableRow className="hover:bg-muted/35" key={user.id}>
+            <TableRow key={user.id}>
               <TableCell className="hidden sm:table-cell">{user.name}</TableCell>
               <TableCell className="max-w-44 truncate">{user.email}</TableCell>
               <TableCell>
@@ -181,7 +188,7 @@ function RoleSelect({
 }): React.ReactElement {
   return (
     <Select value={value} onValueChange={(next) => onChange(next as WorkspaceRole)}>
-      <SelectTrigger aria-label={ariaLabel} className="shadow-none focus:ring-1">
+      <SelectTrigger aria-label={ariaLabel} className="w-32 shadow-none focus:ring-1">
         <SelectValue />
       </SelectTrigger>
       <SelectContent>

@@ -206,15 +206,22 @@ export function MailboxAccessSettings({
       description="Read can view mail; Agent can also send; Manager can configure the mailbox"
       title="Mailbox access"
     >
-      <Table className="overflow-hidden rounded-md border">
-        <TableHeader>
-          <TableRow>
+      <Table containerClassName="rounded-lg border">
+        <TableHeader className="bg-muted/40">
+          <TableRow className="hover:bg-transparent">
             <TableHead>User</TableHead>
             <TableHead>Mailbox</TableHead>
-            <TableHead>Access</TableHead>
+            <TableHead className="w-44">Access</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
+          {managedUsers.length === 0 || mailboxes.length === 0 ? (
+            <TableRow>
+              <TableCell className="h-24 text-center text-muted-foreground" colSpan={3}>
+                No mailbox access rows yet.
+              </TableCell>
+            </TableRow>
+          ) : null}
           {managedUsers.flatMap((user) =>
             mailboxes.map((mailbox) => {
               const key = `${mailbox.id}:${user.id}`;

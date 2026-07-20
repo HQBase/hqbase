@@ -1,6 +1,7 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { DomainSettings } from "@/features/domains/domain-settings";
+import { MailboxAccessSettings } from "@/features/mailbox-access/mailbox-access-settings";
 import { MailboxSettings } from "@/features/mailboxes/mailbox-settings";
 import { SettingsPage } from "@/features/settings/settings-page";
 import { UserSettings } from "@/features/users/user-settings";
@@ -24,6 +25,8 @@ describe("settings presentation", () => {
 
     expect(html).toContain("<section");
     expect(html).toContain("Add mailbox");
+    expect(html).toContain('class="relative w-full overflow-auto rounded-lg border"');
+    expect(html).toContain("No mailboxes yet.");
     expect(html).not.toContain("support@example.com");
   });
 
@@ -31,7 +34,16 @@ describe("settings presentation", () => {
     const html = renderToStaticMarkup(<UserSettings users={[]} onChanged={() => undefined} />);
 
     expect(html).toContain("Add user");
+    expect(html).toContain('class="relative w-full overflow-auto rounded-lg border"');
+    expect(html).toContain("No users yet.");
     expect(html).not.toContain("new-user-email");
+  });
+
+  it("keeps mailbox access in the shared settings table shell", () => {
+    const html = renderToStaticMarkup(<MailboxAccessSettings mailboxes={[]} users={[]} />);
+
+    expect(html).toContain('class="relative w-full overflow-auto rounded-lg border"');
+    expect(html).toContain("No mailbox access rows yet.");
   });
 
   it("keeps domain additions in a modal and never asks for a Cloudflare credential", () => {

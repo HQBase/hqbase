@@ -150,18 +150,32 @@ export function MailboxSettings({
       description="Shared addresses across your connected domains"
       title="Mailboxes"
     >
-      <Table className="overflow-hidden rounded-md border">
-        <TableHeader>
-          <TableRow>
+      <Table containerClassName="rounded-lg border">
+        <TableHeader className="bg-muted/40">
+          <TableRow className="hover:bg-transparent">
             <TableHead>Address</TableHead>
             <TableHead className="hidden sm:table-cell">Name</TableHead>
-            <TableHead>Status</TableHead>
-            {canManage && <TableHead />}
+            <TableHead className="w-28">Status</TableHead>
+            {canManage && (
+              <TableHead className="w-px text-right">
+                <span className="sr-only">Actions</span>
+              </TableHead>
+            )}
           </TableRow>
         </TableHeader>
         <TableBody>
+          {mailboxes.length === 0 ? (
+            <TableRow>
+              <TableCell
+                className="h-24 text-center text-muted-foreground"
+                colSpan={canManage ? 4 : 3}
+              >
+                No mailboxes yet.
+              </TableCell>
+            </TableRow>
+          ) : null}
           {mailboxes.map((mailbox) => (
-            <TableRow className="hover:bg-muted/35" key={mailbox.id}>
+            <TableRow key={mailbox.id}>
               <TableCell className="max-w-52">
                 <span className="block truncate">{mailbox.address}</span>
                 {mailbox.addresses
@@ -192,7 +206,7 @@ export function MailboxSettings({
                 </Badge>
               </TableCell>
               {canManage && (
-                <TableCell className="pl-1 text-right">
+                <TableCell className="whitespace-nowrap pl-1 text-right">
                   <Button
                     className="mr-2 px-2"
                     size="sm"
