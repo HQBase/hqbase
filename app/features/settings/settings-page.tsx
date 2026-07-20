@@ -4,7 +4,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { BillingSettings } from "@/features/billing/billing-settings";
 import type { EntitlementStatus } from "@/features/billing/types";
 import { DomainSettings } from "@/features/domains/domain-settings";
-import { MailboxAccessSettings } from "@/features/mailbox-access/mailbox-access-settings";
 import { MailboxSettings } from "@/features/mailboxes/mailbox-settings";
 import type { Mailbox } from "@/features/mailboxes/types";
 import { DebugSettings } from "@/features/settings/debug-settings";
@@ -46,7 +45,7 @@ export function SettingsPage({
   const resolvedDefaultTab =
     defaultTab === "general" || defaultTab === "upgrade"
       ? "debug"
-      : defaultTab === "mail-clients"
+      : defaultTab === "mail-clients" || defaultTab === "access"
         ? "mailboxes"
         : defaultTab;
 
@@ -62,13 +61,17 @@ export function SettingsPage({
             <SettingsTab value="mailboxes">Mailboxes</SettingsTab>
             <SettingsTab value="users">Users</SettingsTab>
             {canManage ? <SettingsTab value="domains">Domains</SettingsTab> : null}
-            {canManage ? <SettingsTab value="access">Access</SettingsTab> : null}
             {canManage && entitlement ? <SettingsTab value="billing">Billing</SettingsTab> : null}
             {canManage ? <SettingsTab value="updates">Updates</SettingsTab> : null}
             <SettingsTab value="debug">Debug</SettingsTab>
           </TabsList>
           <TabsContent className="mt-5" value="mailboxes">
-            <MailboxSettings canManage={canManage} mailboxes={mailboxes} onChanged={onRefresh} />
+            <MailboxSettings
+              canManage={canManage}
+              mailboxes={mailboxes}
+              users={users}
+              onChanged={onRefresh}
+            />
           </TabsContent>
           <TabsContent className="mt-5" value="users">
             {canManage ? <UserSettings users={users} onChanged={onRefresh} /> : <NoUserAccess />}
@@ -76,11 +79,6 @@ export function SettingsPage({
           {canManage ? (
             <TabsContent className="mt-5" value="domains">
               <DomainSettings portalHostname={setup.portalHostname} onChanged={onRefresh} />
-            </TabsContent>
-          ) : null}
-          {canManage ? (
-            <TabsContent className="mt-5" value="access">
-              <MailboxAccessSettings mailboxes={mailboxes} users={users} />
             </TabsContent>
           ) : null}
           {canManage && entitlement ? (

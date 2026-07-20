@@ -23,27 +23,38 @@ import {
   TableHeader,
   TableRow
 } from "@/components/ui/table";
+import { useMailboxAccessPolicies } from "@/features/mailbox-access/mailbox-access-policies";
+import {
+  MailboxAccessCell,
+  MailboxAccessPolicyDialog
+} from "@/features/mailbox-access/mailbox-access-policy";
 import { SettingsSection } from "@/features/settings/settings-section";
+import type { WorkspaceUser } from "@/features/users/types";
 import { addMailboxAddress, createMailbox, removeMailboxAddress, updateMailbox } from "./api";
+import { MailboxAliasDialog } from "./mailbox-alias-dialog";
 import type { Mailbox } from "./types";
 
 type MailboxSettingsProps = {
   canManage: boolean;
   mailboxes: Mailbox[];
+  users: WorkspaceUser[];
   onChanged: () => void;
 };
 
 export function MailboxSettings({
   canManage,
   mailboxes,
+  users,
   onChanged
 }: MailboxSettingsProps): React.ReactElement {
   const [address, setAddress] = React.useState("");
   const [displayName, setDisplayName] = React.useState("");
   const [createOpen, setCreateOpen] = React.useState(false);
   const [aliasMailbox, setAliasMailbox] = React.useState<Mailbox | null>(null);
+  const [accessMailbox, setAccessMailbox] = React.useState<Mailbox | null>(null);
   const [aliasAddress, setAliasAddress] = React.useState("");
   const [pendingAction, setPendingAction] = React.useState<"mailbox" | "alias" | null>(null);
+  const accessPolicies = useMailboxAccessPolicies(canManage);
 
   async function handleCreate(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -156,6 +167,7 @@ export function MailboxSettings({
             <TableHead>Address</TableHead>
             <TableHead className="hidden sm:table-cell">Name</TableHead>
             <TableHead className="w-28">Status</TableHead>
+            {canManage ? <TableHead className="w-56">Access</TableHead> : null}
             {canManage && (
               <TableHead className="w-px text-right">
                 <span className="sr-only">Actions</span>
@@ -168,7 +180,7 @@ export function MailboxSettings({
             <TableRow>
               <TableCell
                 className="h-24 text-center text-muted-foreground"
-                colSpan={canManage ? 4 : 3}
+                colSpan={canManage ? 5 : 3}
               >
                 No mailboxes yet.
               </TableCell>
@@ -205,6 +217,16 @@ export function MailboxSettings({
                   {mailbox.isActive ? "Active" : "Disabled"}
                 </Badge>
               </TableCell>
+              {canManage ? (
+                <TableCell>
+                  <MailboxAccessCell
+                    mailbox={mailbox}
+                    policies={accessPolicies}
+                    users={users}
+                    onManage={() => setAccessMailbox(mailbox)}
+                  />
+                </TableCell>
+              ) : null}
               {canManage && (
                 <TableCell className="whitespace-nowrap pl-1 text-right">
                   <Button
@@ -232,49 +254,27 @@ export function MailboxSettings({
         </TableBody>
       </Table>
 
-      <Dialog
-        open={aliasMailbox !== null}
-        onOpenChange={(open) => {
-          if (!open) {
-            setAliasMailbox(null);
-            setAliasAddress("");
-          }
+      <MailboxAliasDialog
+        address={aliasAddress}
+        mailbox={aliasMailbox}
+        pending={pendingAction === "alias"}
+        onAddressChange={setAliasAddress}
+        onClose={() => {
+          setAliasMailbox(null);
+          setAliasAddress("");
         }}
-      >
-        <DialogContent className="w-[min(92vw,480px)]">
-          <DialogHeader>
-            <DialogTitle>Add alias</DialogTitle>
-            <DialogDescription>
-              Add another sending and receiving address to {aliasMailbox?.address}.
-            </DialogDescription>
-          </DialogHeader>
-          <form className="flex flex-col gap-5" onSubmit={(event) => void handleAlias(event)}>
-            <FieldGroup>
-              <Field>
-                <FieldLabel htmlFor="new-mailbox-alias">Alias address</FieldLabel>
-                <Input
-                  id="new-mailbox-alias"
-                  placeholder="hello@example.com"
-                  required
-                  type="email"
-                  value={aliasAddress}
-                  onChange={(event) => setAliasAddress(event.target.value)}
-                />
-              </Field>
-            </FieldGroup>
-            <DialogFooter>
-              <DialogClose asChild>
-                <Button type="button" variant="outline">
-                  Cancel
-                </Button>
-              </DialogClose>
-              <Button disabled={pendingAction !== null} type="submit">
-                {pendingAction === "alias" ? "Adding alias…" : "Add alias"}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
+        onSubmit={(event) => void handleAlias(event)}
+      />
+
+      <MailboxAccessPolicyDialog
+        mailbox={accessMailbox}
+        mailboxes={mailboxes}
+        policies={accessPolicies}
+        users={users}
+        onOpenChange={(open) => {
+          if (!open) setAccessMailbox(null);
+        }}
+      />
     </SettingsSection>
   );
 }

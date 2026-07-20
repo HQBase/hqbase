@@ -1,9 +1,11 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { DomainSettings } from "@/features/domains/domain-settings";
-import { MailboxAccessSettings } from "@/features/mailbox-access/mailbox-access-settings";
+import { formatMailboxAccessSummary } from "@/features/mailbox-access/mailbox-access-policies";
 import { MailboxSettings } from "@/features/mailboxes/mailbox-settings";
+import type { Mailbox } from "@/features/mailboxes/types";
 import { SettingsPage } from "@/features/settings/settings-page";
+import type { WorkspaceUser } from "@/features/users/types";
 import { UserSettings } from "@/features/users/user-settings";
 
 const setup = {
@@ -17,10 +19,30 @@ const setup = {
   checklistAcknowledged: true
 };
 
+const mailbox: Mailbox = {
+  id: "mailbox-1",
+  address: "support@example.com",
+  addresses: [],
+  displayName: "Support",
+  isActive: true,
+  accessLevel: "manager",
+  createdAt: "2026-07-20T00:00:00.000Z",
+  updatedAt: "2026-07-20T00:00:00.000Z"
+};
+
+const member: WorkspaceUser = {
+  id: "user-1",
+  name: "Avery Stone",
+  email: "avery@example.com",
+  role: "member",
+  banned: false,
+  createdAt: "2026-07-20T00:00:00.000Z"
+};
+
 describe("settings presentation", () => {
   it("renders mailbox content at the top level and opens creation from a dialog trigger", () => {
     const html = renderToStaticMarkup(
-      <MailboxSettings canManage mailboxes={[]} onChanged={() => undefined} />
+      <MailboxSettings canManage mailboxes={[]} users={[]} onChanged={() => undefined} />
     );
 
     expect(html).toContain("<section");
@@ -39,11 +61,35 @@ describe("settings presentation", () => {
     expect(html).not.toContain("new-user-email");
   });
 
-  it("keeps mailbox access in the shared settings table shell", () => {
-    const html = renderToStaticMarkup(<MailboxAccessSettings mailboxes={[]} users={[]} />);
+  it("centers mailbox access policy in each mailbox row", () => {
+    const html = renderToStaticMarkup(
+      <MailboxSettings
+        canManage
+        mailboxes={[mailbox]}
+        users={[member]}
+        onChanged={() => undefined}
+      />
+    );
 
     expect(html).toContain('class="relative w-full overflow-auto rounded-lg border"');
-    expect(html).toContain("No mailbox access rows yet.");
+    expect(html).toContain(">Access<");
+    expect(html).toContain("Manage access for support@example.com");
+    expect(
+      formatMailboxAccessSummary(
+        mailbox.id,
+        [
+          {
+            mailboxId: mailbox.id,
+            userId: member.id,
+            accessLevel: "agent",
+            createdAt: "2026-07-20T00:00:00.000Z",
+            updatedAt: "2026-07-20T00:00:00.000Z"
+          }
+        ],
+        [member],
+        false
+      )
+    ).toBe("Owner + 1 user");
   });
 
   it("keeps domain additions in a modal and never asks for a Cloudflare credential", () => {
@@ -77,6 +123,7 @@ describe("settings presentation", () => {
 
     expect(html).not.toContain(">General<");
     expect(html).not.toContain(">Upgrade<");
+    expect(html).not.toContain('value="access"');
     expect(html).not.toContain("Mail clients");
     expect(html).toContain(">Debug<");
     expect(html.indexOf(">Debug<")).toBeGreaterThan(html.indexOf(">Updates<"));
