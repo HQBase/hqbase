@@ -3,6 +3,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
+import { CloudflareAuthorizationDialog } from "@/features/settings/cloudflare-authorization-dialog";
 import { SettingsSection } from "@/features/settings/settings-section";
 import { applyUpdate, getUpdateStatus } from "./api";
 import type { UpdateStatus } from "./types";
@@ -17,6 +18,7 @@ export function UpdateSettings({
   const [applyError, setApplyError] = React.useState<string | null>(null);
   const [buildId, setBuildId] = React.useState<string | null>(null);
   const [pendingAction, setPendingAction] = React.useState<"check" | "apply" | null>(null);
+  const [authorizationOpen, setAuthorizationOpen] = React.useState(false);
   const resumedRef = React.useRef(false);
 
   React.useEffect(() => {
@@ -138,10 +140,6 @@ export function UpdateSettings({
             </p>
           </div>
           <div className="flex flex-col gap-4">
-            <p className="text-xs leading-5 text-muted-foreground">
-              Cloudflare will ask you to approve temporary access for this update. HQBase revokes
-              that access after the build starts.
-            </p>
             {!status.compatible ? (
               <Alert variant="destructive">
                 <AlertTitle>Direct update unavailable</AlertTitle>
@@ -156,14 +154,24 @@ export function UpdateSettings({
               </Button>
             ) : !status.compatible ? (
               <Button className="self-start" disabled type="button">
-                Authorize Cloudflare and update
+                Install update
               </Button>
             ) : (
-              <Button asChild className="self-start">
-                <a href="/api/updates/cloudflare/oauth/start">Authorize Cloudflare and update</a>
+              <Button
+                className="self-start"
+                onClick={() => setAuthorizationOpen(true)}
+                type="button"
+              >
+                Install update
               </Button>
             )}
           </div>
+          <CloudflareAuthorizationDialog
+            authorizeHref="/api/updates/cloudflare/oauth/start"
+            description="To install this update, HQBase needs temporary access to your Cloudflare account. You’ll return to Updates automatically, and HQBase will start the update."
+            open={authorizationOpen}
+            onOpenChange={setAuthorizationOpen}
+          />
         </div>
       ) : null}
     </SettingsSection>

@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
+import { CloudflareAuthorizationDialog } from "@/features/settings/cloudflare-authorization-dialog";
 import { SettingsSection } from "@/features/settings/settings-section";
 import { changePortal, listDomains, revokeCloudflareAuthorization, updateDomain } from "./api";
 import { ConnectDomainDialog } from "./connect-domain-dialog";
@@ -28,6 +29,8 @@ export function DomainSettings({
   const [connectOpen, setConnectOpen] = React.useState(false);
   const [connectAuthorized, setConnectAuthorized] = React.useState(false);
   const [changePending, setChangePending] = React.useState(false);
+  const [authorizationOperation, setAuthorizationOperation] =
+    React.useState<PendingCloudflareOperation | null>(null);
   const [pendingDomainId, setPendingDomainId] = React.useState<string | null>(null);
   const resumedRef = React.useRef(false);
 
@@ -73,7 +76,7 @@ export function DomainSettings({
     void changePortal({ zoneId: pending.zoneId, hostname: pending.hostname })
       .then(() => {
         onChanged();
-        toast.success("Portal address changed.");
+        toast.success("Workspace portal updated.");
       })
       .catch((error: unknown) => {
         toast.error(error instanceof Error ? error.message : "Cloudflare change failed.");
@@ -91,12 +94,7 @@ export function DomainSettings({
       toast.error("The portal must use a connected domain with a Cloudflare zone.");
       return;
     }
-    authorizeCloudflare({ action: "portal", zoneId: domain.zoneId, hostname });
-  }
-
-  function authorizeCloudflare(operation: PendingCloudflareOperation) {
-    sessionStorage.setItem(PENDING_OPERATION_KEY, JSON.stringify(operation));
-    window.location.assign("/api/pro/domains/cloudflare/oauth/start");
+    setAuthorizationOperation({ action: "portal", zoneId: domain.zoneId, hostname });
   }
 
   async function toggleDomain(domain: MailDomain) {
@@ -169,10 +167,23 @@ export function DomainSettings({
             </Field>
           </FieldGroup>
           <Button className="self-start" disabled={changePending} type="submit">
-            Authorize and change portal
+            Save
           </Button>
         </form>
       </div>
+      <CloudflareAuthorizationDialog
+        authorizeHref="/api/pro/domains/cloudflare/oauth/start"
+        description="To save this change, HQBase needs temporary access to your Cloudflare account. You’ll return to Domains automatically, and HQBase will update the workspace portal."
+        open={authorizationOperation?.action === "portal"}
+        onAuthorize={() => {
+          if (authorizationOperation) {
+            sessionStorage.setItem(PENDING_OPERATION_KEY, JSON.stringify(authorizationOperation));
+          }
+        }}
+        onOpenChange={(open) => {
+          if (!open) setAuthorizationOperation(null);
+        }}
+      />
     </SettingsSection>
   );
 }

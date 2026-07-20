@@ -145,7 +145,9 @@ describe("settings presentation", () => {
     expect(html).not.toContain("API token");
     expect(html).toContain('class="relative w-full overflow-auto rounded-lg border"');
     expect(html).toContain("No domains connected.");
-    expect(html).toContain("Authorize and change portal");
+    expect(html).toContain(">Save<");
+    expect(html).not.toContain("Authorize and change portal");
+    expect(html).not.toContain('href="/api/pro/domains/cloudflare/oauth/start"');
     expect(html).not.toContain("Bridge origin");
   });
 

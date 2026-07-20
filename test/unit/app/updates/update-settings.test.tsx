@@ -27,10 +27,11 @@ describe("update settings", () => {
     expect(html).toContain("Unknown");
   });
 
-  it("starts updates through Cloudflare authorization without a credential field", () => {
+  it("opens authorization from the update action without a credential field", () => {
     const html = renderToStaticMarkup(<UpdateSettings initialStatus={availableStatus} />);
-    expect(html).toContain('href="/api/updates/cloudflare/oauth/start"');
-    expect(html).toContain("Authorize Cloudflare and update");
+    expect(html).toContain("Install update");
+    expect(html).not.toContain('href="/api/updates/cloudflare/oauth/start"');
+    expect(html).not.toContain("Authorize Cloudflare and update");
     expect(html).not.toContain('type="password"');
     expect(html).not.toContain("API token");
     expect(html).toContain("HQBase 0.2.0");
