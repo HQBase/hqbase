@@ -22,8 +22,3 @@ export const updateDomain = (
 ) => apiPatch<MailDomain>(`/api/pro/domains/${id}`, input);
 export const changePortal = (input: { zoneId: string; workerName?: string; hostname: string }) =>
   apiPut<{ hostname: string }>("/api/pro/domains/portal", input);
-export const changeServiceOrigin = (input: {
-  zoneId: string;
-  workerName?: string;
-  hostname: string;
-}) => apiPut<{ hostname: string }>("/api/pro/domains/service", input);

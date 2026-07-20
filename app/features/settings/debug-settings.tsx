@@ -88,7 +88,6 @@ export function buildDebugReport(
     `setup_complete = ${setup.isComplete}`,
     `primary_domain = ${quoted(setup.primaryDomain)}`,
     `portal_hostname = ${quoted(setup.portalHostname)}`,
-    `service_hostname = ${quoted(setup.serviceHostname)}`,
     `domain_setup = ${quoted(setup.checklistAcknowledged ? "ready" : "pending")}`,
     `users = ${setup.userCount}`,
     `mailboxes = ${setup.mailboxCount}`,

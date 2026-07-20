@@ -10,16 +10,12 @@ Pro supports two first-class lifecycles:
 - Upgrade from an explicitly supported HQBase Community schema.
 
 It includes the Pro web application, multi-domain mail identities, private durable drafts, a rich
-attachment-aware composer, migrations, app-password management, persistent IMAP identity, bridge
-API, and staging E2E orchestration. The Fly-hosted `hqbase-mail-bridge` connects through
-authenticated HTTPS and never receives Cloudflare credentials.
+attachment-aware composer, migrations, and staging E2E orchestration.
 
 Pro also exposes an OAuth-protected remote MCP server at `/mcp`. Its baseline read, organize, send,
 and reply tools can never exceed the connected user's live mailbox grants. See `docs/mcp.md`.
 
-The basic production launch is a web-first beta. IMAP/SMTP and app-password setup remain a private
-preview backed by dedicated preview bridge deployments; they are not generally available or part
-of the launch purchase promise. See `docs/mail-bridge.md`.
+The production launch is web-first.
 
 ## Deploy
 
@@ -73,7 +69,7 @@ This private-source command is for HQBase operators testing or recovering data. 
 it or select a D1 database during an upgrade. The supported customer path starts in the existing
 Community workspace and discovers its bindings automatically. Only documented Community schema
 versions are accepted; unknown schemas fail before mutation. See `docs/community-upgrade.md` for
-the current cutover boundary and `docs/mail-bridge.md` for bridge preview limits.
+the current cutover boundary.
 
 ## Production operations
 

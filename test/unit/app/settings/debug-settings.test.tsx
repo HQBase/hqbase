@@ -47,6 +47,7 @@ describe("debug settings", () => {
 
     expect(report).toContain("# workspace");
     expect(report).toContain('primary_domain = "example.com"');
+    expect(report).not.toContain("service_hostname");
     expect(report).toContain("# community_upgrade");
     expect(report).toContain('state = "migrated"');
     expect(report).toContain('checkpoint_bookmark = "bookmark-1"');

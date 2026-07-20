@@ -1,7 +1,6 @@
 import type * as React from "react";
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { AppPasswordSettings } from "@/features/app-passwords/app-password-settings";
 import { BillingSettings } from "@/features/billing/billing-settings";
 import type { EntitlementStatus } from "@/features/billing/types";
 import { DomainSettings } from "@/features/domains/domain-settings";
@@ -45,7 +44,11 @@ export function SettingsPage({
   updateStatus
 }: SettingsPageProps): React.ReactElement {
   const resolvedDefaultTab =
-    defaultTab === "general" || defaultTab === "upgrade" ? "debug" : defaultTab;
+    defaultTab === "general" || defaultTab === "upgrade"
+      ? "debug"
+      : defaultTab === "mail-clients"
+        ? "mailboxes"
+        : defaultTab;
 
   return (
     <div className="h-full overflow-auto">
@@ -60,7 +63,6 @@ export function SettingsPage({
             <SettingsTab value="users">Users</SettingsTab>
             {canManage ? <SettingsTab value="domains">Domains</SettingsTab> : null}
             {canManage ? <SettingsTab value="access">Access</SettingsTab> : null}
-            <SettingsTab value="mail-clients">Mail clients (preview)</SettingsTab>
             {canManage && entitlement ? <SettingsTab value="billing">Billing</SettingsTab> : null}
             {canManage ? <SettingsTab value="updates">Updates</SettingsTab> : null}
             <SettingsTab value="debug">Debug</SettingsTab>
@@ -73,11 +75,7 @@ export function SettingsPage({
           </TabsContent>
           {canManage ? (
             <TabsContent className="mt-5" value="domains">
-              <DomainSettings
-                portalHostname={setup.portalHostname}
-                serviceHostname={setup.serviceHostname}
-                onChanged={onRefresh}
-              />
+              <DomainSettings portalHostname={setup.portalHostname} onChanged={onRefresh} />
             </TabsContent>
           ) : null}
           {canManage ? (
@@ -85,9 +83,6 @@ export function SettingsPage({
               <MailboxAccessSettings mailboxes={mailboxes} users={users} />
             </TabsContent>
           ) : null}
-          <TabsContent className="mt-5" value="mail-clients">
-            <AppPasswordSettings />
-          </TabsContent>
           {canManage && entitlement ? (
             <TabsContent className="mt-5" value="billing">
               <BillingSettings status={entitlement} onChanged={onEntitlementChanged} />

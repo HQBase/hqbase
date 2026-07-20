@@ -38,4 +38,4 @@ and request a scan at `POST /api/pro/operations/integrity-scan`.
 2. Run `doctor` and `backup`.
 3. Inspect diagnostics, recent failed operation IDs, and the DLQ.
 4. Restore only from a manifest for the same deployment.
-5. Re-run `doctor`, authenticate a bridge session, and perform the headless IMAPS/SMTPS check.
+5. Re-run `doctor` and verify the authenticated web application is healthy.

@@ -36,17 +36,14 @@ describe("settings presentation", () => {
 
   it("keeps domain additions in a modal and never asks for a Cloudflare credential", () => {
     const html = renderToStaticMarkup(
-      <DomainSettings
-        portalHostname="mail.example.com"
-        serviceHostname="bridge.example.com"
-        onChanged={() => undefined}
-      />
+      <DomainSettings portalHostname="mail.example.com" onChanged={() => undefined} />
     );
 
     expect(html).toContain("Connect domain");
     expect(html).not.toContain('type="password"');
     expect(html).not.toContain("API token");
     expect(html).toContain("Authorize and change portal");
+    expect(html).not.toContain("Bridge origin");
   });
 
   it("replaces General and Upgrade with Debug as the final tab", () => {
@@ -68,6 +65,7 @@ describe("settings presentation", () => {
 
     expect(html).not.toContain(">General<");
     expect(html).not.toContain(">Upgrade<");
+    expect(html).not.toContain("Mail clients");
     expect(html).toContain(">Debug<");
     expect(html.indexOf(">Debug<")).toBeGreaterThan(html.indexOf(">Updates<"));
   });

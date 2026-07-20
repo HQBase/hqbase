@@ -3,15 +3,15 @@ import { promisify } from "node:util";
 import { expect, test } from "@playwright/test";
 
 const run = promisify(execFile);
-const email = required("HQBASE_PRO_STAGING_OWNER_EMAIL");
-const password = required("HQBASE_PRO_STAGING_OWNER_PASSWORD");
-const sender = required("HQBASE_PRO_STAGING_SENDER");
-const bridgeToken = required("HQBASE_PRO_STAGING_BRIDGE_TOKEN");
-const bridgeHost = required("HQBASE_PRO_STAGING_BRIDGE_HOST");
-const acceptanceBinary = required("HQBASE_BRIDGE_ACCEPTANCE_BIN");
-const stagingUrl = required("HQBASE_PRO_STAGING_URL");
+const email = process.env.HQBASE_PRO_STAGING_OWNER_EMAIL ?? "";
+const password = process.env.HQBASE_PRO_STAGING_OWNER_PASSWORD ?? "";
+const sender = process.env.HQBASE_PRO_STAGING_SENDER ?? "";
+const bridgeToken = process.env.HQBASE_PRO_STAGING_BRIDGE_TOKEN ?? "";
+const bridgeHost = process.env.HQBASE_PRO_STAGING_BRIDGE_HOST ?? "";
+const acceptanceBinary = process.env.HQBASE_BRIDGE_ACCEPTANCE_BIN ?? "";
+const stagingUrl = process.env.HQBASE_PRO_STAGING_URL ?? "";
 
-test("Pro bridge remains available after lifecycle changes", async ({ request }) => {
+test.skip("Dormant bridge remains available after lifecycle changes", async ({ request }) => {
   const login = await request.post("/api/auth/sign-in/email", {
     data: { email, password, rememberMe: false },
     headers: { origin: stagingUrl }
@@ -50,9 +50,3 @@ test("Pro bridge remains available after lifecycle changes", async ({ request })
     await request.delete(`/api/pro/app-passwords/${created.appPassword.id}`);
   }
 });
-
-function required(name: string): string {
-  const value = process.env[name];
-  if (!value) throw new Error(`${name} is required for Pro staging E2E.`);
-  return value;
-}

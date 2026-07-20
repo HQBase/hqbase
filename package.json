@@ -29,7 +29,6 @@
     "test:e2e:staging": "playwright test --config playwright.config.ts app-shell-smoke.spec.ts pro-bridge.spec.ts",
     "test:e2e:staging:smoke": "playwright test --config playwright.config.ts app-shell-smoke.spec.ts",
     "test:e2e:staging:lifecycle": "playwright test --config playwright.config.ts pro-bridge.spec.ts",
-    "test:e2e:staging:continuity": "playwright test --config playwright.config.ts bridge-continuity.spec.ts",
     "check": "pnpm code:check && pnpm typecheck && pnpm test && pnpm test:coverage && pnpm test:architecture && pnpm build",
     "deploy:dry-run": "pnpm build && wrangler deploy --dry-run",
     "hqbase-pro": "node scripts/hqbase-pro/cli.mjs",
