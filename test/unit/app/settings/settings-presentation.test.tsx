@@ -46,6 +46,7 @@ describe("settings presentation", () => {
     );
 
     expect(html).toContain("<section");
+    expect(html).toContain("Set access by domain");
     expect(html).toContain("Add mailbox");
     expect(html).toContain('class="relative w-full overflow-auto rounded-lg border"');
     expect(html).toContain("No mailboxes yet.");
@@ -74,6 +75,8 @@ describe("settings presentation", () => {
     expect(html).toContain('class="relative w-full overflow-auto rounded-lg border"');
     expect(html).toContain(">Access<");
     expect(html).toContain("Manage access for support@example.com");
+    expect(html).toContain(">Manage access<");
+    expect(html).not.toContain("Apply to domain");
     expect(
       formatMailboxAccessSummary(
         mailbox.id,

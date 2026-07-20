@@ -23,6 +23,7 @@ import {
   TableHeader,
   TableRow
 } from "@/components/ui/table";
+import { DomainAccessDialog } from "@/features/mailbox-access/domain-access-dialog";
 import { useMailboxAccessPolicies } from "@/features/mailbox-access/mailbox-access-policies";
 import {
   MailboxAccessCell,
@@ -52,6 +53,7 @@ export function MailboxSettings({
   const [createOpen, setCreateOpen] = React.useState(false);
   const [aliasMailbox, setAliasMailbox] = React.useState<Mailbox | null>(null);
   const [accessMailbox, setAccessMailbox] = React.useState<Mailbox | null>(null);
+  const [domainAccessOpen, setDomainAccessOpen] = React.useState(false);
   const [aliasAddress, setAliasAddress] = React.useState("");
   const [pendingAction, setPendingAction] = React.useState<"mailbox" | "alias" | null>(null);
   const accessPolicies = useMailboxAccessPolicies(canManage);
@@ -107,55 +109,63 @@ export function MailboxSettings({
     <SettingsSection
       action={
         canManage ? (
-          <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-            <DialogTrigger asChild>
-              <Button type="button">
-                <Plus data-icon="inline-start" />
-                Add mailbox
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="w-[min(92vw,480px)]">
-              <DialogHeader>
-                <DialogTitle>Add mailbox</DialogTitle>
-                <DialogDescription>Create a shared address for this workspace.</DialogDescription>
-              </DialogHeader>
-              <form className="flex flex-col gap-5" onSubmit={(event) => void handleCreate(event)}>
-                <FieldGroup>
-                  <Field>
-                    <FieldLabel htmlFor="new-mailbox-address">Email address</FieldLabel>
-                    <Input
-                      id="new-mailbox-address"
-                      placeholder="support@example.com"
-                      required
-                      type="email"
-                      value={address}
-                      onChange={(event) => setAddress(event.target.value)}
-                    />
-                  </Field>
-                  <Field>
-                    <FieldLabel htmlFor="new-mailbox-name">Display name</FieldLabel>
-                    <Input
-                      id="new-mailbox-name"
-                      placeholder="Support"
-                      required
-                      value={displayName}
-                      onChange={(event) => setDisplayName(event.target.value)}
-                    />
-                  </Field>
-                </FieldGroup>
-                <DialogFooter>
-                  <DialogClose asChild>
-                    <Button type="button" variant="outline">
-                      Cancel
+          <div className="flex flex-wrap gap-2">
+            <Button type="button" variant="outline" onClick={() => setDomainAccessOpen(true)}>
+              Set access by domain
+            </Button>
+            <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+              <DialogTrigger asChild>
+                <Button type="button">
+                  <Plus data-icon="inline-start" />
+                  Add mailbox
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="w-[min(92vw,480px)]">
+                <DialogHeader>
+                  <DialogTitle>Add mailbox</DialogTitle>
+                  <DialogDescription>Create a shared address for this workspace.</DialogDescription>
+                </DialogHeader>
+                <form
+                  className="flex flex-col gap-5"
+                  onSubmit={(event) => void handleCreate(event)}
+                >
+                  <FieldGroup>
+                    <Field>
+                      <FieldLabel htmlFor="new-mailbox-address">Email address</FieldLabel>
+                      <Input
+                        id="new-mailbox-address"
+                        placeholder="support@example.com"
+                        required
+                        type="email"
+                        value={address}
+                        onChange={(event) => setAddress(event.target.value)}
+                      />
+                    </Field>
+                    <Field>
+                      <FieldLabel htmlFor="new-mailbox-name">Display name</FieldLabel>
+                      <Input
+                        id="new-mailbox-name"
+                        placeholder="Support"
+                        required
+                        value={displayName}
+                        onChange={(event) => setDisplayName(event.target.value)}
+                      />
+                    </Field>
+                  </FieldGroup>
+                  <DialogFooter>
+                    <DialogClose asChild>
+                      <Button type="button" variant="outline">
+                        Cancel
+                      </Button>
+                    </DialogClose>
+                    <Button disabled={pendingAction !== null} type="submit">
+                      {pendingAction === "mailbox" ? "Adding mailbox…" : "Add mailbox"}
                     </Button>
-                  </DialogClose>
-                  <Button disabled={pendingAction !== null} type="submit">
-                    {pendingAction === "mailbox" ? "Adding mailbox…" : "Add mailbox"}
-                  </Button>
-                </DialogFooter>
-              </form>
-            </DialogContent>
-          </Dialog>
+                  </DialogFooter>
+                </form>
+              </DialogContent>
+            </Dialog>
+          </div>
         ) : null
       }
       description="Shared addresses across your connected domains"
@@ -268,12 +278,19 @@ export function MailboxSettings({
 
       <MailboxAccessPolicyDialog
         mailbox={accessMailbox}
-        mailboxes={mailboxes}
         policies={accessPolicies}
         users={users}
         onOpenChange={(open) => {
           if (!open) setAccessMailbox(null);
         }}
+      />
+
+      <DomainAccessDialog
+        mailboxes={mailboxes}
+        open={domainAccessOpen}
+        policies={accessPolicies}
+        users={users}
+        onOpenChange={setDomainAccessOpen}
       />
     </SettingsSection>
   );
