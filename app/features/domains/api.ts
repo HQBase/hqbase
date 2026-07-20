@@ -1,8 +1,12 @@
+import type { CloudflareZone } from "@/features/setup/types";
 import { apiGet, apiPatch, apiPost, apiPut } from "@/lib/api-client";
 import type { MailDomain } from "./types";
 export const listDomains = () => apiGet<MailDomain[]>("/api/pro/domains");
+export const listAvailableCloudflareZones = async () =>
+  (await apiGet<{ zones: CloudflareZone[] }>("/api/pro/domains/cloudflare/zones")).zones;
+export const revokeCloudflareAuthorization = () =>
+  apiPost<{ revoked: boolean }>("/api/pro/domains/cloudflare/revoke", {});
 export const provisionDomain = (input: {
-  apiToken: string;
   zoneId: string;
   workerName?: string;
   name: string;
@@ -16,14 +20,9 @@ export const updateDomain = (
     catchAllMailboxId?: string | null;
   }
 ) => apiPatch<MailDomain>(`/api/pro/domains/${id}`, input);
-export const changePortal = (input: {
-  apiToken: string;
-  zoneId: string;
-  workerName?: string;
-  hostname: string;
-}) => apiPut<{ hostname: string }>("/api/pro/domains/portal", input);
+export const changePortal = (input: { zoneId: string; workerName?: string; hostname: string }) =>
+  apiPut<{ hostname: string }>("/api/pro/domains/portal", input);
 export const changeServiceOrigin = (input: {
-  apiToken: string;
   zoneId: string;
   workerName?: string;
   hostname: string;

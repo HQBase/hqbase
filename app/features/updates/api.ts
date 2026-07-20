@@ -5,6 +5,6 @@ export function getUpdateStatus(): Promise<UpdateStatus> {
   return apiGet<UpdateStatus>("/api/updates");
 }
 
-export function applyUpdate(apiToken: string): Promise<{ buildId: string; status: string }> {
-  return apiPost("/api/updates/apply", { apiToken });
+export function applyUpdate(): Promise<{ buildId: string; status: string }> {
+  return apiPost("/api/updates/apply", {});
 }

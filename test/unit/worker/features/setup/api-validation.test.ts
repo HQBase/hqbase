@@ -61,31 +61,20 @@ describe("setup API validation", () => {
     ).toThrow("Mailbox addresses must be unique.");
   });
 
-  it("validates Cloudflare zone listing input", () => {
-    expect(() =>
-      listCloudflareZonesSchema.parse({
-        apiToken: "short"
-      })
-    ).toThrow();
-
-    expect(
-      listCloudflareZonesSchema.parse({
-        apiToken: "a".repeat(40)
-      })
-    ).toEqual({ apiToken: "a".repeat(40) });
+  it("rejects credentials in Cloudflare zone listing input", () => {
+    expect(() => listCloudflareZonesSchema.parse({ apiToken: "a".repeat(40) })).toThrow();
+    expect(listCloudflareZonesSchema.parse({})).toEqual({});
   });
 
   it("defaults Cloudflare Email Sending automation on", () => {
     expect(
       configureCloudflareDomainSchema.parse({
         appHostname: "hqbase.example.com",
-        apiToken: "a".repeat(40),
         workerName: "hqbase",
         zoneId: "zone-1"
       })
     ).toEqual({
       appHostname: "hqbase.example.com",
-      apiToken: "a".repeat(40),
       attachCustomDomain: true,
       enableSending: true,
       workerName: "hqbase",
@@ -96,7 +85,6 @@ describe("setup API validation", () => {
   it("requires the app custom domain only when attaching it", () => {
     expect(() =>
       configureCloudflareDomainSchema.parse({
-        apiToken: "a".repeat(40),
         workerName: "hqbase",
         zoneId: "zone-1"
       })
@@ -105,7 +93,6 @@ describe("setup API validation", () => {
     expect(
       configureCloudflareDomainSchema.parse({
         appHostname: "hqbase.example.com",
-        apiToken: "a".repeat(40),
         attachCustomDomain: false,
         workerName: "hqbase",
         zoneId: "zone-1"

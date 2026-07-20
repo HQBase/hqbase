@@ -1,10 +1,10 @@
 import * as React from "react";
 import { toast } from "sonner";
 
-import { configureCloudflareDomain, listCloudflareZones, verifyCloudflareToken } from "./api";
+import { configureCloudflareDomain, listCloudflareZones, verifyCloudflareAccess } from "./api";
 import { buildAppHostname, customDomainSucceeded, inferWorkerName } from "./setup-helpers";
 import { hasErrors, validateDomain } from "./setup-validation";
-import type { CloudflareConfigureResult, CloudflareTokenStatus, CloudflareZone } from "./types";
+import type { CloudflareAccessStatus, CloudflareConfigureResult, CloudflareZone } from "./types";
 
 export type ConfiguredDomain = { zone: CloudflareZone; result: CloudflareConfigureResult };
 
@@ -12,12 +12,11 @@ export function useSetupCloudflare(callbacks: {
   onConnectionInvalidated: () => void;
   onDomainsChanged: (previousDomains: string[], domains: string[]) => void;
   onDomainConnected: () => void;
-  onTokenChanged: () => void;
   onTokenVerified: () => void;
 }) {
   const callbacksRef = React.useRef(callbacks);
   callbacksRef.current = callbacks;
-  const [tokenStatus, setTokenStatus] = React.useState<CloudflareTokenStatus | null>(null);
+  const [accessStatus, setAccessStatus] = React.useState<CloudflareAccessStatus | null>(null);
   const [tokenError, setTokenError] = React.useState<string | null>(null);
   const [zones, setZones] = React.useState<CloudflareZone[]>([]);
   const [selectedZoneIds, setSelectedZoneIds] = React.useState<string[]>([]);
@@ -62,22 +61,22 @@ export function useSetupCloudflare(callbacks: {
     setTokenError(null);
     setIsLoading(true);
     try {
-      const verified = await verifyCloudflareToken();
+      const verified = await verifyCloudflareAccess();
       if (!verified.active) {
-        setTokenStatus(verified);
-        setTokenError(`Cloudflare reports this token as ${verified.status}.`);
+        setAccessStatus(verified);
+        setTokenError(`Cloudflare reports this authorization as ${verified.status}.`);
         return;
       }
       const nextZones = await listCloudflareZones();
       if (nextZones.length === 0) {
-        setTokenError("The token is valid, but it cannot read any Cloudflare domains.");
+        setTokenError("Cloudflare authorized HQBase, but no domains are available.");
         return;
       }
-      setTokenStatus(verified);
+      setAccessStatus(verified);
       setZones(nextZones);
       callbacksRef.current.onTokenVerified();
     } catch (error) {
-      setTokenError(error instanceof Error ? error.message : "Could not verify this token.");
+      setTokenError(error instanceof Error ? error.message : "Could not verify Cloudflare access.");
     } finally {
       setIsLoading(false);
     }
@@ -178,6 +177,6 @@ export function useSetupCloudflare(callbacks: {
       setDomainAttempted(true);
       setConnectionError(message);
     },
-    tokenReady: tokenStatus?.active === true
+    tokenReady: accessStatus?.active === true
   };
 }

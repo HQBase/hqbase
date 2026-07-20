@@ -10,8 +10,7 @@ import {
   hasMailboxErrors,
   validateDomain,
   validateMailboxes,
-  validateOwner,
-  validateToken
+  validateOwner
 } from "@/features/setup/setup-validation";
 import type { CloudflareZone } from "@/features/setup/types";
 
@@ -120,12 +119,6 @@ describe("setup form validation", () => {
         portalZone: activeZone
       })
     ).toMatchObject({ selectedZoneIds: "Choose up to 10 email domains during setup." });
-  });
-
-  it("rejects values that do not look like Cloudflare tokens", () => {
-    expect(validateToken("")).toBe("Paste the token from Cloudflare.");
-    expect(validateToken("too-short")).toBe("This does not look like a Cloudflare API token.");
-    expect(validateToken("a".repeat(40))).toBeNull();
   });
 
   it("shows mailbox address, domain, display-name, and duplicate errors", () => {

@@ -3,7 +3,17 @@ import * as React from "react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger
+} from "@/components/ui/dialog";
+import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import {
   Table,
@@ -13,6 +23,7 @@ import {
   TableHeader,
   TableRow
 } from "@/components/ui/table";
+import { SettingsSection } from "@/features/settings/settings-section";
 import { addMailboxAddress, createMailbox, removeMailboxAddress, updateMailbox } from "./api";
 import type { Mailbox } from "./types";
 
@@ -29,17 +40,25 @@ export function MailboxSettings({
 }: MailboxSettingsProps): React.ReactElement {
   const [address, setAddress] = React.useState("");
   const [displayName, setDisplayName] = React.useState("");
+  const [createOpen, setCreateOpen] = React.useState(false);
+  const [aliasMailbox, setAliasMailbox] = React.useState<Mailbox | null>(null);
+  const [aliasAddress, setAliasAddress] = React.useState("");
+  const [pendingAction, setPendingAction] = React.useState<"mailbox" | "alias" | null>(null);
 
   async function handleCreate(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    setPendingAction("mailbox");
     try {
       await createMailbox({ address, displayName });
       setAddress("");
       setDisplayName("");
+      setCreateOpen(false);
       toast.success("Mailbox created.");
       onChanged();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Mailbox creation failed.");
+    } finally {
+      setPendingAction(null);
     }
   }
 
@@ -47,123 +66,201 @@ export function MailboxSettings({
     await updateMailbox(mailbox.id, { isActive: !mailbox.isActive });
     onChanged();
   }
-  async function handleAlias(mailbox: Mailbox) {
-    const address = window.prompt("Alias address");
-    if (!address) return;
+
+  async function handleAlias(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!aliasMailbox) return;
+    setPendingAction("alias");
     try {
-      await addMailboxAddress(mailbox.id, { address, displayName: mailbox.displayName });
+      await addMailboxAddress(aliasMailbox.id, {
+        address: aliasAddress,
+        displayName: aliasMailbox.displayName
+      });
+      setAliasAddress("");
+      setAliasMailbox(null);
       toast.success("Alias added.");
       onChanged();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Alias creation failed.");
+    } finally {
+      setPendingAction(null);
     }
   }
+
   async function handleRemoveAlias(mailbox: Mailbox, addressId: string) {
     await removeMailboxAddress(mailbox.id, addressId);
     onChanged();
   }
 
   return (
-    <Card className="bg-card/70 shadow-none">
-      <CardHeader className="pb-4">
-        <CardTitle className="text-base font-medium">Mailboxes</CardTitle>
-        <CardDescription className="text-xs">Shared addresses on your domain</CardDescription>
-      </CardHeader>
-      <CardContent className="flex min-w-0 flex-col gap-5">
-        {canManage && (
-          <form
-            className="grid min-w-0 gap-3 rounded-md border bg-background/50 p-3 md:grid-cols-[1fr_0.8fr_auto]"
-            onSubmit={(event) => void handleCreate(event)}
-          >
-            <Input
-              className="shadow-none focus-visible:ring-1"
-              placeholder="support@example.com"
-              required
-              type="email"
-              value={address}
-              onChange={(event) => setAddress(event.target.value)}
-            />
-            <Input
-              className="shadow-none focus-visible:ring-1"
-              placeholder="Display name"
-              required
-              value={displayName}
-              onChange={(event) => setDisplayName(event.target.value)}
-            />
-            <Button type="submit">
-              <Plus />
-              Add
-            </Button>
-          </form>
-        )}
-        <Table className="overflow-hidden rounded-md border">
-          <TableHeader>
-            <TableRow>
-              <TableHead>Address</TableHead>
-              <TableHead className="hidden sm:table-cell">Name</TableHead>
-              <TableHead>Status</TableHead>
-              {canManage && <TableHead />}
+    <SettingsSection
+      action={
+        canManage ? (
+          <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+            <DialogTrigger asChild>
+              <Button type="button">
+                <Plus data-icon="inline-start" />
+                Add mailbox
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="w-[min(92vw,480px)]">
+              <DialogHeader>
+                <DialogTitle>Add mailbox</DialogTitle>
+                <DialogDescription>Create a shared address for this workspace.</DialogDescription>
+              </DialogHeader>
+              <form className="flex flex-col gap-5" onSubmit={(event) => void handleCreate(event)}>
+                <FieldGroup>
+                  <Field>
+                    <FieldLabel htmlFor="new-mailbox-address">Email address</FieldLabel>
+                    <Input
+                      id="new-mailbox-address"
+                      placeholder="support@example.com"
+                      required
+                      type="email"
+                      value={address}
+                      onChange={(event) => setAddress(event.target.value)}
+                    />
+                  </Field>
+                  <Field>
+                    <FieldLabel htmlFor="new-mailbox-name">Display name</FieldLabel>
+                    <Input
+                      id="new-mailbox-name"
+                      placeholder="Support"
+                      required
+                      value={displayName}
+                      onChange={(event) => setDisplayName(event.target.value)}
+                    />
+                  </Field>
+                </FieldGroup>
+                <DialogFooter>
+                  <DialogClose asChild>
+                    <Button type="button" variant="outline">
+                      Cancel
+                    </Button>
+                  </DialogClose>
+                  <Button disabled={pendingAction !== null} type="submit">
+                    {pendingAction === "mailbox" ? "Adding mailbox…" : "Add mailbox"}
+                  </Button>
+                </DialogFooter>
+              </form>
+            </DialogContent>
+          </Dialog>
+        ) : null
+      }
+      description="Shared addresses across your connected domains"
+      title="Mailboxes"
+    >
+      <Table className="overflow-hidden rounded-md border">
+        <TableHeader>
+          <TableRow>
+            <TableHead>Address</TableHead>
+            <TableHead className="hidden sm:table-cell">Name</TableHead>
+            <TableHead>Status</TableHead>
+            {canManage && <TableHead />}
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {mailboxes.map((mailbox) => (
+            <TableRow className="hover:bg-muted/35" key={mailbox.id}>
+              <TableCell className="max-w-52">
+                <span className="block truncate">{mailbox.address}</span>
+                {mailbox.addresses
+                  ?.filter((item) => !item.isPrimary)
+                  .map((item) => (
+                    <span
+                      className="mt-1 flex items-center gap-1 text-xs text-muted-foreground"
+                      key={item.id}
+                    >
+                      {item.address}
+                      {canManage ? (
+                        <Button
+                          className="h-5 px-1"
+                          type="button"
+                          variant="ghost"
+                          onClick={() => void handleRemoveAlias(mailbox, item.id)}
+                        >
+                          Remove
+                        </Button>
+                      ) : null}
+                    </span>
+                  ))}
+              </TableCell>
+              <TableCell className="hidden sm:table-cell">{mailbox.displayName}</TableCell>
+              <TableCell>
+                <Badge variant={mailbox.isActive ? "secondary" : "outline"}>
+                  {mailbox.isActive ? "Active" : "Disabled"}
+                </Badge>
+              </TableCell>
+              {canManage && (
+                <TableCell className="pl-1 text-right">
+                  <Button
+                    className="mr-2 px-2"
+                    size="sm"
+                    type="button"
+                    variant="ghost"
+                    onClick={() => setAliasMailbox(mailbox)}
+                  >
+                    Add alias
+                  </Button>
+                  <Button
+                    className="px-2"
+                    size="sm"
+                    type="button"
+                    variant="outline"
+                    onClick={() => void handleToggle(mailbox)}
+                  >
+                    {mailbox.isActive ? "Disable" : "Enable"}
+                  </Button>
+                </TableCell>
+              )}
             </TableRow>
-          </TableHeader>
-          <TableBody>
-            {mailboxes.map((mailbox) => (
-              <TableRow className="hover:bg-muted/35" key={mailbox.id}>
-                <TableCell className="max-w-52">
-                  <span className="block truncate">{mailbox.address}</span>
-                  {mailbox.addresses
-                    ?.filter((item) => !item.isPrimary)
-                    .map((item) => (
-                      <span
-                        className="mt-1 flex items-center gap-1 text-xs text-muted-foreground"
-                        key={item.id}
-                      >
-                        {item.address}
-                        {canManage ? (
-                          <Button
-                            className="h-5 px-1"
-                            type="button"
-                            variant="ghost"
-                            onClick={() => void handleRemoveAlias(mailbox, item.id)}
-                          >
-                            Remove
-                          </Button>
-                        ) : null}
-                      </span>
-                    ))}
-                </TableCell>
-                <TableCell className="hidden sm:table-cell">{mailbox.displayName}</TableCell>
-                <TableCell>
-                  <Badge variant={mailbox.isActive ? "secondary" : "outline"}>
-                    {mailbox.isActive ? "Active" : "Disabled"}
-                  </Badge>
-                </TableCell>
-                {canManage && (
-                  <TableCell className="pl-1 text-right">
-                    <Button
-                      className="mr-2 px-2"
-                      size="sm"
-                      type="button"
-                      variant="ghost"
-                      onClick={() => void handleAlias(mailbox)}
-                    >
-                      Add alias
-                    </Button>
-                    <Button
-                      className="px-2"
-                      size="sm"
-                      type="button"
-                      variant="outline"
-                      onClick={() => void handleToggle(mailbox)}
-                    >
-                      {mailbox.isActive ? "Disable" : "Enable"}
-                    </Button>
-                  </TableCell>
-                )}
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </CardContent>
-    </Card>
+          ))}
+        </TableBody>
+      </Table>
+
+      <Dialog
+        open={aliasMailbox !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setAliasMailbox(null);
+            setAliasAddress("");
+          }
+        }}
+      >
+        <DialogContent className="w-[min(92vw,480px)]">
+          <DialogHeader>
+            <DialogTitle>Add alias</DialogTitle>
+            <DialogDescription>
+              Add another sending and receiving address to {aliasMailbox?.address}.
+            </DialogDescription>
+          </DialogHeader>
+          <form className="flex flex-col gap-5" onSubmit={(event) => void handleAlias(event)}>
+            <FieldGroup>
+              <Field>
+                <FieldLabel htmlFor="new-mailbox-alias">Alias address</FieldLabel>
+                <Input
+                  id="new-mailbox-alias"
+                  placeholder="hello@example.com"
+                  required
+                  type="email"
+                  value={aliasAddress}
+                  onChange={(event) => setAliasAddress(event.target.value)}
+                />
+              </Field>
+            </FieldGroup>
+            <DialogFooter>
+              <DialogClose asChild>
+                <Button type="button" variant="outline">
+                  Cancel
+                </Button>
+              </DialogClose>
+              <Button disabled={pendingAction !== null} type="submit">
+                {pendingAction === "alias" ? "Adding alias…" : "Add alias"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+    </SettingsSection>
   );
 }

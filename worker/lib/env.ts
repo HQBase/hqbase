@@ -2,6 +2,8 @@ import type { AuthContext } from "../auth/session";
 
 type WorkerEnvOverrides = {
   CLOUDFLARE_OAUTH_CLIENT_ID?: string;
+  CLOUDFLARE_OAUTH_REDIRECT_URI?: string;
+  CLOUDFLARE_OAUTH_RELAY_URL?: string;
   BETTER_AUTH_URL?: string;
   BILLING?: Fetcher;
   ENVIRONMENT?: string;

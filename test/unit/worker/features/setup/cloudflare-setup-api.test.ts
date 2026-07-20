@@ -100,7 +100,7 @@ describe("Cloudflare setup API", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     await expect(verifyCloudflareToken({ apiToken: "token-123" })).rejects.toThrow(
-      "Cloudflare rejected this API token. Click Create Token, then paste the token value shown once after creation."
+      "Cloudflare rejected the temporary authorization. Authorize Cloudflare again."
     );
   });
 
@@ -312,11 +312,11 @@ describe("Cloudflare setup API", () => {
     const routingStep = result.steps.find((step) => step.id === "routing");
     expect(routingStep).toMatchObject({
       message:
-        "Cloudflare rejected the Email Routing DNS/settings request. Add Zone Settings Edit to the setup token, then retry the domain connection.",
+        "Cloudflare rejected the Email Routing DNS/settings request. Authorize HQBase with Zone Settings Edit, then retry the domain connection.",
       status: "failed"
     });
     expect(result.status.routing.error).toBe(
-      "Cloudflare rejected the Email Routing DNS/settings request. Add Zone Settings Edit to the setup token, then retry the domain connection."
+      "Cloudflare rejected the Email Routing DNS/settings request. Authorize HQBase with Zone Settings Edit, then retry the domain connection."
     );
   });
 

@@ -32,13 +32,6 @@ export type DomainErrors = {
 const emailSchema = z.string().trim().email().max(254);
 const appSubdomainPattern = /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/;
 
-export function validateToken(apiToken: string): string | null {
-  const length = apiToken.trim().length;
-  if (length === 0) return "Paste the token from Cloudflare.";
-  if (length < 20 || length > 500) return "This does not look like a Cloudflare API token.";
-  return null;
-}
-
 export function validateDomain(input: {
   appSubdomain: string;
   selectedZones: CloudflareZone[];

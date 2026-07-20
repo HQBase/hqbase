@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { cloudflareApiTokenSchema, domainSchema } from "../setup/validation";
+import { domainSchema } from "../setup/validation";
 
 const domainStatus = z.enum(["pending", "ready", "degraded", "disabled"]);
 
@@ -24,7 +24,6 @@ export const updateMailDomainSchema = z
   });
 
 export const provisionMailDomainSchema = z.object({
-  apiToken: cloudflareApiTokenSchema,
   name: domainSchema,
   zoneId: z.string().trim().min(1).max(64),
   workerName: z.string().trim().min(1).max(63).optional(),
@@ -32,7 +31,6 @@ export const provisionMailDomainSchema = z.object({
 });
 
 export const changePortalHostnameSchema = z.object({
-  apiToken: cloudflareApiTokenSchema,
   hostname: domainSchema,
   zoneId: z.string().trim().min(1).max(64),
   workerName: z.string().trim().min(1).max(63).optional()

@@ -2,7 +2,17 @@ import { UserPlus } from "lucide-react";
 import * as React from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger
+} from "@/components/ui/dialog";
+import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -20,6 +30,7 @@ import {
   TableHeader,
   TableRow
 } from "@/components/ui/table";
+import { SettingsSection } from "@/features/settings/settings-section";
 import { createUser, updateUserRole } from "./api";
 import type { WorkspaceRole, WorkspaceUser } from "./types";
 
@@ -35,19 +46,25 @@ export function UserSettings({ users, onChanged }: UserSettingsProps): React.Rea
   const [email, setEmail] = React.useState("");
   const [password, setPassword] = React.useState("");
   const [role, setRole] = React.useState<WorkspaceRole>("member");
+  const [createOpen, setCreateOpen] = React.useState(false);
+  const [pending, setPending] = React.useState(false);
 
   async function handleCreate(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    setPending(true);
     try {
       await createUser({ email, name, password, role });
       setName("");
       setEmail("");
       setPassword("");
       setRole("member");
+      setCreateOpen(false);
       toast.success("User created.");
       onChanged();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "User creation failed.");
+    } finally {
+      setPending(false);
     }
   }
 
@@ -57,84 +74,114 @@ export function UserSettings({ users, onChanged }: UserSettingsProps): React.Rea
   }
 
   return (
-    <Card className="bg-card/70 shadow-none">
-      <CardHeader className="pb-4">
-        <CardTitle className="text-base font-medium">Users</CardTitle>
-        <CardDescription className="text-xs">Workspace access</CardDescription>
-      </CardHeader>
-      <CardContent className="flex min-w-0 flex-col gap-5">
-        <form
-          className="grid min-w-0 gap-3 rounded-md border bg-background/50 p-3 md:grid-cols-[0.8fr_1fr_0.8fr_150px_auto]"
-          onSubmit={(event) => void handleCreate(event)}
-        >
-          <Input
-            className="shadow-none focus-visible:ring-1"
-            placeholder="Name"
-            required
-            value={name}
-            onChange={(event) => setName(event.target.value)}
-          />
-          <Input
-            className="shadow-none focus-visible:ring-1"
-            placeholder="Email"
-            required
-            type="email"
-            value={email}
-            onChange={(event) => setEmail(event.target.value)}
-          />
-          <Input
-            className="shadow-none focus-visible:ring-1"
-            minLength={8}
-            placeholder="Password"
-            required
-            type="password"
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-          />
-          <RoleSelect value={role} onChange={setRole} />
-          <Button type="submit">
-            <UserPlus />
-            Add
-          </Button>
-        </form>
-        <Table className="overflow-hidden rounded-md border">
-          <TableHeader>
-            <TableRow>
-              <TableHead className="hidden sm:table-cell">Name</TableHead>
-              <TableHead>Email</TableHead>
-              <TableHead>Role</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {users.map((user) => (
-              <TableRow className="hover:bg-muted/35" key={user.id}>
-                <TableCell className="hidden sm:table-cell">{user.name}</TableCell>
-                <TableCell className="max-w-44 truncate">{user.email}</TableCell>
-                <TableCell>
-                  <RoleSelect
-                    value={user.role}
-                    onChange={(nextRole) => void handleRoleChange(user.id, nextRole)}
+    <SettingsSection
+      action={
+        <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+          <DialogTrigger asChild>
+            <Button type="button">
+              <UserPlus data-icon="inline-start" />
+              Add user
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="w-[min(92vw,520px)]">
+            <DialogHeader>
+              <DialogTitle>Add user</DialogTitle>
+              <DialogDescription>Create sign-in access for a workspace member.</DialogDescription>
+            </DialogHeader>
+            <form className="flex flex-col gap-5" onSubmit={(event) => void handleCreate(event)}>
+              <FieldGroup>
+                <Field>
+                  <FieldLabel htmlFor="new-user-name">Name</FieldLabel>
+                  <Input
+                    id="new-user-name"
+                    required
+                    value={name}
+                    onChange={(event) => setName(event.target.value)}
                   />
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </CardContent>
-    </Card>
+                </Field>
+                <Field>
+                  <FieldLabel htmlFor="new-user-email">Email</FieldLabel>
+                  <Input
+                    id="new-user-email"
+                    required
+                    type="email"
+                    value={email}
+                    onChange={(event) => setEmail(event.target.value)}
+                  />
+                </Field>
+                <Field>
+                  <FieldLabel htmlFor="new-user-password">Temporary password</FieldLabel>
+                  <Input
+                    id="new-user-password"
+                    minLength={8}
+                    required
+                    type="password"
+                    value={password}
+                    onChange={(event) => setPassword(event.target.value)}
+                  />
+                </Field>
+                <Field>
+                  <FieldLabel>Workspace role</FieldLabel>
+                  <RoleSelect ariaLabel="Workspace role" value={role} onChange={setRole} />
+                </Field>
+              </FieldGroup>
+              <DialogFooter>
+                <DialogClose asChild>
+                  <Button type="button" variant="outline">
+                    Cancel
+                  </Button>
+                </DialogClose>
+                <Button disabled={pending} type="submit">
+                  {pending ? "Adding user…" : "Add user"}
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
+      }
+      description="Workspace access"
+      title="Users"
+    >
+      <Table className="overflow-hidden rounded-md border">
+        <TableHeader>
+          <TableRow>
+            <TableHead className="hidden sm:table-cell">Name</TableHead>
+            <TableHead>Email</TableHead>
+            <TableHead>Role</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {users.map((user) => (
+            <TableRow className="hover:bg-muted/35" key={user.id}>
+              <TableCell className="hidden sm:table-cell">{user.name}</TableCell>
+              <TableCell className="max-w-44 truncate">{user.email}</TableCell>
+              <TableCell>
+                <RoleSelect
+                  ariaLabel={`Role for ${user.name}`}
+                  value={user.role}
+                  onChange={(nextRole) => void handleRoleChange(user.id, nextRole)}
+                />
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </SettingsSection>
   );
 }
 
 function RoleSelect({
+  ariaLabel,
   value,
   onChange
 }: {
+  ariaLabel: string;
   value: WorkspaceRole;
   onChange: (value: WorkspaceRole) => void;
 }): React.ReactElement {
   return (
     <Select value={value} onValueChange={(next) => onChange(next as WorkspaceRole)}>
-      <SelectTrigger className="shadow-none focus:ring-1">
+      <SelectTrigger aria-label={ariaLabel} className="shadow-none focus:ring-1">
         <SelectValue />
       </SelectTrigger>
       <SelectContent>

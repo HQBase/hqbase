@@ -1,6 +1,5 @@
 import type * as React from "react";
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AppPasswordSettings } from "@/features/app-passwords/app-password-settings";
 import { BillingSettings } from "@/features/billing/billing-settings";
@@ -9,12 +8,12 @@ import { DomainSettings } from "@/features/domains/domain-settings";
 import { MailboxAccessSettings } from "@/features/mailbox-access/mailbox-access-settings";
 import { MailboxSettings } from "@/features/mailboxes/mailbox-settings";
 import type { Mailbox } from "@/features/mailboxes/types";
-import { GeneralSettings } from "@/features/settings/general-settings";
+import { DebugSettings } from "@/features/settings/debug-settings";
+import { SettingsSection } from "@/features/settings/settings-section";
 import type { SetupStatus } from "@/features/setup/types";
 import type { UpdateStatus } from "@/features/updates/types";
 import { UpdateSettings } from "@/features/updates/update-settings";
 import type { UpgradeLifecycle } from "@/features/upgrades/types";
-import { UpgradeSettings } from "@/features/upgrades/upgrade-settings";
 import type { WorkspaceUser } from "@/features/users/types";
 import { UserSettings } from "@/features/users/user-settings";
 
@@ -45,6 +44,9 @@ export function SettingsPage({
   defaultTab = "mailboxes",
   updateStatus
 }: SettingsPageProps): React.ReactElement {
+  const resolvedDefaultTab =
+    defaultTab === "general" || defaultTab === "upgrade" ? "debug" : defaultTab;
+
   return (
     <div className="h-full overflow-auto">
       <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-8">
@@ -52,7 +54,7 @@ export function SettingsPage({
           <h1 className="text-xl font-medium tracking-tight">Settings</h1>
           <p className="mt-1 text-xs text-muted-foreground">Workspace and access</p>
         </div>
-        <Tabs defaultValue={defaultTab}>
+        <Tabs defaultValue={resolvedDefaultTab}>
           <TabsList className="h-auto w-full flex-wrap justify-start gap-x-1 rounded-none border-b bg-transparent p-0">
             <SettingsTab value="mailboxes">Mailboxes</SettingsTab>
             <SettingsTab value="users">Users</SettingsTab>
@@ -60,11 +62,8 @@ export function SettingsPage({
             {canManage ? <SettingsTab value="access">Access</SettingsTab> : null}
             <SettingsTab value="mail-clients">Mail clients (preview)</SettingsTab>
             {canManage && entitlement ? <SettingsTab value="billing">Billing</SettingsTab> : null}
-            {canManage && entitlement && upgrade ? (
-              <SettingsTab value="upgrade">Upgrade</SettingsTab>
-            ) : null}
-            <SettingsTab value="general">General</SettingsTab>
             {canManage ? <SettingsTab value="updates">Updates</SettingsTab> : null}
+            <SettingsTab value="debug">Debug</SettingsTab>
           </TabsList>
           <TabsContent className="mt-5" value="mailboxes">
             <MailboxSettings canManage={canManage} mailboxes={mailboxes} onChanged={onRefresh} />
@@ -86,9 +85,6 @@ export function SettingsPage({
               <MailboxAccessSettings mailboxes={mailboxes} users={users} />
             </TabsContent>
           ) : null}
-          <TabsContent className="mt-5" value="general">
-            <GeneralSettings setup={setup} />
-          </TabsContent>
           <TabsContent className="mt-5" value="mail-clients">
             <AppPasswordSettings />
           </TabsContent>
@@ -97,20 +93,19 @@ export function SettingsPage({
               <BillingSettings status={entitlement} onChanged={onEntitlementChanged} />
             </TabsContent>
           ) : null}
-          {canManage && entitlement && upgrade ? (
-            <TabsContent className="mt-5" value="upgrade">
-              <UpgradeSettings
-                entitlement={entitlement}
-                lifecycle={upgrade}
-                onChanged={onUpgradeChanged}
-              />
-            </TabsContent>
-          ) : null}
           {canManage ? (
             <TabsContent className="mt-5" value="updates">
               <UpdateSettings initialStatus={updateStatus} />
             </TabsContent>
           ) : null}
+          <TabsContent className="mt-5" value="debug">
+            <DebugSettings
+              entitlement={canManage ? entitlement : null}
+              setup={setup}
+              upgrade={canManage ? upgrade : null}
+              onUpgradeChanged={onUpgradeChanged}
+            />
+          </TabsContent>
         </Tabs>
       </div>
     </div>
@@ -136,14 +131,13 @@ function SettingsTab({
 
 function NoUserAccess(): React.ReactElement {
   return (
-    <Card className="bg-card/70 shadow-none">
-      <CardHeader>
-        <CardTitle>Users</CardTitle>
-        <CardDescription>Only owner and admin users can manage workspace users.</CardDescription>
-      </CardHeader>
-      <CardContent className="text-sm text-muted-foreground">
+    <SettingsSection
+      description="Only owner and admin users can manage workspace users."
+      title="Users"
+    >
+      <p className="text-sm text-muted-foreground">
         You can still read and send shared workspace email.
-      </CardContent>
-    </Card>
+      </p>
+    </SettingsSection>
   );
 }

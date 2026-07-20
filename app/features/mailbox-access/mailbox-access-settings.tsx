@@ -1,10 +1,22 @@
+import { Plus } from "lucide-react";
 import * as React from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger
+} from "@/components/ui/dialog";
+import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field";
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
   SelectTrigger,
   SelectValue
@@ -18,6 +30,7 @@ import {
   TableRow
 } from "@/components/ui/table";
 import type { Mailbox } from "@/features/mailboxes/types";
+import { SettingsSection } from "@/features/settings/settings-section";
 import type { WorkspaceUser } from "@/features/users/types";
 import { listMailboxGrants, revokeMailboxGrant, setMailboxGrant } from "./api";
 import type { MailboxAccessLevel, MailboxGrant } from "./types";
@@ -33,6 +46,7 @@ export function MailboxAccessSettings({
 }): React.ReactElement {
   const [grants, setGrants] = React.useState<MailboxGrant[]>([]);
   const [busy, setBusy] = React.useState<string | null>(null);
+  const [bulkOpen, setBulkOpen] = React.useState(false);
   const [bulkUserId, setBulkUserId] = React.useState("");
   const [bulkDomain, setBulkDomain] = React.useState("");
   const [bulkLevel, setBulkLevel] = React.useState<MailboxAccessLevel>("read");
@@ -71,7 +85,9 @@ export function MailboxAccessSettings({
   )
     .filter(Boolean)
     .sort();
-  async function applyDomainGrants() {
+
+  async function applyDomainGrants(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
     const targets = mailboxes.filter((mailbox) =>
       (mailbox.addresses?.length ? mailbox.addresses : [{ address: mailbox.address }]).some(
         (identity) => identity.address.endsWith(`@${bulkDomain}`)
@@ -86,6 +102,7 @@ export function MailboxAccessSettings({
         )
       );
       await reload();
+      setBulkOpen(false);
       toast.success(`Explicit grants written for ${targets.length} mailboxes.`);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Could not apply domain access.");
@@ -93,109 +110,149 @@ export function MailboxAccessSettings({
       setBusy(null);
     }
   }
+
   return (
-    <Card className="bg-card/70 shadow-none">
-      <CardHeader>
-        <CardTitle className="text-base font-medium">Mailbox access</CardTitle>
-        <CardDescription className="text-xs">
-          Read can view mail. Agent can also send and change shared state. Manager can configure the
-          mailbox.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="grid gap-5">
-        <div className="grid gap-2 rounded-md border bg-background/50 p-3 md:grid-cols-[1fr_1fr_1fr_auto]">
-          <Select value={bulkUserId} onValueChange={setBulkUserId}>
-            <SelectTrigger>
-              <SelectValue placeholder="User" />
-            </SelectTrigger>
-            <SelectContent>
-              {managedUsers.map((user) => (
-                <SelectItem key={user.id} value={user.id}>
-                  {user.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select value={bulkDomain} onValueChange={setBulkDomain}>
-            <SelectTrigger>
-              <SelectValue placeholder="Domain" />
-            </SelectTrigger>
-            <SelectContent>
-              {domains.map((domain) => (
-                <SelectItem key={domain} value={domain}>
-                  {domain}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select
-            value={bulkLevel}
-            onValueChange={(value) => setBulkLevel(value as MailboxAccessLevel)}
-          >
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="read">Read</SelectItem>
-              <SelectItem value="agent">Agent</SelectItem>
-              <SelectItem value="manager">Manager</SelectItem>
-            </SelectContent>
-          </Select>
-          <Button
-            disabled={busy === "bulk" || !bulkUserId || !bulkDomain}
-            type="button"
-            onClick={() => void applyDomainGrants()}
-          >
-            Apply to domain
-          </Button>
-          <p className="text-xs text-muted-foreground md:col-span-4">
-            This is a bulk action. It writes explicit mailbox grants and does not grant future
-            mailboxes automatically.
-          </p>
-        </div>
-        <Table className="overflow-hidden rounded-md border">
-          <TableHeader>
-            <TableRow>
-              <TableHead>User</TableHead>
-              <TableHead>Mailbox</TableHead>
-              <TableHead>Access</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {managedUsers.flatMap((user) =>
-              mailboxes.map((mailbox) => {
-                const key = `${mailbox.id}:${user.id}`;
-                const value =
-                  grants.find((grant) => grant.mailboxId === mailbox.id && grant.userId === user.id)
-                    ?.accessLevel ?? "none";
-                return (
-                  <TableRow key={key}>
-                    <TableCell>{user.name}</TableCell>
-                    <TableCell>{mailbox.address}</TableCell>
-                    <TableCell>
-                      <Select
-                        disabled={busy === key}
-                        value={value}
-                        onValueChange={(next) => void change(mailbox.id, user.id, next as Choice)}
+    <SettingsSection
+      action={
+        <Dialog open={bulkOpen} onOpenChange={setBulkOpen}>
+          <DialogTrigger asChild>
+            <Button type="button">
+              <Plus data-icon="inline-start" />
+              Apply domain access
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="w-[min(92vw,500px)]">
+            <DialogHeader>
+              <DialogTitle>Apply domain access</DialogTitle>
+              <DialogDescription>
+                Add explicit access to every current mailbox on one domain.
+              </DialogDescription>
+            </DialogHeader>
+            <form
+              className="flex flex-col gap-5"
+              onSubmit={(event) => void applyDomainGrants(event)}
+            >
+              <FieldGroup>
+                <Field>
+                  <FieldLabel>User</FieldLabel>
+                  <Select value={bulkUserId} onValueChange={setBulkUserId}>
+                    <SelectTrigger aria-label="User">
+                      <SelectValue placeholder="Choose a user" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectGroup>
+                        {managedUsers.map((user) => (
+                          <SelectItem key={user.id} value={user.id}>
+                            {user.name}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
+                </Field>
+                <Field>
+                  <FieldLabel>Domain</FieldLabel>
+                  <Select value={bulkDomain} onValueChange={setBulkDomain}>
+                    <SelectTrigger aria-label="Domain">
+                      <SelectValue placeholder="Choose a domain" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectGroup>
+                        {domains.map((domain) => (
+                          <SelectItem key={domain} value={domain}>
+                            {domain}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
+                </Field>
+                <Field>
+                  <FieldLabel>Access level</FieldLabel>
+                  <Select
+                    value={bulkLevel}
+                    onValueChange={(value) => setBulkLevel(value as MailboxAccessLevel)}
+                  >
+                    <SelectTrigger aria-label="Access level">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectGroup>
+                        <SelectItem value="read">Read</SelectItem>
+                        <SelectItem value="agent">Agent</SelectItem>
+                        <SelectItem value="manager">Manager</SelectItem>
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
+                  <FieldDescription>
+                    This does not grant access to mailboxes added later.
+                  </FieldDescription>
+                </Field>
+              </FieldGroup>
+              <DialogFooter>
+                <DialogClose asChild>
+                  <Button type="button" variant="outline">
+                    Cancel
+                  </Button>
+                </DialogClose>
+                <Button disabled={busy === "bulk" || !bulkUserId || !bulkDomain} type="submit">
+                  {busy === "bulk" ? "Applying access…" : "Apply access"}
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
+      }
+      description="Read can view mail; Agent can also send; Manager can configure the mailbox"
+      title="Mailbox access"
+    >
+      <Table className="overflow-hidden rounded-md border">
+        <TableHeader>
+          <TableRow>
+            <TableHead>User</TableHead>
+            <TableHead>Mailbox</TableHead>
+            <TableHead>Access</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {managedUsers.flatMap((user) =>
+            mailboxes.map((mailbox) => {
+              const key = `${mailbox.id}:${user.id}`;
+              const value =
+                grants.find((grant) => grant.mailboxId === mailbox.id && grant.userId === user.id)
+                  ?.accessLevel ?? "none";
+              return (
+                <TableRow key={key}>
+                  <TableCell>{user.name}</TableCell>
+                  <TableCell>{mailbox.address}</TableCell>
+                  <TableCell>
+                    <Select
+                      disabled={busy === key}
+                      value={value}
+                      onValueChange={(next) => void change(mailbox.id, user.id, next as Choice)}
+                    >
+                      <SelectTrigger
+                        aria-label={`${user.name} access to ${mailbox.address}`}
+                        className="w-36 shadow-none"
                       >
-                        <SelectTrigger className="w-36 shadow-none">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectGroup>
                           <SelectItem value="none">No access</SelectItem>
                           <SelectItem value="read">Read</SelectItem>
                           <SelectItem value="agent">Agent</SelectItem>
                           <SelectItem value="manager">Manager</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </TableCell>
-                  </TableRow>
-                );
-              })
-            )}
-          </TableBody>
-        </Table>
-      </CardContent>
-    </Card>
+                        </SelectGroup>
+                      </SelectContent>
+                    </Select>
+                  </TableCell>
+                </TableRow>
+              );
+            })
+          )}
+        </TableBody>
+      </Table>
+    </SettingsSection>
   );
 }

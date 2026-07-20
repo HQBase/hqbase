@@ -104,15 +104,11 @@ function cloudflareErrorMessage(path: string, message?: string): string {
   if (isEmailRoutingSettingsPath(path) && isAuthenticationError(message)) {
     return [
       "Cloudflare rejected the Email Routing DNS/settings request.",
-      "Add Zone Settings Edit to the setup token, then retry the domain connection."
+      "Authorize HQBase with Zone Settings Edit, then retry the domain connection."
     ].join(" ");
   }
   if (message.toLowerCase().includes("invalid api token")) {
-    return [
-      "Cloudflare rejected this API token.",
-      "Click Create Token, then paste the token value shown once after creation.",
-      "Do not paste the token name, token ID, JSON payload, Terraform output, or a Global API Key."
-    ].join(" ");
+    return "Cloudflare rejected the temporary authorization. Authorize Cloudflare again. If your organization blocks HQBase, ask a Cloudflare administrator to allow the OAuth application.";
   }
   return message;
 }

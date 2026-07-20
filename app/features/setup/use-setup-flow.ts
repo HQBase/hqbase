@@ -42,7 +42,6 @@ export function useSetupFlow(onComplete: () => void) {
     onDomainsChanged: (previousDomains, domains) =>
       setMailboxes((current) => syncMailboxesForDomains(current, previousDomains, domains)),
     onDomainConnected: () => advanceTo(OWNER_STEP),
-    onTokenChanged: () => setActiveStep(ACCESS_STEP),
     onTokenVerified: () => advanceTo(DOMAIN_STEP)
   });
   const ownerDraft = { email: ownerEmail, name: ownerName, password: ownerPassword };

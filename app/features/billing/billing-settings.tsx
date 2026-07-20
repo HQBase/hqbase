@@ -5,14 +5,6 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle
-} from "@/components/ui/card";
-import {
   Field,
   FieldDescription,
   FieldError,
@@ -21,6 +13,8 @@ import {
   FieldLabelRow
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { Separator } from "@/components/ui/separator";
+import { SettingsSection } from "@/features/settings/settings-section";
 import { activateEntitlement, refreshEntitlement } from "./api";
 import type { EntitlementStatus } from "./types";
 
@@ -86,84 +80,80 @@ export function BillingSettings({
       : null);
 
   return (
-    <Card className="bg-card/70 shadow-none">
-      <CardHeader>
-        <div className="flex items-center gap-2">
-          <CardTitle className="text-base font-medium">HQBase Pro</CardTitle>
-          <Badge
-            aria-label={`License status: ${label(status.state)}`}
-            role="status"
-            variant={status.canConfigure ? "secondary" : "destructive"}
-          >
-            {label(status.state)}
-          </Badge>
-        </div>
-        <CardDescription>
-          One production workspace, unlimited users and domains, plus local and staging activations.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-5">
-        {statusDiagnostic ? (
-          <Alert variant={refreshError ? "destructive" : "default"}>
-            <AlertTitle>Subscription check needs attention</AlertTitle>
-            <AlertDescription>{statusDiagnostic}</AlertDescription>
-          </Alert>
-        ) : null}
-        <dl className="grid gap-3 text-sm sm:grid-cols-3">
-          <StatusItem label="License" value={status.displayKey ?? "Not activated"} />
-          <StatusItem
-            label="Paid through"
-            value={status.currentPeriodEnd ? formatDate(status.currentPeriodEnd) : "—"}
-          />
-          <StatusItem
-            label="Last checked"
-            value={status.checkedAt ? formatDateTime(status.checkedAt) : "Never"}
-          />
-        </dl>
-        <form
-          className="rounded-md border bg-background/50 p-4"
-          onSubmit={(event) => void activate(event)}
+    <SettingsSection
+      action={
+        <Badge
+          aria-label={`License status: ${label(status.state)}`}
+          role="status"
+          variant={status.canConfigure ? "secondary" : "destructive"}
         >
-          <FieldGroup>
-            <Field data-invalid={Boolean(activationError)}>
-              <FieldLabelRow>
-                <FieldLabel htmlFor="pro-license-key">License key</FieldLabel>
-                {activationError ? (
-                  <FieldError id={activationErrorId}>{activationError}</FieldError>
-                ) : null}
-              </FieldLabelRow>
-              <Input
-                aria-describedby={activationError ? activationErrorId : undefined}
-                aria-invalid={Boolean(activationError)}
-                autoCapitalize="none"
-                autoComplete="off"
-                id="pro-license-key"
-                placeholder="HQB_…"
-                required
-                type="password"
-                value={licenseKey}
-                onChange={(event) => {
-                  setLicenseKey(event.target.value);
-                  setActivationError(null);
-                }}
-              />
-              <FieldDescription>
-                The key is encrypted before storage and is never written to logs.
-              </FieldDescription>
-            </Field>
-            <Button disabled={isPending} type="submit">
-              {pendingAction === "activate"
-                ? status.displayKey
-                  ? "Replacing license…"
-                  : "Activating license…"
-                : status.displayKey
-                  ? "Replace license"
-                  : "Activate license"}
-            </Button>
-          </FieldGroup>
-        </form>
-      </CardContent>
-      <CardFooter className="flex-col items-stretch gap-2 border-t pt-4 sm:flex-row sm:items-center">
+          {label(status.state)}
+        </Badge>
+      }
+      description="One production workspace, unlimited users and domains, plus local and staging activations"
+      title="HQBase Pro"
+    >
+      {statusDiagnostic ? (
+        <Alert variant={refreshError ? "destructive" : "default"}>
+          <AlertTitle>Subscription check needs attention</AlertTitle>
+          <AlertDescription>{statusDiagnostic}</AlertDescription>
+        </Alert>
+      ) : null}
+      <dl className="grid gap-3 text-sm sm:grid-cols-3">
+        <StatusItem label="License" value={status.displayKey ?? "Not activated"} />
+        <StatusItem
+          label="Paid through"
+          value={status.currentPeriodEnd ? formatDate(status.currentPeriodEnd) : "—"}
+        />
+        <StatusItem
+          label="Last checked"
+          value={status.checkedAt ? formatDateTime(status.checkedAt) : "Never"}
+        />
+      </dl>
+      <form
+        className="rounded-md border bg-background/50 p-4"
+        onSubmit={(event) => void activate(event)}
+      >
+        <FieldGroup>
+          <Field data-invalid={Boolean(activationError)}>
+            <FieldLabelRow>
+              <FieldLabel htmlFor="pro-license-key">License key</FieldLabel>
+              {activationError ? (
+                <FieldError id={activationErrorId}>{activationError}</FieldError>
+              ) : null}
+            </FieldLabelRow>
+            <Input
+              aria-describedby={activationError ? activationErrorId : undefined}
+              aria-invalid={Boolean(activationError)}
+              autoCapitalize="none"
+              autoComplete="off"
+              id="pro-license-key"
+              placeholder="HQB_…"
+              required
+              type="password"
+              value={licenseKey}
+              onChange={(event) => {
+                setLicenseKey(event.target.value);
+                setActivationError(null);
+              }}
+            />
+            <FieldDescription>
+              The key is encrypted before storage and is never written to logs.
+            </FieldDescription>
+          </Field>
+          <Button className="self-start" disabled={isPending} type="submit">
+            {pendingAction === "activate"
+              ? status.displayKey
+                ? "Replacing license…"
+                : "Activating license…"
+              : status.displayKey
+                ? "Replace license"
+                : "Activate license"}
+          </Button>
+        </FieldGroup>
+      </form>
+      <Separator />
+      <div className="flex flex-col items-stretch gap-2 sm:flex-row sm:items-center">
         <Button
           disabled={isPending || !status.displayKey}
           className="w-full sm:w-auto"
@@ -180,8 +170,8 @@ export function BillingSettings({
             <ArrowUpRight data-icon="inline-end" />
           </a>
         </Button>
-      </CardFooter>
-    </Card>
+      </div>
+    </SettingsSection>
   );
 }
 

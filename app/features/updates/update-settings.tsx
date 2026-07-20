@@ -2,15 +2,8 @@ import * as React from "react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Field,
-  FieldDescription,
-  FieldError,
-  FieldLabel,
-  FieldLabelRow
-} from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
+import { Separator } from "@/components/ui/separator";
+import { SettingsSection } from "@/features/settings/settings-section";
 import { applyUpdate, getUpdateStatus } from "./api";
 import type { UpdateStatus } from "./types";
 
@@ -20,13 +13,35 @@ export function UpdateSettings({
   initialStatus: UpdateStatus | null;
 }): React.ReactElement {
   const [status, setStatus] = React.useState(initialStatus);
-  const [apiToken, setApiToken] = React.useState("");
   const [checkError, setCheckError] = React.useState<string | null>(null);
   const [applyError, setApplyError] = React.useState<string | null>(null);
   const [buildId, setBuildId] = React.useState<string | null>(null);
   const [pendingAction, setPendingAction] = React.useState<"check" | "apply" | null>(null);
-  const tokenDescriptionId = "update-cloudflare-token-description";
-  const tokenErrorId = "update-cloudflare-token-error";
+  const resumedRef = React.useRef(false);
+
+  React.useEffect(() => {
+    if (resumedRef.current) return;
+    const url = new URL(window.location.href);
+    const oauthResult = url.searchParams.get("cloudflare");
+    if (!oauthResult || url.searchParams.get("settings") !== "updates") return;
+    resumedRef.current = true;
+    url.searchParams.delete("cloudflare");
+    url.searchParams.delete("settings");
+    window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
+
+    if (oauthResult !== "connected") {
+      setApplyError(oauthErrorMessage(oauthResult));
+      return;
+    }
+
+    setPendingAction("apply");
+    void applyUpdate()
+      .then((result) => setBuildId(result.buildId))
+      .catch((nextError: unknown) => {
+        setApplyError(nextError instanceof Error ? nextError.message : "Update could not start.");
+      })
+      .finally(() => setPendingAction(null));
+  }, []);
 
   async function check(): Promise<void> {
     setPendingAction("check");
@@ -39,21 +54,6 @@ export function UpdateSettings({
       setPendingAction(null);
     }
   }
-  async function apply(event: React.FormEvent<HTMLFormElement>): Promise<void> {
-    event.preventDefault();
-    setPendingAction("apply");
-    setApplyError(null);
-    try {
-      const result = await applyUpdate(apiToken);
-      setBuildId(result.buildId);
-      setApiToken("");
-    } catch (nextError) {
-      setApplyError(nextError instanceof Error ? nextError.message : "Update could not start.");
-    } finally {
-      setPendingAction(null);
-    }
-  }
-
   const isPending = pendingAction !== null;
   const statusLabel = !status
     ? "Not checked"
@@ -62,11 +62,28 @@ export function UpdateSettings({
       : "Up to date";
 
   return (
-    <div className="grid gap-5">
+    <SettingsSection
+      action={
+        <Badge
+          role="status"
+          variant={!status ? "outline" : status.available ? "default" : "secondary"}
+        >
+          {statusLabel}
+        </Badge>
+      }
+      description="Signed stable releases for this installation"
+      title="Updates"
+    >
       {checkError ? (
         <Alert variant="destructive">
           <AlertTitle>Update check unavailable</AlertTitle>
           <AlertDescription>{checkError}</AlertDescription>
+        </Alert>
+      ) : null}
+      {applyError ? (
+        <Alert variant="destructive">
+          <AlertTitle>Update authorization unavailable</AlertTitle>
+          <AlertDescription>{applyError}</AlertDescription>
         </Alert>
       ) : null}
       {buildId ? (
@@ -78,108 +95,85 @@ export function UpdateSettings({
           </AlertDescription>
         </Alert>
       ) : null}
-      <Card className="bg-card/70 shadow-none">
-        <CardHeader>
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <CardTitle className="text-base font-medium">Updates</CardTitle>
-              <CardDescription className="text-xs">
-                Signed stable releases for this installation
-              </CardDescription>
-            </div>
-            <Badge
-              role="status"
-              variant={!status ? "outline" : status.available ? "default" : "secondary"}
+      <div className="grid gap-4 text-sm">
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Version label="Installed" value={status?.installedVersion ?? "Unknown"} />
+          <Version label="Latest stable" value={status?.release.version ?? "Not checked"} />
+        </div>
+        {status?.available ? (
+          <div className="rounded-md border bg-background/50 p-4">
+            <p className="font-medium">HQBase {status.release.version}</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Schema {status.release.schemaVersion} · published{" "}
+              {new Date(status.release.publishedAt).toLocaleDateString()}
+            </p>
+            <a
+              className="mt-2 inline-block text-xs underline underline-offset-4"
+              href={status.release.notesUrl}
+              rel="noreferrer"
+              target="_blank"
             >
-              {statusLabel}
-            </Badge>
+              Read release notes
+            </a>
           </div>
-        </CardHeader>
-        <CardContent className="grid gap-4 text-sm">
-          <div className="grid gap-3 sm:grid-cols-2">
-            <Version label="Installed" value={status?.installedVersion ?? "Unknown"} />
-            <Version label="Latest stable" value={status?.release.version ?? "Not checked"} />
-          </div>
-          {status?.available ? (
-            <div className="rounded-md border bg-background/50 p-4">
-              <p className="font-medium">HQBase {status.release.version}</p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Schema {status.release.schemaVersion} · published{" "}
-                {new Date(status.release.publishedAt).toLocaleDateString()}
-              </p>
-              <a
-                className="mt-2 inline-block text-xs underline underline-offset-4"
-                href={status.release.notesUrl}
-                rel="noreferrer"
-                target="_blank"
-              >
-                Read release notes
-              </a>
-            </div>
-          ) : null}
-          <Button disabled={isPending} onClick={() => void check()} type="button" variant="outline">
-            {pendingAction === "check" ? "Checking for updates…" : "Check again"}
-          </Button>
-        </CardContent>
-      </Card>
+        ) : null}
+        <Button
+          className="self-start"
+          disabled={isPending}
+          onClick={() => void check()}
+          type="button"
+          variant="outline"
+        >
+          {pendingAction === "check" ? "Checking for updates…" : "Check again"}
+        </Button>
+      </div>
       {status?.available ? (
-        <Card className="bg-card/70 shadow-none">
-          <CardHeader>
-            <CardTitle className="text-base font-medium">Apply update</CardTitle>
-            <CardDescription className="text-xs">
+        <div className="flex flex-col gap-4">
+          <Separator />
+          <div>
+            <h3 className="text-sm font-medium">Apply update</h3>
+            <p className="mt-1 text-xs text-muted-foreground">
               HQBase verifies the artifact, records the Worker version and D1 bookmark, migrates,
               deploys, and verifies before reporting success.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form className="flex flex-col gap-4" onSubmit={(event) => void apply(event)}>
-              <Field data-invalid={Boolean(applyError)}>
-                <FieldLabelRow>
-                  <FieldLabel htmlFor="update-cloudflare-token">
-                    Temporary Cloudflare API token
-                  </FieldLabel>
-                  {applyError ? <FieldError id={tokenErrorId}>{applyError}</FieldError> : null}
-                </FieldLabelRow>
-                <Input
-                  aria-describedby={`${tokenDescriptionId}${applyError ? ` ${tokenErrorId}` : ""}`}
-                  aria-invalid={Boolean(applyError)}
-                  autoCapitalize="none"
-                  autoComplete="off"
-                  id="update-cloudflare-token"
-                  minLength={20}
-                  required
-                  type="password"
-                  value={apiToken}
-                  onChange={(event) => {
-                    setApiToken(event.target.value);
-                    setApplyError(null);
-                  }}
-                />
-                <FieldDescription id={tokenDescriptionId}>
-                  Required permissions: Workers Scripts Read, Workers Builds Configuration Edit, and
-                  Zone Read. The token is used for this request and is never stored.
-                </FieldDescription>
-              </Field>
-              {!status.compatible ? (
-                <Alert variant="destructive">
-                  <AlertTitle>Direct update unavailable</AlertTitle>
-                  <AlertDescription>
-                    This release cannot update directly from the installed version.
-                  </AlertDescription>
-                </Alert>
-              ) : null}
-              <Button
-                disabled={isPending || apiToken.length < 20 || !status.compatible}
-                type="submit"
-              >
-                {pendingAction === "apply" ? "Starting update…" : "Start update"}
+            </p>
+          </div>
+          <div className="flex flex-col gap-4">
+            <p className="text-xs leading-5 text-muted-foreground">
+              Cloudflare will ask you to approve temporary access for this update. HQBase revokes
+              that access after the build starts.
+            </p>
+            {!status.compatible ? (
+              <Alert variant="destructive">
+                <AlertTitle>Direct update unavailable</AlertTitle>
+                <AlertDescription>
+                  This release cannot update directly from the installed version.
+                </AlertDescription>
+              </Alert>
+            ) : null}
+            {isPending ? (
+              <Button className="self-start" disabled type="button">
+                Starting update…
               </Button>
-            </form>
-          </CardContent>
-        </Card>
+            ) : !status.compatible ? (
+              <Button className="self-start" disabled type="button">
+                Authorize Cloudflare and update
+              </Button>
+            ) : (
+              <Button asChild className="self-start">
+                <a href="/api/updates/cloudflare/oauth/start">Authorize Cloudflare and update</a>
+              </Button>
+            )}
+          </div>
+        </div>
       ) : null}
-    </div>
+    </SettingsSection>
   );
+}
+
+function oauthErrorMessage(result: string): string {
+  if (result === "denied") return "Cloudflare authorization was cancelled.";
+  if (result === "invalid") return "Cloudflare authorization expired. Please try again.";
+  return "Cloudflare could not authorize the update. If your organization blocks HQBase, ask a Cloudflare administrator to allow the OAuth application.";
 }
 
 function Version({ label, value }: { label: string; value: string }): React.ReactElement {

@@ -22,7 +22,7 @@ import {
   configureCloudflareDomainSchema,
   inspectCloudflareDomainSchema,
   listCloudflareZonesSchema,
-  verifyCloudflareTokenSchema
+  verifyCloudflareAccessSchema
 } from "./validation";
 
 export const setupRoutes = new Hono<HonoApp>();
@@ -34,15 +34,13 @@ setupRoutes.get("/status", async (c) => {
 setupRoutes.post("/cloudflare/zones", async (c) => {
   const input = parseWith(listCloudflareZonesSchema, await readJson(c.req.raw));
   return c.json({
-    zones: await listCloudflareZones({ ...input, apiToken: setupToken(c.env, input.apiToken) })
+    zones: await listCloudflareZones({ ...input, apiToken: setupGrant(c.env) })
   });
 });
 
-setupRoutes.post("/cloudflare/token", async (c) => {
-  const input = parseWith(verifyCloudflareTokenSchema, await readJson(c.req.raw));
-  return c.json(
-    await verifyCloudflareToken({ ...input, apiToken: setupToken(c.env, input.apiToken) })
-  );
+setupRoutes.post("/cloudflare/access", async (c) => {
+  const input = parseWith(verifyCloudflareAccessSchema, await readJson(c.req.raw));
+  return c.json(await verifyCloudflareToken({ ...input, apiToken: setupGrant(c.env) }));
 });
 
 setupRoutes.post("/cloudflare/inspect", async (c) => {
@@ -50,7 +48,7 @@ setupRoutes.post("/cloudflare/inspect", async (c) => {
   return c.json(
     await inspectCloudflareDomain({
       ...input,
-      apiToken: setupToken(c.env, input.apiToken),
+      apiToken: setupGrant(c.env),
       workerName: c.env.HQBASE_WORKER_NAME ?? input.workerName
     })
   );
@@ -62,7 +60,7 @@ setupRoutes.post("/cloudflare/configure", async (c) => {
   return c.json(
     await configureCloudflareDomain({
       ...input,
-      apiToken: setupToken(c.env, input.apiToken),
+      apiToken: setupGrant(c.env),
       workerName: c.env.HQBASE_WORKER_NAME ?? input.workerName,
       replaceWorkerName: upgrade?.sourceWorkerName ?? undefined
     })
@@ -97,8 +95,8 @@ setupRoutes.post("/bootstrap", async (c) => {
   return c.json(result, 201);
 });
 
-function setupToken(env: HonoApp["Bindings"], apiToken?: string): string {
-  const value = apiToken ?? env.HQBASE_SETUP_OAUTH_ACCESS_TOKEN;
+function setupGrant(env: HonoApp["Bindings"]): string {
+  const value = env.HQBASE_SETUP_OAUTH_ACCESS_TOKEN;
   if (!value) {
     throw new Error(
       "The Cloudflare setup authorization expired. Restart Pro installation to authorize again."

@@ -6,9 +6,17 @@ import { readJson } from "../../lib/json";
 import { parseWith } from "../../lib/validation";
 import { recordAudit } from "../audit/service";
 import {
+  clearRuntimeCloudflareGrantCookie,
+  finishRuntimeCloudflareOAuth,
+  resolveRuntimeCloudflareGrant,
+  revokeRuntimeCloudflareGrant,
+  startRuntimeCloudflareOAuth
+} from "../cloudflare/oauth";
+import {
   attachWorkerCustomDomain,
   configureCloudflareDomain,
-  inspectCloudflareDomain
+  inspectCloudflareDomain,
+  listCloudflareZones
 } from "../setup/cloudflare";
 import { getSetupStatus, upsertWorkspaceHost } from "../setup/queries";
 import { getUpgradeLifecycle } from "../upgrades/queries";
@@ -23,10 +31,43 @@ import {
 
 export const domainRoutes = new Hono<HonoApp>();
 
+const domainOAuthFlow = {
+  callbackPath: "/api/pro/domains/cloudflare/oauth/callback",
+  operation: "domains",
+  settingsTab: "domains"
+} as const;
+
 domainRoutes.get("/", async (c) => {
   const auth = await requireAuthContext(c.env, c.req.raw);
   requireRole(auth, ["owner", "admin"]);
   return c.json(await listMailDomains(c.env.DB));
+});
+
+domainRoutes.get("/cloudflare/oauth/start", async (c) => {
+  const auth = await requireAuthContext(c.env, c.req.raw);
+  requireRole(auth, ["owner", "admin"]);
+  requireRecentSession(auth);
+  return startRuntimeCloudflareOAuth(c.req.raw, c.env, domainOAuthFlow);
+});
+
+domainRoutes.get("/cloudflare/oauth/callback", async (c) => {
+  return finishRuntimeCloudflareOAuth(c.req.raw, c.env, domainOAuthFlow);
+});
+
+domainRoutes.get("/cloudflare/zones", async (c) => {
+  const auth = await requireAuthContext(c.env, c.req.raw);
+  requireRole(auth, ["owner", "admin"]);
+  const grant = await resolveRuntimeCloudflareGrant(c.req.raw, c.env);
+  return c.json({ zones: await listCloudflareZones({ apiToken: grant }) });
+});
+
+domainRoutes.post("/cloudflare/revoke", async (c) => {
+  const auth = await requireAuthContext(c.env, c.req.raw);
+  requireRole(auth, ["owner", "admin"]);
+  const grant = await resolveRuntimeCloudflareGrant(c.req.raw, c.env);
+  await revokeRuntimeCloudflareGrant(grant, c.env);
+  c.header("set-cookie", clearRuntimeCloudflareGrantCookie());
+  return c.json({ revoked: true });
 });
 
 domainRoutes.post("/", async (c) => {
@@ -51,9 +92,11 @@ domainRoutes.post("/", async (c) => {
 domainRoutes.post("/provision", async (c) => {
   const auth = await requireAuthContext(c.env, c.req.raw);
   requireRole(auth, ["owner", "admin"]);
+  requireRecentSession(auth);
   const input = parseWith(provisionMailDomainSchema, await readJson(c.req.raw));
+  const grant = await resolveRuntimeCloudflareGrant(c.req.raw, c.env);
   const result = await configureCloudflareDomain({
-    apiToken: input.apiToken,
+    apiToken: grant,
     zoneId: input.zoneId,
     workerName: c.env.HQBASE_WORKER_NAME ?? input.workerName,
     attachCustomDomain: false,
@@ -77,6 +120,8 @@ domainRoutes.post("/provision", async (c) => {
     resourceId: domain.id,
     outcome: result.status.ready ? "success" : "failure"
   });
+  await revokeRuntimeCloudflareGrant(grant, c.env);
+  c.header("set-cookie", clearRuntimeCloudflareGrantCookie());
   return c.json({ domain, steps: result.steps }, result.status.ready ? 200 : 207);
 });
 
@@ -85,14 +130,15 @@ domainRoutes.put("/portal", async (c) => {
   requireRole(auth, ["owner", "admin"]);
   requireRecentSession(auth);
   const input = parseWith(changePortalHostnameSchema, await readJson(c.req.raw));
+  const grant = await resolveRuntimeCloudflareGrant(c.req.raw, c.env);
   const inspected = await inspectCloudflareDomain({
-    apiToken: input.apiToken,
+    apiToken: grant,
     workerName: c.env.HQBASE_WORKER_NAME ?? input.workerName,
     zoneId: input.zoneId
   });
   const upgrade = await getUpgradeLifecycle(c.env.DB);
   await attachWorkerCustomDomain({
-    apiToken: input.apiToken,
+    apiToken: grant,
     hostname: input.hostname,
     replaceWorkerName: upgrade?.sourceWorkerName ?? undefined,
     workerName: inspected.workerName,
@@ -113,6 +159,8 @@ domainRoutes.put("/portal", async (c) => {
     resourceId: input.hostname,
     outcome: "success"
   });
+  await revokeRuntimeCloudflareGrant(grant, c.env);
+  c.header("set-cookie", clearRuntimeCloudflareGrantCookie());
   return c.json({ hostname: input.hostname, canonical: true });
 });
 
@@ -121,6 +169,7 @@ domainRoutes.put("/service", async (c) => {
   requireRole(auth, ["owner", "admin"]);
   requireRecentSession(auth);
   const input = parseWith(changeServiceHostnameSchema, await readJson(c.req.raw));
+  const grant = await resolveRuntimeCloudflareGrant(c.req.raw, c.env);
   const setup = await getSetupStatus(c.env.DB);
   if (input.hostname === setup.portalHostname) {
     throw new AppError(
@@ -130,13 +179,13 @@ domainRoutes.put("/service", async (c) => {
     );
   }
   const inspected = await inspectCloudflareDomain({
-    apiToken: input.apiToken,
+    apiToken: grant,
     workerName: c.env.HQBASE_WORKER_NAME ?? input.workerName,
     zoneId: input.zoneId
   });
   const upgrade = await getUpgradeLifecycle(c.env.DB);
   await attachWorkerCustomDomain({
-    apiToken: input.apiToken,
+    apiToken: grant,
     hostname: input.hostname,
     replaceWorkerName: upgrade?.sourceWorkerName ?? undefined,
     workerName: inspected.workerName,
@@ -157,6 +206,8 @@ domainRoutes.put("/service", async (c) => {
     resourceId: input.hostname,
     outcome: "success"
   });
+  await revokeRuntimeCloudflareGrant(grant, c.env);
+  c.header("set-cookie", clearRuntimeCloudflareGrantCookie());
   return c.json({ hostname: input.hostname });
 });
 

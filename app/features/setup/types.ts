@@ -32,7 +32,7 @@ export type CloudflareZone = {
   accountName: string | null;
 };
 
-export type CloudflareTokenStatus = {
+export type CloudflareAccessStatus = {
   id: string;
   status: string;
   active: boolean;

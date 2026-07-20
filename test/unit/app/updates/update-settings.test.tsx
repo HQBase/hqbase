@@ -27,12 +27,12 @@ describe("update settings", () => {
     expect(html).toContain("Unknown");
   });
 
-  it("renders a labelled, keyboard-submittable update form", () => {
+  it("starts updates through Cloudflare authorization without a credential field", () => {
     const html = renderToStaticMarkup(<UpdateSettings initialStatus={availableStatus} />);
-    expect(html).toContain('for="update-cloudflare-token"');
-    expect(html).toContain('id="update-cloudflare-token"');
-    expect(html).toContain('type="submit"');
-    expect(html).toContain("Start update");
+    expect(html).toContain('href="/api/updates/cloudflare/oauth/start"');
+    expect(html).toContain("Authorize Cloudflare and update");
+    expect(html).not.toContain('type="password"');
+    expect(html).not.toContain("API token");
     expect(html).toContain("HQBase 0.2.0");
   });
 

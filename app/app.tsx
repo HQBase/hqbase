@@ -32,6 +32,7 @@ const ComposeDialog = React.lazy(() =>
 );
 
 export function App(): React.ReactElement {
+  const initialSettingsTab = readInitialSettingsTab();
   const [setup, setSetup] = React.useState<SetupStatus | null>(null);
   const [user, setUser] = React.useState<CurrentUser | null>(null);
   const [mailboxes, setMailboxes] = React.useState<Mailbox[]>([]);
@@ -39,7 +40,9 @@ export function App(): React.ReactElement {
   const [entitlement, setEntitlement] = React.useState<EntitlementStatus | null>(null);
   const [upgrade, setUpgrade] = React.useState<UpgradeLifecycle | null>(null);
   const [messages, setMessages] = React.useState<MessageSummary[]>([]);
-  const [activeFolder, setActiveFolder] = React.useState<FolderId>("inbox");
+  const [activeFolder, setActiveFolder] = React.useState<FolderId>(
+    initialSettingsTab ? "settings" : "inbox"
+  );
   const [mailboxId, setMailboxId] = React.useState("all");
   const [search, setSearch] = React.useState("");
   const [selectedId, setSelectedId] = React.useState<string | null>(null);
@@ -47,7 +50,7 @@ export function App(): React.ReactElement {
   const [replyTo, setReplyTo] = React.useState<MessageDetail | null>(null);
   const [isLoading, setIsLoading] = React.useState(true);
   const [updateStatus, setUpdateStatus] = React.useState<UpdateStatus | null>(null);
-  const [settingsTab, setSettingsTab] = React.useState("mailboxes");
+  const [settingsTab, setSettingsTab] = React.useState(initialSettingsTab ?? "mailboxes");
 
   const loadWorkspace = React.useCallback(async (currentUser: CurrentUser) => {
     const [nextSetup, nextMailboxes] = await Promise.all([getSetupStatus(), listMailboxes()]);
@@ -260,6 +263,11 @@ export function App(): React.ReactElement {
       <Toaster />
     </>
   );
+}
+
+function readInitialSettingsTab(): "domains" | "updates" | null {
+  const tab = new URL(window.location.href).searchParams.get("settings");
+  return tab === "domains" || tab === "updates" ? tab : null;
 }
 
 function FullScreenStatus({ label }: { label: string }): React.ReactElement {

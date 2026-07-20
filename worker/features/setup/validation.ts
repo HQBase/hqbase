@@ -66,18 +66,11 @@ export const bootstrapSetupSchema = z
     }
   });
 
-export const cloudflareApiTokenSchema = z.string().trim().min(20).max(500);
+export const verifyCloudflareAccessSchema = z.object({}).strict();
 
-export const verifyCloudflareTokenSchema = z.object({
-  apiToken: cloudflareApiTokenSchema.optional()
-});
-
-export const listCloudflareZonesSchema = z.object({
-  apiToken: cloudflareApiTokenSchema.optional()
-});
+export const listCloudflareZonesSchema = z.object({}).strict();
 
 export const inspectCloudflareDomainSchema = z.object({
-  apiToken: cloudflareApiTokenSchema.optional(),
   workerName: z.string().trim().min(1).max(63).optional(),
   zoneId: z.string().trim().min(1).max(64)
 });
