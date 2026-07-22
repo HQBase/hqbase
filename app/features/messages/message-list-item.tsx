@@ -6,25 +6,39 @@ import { formatDateTime } from "@/lib/format";
 import type { MessageSummary } from "./types";
 
 type MessageListItemProps = {
+  href: string;
   message: MessageSummary;
   isActive: boolean;
   onSelect: (message: MessageSummary) => void;
 };
 
 export function MessageListItem({
+  href,
   message,
   isActive,
   onSelect
 }: MessageListItemProps): React.ReactElement {
   return (
-    <button
+    <a
       className={cn(
         "relative grid w-full gap-1.5 border-b border-border/70 px-4 py-3 text-left transition-colors hover:bg-muted/55",
         isActive && "bg-muted/85",
         message.readAt === null && !isActive && "bg-card/70"
       )}
-      onClick={() => onSelect(message)}
-      type="button"
+      href={href}
+      onClick={(event) => {
+        if (
+          event.button !== 0 ||
+          event.metaKey ||
+          event.ctrlKey ||
+          event.shiftKey ||
+          event.altKey
+        ) {
+          return;
+        }
+        event.preventDefault();
+        onSelect(message);
+      }}
     >
       <div className="flex min-w-0 items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-2">
@@ -56,7 +70,7 @@ export function MessageListItem({
           </Badge>
         )}
       </div>
-    </button>
+    </a>
   );
 }
 

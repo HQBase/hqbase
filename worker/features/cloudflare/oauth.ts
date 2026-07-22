@@ -179,7 +179,7 @@ function oauthResultHeaders(
   result: string,
   flow: RuntimeCloudflareOAuthFlow
 ): Headers {
-  const target = new URL("/", request.url);
+  const target = new URL(`/settings/${flow.settingsTab}`, request.url);
   target.searchParams.set("cloudflare", result);
   target.searchParams.set("settings", flow.settingsTab);
   const headers = new Headers({ "cache-control": "no-store", location: target.toString() });

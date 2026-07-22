@@ -25,14 +25,14 @@ import type { UpgradeLifecycle } from "@/features/upgrades/types";
 import { UpgradeComplete } from "@/features/upgrades/upgrade-complete";
 import { listUsers } from "@/features/users/api";
 import type { WorkspaceUser } from "@/features/users/types";
-import type { FolderId } from "@/lib/routes";
+import type { FolderId, MailFolderId, SettingsTabId } from "@/lib/routes";
+import { useAppRoute } from "@/lib/use-app-route";
 
 const ComposeDialog = React.lazy(() =>
   import("@/features/compose/compose-dialog").then((module) => ({ default: module.ComposeDialog }))
 );
 
 export function App(): React.ReactElement {
-  const initialSettingsTab = readInitialSettingsTab();
   const [setup, setSetup] = React.useState<SetupStatus | null>(null);
   const [user, setUser] = React.useState<CurrentUser | null>(null);
   const [mailboxes, setMailboxes] = React.useState<Mailbox[]>([]);
@@ -40,17 +40,16 @@ export function App(): React.ReactElement {
   const [entitlement, setEntitlement] = React.useState<EntitlementStatus | null>(null);
   const [upgrade, setUpgrade] = React.useState<UpgradeLifecycle | null>(null);
   const [messages, setMessages] = React.useState<MessageSummary[]>([]);
-  const [activeFolder, setActiveFolder] = React.useState<FolderId>(
-    initialSettingsTab ? "settings" : "inbox"
-  );
   const [mailboxId, setMailboxId] = React.useState("all");
   const [search, setSearch] = React.useState("");
-  const [selectedId, setSelectedId] = React.useState<string | null>(null);
   const [composeOpen, setComposeOpen] = React.useState(false);
   const [replyTo, setReplyTo] = React.useState<MessageDetail | null>(null);
   const [isLoading, setIsLoading] = React.useState(true);
   const [updateStatus, setUpdateStatus] = React.useState<UpdateStatus | null>(null);
-  const [settingsTab, setSettingsTab] = React.useState(initialSettingsTab ?? "mailboxes");
+  const { navigate, route } = useAppRoute(setup?.isComplete);
+  const activeFolder: FolderId = route.kind === "settings" ? "settings" : route.folder;
+  const selectedId = route.kind === "mail" ? route.messageId : null;
+  const settingsTab: SettingsTabId = route.kind === "settings" ? route.tab : "mailboxes";
 
   const loadWorkspace = React.useCallback(async (currentUser: CurrentUser) => {
     const [nextSetup, nextMailboxes] = await Promise.all([getSetupStatus(), listMailboxes()]);
@@ -112,7 +111,6 @@ export function App(): React.ReactElement {
         ? nextMessages.filter((message) => message.starredAt)
         : nextMessages;
     setMessages(filtered);
-    setSelectedId((current) => current ?? filtered[0]?.id ?? null);
   }, [activeFolder, mailboxId, search, user]);
 
   React.useEffect(() => {
@@ -152,6 +150,15 @@ export function App(): React.ReactElement {
     return () => window.clearInterval(interval);
   }, [activeFolder, reloadMessages, user]);
 
+  React.useEffect(() => {
+    if (!user || isLoading || route.kind !== "settings") return;
+    const canManage = user.role === "owner" || user.role === "admin";
+    const managementOnly = ["domains", "billing", "updates"].includes(route.tab);
+    if ((!canManage && managementOnly) || (route.tab === "billing" && !entitlement)) {
+      navigate({ kind: "settings", tab: "mailboxes" }, true);
+    }
+  }, [entitlement, isLoading, navigate, route, user]);
+
   if (isLoading && setup === null) {
     return <FullScreenStatus label="Loading HQBase" />;
   }
@@ -180,14 +187,10 @@ export function App(): React.ReactElement {
     <>
       <UpgradeComplete
         onOpenSettings={() => {
-          window.history.replaceState(null, "", "/");
-          setSettingsTab("billing");
-          setActiveFolder("settings");
+          navigate({ kind: "settings", tab: "billing" });
         }}
         onAddDomain={() => {
-          window.history.replaceState(null, "", "/");
-          setSettingsTab("domains");
-          setActiveFolder("settings");
+          navigate({ kind: "settings", tab: "domains" });
         }}
       />
       <AppShell
@@ -198,16 +201,18 @@ export function App(): React.ReactElement {
         user={user}
         updateStatus={updateStatus}
         onOpenUpdates={() => {
-          setSettingsTab("updates");
-          setActiveFolder("settings");
+          navigate({ kind: "settings", tab: "updates" });
         }}
         onCompose={() => {
           setReplyTo(null);
           setComposeOpen(true);
         }}
         onFolderChange={(folder) => {
-          setActiveFolder(folder);
-          setSelectedId(null);
+          navigate(
+            folder === "settings"
+              ? { kind: "settings", tab: "mailboxes" }
+              : { kind: "mail", folder, messageId: null }
+          );
         }}
         onMailboxChange={setMailboxId}
         onSearchChange={setSearch}
@@ -221,7 +226,7 @@ export function App(): React.ReactElement {
           <div className="min-h-0 flex-1">
             {activeFolder === "settings" ? (
               <SettingsPage
-                key={settingsTab}
+                activeTab={settingsTab}
                 canManage={user.role === "owner" || user.role === "admin"}
                 entitlement={entitlement}
                 upgrade={upgrade}
@@ -231,11 +236,12 @@ export function App(): React.ReactElement {
                 onEntitlementChanged={setEntitlement}
                 onUpgradeChanged={setUpgrade}
                 onRefresh={() => void reload()}
-                defaultTab={settingsTab}
+                onTabChange={(tab) => navigate({ kind: "settings", tab })}
                 updateStatus={updateStatus}
               />
             ) : (
               <InboxPage
+                activeFolder={activeFolder as MailFolderId}
                 messages={messages}
                 selectedId={selectedId}
                 onRefresh={() => void reloadMessages()}
@@ -243,7 +249,12 @@ export function App(): React.ReactElement {
                   setReplyTo(message);
                   setComposeOpen(true);
                 }}
-                onSelect={setSelectedId}
+                onMessageRouteChange={(folder, messageId) =>
+                  navigate({ kind: "mail", folder, messageId })
+                }
+                onSelect={(messageId) =>
+                  navigate({ kind: "mail", folder: activeFolder as MailFolderId, messageId })
+                }
               />
             )}
           </div>
@@ -263,11 +274,6 @@ export function App(): React.ReactElement {
       <Toaster />
     </>
   );
-}
-
-function readInitialSettingsTab(): "domains" | "updates" | null {
-  const tab = new URL(window.location.href).searchParams.get("settings");
-  return tab === "domains" || tab === "updates" ? tab : null;
 }
 
 function FullScreenStatus({ label }: { label: string }): React.ReactElement {

@@ -75,7 +75,7 @@ describe("Pro runtime Cloudflare OAuth", () => {
     });
 
     expect(finished.headers.get("location")).toBe(
-      "https://mail.example.com/?cloudflare=connected&settings=updates"
+      "https://mail.example.com/settings/updates?cloudflare=connected&settings=updates"
     );
     expect(grantCookie).not.toContain("runtime-oauth-secret");
     await expect(resolveRuntimeCloudflareGrant(grantRequest, env)).resolves.toBe(

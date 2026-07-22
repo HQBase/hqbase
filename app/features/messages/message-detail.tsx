@@ -8,25 +8,30 @@ import { MessageHtml } from "./message-html";
 import type { MessageDetail as MessageDetailType } from "./types";
 
 type MessageDetailProps = {
+  error?: string | null;
+  isLoading?: boolean;
   message: MessageDetailType | null;
   onAction: (action: "read" | "unread" | "star" | "unstar" | "archive" | "trash") => void;
   onReply: (message: MessageDetailType) => void;
 };
 
 export function MessageDetail({
+  error = null,
+  isLoading = false,
   message,
   onAction,
   onReply
 }: MessageDetailProps): React.ReactElement {
+  if (isLoading) {
+    return <MessageReaderStatus label="Loading message" />;
+  }
+
+  if (error) {
+    return <MessageReaderStatus description={error} label="Message unavailable" />;
+  }
+
   if (!message) {
-    return (
-      <div className="flex h-full flex-col items-center justify-center gap-3 p-8 text-center text-muted-foreground">
-        <div className="flex size-9 items-center justify-center rounded-md border bg-card">
-          <MailOpen className="size-4" />
-        </div>
-        <span className="text-xs">Select a message</span>
-      </div>
-    );
+    return <MessageReaderStatus label="Select a message" />;
   }
 
   const timestamp = message.receivedAt ?? message.sentAt ?? message.createdAt;
@@ -110,6 +115,26 @@ export function MessageDetail({
         </div>
       </div>
     </article>
+  );
+}
+
+function MessageReaderStatus({
+  description,
+  label
+}: {
+  description?: string;
+  label: string;
+}): React.ReactElement {
+  return (
+    <div className="flex h-full flex-col items-center justify-center gap-3 p-8 text-center text-muted-foreground">
+      <div className="flex size-9 items-center justify-center rounded-md border bg-card">
+        <MailOpen className="size-4" />
+      </div>
+      <div className="grid max-w-sm gap-1">
+        <span className="text-xs">{label}</span>
+        {description ? <span className="text-xs text-muted-foreground">{description}</span> : null}
+      </div>
+    </div>
   );
 }
 

@@ -14,8 +14,10 @@ import { UpdateSettings } from "@/features/updates/update-settings";
 import type { UpgradeLifecycle } from "@/features/upgrades/types";
 import type { WorkspaceUser } from "@/features/users/types";
 import { UserSettings } from "@/features/users/user-settings";
+import { appRoutePath, isSettingsTabId, type SettingsTabId } from "@/lib/routes";
 
 type SettingsPageProps = {
+  activeTab: SettingsTabId;
   canManage: boolean;
   mailboxes: Mailbox[];
   setup: SetupStatus;
@@ -25,11 +27,12 @@ type SettingsPageProps = {
   onEntitlementChanged: (status: EntitlementStatus) => void;
   onUpgradeChanged: (upgrade: UpgradeLifecycle) => void;
   onRefresh: () => void;
-  defaultTab?: string;
+  onTabChange: (tab: SettingsTabId) => void;
   updateStatus: UpdateStatus | null;
 };
 
 export function SettingsPage({
+  activeTab,
   canManage,
   mailboxes,
   setup,
@@ -39,16 +42,9 @@ export function SettingsPage({
   onEntitlementChanged,
   onUpgradeChanged,
   onRefresh,
-  defaultTab = "mailboxes",
+  onTabChange,
   updateStatus
 }: SettingsPageProps): React.ReactElement {
-  const resolvedDefaultTab =
-    defaultTab === "general" || defaultTab === "upgrade"
-      ? "debug"
-      : defaultTab === "mail-clients" || defaultTab === "access"
-        ? "mailboxes"
-        : defaultTab;
-
   return (
     <div className="h-full overflow-auto">
       <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-8">
@@ -56,7 +52,12 @@ export function SettingsPage({
           <h1 className="text-xl font-medium tracking-tight">Settings</h1>
           <p className="mt-1 text-xs text-muted-foreground">Workspace and access</p>
         </div>
-        <Tabs defaultValue={resolvedDefaultTab}>
+        <Tabs
+          value={activeTab}
+          onValueChange={(value) => {
+            if (isSettingsTabId(value)) onTabChange(value);
+          }}
+        >
           <TabsList className="h-auto w-full flex-wrap justify-start gap-x-1 rounded-none border-b bg-transparent p-0">
             <SettingsTab value="mailboxes">Mailboxes</SettingsTab>
             <SettingsTab value="users">Users</SettingsTab>
@@ -110,14 +111,31 @@ function SettingsTab({
   value
 }: {
   children: React.ReactNode;
-  value: string;
+  value: SettingsTabId;
 }): React.ReactElement {
   return (
     <TabsTrigger
+      asChild
       className="rounded-none border-b border-transparent px-3 py-2 text-xs font-normal text-muted-foreground data-[state=active]:border-foreground data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:shadow-none"
       value={value}
     >
-      {children}
+      <a
+        href={appRoutePath({ kind: "settings", tab: value })}
+        onClick={(event) => {
+          if (
+            event.button !== 0 ||
+            event.metaKey ||
+            event.ctrlKey ||
+            event.shiftKey ||
+            event.altKey
+          ) {
+            return;
+          }
+          event.preventDefault();
+        }}
+      >
+        {children}
+      </a>
     </TabsTrigger>
   );
 }

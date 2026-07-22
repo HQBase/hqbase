@@ -171,8 +171,8 @@ describe("settings presentation", () => {
   it("replaces General and Upgrade with Debug as the final tab", () => {
     const html = renderToStaticMarkup(
       <SettingsPage
+        activeTab="mailboxes"
         canManage
-        defaultTab="mailboxes"
         entitlement={null}
         mailboxes={[]}
         setup={setup}
@@ -181,6 +181,7 @@ describe("settings presentation", () => {
         users={[]}
         onEntitlementChanged={() => undefined}
         onRefresh={() => undefined}
+        onTabChange={() => undefined}
         onUpgradeChanged={() => undefined}
       />
     );
@@ -190,6 +191,8 @@ describe("settings presentation", () => {
     expect(html).not.toContain('value="access"');
     expect(html).not.toContain("Mail clients");
     expect(html).toContain(">Debug<");
+    expect(html).toContain('href="/settings/mailboxes"');
+    expect(html).toContain('href="/settings/debug"');
     expect(html.indexOf(">Debug<")).toBeGreaterThan(html.indexOf(">Updates<"));
   });
 });

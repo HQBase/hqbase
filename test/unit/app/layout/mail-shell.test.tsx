@@ -39,6 +39,9 @@ describe("mail shell", () => {
     );
 
     expect(html).toContain('src="/logo.svg"');
+    expect(html).toContain('href="/inbox"');
+    expect(html).toContain('href="/catch-all"');
+    expect(html).toContain('href="/settings/mailboxes"');
     expect(html).not.toContain(">HQ<");
     expect(html).not.toContain(">Mail</div>");
   });
