@@ -1,6 +1,5 @@
 import * as React from "react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { CloudflareAuthorizationDialog } from "@/features/settings/cloudflare-authorization-dialog";
@@ -57,25 +56,9 @@ export function UpdateSettings({
     }
   }
   const isPending = pendingAction !== null;
-  const statusLabel = !status
-    ? "Not checked"
-    : status.available
-      ? "Update available"
-      : "Up to date";
 
   return (
-    <SettingsSection
-      action={
-        <Badge
-          role="status"
-          variant={!status ? "outline" : status.available ? "default" : "secondary"}
-        >
-          {statusLabel}
-        </Badge>
-      }
-      description="Signed stable releases for this installation"
-      title="Updates"
-    >
+    <SettingsSection description="Signed stable releases" title="Updates">
       {checkError ? (
         <Alert variant="destructive">
           <AlertTitle>Update check unavailable</AlertTitle>
@@ -97,36 +80,17 @@ export function UpdateSettings({
           </AlertDescription>
         </Alert>
       ) : null}
-      <div className="grid gap-4 text-sm">
-        <div className="grid gap-3 sm:grid-cols-2">
-          <Version label="Installed" value={status?.installedVersion ?? "Unknown"} />
-          <Version label="Latest stable" value={status?.release.version ?? "Not checked"} />
-        </div>
-        {status?.available ? (
-          <div className="rounded-md border bg-background/50 p-4">
-            <p className="font-medium">HQBase {status.release.version}</p>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Schema {status.release.schemaVersion} · published{" "}
-              {new Date(status.release.publishedAt).toLocaleDateString()}
-            </p>
-            <a
-              className="mt-2 inline-block text-xs underline underline-offset-4"
-              href={status.release.notesUrl}
-              rel="noreferrer"
-              target="_blank"
-            >
-              Read release notes
-            </a>
-          </div>
-        ) : null}
+      <div aria-live="polite" className="flex flex-wrap items-center gap-x-6 gap-y-2 text-xs">
+        <Version label="Current" value={status?.installedVersion ?? "Unknown"} />
+        <Version label="Available" value={status?.release.version ?? "Not checked"} />
         <Button
-          className="self-start"
           disabled={isPending}
           onClick={() => void check()}
+          size="sm"
           type="button"
-          variant="outline"
+          variant="ghost"
         >
-          {pendingAction === "check" ? "Checking for updates…" : "Check again"}
+          {pendingAction === "check" ? "Checking…" : "Check updates"}
         </Button>
       </div>
       {status?.available ? (
@@ -186,9 +150,9 @@ function oauthErrorMessage(result: string): string {
 
 function Version({ label, value }: { label: string; value: string }): React.ReactElement {
   return (
-    <div className="flex items-center justify-between rounded-md border bg-background/50 p-3">
+    <div className="flex items-baseline gap-2">
       <span className="text-muted-foreground">{label}</span>
-      <span className="font-medium">{value}</span>
+      <span className="font-mono font-medium text-foreground">{value}</span>
     </div>
   );
 }

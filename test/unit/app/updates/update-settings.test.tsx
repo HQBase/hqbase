@@ -25,6 +25,7 @@ describe("update settings", () => {
     expect(html).toContain("Not checked");
     expect(html).not.toContain("Up to date");
     expect(html).toContain("Unknown");
+    expect(html).toContain("Check updates");
   });
 
   it("opens authorization from the update action without a credential field", () => {
@@ -34,7 +35,13 @@ describe("update settings", () => {
     expect(html).not.toContain("Authorize Cloudflare and update");
     expect(html).not.toContain('type="password"');
     expect(html).not.toContain("API token");
-    expect(html).toContain("HQBase 0.2.0");
+    expect(html).toContain("Current");
+    expect(html).toContain("0.1.2");
+    expect(html).toContain("Available");
+    expect(html).toContain("0.2.0");
+    expect(html).not.toContain("HQBase 0.2.0");
+    expect(html).not.toContain("Read release notes");
+    expect(html).not.toContain("Schema 10");
   });
 
   it("makes incompatible releases explicit and disables the action", () => {
