@@ -1,11 +1,14 @@
 # Contributing
 
-HQBase Pro is source-available under the HQBase Commercial Source License 1.0. Contributions are not accepted until HQBase adopts contributor terms that preserve its ability to offer commercial licenses. Changes must keep both fresh installation and supported Community upgrades working.
+HQBase is licensed under AGPL-3.0-or-later.
 
 ```sh
 pnpm install
+pnpm db:migrate:local
 pnpm check
 pnpm deploy:dry-run
 ```
 
-Use feature-oriented modules, strict boundary validation, versioned migrations, organized tests, and the 400-line implementation-file limit. Every authorization rule, migration, bridge contract change, and fixed bug requires tests.
+Use feature-oriented modules, strict boundary validation, versioned migrations, organized tests,
+and the 400-line implementation-file limit. Every authorization rule, migration, and fixed bug
+requires tests. Never log credentials or mail content.

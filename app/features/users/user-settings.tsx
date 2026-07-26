@@ -32,6 +32,7 @@ import {
 } from "@/components/ui/table";
 import { SettingsSection } from "@/features/settings/settings-section";
 import { createUser, updateUserRole } from "./api";
+import { RoleGuidance } from "./role-guidance";
 import type { WorkspaceRole, WorkspaceUser } from "./types";
 
 type UserSettingsProps = {
@@ -147,7 +148,12 @@ export function UserSettings({ users, onChanged }: UserSettingsProps): React.Rea
           <TableRow className="hover:bg-transparent">
             <TableHead className="hidden sm:table-cell">Name</TableHead>
             <TableHead>Email</TableHead>
-            <TableHead className="w-40">Role</TableHead>
+            <TableHead className="w-40">
+              <span className="flex items-center gap-1">
+                Role
+                <RoleGuidance />
+              </span>
+            </TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>

@@ -29,7 +29,8 @@ import { SettingsSection } from "@/features/settings/settings-section";
 import type { WorkspaceUser } from "@/features/users/types";
 import { addMailboxAddress, createMailbox, removeMailboxAddress, updateMailbox } from "./api";
 import { MailboxAliasDialog } from "./mailbox-alias-dialog";
-import { MailboxTable } from "./mailbox-table";
+import { MailboxDetailsSheet } from "./mailbox-details-sheet";
+import { MailboxSelectionBar, MailboxTable } from "./mailbox-table";
 import type { Mailbox } from "./types";
 
 type MailboxSettingsProps = {
@@ -49,7 +50,8 @@ export function MailboxSettings({
   const [displayName, setDisplayName] = React.useState("");
   const [createOpen, setCreateOpen] = React.useState(false);
   const [aliasMailbox, setAliasMailbox] = React.useState<Mailbox | null>(null);
-  const [accessMailbox, setAccessMailbox] = React.useState<Mailbox | null>(null);
+  const [detailsMailboxId, setDetailsMailboxId] = React.useState<string | null>(null);
+  const [accessMailboxId, setAccessMailboxId] = React.useState<string | null>(null);
   const [bulkAccessOpen, setBulkAccessOpen] = React.useState(false);
   const [domainFilter, setDomainFilter] = React.useState("all");
   const [selectedMailboxIds, setSelectedMailboxIds] = React.useState<string[]>([]);
@@ -64,6 +66,8 @@ export function MailboxSettings({
       : mailboxes.filter((mailbox) => mailboxMatchesDomain(mailbox, activeDomain));
   const selectedMailboxIdSet = new Set(selectedMailboxIds);
   const selectedMailboxes = mailboxes.filter((mailbox) => selectedMailboxIdSet.has(mailbox.id));
+  const detailsMailbox = mailboxes.find((mailbox) => mailbox.id === detailsMailboxId) ?? null;
+  const accessMailbox = mailboxes.find((mailbox) => mailbox.id === accessMailboxId) ?? null;
 
   async function handleCreate(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -98,10 +102,10 @@ export function MailboxSettings({
       });
       setAliasAddress("");
       setAliasMailbox(null);
-      toast.success("Alias added.");
+      toast.success("Email address added.");
       onChanged();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Alias creation failed.");
+      toast.error(error instanceof Error ? error.message : "Address creation failed.");
     } finally {
       setPendingAction(null);
     }
@@ -170,43 +174,36 @@ export function MailboxSettings({
       description="Shared addresses across your connected domains"
       title="Mailboxes"
     >
-      {canManage && mailboxes.length > 0 && (domains.length > 1 || selectedMailboxes.length > 0) ? (
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          {domains.length > 1 ? (
-            <Select
-              value={activeDomain}
-              onValueChange={(value) => {
-                setDomainFilter(value);
-                setSelectedMailboxIds([]);
-              }}
-            >
-              <SelectTrigger aria-label="Filter mailboxes by domain" className="w-56 shadow-none">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectGroup>
-                  <SelectItem value="all">All domains</SelectItem>
-                  {domains.map((domain) => (
-                    <SelectItem key={domain} value={domain}>
-                      {domain}
-                    </SelectItem>
-                  ))}
-                </SelectGroup>
-              </SelectContent>
-            </Select>
-          ) : null}
-          {selectedMailboxes.length > 0 ? (
-            <div className="ml-auto flex items-center gap-3">
-              <span className="text-sm text-muted-foreground">
-                {selectedMailboxes.length} selected
-              </span>
-              <Button size="sm" type="button" onClick={() => setBulkAccessOpen(true)}>
-                Set access
-              </Button>
-            </div>
-          ) : null}
+      {canManage && mailboxes.length > 0 && domains.length > 1 ? (
+        <div>
+          <Select
+            value={activeDomain}
+            onValueChange={(value) => {
+              setDomainFilter(value);
+              setSelectedMailboxIds([]);
+            }}
+          >
+            <SelectTrigger aria-label="Filter mailboxes by domain" className="w-56 shadow-none">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectGroup>
+                <SelectItem value="all">All domains</SelectItem>
+                {domains.map((domain) => (
+                  <SelectItem key={domain} value={domain}>
+                    {domain}
+                  </SelectItem>
+                ))}
+              </SelectGroup>
+            </SelectContent>
+          </Select>
         </div>
       ) : null}
+
+      <MailboxSelectionBar
+        selectedCount={selectedMailboxes.length}
+        onManage={() => setBulkAccessOpen(true)}
+      />
 
       <MailboxTable
         canManage={canManage}
@@ -214,10 +211,27 @@ export function MailboxSettings({
         policies={accessPolicies}
         selectedIds={selectedMailboxIds}
         users={users}
-        onAddAlias={setAliasMailbox}
-        onManageAccess={setAccessMailbox}
-        onRemoveAlias={(mailbox, addressId) => void handleRemoveAlias(mailbox, addressId)}
+        onOpenDetails={(mailbox) => setDetailsMailboxId(mailbox.id)}
         onSelectionChange={setSelectedMailboxIds}
+      />
+
+      <MailboxDetailsSheet
+        canManage={canManage}
+        mailbox={detailsMailbox}
+        policies={accessPolicies}
+        users={users}
+        onAddAddress={(mailbox) => {
+          setDetailsMailboxId(null);
+          setAliasMailbox(mailbox);
+        }}
+        onManageAccess={(mailbox) => {
+          setDetailsMailboxId(null);
+          setAccessMailboxId(mailbox.id);
+        }}
+        onOpenChange={(open) => {
+          if (!open) setDetailsMailboxId(null);
+        }}
+        onRemoveAddress={(mailbox, addressId) => void handleRemoveAlias(mailbox, addressId)}
         onToggle={(mailbox) => void handleToggle(mailbox)}
       />
 
@@ -238,7 +252,7 @@ export function MailboxSettings({
         policies={accessPolicies}
         users={users}
         onOpenChange={(open) => {
-          if (!open) setAccessMailbox(null);
+          if (!open) setAccessMailboxId(null);
         }}
       />
 

@@ -8,7 +8,7 @@ import { describe, expect, it, vi } from "vitest";
 
 const env = {
   BETTER_AUTH_SECRET: "test-better-auth-secret-with-enough-entropy",
-  CLOUDFLARE_OAUTH_CLIENT_ID: "pro-client",
+  CLOUDFLARE_OAUTH_CLIENT_ID: "hqbase-client",
   CLOUDFLARE_OAUTH_REDIRECT_URI: "https://auth.hqbase.io/oauth/callback",
   CLOUDFLARE_OAUTH_RELAY_URL: "https://auth.hqbase.io"
 };
@@ -19,7 +19,13 @@ const updateFlow = {
   settingsTab: "updates"
 } as const;
 
-describe("Pro runtime Cloudflare OAuth", () => {
+const setupFlow = {
+  callbackPath: "/api/setup/cloudflare/oauth/callback",
+  operation: "setup",
+  returnPath: "/setup"
+} as const;
+
+describe("HQBase runtime Cloudflare OAuth", () => {
   it("starts operation-scoped PKCE without exposing the verifier", async () => {
     const response = await startRuntimeCloudflareOAuth(
       new Request("https://mail.example.com/settings"),
@@ -36,8 +42,8 @@ describe("Pro runtime Cloudflare OAuth", () => {
       "https://mail.example.com/api/updates/cloudflare/oauth/callback"
     );
     expect(target.toString()).not.toContain("verifier");
-    expect(cookies).toContain("hqb_pro_cf_oauth_verifier=");
-    expect(cookies).toContain("hqb_pro_cf_oauth_grant=");
+    expect(cookies).toContain("hqb_cf_oauth_verifier=");
+    expect(cookies).toContain("hqb_cf_oauth_grant=");
   });
 
   it("exchanges, encrypts, and resolves the grant only on the server", async () => {
@@ -47,8 +53,8 @@ describe("Pro runtime Cloudflare OAuth", () => {
       updateFlow
     );
     const startCookies = started.headers.get("set-cookie") ?? "";
-    const state = cookieValue(startCookies, "hqb_pro_cf_oauth_state");
-    const verifier = cookieValue(startCookies, "hqb_pro_cf_oauth_verifier");
+    const state = cookieValue(startCookies, "hqb_cf_oauth_state");
+    const verifier = cookieValue(startCookies, "hqb_cf_oauth_verifier");
     const tokenFetch = vi.fn<typeof fetch>(() =>
       Promise.resolve(Response.json({ access_token: "runtime-oauth-secret" }))
     );
@@ -58,8 +64,8 @@ describe("Pro runtime Cloudflare OAuth", () => {
         {
           headers: {
             cookie: cookieHeader({
-              hqb_pro_cf_oauth_state: state,
-              hqb_pro_cf_oauth_verifier: verifier
+              hqb_cf_oauth_state: state,
+              hqb_cf_oauth_verifier: verifier
             })
           }
         }
@@ -69,9 +75,9 @@ describe("Pro runtime Cloudflare OAuth", () => {
       tokenFetch
     );
     const grantCookie = finished.headers.get("set-cookie") ?? "";
-    const encryptedGrant = cookieValue(grantCookie, "hqb_pro_cf_oauth_grant");
+    const encryptedGrant = cookieValue(grantCookie, "hqb_cf_oauth_grant");
     const grantRequest = new Request("https://mail.example.com/api/updates/apply", {
-      headers: { cookie: cookieHeader({ hqb_pro_cf_oauth_grant: encryptedGrant }) }
+      headers: { cookie: cookieHeader({ hqb_cf_oauth_grant: encryptedGrant }) }
     });
 
     expect(finished.headers.get("location")).toBe(
@@ -83,7 +89,46 @@ describe("Pro runtime Cloudflare OAuth", () => {
     );
   });
 
-  it("requires a runtime OAuth grant and revokes it with the Pro client", async () => {
+  it("supports first-run setup without a private installer token", async () => {
+    const started = await startRuntimeCloudflareOAuth(
+      new Request("https://mail.example.com/setup"),
+      env,
+      setupFlow
+    );
+    const target = new URL(started.headers.get("location") ?? "");
+    const startCookies = started.headers.get("set-cookie") ?? "";
+    const state = cookieValue(startCookies, "hqb_cf_oauth_state");
+    const verifier = cookieValue(startCookies, "hqb_cf_oauth_verifier");
+    const finished = await finishRuntimeCloudflareOAuth(
+      new Request(
+        `https://mail.example.com/api/setup/cloudflare/oauth/callback?code=code-1&state=${state}`,
+        {
+          headers: {
+            cookie: cookieHeader({
+              hqb_cf_oauth_state: state,
+              hqb_cf_oauth_verifier: verifier
+            })
+          }
+        }
+      ),
+      env,
+      setupFlow,
+      vi.fn<typeof fetch>(() =>
+        Promise.resolve(Response.json({ access_token: "setup-oauth-secret" }))
+      )
+    );
+
+    expect(target.searchParams.get("operation")).toBe("setup");
+    expect(target.searchParams.get("callback")).toBe(
+      "https://mail.example.com/api/setup/cloudflare/oauth/callback"
+    );
+    expect(finished.headers.get("location")).toBe(
+      "https://mail.example.com/setup?cloudflare=connected"
+    );
+    expect(finished.headers.get("set-cookie")).not.toContain("setup-oauth-secret");
+  });
+
+  it("requires a runtime OAuth grant and revokes it with the HQBase client", async () => {
     await expect(
       resolveRuntimeCloudflareGrant(new Request("https://mail.example.com/api/updates/apply"), env)
     ).rejects.toThrow("Authorize Cloudflare again");
@@ -91,7 +136,7 @@ describe("Pro runtime Cloudflare OAuth", () => {
     const revokeFetch = vi.fn<typeof fetch>(() => Promise.resolve(new Response(null)));
     await revokeRuntimeCloudflareGrant("runtime-oauth-secret", env, revokeFetch);
     expect(String(revokeFetch.mock.calls[0]?.[1]?.body)).toBe(
-      "client_id=pro-client&token=runtime-oauth-secret"
+      "client_id=hqbase-client&token=runtime-oauth-secret"
     );
   });
 });

@@ -1,4 +1,4 @@
-name: Signed Pro release
+name: Signed HQBase release
 
 on:
   workflow_dispatch:
@@ -7,27 +7,23 @@ on:
         description: Semantic release version
         required: true
       min_version:
-        description: Oldest Pro version supported by this release
+        description: Oldest HQBase version supported by this release
         required: false
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
-  group: hqbase-pro-release
+  group: hqbase-release
   cancel-in-progress: false
 
 jobs:
   publish:
     runs-on: ubuntu-latest
     environment: release
-    timeout-minutes: 20
+    timeout-minutes: 25
     env:
       BETTER_AUTH_SECRET: ci-auth-secret-not-used-in-production
-      PRO_APP_PASSWORD_PEPPER: ci-app-password-pepper-not-used-in-production
-      PRO_BRIDGE_TOKEN: ci-bridge-token-not-used-in-production
-      PRO_ENTITLEMENT_SECRET: ci-entitlement-secret-not-used-in-production
-      PRO_SESSION_SECRET: ci-session-secret-not-used-in-production
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -40,33 +36,20 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm check
       - run: pnpm deploy:dry-run
-      - name: Verify release credentials
+      - name: Verify release input and signing key
         env:
           HQBASE_RELEASE_PRIVATE_KEY: ${{ secrets.HQBASE_RELEASE_PRIVATE_KEY }}
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        run: test -n "$HQBASE_RELEASE_PRIVATE_KEY" && test -n "$CLOUDFLARE_API_TOKEN" && test -n "$CLOUDFLARE_ACCOUNT_ID"
-      - name: Verify checked-in release version
-        env:
           HQBASE_RELEASE_VERSION: ${{ inputs.version }}
         run: |
+          test -n "$HQBASE_RELEASE_PRIVATE_KEY"
           release_version="${HQBASE_RELEASE_VERSION#v}"
-          package_version=$(node -p "require('./package.json').version")
-          test "$release_version" = "$package_version"
-      - name: Verify public release notes
-        env:
-          HQBASE_RELEASE_VERSION: ${{ inputs.version }}
-        run: |
-          release_version="${HQBASE_RELEASE_VERSION#v}"
-          curl --fail --silent --show-error \
-            https://raw.githubusercontent.com/HQBase/hqbase-pro-deploy/main/RELEASE_NOTES.md \
-            --output /tmp/hqbase-pro-release-notes.md
-          RELEASE_VERSION="$release_version" node --input-type=module -e '
-            import { readFileSync } from "node:fs";
-            const notes = readFileSync("/tmp/hqbase-pro-release-notes.md", "utf8");
-            if (!notes.includes(`## ${process.env.RELEASE_VERSION}\n`)) process.exit(1);
-          '
-      - name: Package and sign
+          test "$release_version" = "$(node -p "require('./package.json').version")"
+          test "$GITHUB_REF_NAME" = "main"
+          if gh release view "v${release_version}" >/dev/null 2>&1; then
+            echo "Release v${release_version} already exists and is immutable." >&2
+            exit 1
+          fi
+      - name: Package and sign public release
         env:
           HQBASE_RELEASE_PRIVATE_KEY: ${{ secrets.HQBASE_RELEASE_PRIVATE_KEY }}
           HQBASE_RELEASE_VERSION: ${{ inputs.version }}
@@ -74,77 +57,47 @@ jobs:
         run: |
           export HQBASE_RELEASE_VERSION="${HQBASE_RELEASE_VERSION#v}"
           pnpm release:package
-      - name: Refuse to overwrite an immutable artifact
-        id: immutable-artifact
+      - name: Extract release notes
         env:
           HQBASE_RELEASE_VERSION: ${{ inputs.version }}
-        run: |
-          release_version="${HQBASE_RELEASE_VERSION#v}"
-          status=$(curl --silent --show-error \
-            --output /tmp/existing-pro-release.json \
-            --write-out '%{http_code}' \
-            "https://billing.hqbase.io/v1/releases/pro/${release_version}/artifact-metadata")
-          case "$status" in
-            200)
-              curl --fail --silent --show-error \
-                https://billing.hqbase.io/v1/releases/pro/stable \
-                --output /tmp/existing-pro-stable.json
-              node --input-type=module -e '
-                import { createPublicKey, verify } from "node:crypto";
-                import { readFileSync } from "node:fs";
-                const version = process.env.HQBASE_RELEASE_VERSION.replace(/^v/, "");
-                const metadata = JSON.parse(readFileSync("/tmp/existing-pro-release.json", "utf8"));
-                const envelope = JSON.parse(readFileSync("/tmp/existing-pro-stable.json", "utf8"));
-                const key = createPublicKey({ key: Buffer.from("MCowBQYDK2VwAyEAsVwKniCvpHDwbbnjTPP0SuIIG97cRL+iFBQvay9OrU4=", "base64"), format: "der", type: "spki" });
-                if (!verify(null, Buffer.from(envelope.payload, "base64url"), key, Buffer.from(envelope.signature, "base64url"))) process.exit(1);
-                const payload = JSON.parse(Buffer.from(envelope.payload, "base64url").toString("utf8"));
-                if (payload.edition !== "pro" || payload.version !== version) process.exit(1);
-                for (const [field, manifestField] of [["artifact", "artifact"], ["deploymentArtifact", "deploymentArtifact"]]) {
-                  if (metadata[field]?.sha256 !== payload[manifestField]?.sha256 || metadata[field]?.size !== payload[manifestField]?.size) process.exit(1);
-                }
-              '
-              echo "exists=true" >> "$GITHUB_OUTPUT"
-              ;;
-            404)
-              echo "exists=false" >> "$GITHUB_OUTPUT"
-              ;;
-            *)
-              echo "Pro artifact metadata lookup returned HTTP ${status}" >&2
-              exit 1
-              ;;
-          esac
-      - name: Publish private artifact and public signed manifest
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          HQBASE_RELEASE_VERSION: ${{ inputs.version }}
-          HQBASE_ARTIFACT_EXISTS: ${{ steps.immutable-artifact.outputs.exists }}
         run: |
           export HQBASE_RELEASE_VERSION="${HQBASE_RELEASE_VERSION#v}"
-          if [ "$HQBASE_ARTIFACT_EXISTS" != "true" ]; then
-            pnpm exec wrangler r2 object put "hqbase-releases/artifacts/pro/${HQBASE_RELEASE_VERSION}.tar.gz" --file "release/pro-${HQBASE_RELEASE_VERSION}.tar.gz" --remote
-            pnpm exec wrangler r2 object put "hqbase-releases/artifacts/pro/${HQBASE_RELEASE_VERSION}.worker.json" --file "release/pro-${HQBASE_RELEASE_VERSION}.worker.json" --remote
-            pnpm exec wrangler r2 object put "hqbase-releases/manifests/pro/stable.json" --file release/stable.json --remote
-          fi
-      - name: Verify published artifact and signed manifest
+          node --input-type=module -e '
+            import { readFileSync, writeFileSync } from "node:fs";
+            const version = process.env.HQBASE_RELEASE_VERSION;
+            const changelog = readFileSync("CHANGELOG.md", "utf8");
+            const start = changelog.indexOf(`## ${version}\n`);
+            if (start < 0) throw new Error(`Missing changelog entry for ${version}`);
+            const bodyStart = start + `## ${version}\n`.length;
+            const next = changelog.indexOf("\n## ", bodyStart);
+            const body = changelog.slice(bodyStart, next < 0 ? undefined : next).trim();
+            writeFileSync("release/notes.md", `${body}\n`);
+          '
+      - name: Publish immutable GitHub Release assets
         env:
+          GH_TOKEN: ${{ github.token }}
           HQBASE_RELEASE_VERSION: ${{ inputs.version }}
-          HQBASE_ARTIFACT_EXISTS: ${{ steps.immutable-artifact.outputs.exists }}
         run: |
           release_version="${HQBASE_RELEASE_VERSION#v}"
+          gh release create "v${release_version}" \
+            --target "$GITHUB_SHA" \
+            --title "HQBase ${release_version}" \
+            --notes-file release/notes.md \
+            --latest \
+            "release/hqbase-${release_version}.tar.gz" \
+            "release/hqbase-${release_version}.sha256" \
+            "release/manifest-${release_version}.json" \
+            "release/stable.json"
+      - name: Verify public stable asset, signature, and digest
+        env:
+          HQBASE_RELEASE_VERSION: ${{ inputs.version }}
+        run: |
+          release_version="${HQBASE_RELEASE_VERSION#v}"
+          stable_url="https://github.com/HQBase/hqbase/releases/latest/download/stable.json"
+          artifact_url="https://github.com/HQBase/hqbase/releases/download/v${release_version}/hqbase-${release_version}.tar.gz"
           for attempt in $(seq 1 30); do
-            if curl --fail --silent --show-error \
-              "https://billing.hqbase.io/v1/releases/pro/${release_version}/artifact-metadata" \
-              --output /tmp/published-pro-release.json; then
-              break
-            fi
-            test "$attempt" -lt 30
-            sleep 2
-          done
-          for attempt in $(seq 1 30); do
-            if curl --fail --silent --show-error \
-              https://billing.hqbase.io/v1/releases/pro/stable \
-              --output /tmp/live-pro-stable.json; then
+            if curl --fail --location --silent --show-error "$stable_url" --output /tmp/stable.json &&
+               curl --fail --location --silent --show-error "$artifact_url" --output /tmp/hqbase.tar.gz; then
               break
             fi
             test "$attempt" -lt 30
@@ -154,24 +107,23 @@ jobs:
             import { createHash, createPublicKey, verify } from "node:crypto";
             import { readFileSync, statSync } from "node:fs";
             const version = process.env.HQBASE_RELEASE_VERSION.replace(/^v/, "");
-            const metadata = JSON.parse(readFileSync("/tmp/published-pro-release.json", "utf8"));
-            const envelope = JSON.parse(readFileSync("/tmp/live-pro-stable.json", "utf8"));
-            const key = createPublicKey({ key: Buffer.from("MCowBQYDK2VwAyEAsVwKniCvpHDwbbnjTPP0SuIIG97cRL+iFBQvay9OrU4=", "base64"), format: "der", type: "spki" });
-            if (!verify(null, Buffer.from(envelope.payload, "base64url"), key, Buffer.from(envelope.signature, "base64url"))) process.exit(1);
-            const payload = JSON.parse(Buffer.from(envelope.payload, "base64url").toString("utf8"));
-            if (payload.edition !== "pro" || payload.version !== version) process.exit(1);
-            for (const [field, manifestField, file] of [
-              ["artifact", "artifact", `release/pro-${version}.tar.gz`],
-              ["deploymentArtifact", "deploymentArtifact", `release/pro-${version}.worker.json`]
-            ]) {
-              if (metadata[field]?.sha256 !== payload[manifestField]?.sha256 || metadata[field]?.size !== payload[manifestField]?.size) process.exit(1);
-              if (process.env.HQBASE_ARTIFACT_EXISTS !== "true") {
-                const sha256 = createHash("sha256").update(readFileSync(file)).digest("hex");
-                if (sha256 !== metadata[field]?.sha256 || statSync(file).size !== metadata[field]?.size) process.exit(1);
-              }
+            const config = JSON.parse(readFileSync("config/product.json", "utf8"));
+            const envelope = JSON.parse(readFileSync("/tmp/stable.json", "utf8"));
+            const key = createPublicKey({
+              key: Buffer.from(config.releasePublicKey, "base64"),
+              format: "der",
+              type: "spki"
+            });
+            if (!verify(null, Buffer.from(envelope.payload, "base64url"), key, Buffer.from(envelope.signature, "base64url"))) {
+              throw new Error("Published stable manifest signature is invalid.");
             }
-            if (process.env.HQBASE_ARTIFACT_EXISTS !== "true") {
-              const expected = JSON.parse(readFileSync("release/stable.json", "utf8"));
-              if (expected.payload !== envelope.payload || expected.signature !== envelope.signature) process.exit(1);
+            const manifest = JSON.parse(Buffer.from(envelope.payload, "base64url").toString("utf8"));
+            if (manifest.product !== "hqbase" || manifest.version !== version) {
+              throw new Error("Published stable manifest identity is invalid.");
+            }
+            const bytes = readFileSync("/tmp/hqbase.tar.gz");
+            if (createHash("sha256").update(bytes).digest("hex") !== manifest.artifact.sha256 ||
+                statSync("/tmp/hqbase.tar.gz").size !== manifest.artifact.size) {
+              throw new Error("Published artifact does not match the signed manifest.");
             }
           '

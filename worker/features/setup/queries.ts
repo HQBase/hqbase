@@ -25,16 +25,15 @@ export async function getSetupStatus(db: D1Database): Promise<SetupStatus> {
     db
       .prepare(
         `SELECT hostname, kind FROM workspace_hosts
-         WHERE (kind = 'portal' AND is_canonical = 1) OR kind = 'service'`
+         WHERE kind = 'portal' AND is_canonical = 1`
       )
-      .all<{ hostname: string; kind: "portal" | "service" }>()
+      .all<{ hostname: string; kind: "portal" }>()
   ]);
 
   return {
     isComplete: isComplete ?? false,
     primaryDomain,
     portalHostname: hosts.results.find((host) => host.kind === "portal")?.hostname ?? null,
-    serviceHostname: hosts.results.find((host) => host.kind === "service")?.hostname ?? null,
     domains,
     userCount,
     mailboxCount,
@@ -47,19 +46,13 @@ export async function upsertWorkspaceHost(
   input: {
     hostname: string;
     zoneId?: string | null;
-    kind: "portal" | "service";
+    kind: "portal";
     canonical?: boolean;
   }
 ): Promise<void> {
   const timestamp = new Date().toISOString();
   if (input.kind === "portal" && input.canonical !== false) {
     await db.prepare("UPDATE workspace_hosts SET is_canonical = 0 WHERE kind = 'portal'").run();
-  }
-  if (input.kind === "service") {
-    await db
-      .prepare("DELETE FROM workspace_hosts WHERE kind = 'service' AND hostname <> ?")
-      .bind(input.hostname)
-      .run();
   }
   await db
     .prepare(

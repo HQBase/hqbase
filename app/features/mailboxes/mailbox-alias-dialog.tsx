@@ -37,15 +37,16 @@ export function MailboxAliasDialog({
     >
       <DialogContent className="w-[min(92vw,480px)]">
         <DialogHeader>
-          <DialogTitle>Add alias</DialogTitle>
+          <DialogTitle>Add email address</DialogTitle>
           <DialogDescription>
-            Add another sending and receiving address to {mailbox?.address}.
+            Mail sent to this address will arrive in {mailbox?.address}. It can also be used when
+            sending.
           </DialogDescription>
         </DialogHeader>
         <form className="flex flex-col gap-5" onSubmit={onSubmit}>
           <FieldGroup>
             <Field>
-              <FieldLabel htmlFor="new-mailbox-alias">Alias address</FieldLabel>
+              <FieldLabel htmlFor="new-mailbox-alias">Additional email address</FieldLabel>
               <Input
                 id="new-mailbox-alias"
                 placeholder="hello@example.com"
@@ -63,7 +64,7 @@ export function MailboxAliasDialog({
               </Button>
             </DialogClose>
             <Button disabled={pending} type="submit">
-              {pending ? "Adding alias…" : "Add alias"}
+              {pending ? "Adding address…" : "Add email address"}
             </Button>
           </DialogFooter>
         </form>

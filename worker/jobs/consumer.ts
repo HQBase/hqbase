@@ -1,34 +1,24 @@
 import { nowIso } from "../db/client";
 import type { WorkerEnv } from "../lib/env";
 import { operationalLog } from "../observability/log";
-import { isProJob, type ProJob } from "./types";
+import { isJob, type Job } from "./types";
 
 const batchSize = 100;
 
 async function deleteExpiredRows(env: WorkerEnv): Promise<Record<string, number>> {
   const nowSeconds = Math.floor(Date.now() / 1000);
-  const cutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
   const results = await env.DB.batch([
-    env.DB.prepare("DELETE FROM pro_rate_limits WHERE expires_at < ?").bind(nowSeconds),
-    env.DB.prepare("DELETE FROM pro_mail_sessions WHERE expires_at < ? OR revoked_at < ?").bind(
-      nowIso(),
-      cutoff
-    ),
-    env.DB.prepare("DELETE FROM pro_bridge_mutations WHERE created_at < ?").bind(cutoff),
-    env.DB.prepare("DELETE FROM pro_bridge_submissions WHERE created_at < ?").bind(cutoff)
+    env.DB.prepare("DELETE FROM rate_limits WHERE expires_at < ?").bind(nowSeconds)
   ]);
   return {
-    rateLimits: results[0]?.meta.changes ?? 0,
-    sessions: results[1]?.meta.changes ?? 0,
-    mutations: results[2]?.meta.changes ?? 0,
-    submissions: results[3]?.meta.changes ?? 0
+    rateLimits: results[0]?.meta.changes ?? 0
   };
 }
 
 async function applyRetention(env: WorkerEnv): Promise<number> {
   const expired = await env.DB.prepare(
     `SELECT m.id, m.raw_r2_key FROM messages m
-     JOIN pro_retention_policies p ON p.mailbox_id = m.mailbox_id
+     JOIN retention_policies p ON p.mailbox_id = m.mailbox_id
      WHERE (m.folder = 'trash'
        AND COALESCE(m.trashed_at, m.updated_at) < datetime('now', '-' || p.trash_days || ' days'))
        OR (p.message_days IS NOT NULL
@@ -66,10 +56,8 @@ async function integrityCounters(env: WorkerEnv): Promise<Record<string, number>
   const database = await env.DB.prepare(
     `SELECT
        (SELECT COUNT(*) FROM messages WHERE raw_r2_key IS NOT NULL) AS raw_refs,
-       (SELECT COUNT(*) FROM message_attachments) AS attachment_refs,
-       (SELECT COUNT(*) FROM pro_imap_messages im LEFT JOIN messages m ON m.id = im.message_id
-        WHERE m.id IS NULL) AS broken_imap_refs`
-  ).first<{ raw_refs: number; attachment_refs: number; broken_imap_refs: number }>();
+       (SELECT COUNT(*) FROM message_attachments) AS attachment_refs`
+  ).first<{ raw_refs: number; attachment_refs: number }>();
   let listed = 0;
   let orphaned = 0;
   let cursor: string | undefined;
@@ -90,16 +78,15 @@ async function integrityCounters(env: WorkerEnv): Promise<Record<string, number>
   return {
     rawReferences: database?.raw_refs ?? 0,
     attachmentReferences: database?.attachment_refs ?? 0,
-    brokenImapReferences: database?.broken_imap_refs ?? 0,
     r2ObjectsScanned: listed,
     orphanedR2Objects: orphaned
   };
 }
 
-export async function processJob(env: WorkerEnv, job: ProJob): Promise<void> {
+export async function processJob(env: WorkerEnv, job: Job): Promise<void> {
   const startedAt = nowIso();
   const inserted = await env.DB.prepare(
-    `INSERT OR IGNORE INTO pro_operation_runs
+    `INSERT OR IGNORE INTO operation_runs
      (id, kind, status, counters_json, started_at) VALUES (?, ?, 'running', '{}', ?)`
   )
     .bind(job.id, job.kind, startedAt)
@@ -111,7 +98,7 @@ export async function processJob(env: WorkerEnv, job: ProJob): Promise<void> {
         ? { ...(await deleteExpiredRows(env)), retainedMessages: await applyRetention(env) }
         : await integrityCounters(env);
     await env.DB.prepare(
-      `UPDATE pro_operation_runs SET status = 'succeeded', counters_json = ?, finished_at = ?
+      `UPDATE operation_runs SET status = 'succeeded', counters_json = ?, finished_at = ?
        WHERE id = ?`
     )
       .bind(JSON.stringify(counters), nowIso(), job.id)
@@ -119,7 +106,7 @@ export async function processJob(env: WorkerEnv, job: ProJob): Promise<void> {
     operationalLog("info", "job_succeeded", { jobId: job.id, kind: job.kind });
   } catch (error) {
     await env.DB.prepare(
-      `UPDATE pro_operation_runs SET status = 'failed', error_code = ?, finished_at = ? WHERE id = ?`
+      `UPDATE operation_runs SET status = 'failed', error_code = ?, finished_at = ? WHERE id = ?`
     )
       .bind("JOB_FAILED", nowIso(), job.id)
       .run();
@@ -128,9 +115,9 @@ export async function processJob(env: WorkerEnv, job: ProJob): Promise<void> {
   }
 }
 
-export async function consumeJobs(batch: MessageBatch<ProJob>, env: WorkerEnv): Promise<void> {
+export async function consumeJobs(batch: MessageBatch<Job>, env: WorkerEnv): Promise<void> {
   for (const message of batch.messages) {
-    if (!isProJob(message.body)) {
+    if (!isJob(message.body)) {
       operationalLog("warn", "job_rejected", { messageId: message.id });
       message.ack();
       continue;

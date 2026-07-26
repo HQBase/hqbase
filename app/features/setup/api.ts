@@ -34,7 +34,6 @@ export async function inspectCloudflareDomain(input: {
 
 export async function configureCloudflareDomain(input: {
   appHostname?: string;
-  serviceHostname?: string;
   attachCustomDomain: boolean;
   enableSending: boolean;
   workerName: string;

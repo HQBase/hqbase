@@ -1,0 +1,91 @@
+import { Cable, Menu } from "lucide-react";
+import * as React from "react";
+
+import { Button } from "@/components/ui/button";
+import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import type { CurrentUser } from "@/features/auth/types";
+import { McpConnectionDialog } from "@/features/mcp/connection-dialog";
+import type { FolderId } from "@/lib/routes";
+import { folders } from "@/lib/routes";
+import { Sidebar } from "./sidebar";
+
+type MobileNavigationProps = {
+  activeFolder: FolderId;
+  user: CurrentUser;
+  onFolderChange: (folder: FolderId) => void;
+};
+
+export function MobileNavigation({
+  activeFolder,
+  user,
+  onFolderChange
+}: MobileNavigationProps): React.ReactElement {
+  const [open, setOpen] = React.useState(false);
+  const [mcpOpen, setMcpOpen] = React.useState(false);
+  const menuTriggerRef = React.useRef<HTMLButtonElement>(null);
+  const drawerRef = React.useRef<HTMLDivElement>(null);
+  const activeLabel = folders.find((folder) => folder.id === activeFolder)?.label ?? "Navigation";
+
+  function handleFolderChange(folder: FolderId): void {
+    onFolderChange(folder);
+    setOpen(false);
+  }
+
+  return (
+    <div className="flex h-14 items-center gap-2 border-b px-2 md:hidden">
+      <Sheet open={open} onOpenChange={setOpen}>
+        <SheetTrigger asChild>
+          <Button
+            aria-label="Open navigation"
+            className="size-11 text-muted-foreground"
+            ref={menuTriggerRef}
+            size="icon"
+            title="Open navigation"
+            type="button"
+            variant="ghost"
+          >
+            <Menu className="size-5" />
+          </Button>
+        </SheetTrigger>
+        <SheetContent
+          aria-describedby={undefined}
+          className="w-[min(86vw,18rem)] p-0"
+          ref={drawerRef}
+          side="left"
+          onOpenAutoFocus={(event) => {
+            event.preventDefault();
+            drawerRef.current?.querySelector<HTMLElement>("[data-navigation-item]")?.focus();
+          }}
+        >
+          <SheetTitle className="sr-only">Navigation</SheetTitle>
+          <Sidebar
+            activeFolder={activeFolder}
+            drawerAction={
+              <Button
+                className="h-11 w-full justify-start gap-2.5 px-2.5 text-sm font-normal text-muted-foreground"
+                onClick={() => {
+                  setOpen(false);
+                  setMcpOpen(true);
+                }}
+                type="button"
+                variant="ghost"
+              >
+                <Cable />
+                Connect MCP
+              </Button>
+            }
+            onFolderChange={handleFolderChange}
+            variant="drawer"
+          />
+        </SheetContent>
+      </Sheet>
+      <span className="truncate text-sm font-medium">{activeLabel}</span>
+      <McpConnectionDialog
+        open={mcpOpen}
+        restoreFocusRef={menuTriggerRef}
+        user={user}
+        onOpenChange={setMcpOpen}
+      />
+    </div>
+  );
+}

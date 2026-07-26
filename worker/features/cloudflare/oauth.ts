@@ -2,11 +2,11 @@ import { z } from "zod";
 
 import type { WorkerEnv } from "../../lib/env";
 import { AppError } from "../../lib/errors";
-import { hqbaseProProductConfig } from "../../lib/product-config";
+import { hqbaseProductConfig } from "../../lib/product-config";
 
-const VERIFIER_COOKIE = "hqb_pro_cf_oauth_verifier";
-const STATE_COOKIE = "hqb_pro_cf_oauth_state";
-const GRANT_COOKIE = "hqb_pro_cf_oauth_grant";
+const VERIFIER_COOKIE = "hqb_cf_oauth_verifier";
+const STATE_COOKIE = "hqb_cf_oauth_state";
+const GRANT_COOKIE = "hqb_cf_oauth_grant";
 const OAUTH_COOKIE_TTL_SECONDS = 10 * 60;
 const GRANT_COOKIE_TTL_SECONDS = 15 * 60;
 const TOKEN_ENDPOINT = "https://dash.cloudflare.com/oauth2/token";
@@ -18,11 +18,17 @@ type OAuthConfigEnv = Pick<
 >;
 type OAuthCookieEnv = Pick<WorkerEnv, "BETTER_AUTH_SECRET">;
 
-export type RuntimeCloudflareOAuthFlow = {
-  callbackPath: string;
-  operation: "domains" | "updates";
-  settingsTab: "domains" | "updates";
-};
+export type RuntimeCloudflareOAuthFlow =
+  | {
+      callbackPath: string;
+      operation: "domains" | "updates";
+      settingsTab: "domains" | "updates";
+    }
+  | {
+      callbackPath: string;
+      operation: "setup";
+      returnPath: "/setup";
+    };
 
 const tokenResponseSchema = z.object({ access_token: z.string().min(1) });
 
@@ -121,7 +127,7 @@ export async function revokeRuntimeCloudflareGrant(
   fetcher: typeof fetch = fetch
 ): Promise<void> {
   const clientId =
-    env.CLOUDFLARE_OAUTH_CLIENT_ID?.trim() || hqbaseProProductConfig.cloudflareOAuthClientId;
+    env.CLOUDFLARE_OAUTH_CLIENT_ID?.trim() || hqbaseProductConfig.cloudflareOAuthClientId;
   const response = await fetcher(REVOKE_ENDPOINT, {
     body: new URLSearchParams({ client_id: clientId, token: accessToken }),
     headers: { "content-type": "application/x-www-form-urlencoded" },
@@ -156,13 +162,10 @@ function oauthConfig(env: OAuthConfigEnv): {
   relayUrl: string;
 } {
   return {
-    clientId:
-      env.CLOUDFLARE_OAUTH_CLIENT_ID?.trim() || hqbaseProProductConfig.cloudflareOAuthClientId,
+    clientId: env.CLOUDFLARE_OAUTH_CLIENT_ID?.trim() || hqbaseProductConfig.cloudflareOAuthClientId,
     redirectUri:
-      env.CLOUDFLARE_OAUTH_REDIRECT_URI?.trim() ||
-      hqbaseProProductConfig.cloudflareOAuthRedirectUri,
-    relayUrl:
-      env.CLOUDFLARE_OAUTH_RELAY_URL?.trim() || hqbaseProProductConfig.cloudflareOAuthRelayUrl
+      env.CLOUDFLARE_OAUTH_REDIRECT_URI?.trim() || hqbaseProductConfig.cloudflareOAuthRedirectUri,
+    relayUrl: env.CLOUDFLARE_OAUTH_RELAY_URL?.trim() || hqbaseProductConfig.cloudflareOAuthRelayUrl
   };
 }
 
@@ -179,9 +182,12 @@ function oauthResultHeaders(
   result: string,
   flow: RuntimeCloudflareOAuthFlow
 ): Headers {
-  const target = new URL(`/settings/${flow.settingsTab}`, request.url);
+  const target = new URL(
+    "returnPath" in flow ? flow.returnPath : `/settings/${flow.settingsTab}`,
+    request.url
+  );
   target.searchParams.set("cloudflare", result);
-  target.searchParams.set("settings", flow.settingsTab);
+  if ("settingsTab" in flow) target.searchParams.set("settings", flow.settingsTab);
   const headers = new Headers({ "cache-control": "no-store", location: target.toString() });
   headers.append("set-cookie", secureCookie(VERIFIER_COOKIE, "", 0));
   headers.append("set-cookie", secureCookie(STATE_COOKIE, "", 0));
@@ -212,7 +218,7 @@ async function decryptGrant(value: string, secret: string): Promise<string> {
 async function grantKey(secret: string, usages: KeyUsage[]): Promise<CryptoKey> {
   const material = await crypto.subtle.digest(
     "SHA-256",
-    new TextEncoder().encode(`hqbase-pro-runtime-cloudflare-oauth:${secret}`)
+    new TextEncoder().encode(`hqbase-runtime-cloudflare-oauth:${secret}`)
   );
   return crypto.subtle.importKey("raw", material, "AES-GCM", false, usages);
 }

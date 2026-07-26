@@ -2,7 +2,6 @@ export type SetupStatus = {
   isComplete: boolean;
   primaryDomain: string | null;
   portalHostname: string | null;
-  serviceHostname: string | null;
   domains: Array<{ id: string; name: string; isEnabled: boolean }>;
   userCount: number;
   mailboxCount: number;

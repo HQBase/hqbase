@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { destroyPlan, destroyTargets } from "../../../scripts/hqbase-pro/destroy.mjs";
+import { destroyPlan, destroyTargets } from "../../../scripts/hqbase/destroy.mjs";
 
 const scopes = ["worker", "data", "storage", "state", "domain", "all"];
 
@@ -8,7 +8,7 @@ function manifest({ reused = false } = {}) {
   return {
     version: 1,
     name: "qa",
-    worker: { name: "hqbase-pro-qa" },
+    worker: { name: "hqbase-qa" },
     d1: { name: "hqbase-data", reused },
     r2: { bucket: "hqbase-mail", reused },
     queue: { name: "hqbase-jobs", deadLetterName: "hqbase-jobs-dlq" },
@@ -41,7 +41,7 @@ describe("operator destroy scopes", () => {
     expect(() => destroyTargets("ephemeral")).toThrowError(/Unknown destroy scope/);
   });
 
-  it.each(scopes)("honors the %s scope for fresh Pro resources", (scope) => {
+  it.each(scopes)("honors the %s scope for fresh resources", (scope) => {
     const targets = destroyTargets(scope);
 
     expect(destroyPlan(scope, manifest())).toEqual({
@@ -50,7 +50,7 @@ describe("operator destroy scopes", () => {
     });
   });
 
-  it.each(scopes)("preserves Community D1 and R2 for the %s scope", (scope) => {
+  it.each(scopes)("preserves externally owned D1 and R2 for the %s scope", (scope) => {
     const targets = destroyTargets(scope);
 
     expect(destroyPlan(scope, manifest({ reused: true }))).toEqual({
@@ -68,8 +68,8 @@ describe("operator destroy scopes", () => {
     expect(() =>
       destroyPlan("all", {
         version: 1,
-        d1: { name: "community-data" },
-        r2: { bucket: "community-mail", reused: true }
+        d1: { name: "external-data" },
+        r2: { bucket: "external-mail", reused: true }
       })
     ).toThrowError(/"d1\.reused".*Migrate or repair/);
   });
@@ -84,7 +84,7 @@ describe("operator destroy scopes", () => {
     expect(() =>
       destroyPlan("all", {
         ...manifest(),
-        r2: { bucket: "community-mail", reused: "true" }
+        r2: { bucket: "external-mail", reused: "true" }
       })
     ).toThrowError(/"r2\.reused".*explicit boolean/);
   });

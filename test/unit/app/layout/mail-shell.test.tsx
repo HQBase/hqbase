@@ -1,7 +1,10 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
+import { MobileNavigation } from "@/components/layout/mobile-navigation";
 import { Sidebar } from "@/components/layout/sidebar";
 import { TopBar } from "@/components/layout/top-bar";
+import { ComposeWindow } from "@/features/compose/compose-window";
+import { McpConnectionDetails } from "@/features/mcp/connection-dialog";
 
 const user = {
   id: "user-1",
@@ -30,6 +33,9 @@ describe("mail shell", () => {
     expect(html).toContain("ml-auto flex shrink-0 items-center gap-2");
     expect(html).toContain("Search mail");
     expect(html).toContain("Compose");
+    expect(html).toContain("Connect MCP");
+    expect(html).toContain("Open profile menu");
+    expect(html.indexOf("Connect MCP")).toBeLessThan(html.indexOf("Open profile menu"));
     expect(html).toContain("OB");
   });
 
@@ -44,5 +50,69 @@ describe("mail shell", () => {
     expect(html).toContain('href="/settings/mailboxes"');
     expect(html).not.toContain(">HQ<");
     expect(html).not.toContain(">Mail</div>");
+  });
+
+  it("uses a labelled hamburger trigger instead of a mobile folder select", () => {
+    const html = renderToStaticMarkup(
+      <MobileNavigation activeFolder="catchall" user={user} onFolderChange={() => undefined} />
+    );
+
+    expect(html).toContain('aria-label="Open navigation"');
+    expect(html).toContain('title="Open navigation"');
+    expect(html).toContain("Catch-all");
+    expect(html).toContain("size-11");
+    expect(html).not.toContain('role="combobox"');
+  });
+
+  it("gives drawer destinations mobile-sized targets and marks the active page", () => {
+    const html = renderToStaticMarkup(
+      <Sidebar
+        activeFolder="inbox"
+        drawerAction={<button type="button">Connect MCP</button>}
+        onFolderChange={() => undefined}
+        variant="drawer"
+      />
+    );
+
+    expect(html).toContain("flex h-full w-full");
+    expect(html).toContain("h-11 text-sm");
+    expect(html).toContain('aria-current="page"');
+    expect(html).toContain("Connect MCP");
+  });
+
+  it("explains the existing MCP endpoint and inherited user permissions", () => {
+    const html = renderToStaticMarkup(
+      <McpConnectionDetails
+        endpoint="https://mail.example.com/mcp"
+        endpointId="mcp-endpoint"
+        user={user}
+      />
+    );
+
+    expect(html).toContain("https://mail.example.com/mcp");
+    expect(html).toContain("remote Streamable HTTP MCP");
+    expect(html).toContain("OAuth 2.1");
+    expect(html).toContain("registers dynamically with PKCE");
+    expect(html).toContain("current workspace role");
+    expect(html).toContain("live mailbox grants");
+    expect(html).not.toContain("Community");
+    expect(html).not.toContain("Pro");
+  });
+
+  it("renders Compose as a non-modal responsive work surface", () => {
+    const html = renderToStaticMarkup(
+      <ComposeWindow open status="Draft saved" title="New message" onOpenChange={() => undefined}>
+        <div>Draft fields</div>
+      </ComposeWindow>
+    );
+
+    expect(html).toContain('role="dialog"');
+    expect(html).toContain('aria-modal="false"');
+    expect(html).toContain("fixed inset-0");
+    expect(html).toContain("md:bottom-0");
+    expect(html).toContain('aria-label="Minimize compose"');
+    expect(html).toContain('aria-label="Expand compose"');
+    expect(html).toContain('aria-label="Close compose"');
+    expect(html).toContain("Draft fields");
   });
 });

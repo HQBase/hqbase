@@ -30,13 +30,13 @@ describe("setup UI", () => {
 
     expect(html).not.toContain("Installation access needs attention");
     expect(html).toContain("The delegated Cloudflare grant expired before setup finished.");
-    expect(html).toContain("Retry verification");
+    expect(html).toContain("Authorize Cloudflare");
     expect(html).not.toContain("relative w-full rounded-lg border");
   });
 
   it("uses an installation timeline until Cloudflare access is ready", () => {
     const html = renderToStaticMarkup(
-      <SetupFrame description="Complete installation." title="Set up HQBase Pro">
+      <SetupFrame description="Complete installation." title="Set up HQBase">
         <WizardLayout activePhase={2} activeStep={0} steps={[]}>
           <AccessStep error={null} isLoading onNext={() => undefined} />
         </WizardLayout>
@@ -44,8 +44,8 @@ describe("setup UI", () => {
     );
 
     expect(html).toContain('aria-label="Installation steps"');
-    expect(html).toContain("Purchase Pro and deploy resources");
-    expect(html).toContain("Licensed Worker and storage");
+    expect(html).toContain("Deploy HQBase resources");
+    expect(html).toContain("Worker and customer-owned storage");
     expect(html).toContain("Complete");
     expect(html).toContain("Authorize and install");
     expect(html).toContain("In progress");

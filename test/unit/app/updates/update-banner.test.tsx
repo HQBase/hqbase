@@ -4,7 +4,7 @@ import type { UpdateStatus } from "@/features/updates/types";
 import { UpdateBanner } from "@/features/updates/update-banner";
 
 describe("update banner", () => {
-  it("announces a newer Pro release outside Settings", () => {
+  it("announces a newer HQBase release outside Settings", () => {
     const status = {
       installedVersion: "0.1.0",
       available: true,

@@ -1,8 +1,6 @@
 import type * as React from "react";
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { BillingSettings } from "@/features/billing/billing-settings";
-import type { EntitlementStatus } from "@/features/billing/types";
 import { DomainSettings } from "@/features/domains/domain-settings";
 import { MailboxSettings } from "@/features/mailboxes/mailbox-settings";
 import type { Mailbox } from "@/features/mailboxes/types";
@@ -11,7 +9,6 @@ import { SettingsSection } from "@/features/settings/settings-section";
 import type { SetupStatus } from "@/features/setup/types";
 import type { UpdateStatus } from "@/features/updates/types";
 import { UpdateSettings } from "@/features/updates/update-settings";
-import type { UpgradeLifecycle } from "@/features/upgrades/types";
 import type { WorkspaceUser } from "@/features/users/types";
 import { UserSettings } from "@/features/users/user-settings";
 import { appRoutePath, isSettingsTabId, type SettingsTabId } from "@/lib/routes";
@@ -22,10 +19,6 @@ type SettingsPageProps = {
   mailboxes: Mailbox[];
   setup: SetupStatus;
   users: WorkspaceUser[];
-  entitlement: EntitlementStatus | null;
-  upgrade: UpgradeLifecycle | null;
-  onEntitlementChanged: (status: EntitlementStatus) => void;
-  onUpgradeChanged: (upgrade: UpgradeLifecycle) => void;
   onRefresh: () => void;
   onTabChange: (tab: SettingsTabId) => void;
   updateStatus: UpdateStatus | null;
@@ -37,10 +30,6 @@ export function SettingsPage({
   mailboxes,
   setup,
   users,
-  entitlement,
-  upgrade,
-  onEntitlementChanged,
-  onUpgradeChanged,
   onRefresh,
   onTabChange,
   updateStatus
@@ -62,7 +51,6 @@ export function SettingsPage({
             <SettingsTab value="mailboxes">Mailboxes</SettingsTab>
             <SettingsTab value="users">Users</SettingsTab>
             {canManage ? <SettingsTab value="domains">Domains</SettingsTab> : null}
-            {canManage && entitlement ? <SettingsTab value="billing">Billing</SettingsTab> : null}
             {canManage ? <SettingsTab value="updates">Updates</SettingsTab> : null}
             <SettingsTab value="debug">Debug</SettingsTab>
           </TabsList>
@@ -82,23 +70,13 @@ export function SettingsPage({
               <DomainSettings portalHostname={setup.portalHostname} onChanged={onRefresh} />
             </TabsContent>
           ) : null}
-          {canManage && entitlement ? (
-            <TabsContent className="mt-5" value="billing">
-              <BillingSettings status={entitlement} onChanged={onEntitlementChanged} />
-            </TabsContent>
-          ) : null}
           {canManage ? (
             <TabsContent className="mt-5" value="updates">
               <UpdateSettings initialStatus={updateStatus} />
             </TabsContent>
           ) : null}
           <TabsContent className="mt-5" value="debug">
-            <DebugSettings
-              entitlement={canManage ? entitlement : null}
-              setup={setup}
-              upgrade={canManage ? upgrade : null}
-              onUpgradeChanged={onUpgradeChanged}
-            />
+            <DebugSettings setup={setup} />
           </TabsContent>
         </Tabs>
       </div>

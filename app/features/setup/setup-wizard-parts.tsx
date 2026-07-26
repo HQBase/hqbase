@@ -55,10 +55,10 @@ function InstallationTimeline({
     <ol aria-label="Installation steps" className="mt-6 space-y-6">
       <InstallationTimelineStep
         activity={activePhase === 1 ? "In progress" : "Complete"}
-        description="Licensed Worker and storage"
+        description="Worker and customer-owned storage"
         isLast={false}
         status={activePhase === 1 ? "current" : "complete"}
-        title="Purchase Pro and deploy resources"
+        title="Deploy HQBase resources"
       >
         {activePhase === 1 ? children : null}
       </InstallationTimelineStep>

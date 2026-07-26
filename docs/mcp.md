@@ -1,36 +1,15 @@
 # MCP
 
-HQBase Pro includes a remote Model Context Protocol server at:
+HQBase exposes a remote Streamable HTTP MCP endpoint at `/mcp`.
 
-```text
-https://<your-workspace-host>/mcp
-```
+Clients discover OAuth metadata, register with supported redirect URIs, and use OAuth 2.1
+authorization code flow with PKCE. The connected HQBase user must sign in and consent. Passwords,
+Cloudflare grants, runtime secrets, and customer credentials never enter the MCP client.
 
-Use that URL in a client that supports remote Streamable HTTP MCP. The client automatically
-discovers the workspace's OAuth 2.1 authorization server, registers with PKCE, and opens HQBase for
-sign-in and consent. Your password, Pro secrets, Cloudflare installation grant, and Cloudflare
-credentials are never given to the MCP client.
+MCP scopes never broaden workspace permissions. Every request intersects the granted scopes with
+the user's current mailbox grants, role, ban state, and session validity.
 
-## Scopes and grants
-
-- `mail:read`: list, search, and open mail only where the user currently has `read`, `agent`, or
-  `manager` mailbox access.
-- `mail:write`: change message state only where the user currently has `agent` or `manager` access.
-- `mail:send`: send and reply only where the user currently has `agent` or `manager` access.
-- `offline_access`: let the client refresh its connection until access is revoked.
-
-OAuth scopes never broaden Pro permissions. Grant changes, role changes, bans, session expiry, and
-session revocation are checked against live workspace state.
-
-## Tools
-
-- `list_mailboxes`
-- `search_messages`
-- `get_message`
-- `update_message`
-- `send_email`
-- `reply_to_message`
-
-Search results are bounded. MCP does not return raw email, stored HTML, remote media, inline media,
-attachment bytes, audit history, billing, setup values, secrets, bridge operations, or Cloudflare
-credentials. Successful state changes, sends, and replies create content-free Pro audit events.
+Available tools cover listing accessible mailboxes, searching readable messages, reading message
+content, changing message state, creating drafts, sending, and replying. Responses exclude setup
+values, secrets, Cloudflare credentials, and attachment bytes. Content-free audit events record
+successful state changes and sends.

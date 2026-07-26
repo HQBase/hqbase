@@ -21,7 +21,7 @@ from the in-app setup wizard or from the repeatable operator.
 Public Deploy Button installs use `/setup` after the Worker is deployed:
 
 1. Approve the requested accounts, zones, and permissions in the Cloudflare OAuth screen during
-   Pro installation.
+   HQBase installation.
 2. Open `/setup`. HQBase verifies the delegated installation grant automatically.
 3. Select the primary domain and choose the editable workspace subdomain. The
    selected domain is the fixed suffix for the app address.
@@ -58,10 +58,10 @@ The repeatable operator can perform the same Cloudflare Email Routing/Sending
 steps for a named development deployment:
 
 ```sh
-pnpm hqbase-pro:install --name dev-01 --domain example.com
+pnpm hqbase:install --name dev-01 --domain example.com
 ```
 
-Use `pnpm hqbase-pro:reset --name dev-01 --scope domain` to disable the catch-all Worker route and disable Email Sending/Routing if this operator enabled them.
+Use `pnpm hqbase:reset --name dev-01 --scope domain` to disable the catch-all Worker route and disable Email Sending/Routing if this operator enabled them.
 
 ## Outbound Checklist
 

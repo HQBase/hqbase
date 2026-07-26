@@ -5,7 +5,6 @@ export type SetupStatus = {
   isComplete: boolean;
   primaryDomain: string | null;
   portalHostname: string | null;
-  serviceHostname: string | null;
   domains: MailDomain[];
   userCount: number;
   mailboxCount: number;
@@ -16,7 +15,7 @@ export type WorkspaceHost = {
   id: string;
   hostname: string;
   zoneId: string | null;
-  kind: "portal" | "service";
+  kind: "portal";
   isCanonical: boolean;
   status: "pending" | "ready" | "degraded" | "disabled";
   verifiedAt: string | null;

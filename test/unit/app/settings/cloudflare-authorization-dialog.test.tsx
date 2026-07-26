@@ -8,7 +8,7 @@ describe("Cloudflare authorization dialog", () => {
     const html = renderToStaticMarkup(
       <Dialog>
         <CloudflareAuthorizationDialogBody
-          authorizeHref="/api/pro/domains/cloudflare/oauth/start"
+          authorizeHref="/api/domains/cloudflare/oauth/start"
           description="To save this change, HQBase needs temporary access to your Cloudflare account."
         />
       </Dialog>
@@ -17,6 +17,6 @@ describe("Cloudflare authorization dialog", () => {
     expect(html).toContain("Authorize Cloudflare");
     expect(html).toContain("To save this change");
     expect(html).toContain("Cancel");
-    expect(html).toContain('href="/api/pro/domains/cloudflare/oauth/start"');
+    expect(html).toContain('href="/api/domains/cloudflare/oauth/start"');
   });
 });

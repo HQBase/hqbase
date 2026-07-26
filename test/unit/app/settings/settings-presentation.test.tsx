@@ -5,8 +5,10 @@ import { DomainTable } from "@/features/domains/domain-table";
 import type { MailDomain } from "@/features/domains/types";
 import { formatMailboxAccessSummary } from "@/features/mailbox-access/mailbox-access-policies";
 import { MailboxSettings } from "@/features/mailboxes/mailbox-settings";
+import { MailboxSelectionBar } from "@/features/mailboxes/mailbox-table";
 import type { Mailbox } from "@/features/mailboxes/types";
 import { SettingsPage } from "@/features/settings/settings-page";
+import { RoleGuidanceCopy } from "@/features/users/role-guidance";
 import type { WorkspaceUser } from "@/features/users/types";
 import { UserSettings } from "@/features/users/user-settings";
 
@@ -14,7 +16,6 @@ const setup = {
   isComplete: true,
   primaryDomain: "example.com",
   portalHostname: "mail.example.com",
-  serviceHostname: "bridge.example.com",
   domains: [{ id: "domain-1", name: "example.com", isEnabled: true }],
   userCount: 1,
   mailboxCount: 2,
@@ -82,10 +83,21 @@ describe("settings presentation", () => {
     expect(html).toContain("Add user");
     expect(html).toContain('class="relative w-full overflow-auto rounded-lg border"');
     expect(html).toContain("No users yet.");
+    expect(html).toContain('aria-label="About workspace roles"');
     expect(html).not.toContain("new-user-email");
   });
 
-  it("centers mailbox access policy in each mailbox row", () => {
+  it("explains workspace roles and mailbox grants", () => {
+    const html = renderToStaticMarkup(<RoleGuidanceCopy />);
+
+    expect(html).toContain("controls owner membership");
+    expect(html).toContain("Mailbox access requires an explicit grant");
+    expect(html).toContain("can access every mailbox");
+    expect(html).not.toContain("Community");
+    expect(html).not.toContain("Pro");
+  });
+
+  it("opens mailbox details from the compact access summary", () => {
     const html = renderToStaticMarkup(
       <MailboxSettings
         canManage
@@ -100,8 +112,8 @@ describe("settings presentation", () => {
     expect(html).toContain('aria-label="Select support@example.com"');
     expect(html).not.toContain('aria-label="Filter mailboxes by domain"');
     expect(html).toContain(">Access<");
-    expect(html).toContain("Manage access for support@example.com");
-    expect(html).toContain(">Manage access<");
+    expect(html).toContain("View access for support@example.com");
+    expect(html).not.toContain(">Manage access<");
     expect(html).not.toContain("Apply to domain");
     expect(html).not.toContain("Set access by domain");
     expect(
@@ -119,7 +131,7 @@ describe("settings presentation", () => {
         [member],
         false
       )
-    ).toBe("Owner + 1 user");
+    ).toBe("Owners · Manager, Avery Stone · Agent");
   });
 
   it("shows the domain filter only when there are multiple domains", () => {
@@ -135,6 +147,19 @@ describe("settings presentation", () => {
     expect(html).toContain('aria-label="Filter mailboxes by domain"');
   });
 
+  it("only shows one bulk action after mailbox selection", () => {
+    expect(
+      renderToStaticMarkup(<MailboxSelectionBar selectedCount={0} onManage={() => undefined} />)
+    ).toBe("");
+
+    const html = renderToStaticMarkup(
+      <MailboxSelectionBar selectedCount={2} onManage={() => undefined} />
+    );
+    expect(html).toContain("2 selected");
+    expect(html).toContain("Manage access for selected");
+    expect(html.match(/<button/g)).toHaveLength(1);
+  });
+
   it("keeps domain additions in a modal and never asks for a Cloudflare credential", () => {
     const html = renderToStaticMarkup(
       <DomainSettings portalHostname="mail.example.com" onChanged={() => undefined} />
@@ -147,7 +172,7 @@ describe("settings presentation", () => {
     expect(html).toContain("No domains connected.");
     expect(html).toContain(">Save<");
     expect(html).not.toContain("Authorize and change portal");
-    expect(html).not.toContain('href="/api/pro/domains/cloudflare/oauth/start"');
+    expect(html).not.toContain('href="/api/domains/cloudflare/oauth/start"');
     expect(html).not.toContain("Bridge origin");
   });
 
@@ -173,16 +198,12 @@ describe("settings presentation", () => {
       <SettingsPage
         activeTab="mailboxes"
         canManage
-        entitlement={null}
         mailboxes={[]}
         setup={setup}
         updateStatus={null}
-        upgrade={null}
         users={[]}
-        onEntitlementChanged={() => undefined}
         onRefresh={() => undefined}
         onTabChange={() => undefined}
-        onUpgradeChanged={() => undefined}
       />
     );
 

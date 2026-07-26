@@ -88,7 +88,7 @@ CREATE TABLE IF NOT EXISTS messages (
   thread_id TEXT NOT NULL REFERENCES threads(id) ON DELETE CASCADE,
   mailbox_id TEXT REFERENCES mailboxes(id) ON DELETE SET NULL,
   direction TEXT NOT NULL CHECK (direction IN ('inbound', 'outbound')),
-  folder TEXT NOT NULL CHECK (folder IN ('inbox', 'sent', 'archived', 'trash', 'catchall')),
+  folder TEXT NOT NULL CHECK (folder IN ('inbox', 'sent', 'drafts', 'archived', 'trash', 'catchall')),
   from_address TEXT NOT NULL,
   to_json TEXT NOT NULL,
   cc_json TEXT NOT NULL,

@@ -12,7 +12,7 @@ describe("PWA build contract", () => {
   it("ships an installable, standalone manifest", async () => {
     const manifest = JSON.parse(await readFile("public/manifest.webmanifest", "utf8"));
     expect(() => validateManifest(manifest)).not.toThrow();
-    expect(manifest.name).toBe("HQBase Pro");
+    expect(manifest.name).toBe("HQBase");
     expect(manifest.theme_color).toBe("#09090b");
   });
 

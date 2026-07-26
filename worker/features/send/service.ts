@@ -178,7 +178,7 @@ async function storeSentMessage(
     });
   }
   if (input.draftId && input.userId) {
-    await env.DB.prepare("DELETE FROM pro_drafts WHERE id = ? AND user_id = ?")
+    await env.DB.prepare("DELETE FROM drafts WHERE id = ? AND user_id = ?")
       .bind(input.draftId, input.userId)
       .run();
   }

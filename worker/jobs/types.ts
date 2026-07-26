@@ -1,12 +1,12 @@
-export type ProJob = {
+export type Job = {
   id: string;
   kind: "integrity-scan" | "maintenance";
   requestedAt: string;
 };
 
-export function isProJob(value: unknown): value is ProJob {
+export function isJob(value: unknown): value is Job {
   if (!value || typeof value !== "object") return false;
-  const candidate = value as Partial<ProJob>;
+  const candidate = value as Partial<Job>;
   return (
     typeof candidate.id === "string" &&
     typeof candidate.requestedAt === "string" &&

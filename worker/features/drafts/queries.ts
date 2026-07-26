@@ -43,7 +43,7 @@ const mapAttachment = (row: AttachmentRow): DraftAttachment => ({
 async function attachments(db: D1Database, draftId: string) {
   const rows = await db
     .prepare(
-      "SELECT id, filename, content_type, size_bytes, r2_key FROM pro_draft_attachments WHERE draft_id = ? ORDER BY created_at"
+      "SELECT id, filename, content_type, size_bytes, r2_key FROM draft_attachments WHERE draft_id = ? ORDER BY created_at"
     )
     .bind(draftId)
     .all<AttachmentRow>();
@@ -68,14 +68,14 @@ async function mapDraft(db: D1Database, row: DraftRow): Promise<Draft> {
 }
 export async function listDrafts(db: D1Database, userId: string): Promise<Draft[]> {
   const rows = await db
-    .prepare("SELECT * FROM pro_drafts WHERE user_id = ? ORDER BY updated_at DESC")
+    .prepare("SELECT * FROM drafts WHERE user_id = ? ORDER BY updated_at DESC")
     .bind(userId)
     .all<DraftRow>();
   return Promise.all(rows.results.map((row) => mapDraft(db, row)));
 }
 export async function getDraft(db: D1Database, userId: string, id: string): Promise<Draft | null> {
   const row = await db
-    .prepare("SELECT * FROM pro_drafts WHERE id = ? AND user_id = ?")
+    .prepare("SELECT * FROM drafts WHERE id = ? AND user_id = ?")
     .bind(id, userId)
     .first<DraftRow>();
   return row ? mapDraft(db, row) : null;
@@ -106,7 +106,7 @@ export async function saveDraft(
   const nextVersion = current ? current.version + 1 : 1;
   await db
     .prepare(
-      `INSERT INTO pro_drafts (id, user_id, mailbox_id, reply_to_message_id, from_address, to_json, cc_json, bcc_json, subject, text_body, html_body, version, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET mailbox_id=excluded.mailbox_id, reply_to_message_id=excluded.reply_to_message_id, from_address=excluded.from_address, to_json=excluded.to_json, cc_json=excluded.cc_json, bcc_json=excluded.bcc_json, subject=excluded.subject, text_body=excluded.text_body, html_body=excluded.html_body, version=excluded.version, updated_at=excluded.updated_at`
+      `INSERT INTO drafts (id, user_id, mailbox_id, reply_to_message_id, from_address, to_json, cc_json, bcc_json, subject, text_body, html_body, version, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET mailbox_id=excluded.mailbox_id, reply_to_message_id=excluded.reply_to_message_id, from_address=excluded.from_address, to_json=excluded.to_json, cc_json=excluded.cc_json, bcc_json=excluded.bcc_json, subject=excluded.subject, text_body=excluded.text_body, html_body=excluded.html_body, version=excluded.version, updated_at=excluded.updated_at`
     )
     .bind(
       id,
@@ -137,12 +137,12 @@ export async function deleteDraft(
 ): Promise<boolean> {
   const rows = await db
     .prepare(
-      "SELECT a.r2_key FROM pro_draft_attachments a JOIN pro_drafts d ON d.id=a.draft_id WHERE d.id=? AND d.user_id=?"
+      "SELECT a.r2_key FROM draft_attachments a JOIN drafts d ON d.id=a.draft_id WHERE d.id=? AND d.user_id=?"
     )
     .bind(id, userId)
     .all<{ r2_key: string }>();
   const result = await db
-    .prepare("DELETE FROM pro_drafts WHERE id=? AND user_id=?")
+    .prepare("DELETE FROM drafts WHERE id=? AND user_id=?")
     .bind(id, userId)
     .run();
   await Promise.all(rows.results.map((row) => bucket.delete(row.r2_key)));
@@ -157,9 +157,7 @@ export async function addDraftAttachment(
   if (!(await getDraft(db, userId, draftId)))
     throw new AppError("DRAFT_NOT_FOUND", "Draft not found.", 404);
   const total = await db
-    .prepare(
-      "SELECT COALESCE(SUM(size_bytes),0) AS size FROM pro_draft_attachments WHERE draft_id=?"
-    )
+    .prepare("SELECT COALESCE(SUM(size_bytes),0) AS size FROM draft_attachments WHERE draft_id=?")
     .bind(draftId)
     .first<{ size: number }>();
   if (file.size > 25 * 1024 * 1024 || (total?.size ?? 0) + file.size > 25 * 1024 * 1024)
@@ -169,7 +167,7 @@ export async function addDraftAttachment(
   const now = nowIso();
   await db
     .prepare(
-      "INSERT INTO pro_draft_attachments (id,draft_id,filename,content_type,size_bytes,r2_key,created_at) VALUES (?,?,?,?,?,?,?)"
+      "INSERT INTO draft_attachments (id,draft_id,filename,content_type,size_bytes,r2_key,created_at) VALUES (?,?,?,?,?,?,?)"
     )
     .bind(
       id,
@@ -200,12 +198,12 @@ export async function removeDraftAttachment(
 ) {
   const row = await db
     .prepare(
-      "SELECT a.r2_key FROM pro_draft_attachments a JOIN pro_drafts d ON d.id=a.draft_id WHERE a.id=? AND d.id=? AND d.user_id=?"
+      "SELECT a.r2_key FROM draft_attachments a JOIN drafts d ON d.id=a.draft_id WHERE a.id=? AND d.id=? AND d.user_id=?"
     )
     .bind(id, draftId, userId)
     .first<{ r2_key: string }>();
   if (!row) return false;
-  await db.prepare("DELETE FROM pro_draft_attachments WHERE id=?").bind(id).run();
+  await db.prepare("DELETE FROM draft_attachments WHERE id=?").bind(id).run();
   await bucket.delete(row.r2_key);
   return true;
 }
@@ -227,7 +225,7 @@ export async function draftAttachmentObjects(
   if (ids.length === 0) return [];
   const rows = await db
     .prepare(
-      `SELECT a.id,a.filename,a.content_type,a.size_bytes,a.r2_key FROM pro_draft_attachments a JOIN pro_drafts d ON d.id=a.draft_id WHERE d.user_id=? AND a.id IN (${ids.map(() => "?").join(",")})`
+      `SELECT a.id,a.filename,a.content_type,a.size_bytes,a.r2_key FROM draft_attachments a JOIN drafts d ON d.id=a.draft_id WHERE d.user_id=? AND a.id IN (${ids.map(() => "?").join(",")})`
     )
     .bind(userId, ...ids)
     .all<AttachmentRow>();

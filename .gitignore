@@ -9,5 +9,5 @@ coverage
 playwright-report
 test-results
 .DS_Store
-.hqbase-pro/deployments/*
-!.hqbase-pro/deployments/.gitkeep
+.hqbase/deployments/*
+!.hqbase/deployments/.gitkeep

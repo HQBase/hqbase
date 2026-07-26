@@ -1,18 +1,18 @@
 {
-  "name": "hqbase-pro",
+  "name": "hqbase",
   "version": "0.1.11",
   "private": true,
   "type": "module",
   "packageManager": "pnpm@11.7.0",
   "hqbaseRelease": {
-    "minimumVersion": "0.1.3"
+    "minimumVersion": "0.1.11"
   },
   "scripts": {
     "dev": "wrangler dev --port 8787",
     "dev:vite": "vite --host 127.0.0.1 --port 5173",
     "dev:setup-ui": "vite --host 127.0.0.1 --port 5173 --open /__ui/setup?state=loading",
     "build": "vite build && node scripts/build-pwa.mjs && node scripts/check-setup-preview-boundary.mjs",
-    "deploy": "pnpm build && node scripts/hqbase-pro/deploy.mjs && pnpm hqbase-pro postdeploy",
+    "deploy": "node scripts/release/deploy.mjs",
     "db:migrate:local": "wrangler d1 migrations apply DB --local",
     "db:migrate:remote": "wrangler d1 migrations apply DB --remote",
     "format": "biome format --write .",
@@ -26,46 +26,30 @@
     "test:coverage": "vitest run --config vitest.config.ts --coverage",
     "test:architecture": "node scripts/check-architecture.mjs",
     "test:pwa": "node scripts/test-pwa.mjs",
-    "test:e2e:staging": "playwright test --config playwright.config.ts app-shell-smoke.spec.ts pro-bridge.spec.ts",
+    "test:e2e:staging": "playwright test --config playwright.config.ts app-shell-smoke.spec.ts lifecycle.spec.ts",
     "test:e2e:staging:smoke": "playwright test --config playwright.config.ts app-shell-smoke.spec.ts",
-    "test:e2e:staging:lifecycle": "playwright test --config playwright.config.ts pro-bridge.spec.ts",
+    "test:e2e:staging:lifecycle": "playwright test --config playwright.config.ts lifecycle.spec.ts",
     "check": "pnpm code:check && pnpm typecheck && pnpm test && pnpm test:coverage && pnpm test:architecture && pnpm build",
     "deploy:dry-run": "pnpm build && wrangler deploy --dry-run",
-    "hqbase-pro": "node scripts/hqbase-pro/cli.mjs",
-    "hqbase-pro:button": "node scripts/hqbase-pro/cli.mjs button",
-    "hqbase-pro:install": "node scripts/hqbase-pro/cli.mjs install",
-    "hqbase-pro:doctor": "node scripts/hqbase-pro/cli.mjs doctor",
-    "hqbase-pro:reset": "node scripts/hqbase-pro/cli.mjs reset",
-    "hqbase-pro:destroy": "node scripts/hqbase-pro/cli.mjs destroy",
-    "hqbase-pro:upgrade": "node scripts/hqbase-pro/upgrade.mjs",
+    "hqbase": "node scripts/hqbase/cli.mjs",
+    "hqbase:button": "node scripts/hqbase/cli.mjs button",
+    "hqbase:install": "node scripts/hqbase/cli.mjs install",
+    "hqbase:doctor": "node scripts/hqbase/cli.mjs doctor",
+    "hqbase:reset": "node scripts/hqbase/cli.mjs reset",
+    "hqbase:destroy": "node scripts/hqbase/cli.mjs destroy",
     "cf:typegen": "wrangler types",
     "release:package": "node scripts/release/package.mjs"
   },
   "cloudflare": {
     "bindings": {
-      "BETTER_AUTH_SECRET": {
-        "description": "Required Better Auth signing secret. Paste a long random value generated with `openssl rand -base64 32`."
-      },
-      "PRO_APP_PASSWORD_PEPPER": {
-        "description": "Secret HMAC pepper for mail-client app passwords. Generated per deployment."
-      },
-      "PRO_BRIDGE_TOKEN": {
-        "description": "Deployment-scoped bearer token shared only with the mail bridge."
-      },
-      "PRO_SESSION_SECRET": {
-        "description": "Secret HMAC key for short-lived mail-bridge sessions."
-      },
-      "PRO_ENTITLEMENT_SECRET": {
-        "description": "Deployment-scoped AES key material used to encrypt the Polar license key stored in D1."
-      },
       "DB": {
-        "description": "Create a new D1 database for a fresh Pro workspace. Community upgrades preserve and detect their existing database automatically."
+        "description": "Create a new D1 database for this HQBase workspace."
       },
       "MAIL_OBJECTS": {
-        "description": "Create a new R2 bucket for a fresh Pro workspace. Community upgrades preserve and detect their existing mail bucket automatically."
+        "description": "Create a new R2 bucket for this HQBase workspace."
       },
-      "PRO_JOBS": {
-        "description": "Queue used for bounded Pro maintenance and integrity jobs with a dead-letter queue."
+      "HQBASE_JOBS": {
+        "description": "Queue used for bounded maintenance and integrity jobs with a dead-letter queue."
       },
       "MAIL_SENDER": {
         "description": "Cloudflare Email Sending binding. The sending domain must be onboarded in Cloudflare Email Service."
@@ -118,7 +102,6 @@
     "@vitejs/plugin-react": "^4.6.0",
     "@vitest/coverage-v8": "4.1.10",
     "autoprefixer": "^10.4.21",
-    "blake3-wasm": "2.1.5",
     "postcss": "^8.5.6",
     "tailwindcss": "^3.4.17",
     "typescript": "^5.8.3",

@@ -18,7 +18,7 @@ export const sendRoutes = new Hono<HonoApp>();
 
 sendRoutes.post("/send", async (c) => {
   const authContext = await requireAuthContext(c.env, c.req.raw);
-  await enforceRateLimit(c.env.DB, c.env.PRO_SESSION_SECRET, {
+  await enforceRateLimit(c.env.DB, c.env.BETTER_AUTH_SECRET, {
     scope: "mail.send",
     subject: authContext.user.id,
     limit: 60,
@@ -49,7 +49,7 @@ sendRoutes.post("/send", async (c) => {
 
 sendRoutes.post("/reply", async (c) => {
   const authContext = await requireAuthContext(c.env, c.req.raw);
-  await enforceRateLimit(c.env.DB, c.env.PRO_SESSION_SECRET, {
+  await enforceRateLimit(c.env.DB, c.env.BETTER_AUTH_SECRET, {
     scope: "mail.reply",
     subject: authContext.user.id,
     limit: 60,

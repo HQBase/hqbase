@@ -9,7 +9,9 @@ import { appRoutePath, mailFolders } from "@/lib/routes";
 
 type SidebarProps = {
   activeFolder: FolderId;
+  drawerAction?: React.ReactNode;
   onFolderChange: (folder: FolderId) => void;
+  variant?: "desktop" | "drawer";
 };
 
 const icons: Record<FolderId, LucideIcon> = {
@@ -22,9 +24,21 @@ const icons: Record<FolderId, LucideIcon> = {
   settings: Settings
 };
 
-export function Sidebar({ activeFolder, onFolderChange }: SidebarProps): React.ReactElement {
+export function Sidebar({
+  activeFolder,
+  drawerAction,
+  onFolderChange,
+  variant = "desktop"
+}: SidebarProps): React.ReactElement {
+  const isDrawer = variant === "drawer";
+
   return (
-    <aside className="hidden w-56 shrink-0 flex-col border-r bg-background p-3 md:flex">
+    <aside
+      className={cn(
+        "w-56 shrink-0 flex-col bg-background p-3",
+        isDrawer ? "flex h-full w-full" : "hidden border-r md:flex"
+      )}
+    >
       <div className="mb-7 flex h-9 items-center gap-2.5 px-2">
         <img alt="" className="h-7 w-auto shrink-0" src="/logo.svg" />
         <span className="text-sm font-medium tracking-tight">HQBase</span>
@@ -37,12 +51,15 @@ export function Sidebar({ activeFolder, onFolderChange }: SidebarProps): React.R
               asChild
               className={cn(
                 "h-8 justify-start gap-2.5 px-2.5 text-[13px] font-normal text-muted-foreground",
+                isDrawer && "h-11 text-sm",
                 activeFolder === folder.id && "bg-muted text-foreground"
               )}
               key={folder.id}
               variant="ghost"
             >
               <a
+                aria-current={activeFolder === folder.id ? "page" : undefined}
+                data-navigation-item
                 href={appRoutePath({ kind: "mail", folder: folder.id, messageId: null })}
                 onClick={(event) => {
                   if (isModifiedNavigation(event)) return;
@@ -57,15 +74,18 @@ export function Sidebar({ activeFolder, onFolderChange }: SidebarProps): React.R
           );
         })}
         <div className="mt-auto border-t pt-2">
+          {isDrawer && drawerAction ? <div className="mb-0.5">{drawerAction}</div> : null}
           <Button
             asChild
             className={cn(
               "h-8 w-full justify-start gap-2.5 px-2.5 text-[13px] font-normal text-muted-foreground",
+              isDrawer && "h-11 text-sm",
               activeFolder === "settings" && "bg-muted text-foreground"
             )}
             variant="ghost"
           >
             <a
+              aria-current={activeFolder === "settings" ? "page" : undefined}
               href={appRoutePath({ kind: "settings", tab: "mailboxes" })}
               onClick={(event) => {
                 if (isModifiedNavigation(event)) return;

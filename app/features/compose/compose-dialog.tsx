@@ -3,14 +3,6 @@ import * as React from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle
-} from "@/components/ui/dialog";
-import {
   createDraft,
   type Draft,
   type DraftAttachment,
@@ -31,6 +23,7 @@ import {
   serializeDraft,
   splitRecipients
 } from "./compose-state";
+import { ComposeWindow } from "./compose-window";
 import { RichEmailEditor } from "./rich-email-editor";
 
 export function ComposeDialog({
@@ -209,90 +202,87 @@ export function ComposeDialog({
     onOpenChange(false);
   }
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex max-h-[90vh] max-w-3xl flex-col overflow-hidden bg-card p-0 shadow-2xl">
-        <DialogHeader className="border-b px-5 py-4">
-          <DialogTitle className="text-base font-medium">
-            {replyTo ? "Reply" : "New message"}
-          </DialogTitle>
-          <DialogDescription className="text-xs">
-            {saveState === "saving"
-              ? "Saving draft…"
-              : saveState === "error"
-                ? "Draft not saved"
-                : "Draft saved"}
-          </DialogDescription>
-        </DialogHeader>
-        {!draft || !initialized.current ? (
-          <div className="grid min-h-60 place-items-center text-sm text-muted-foreground">
-            Opening draft…
-          </div>
-        ) : (
-          <form className="flex min-h-0 flex-1 flex-col" onSubmit={(e) => void handleSubmit(e)}>
-            <ComposeFields
-              identities={identities}
-              replyTo={replyTo}
-              from={from}
-              to={to}
-              cc={cc}
-              bcc={bcc}
-              subject={subject}
-              setFrom={setFrom}
-              setTo={setTo}
-              setCc={setCc}
-              setBcc={setBcc}
-              setSubject={setSubject}
-            />
-            <RichEmailEditor
-              html={html}
-              onFiles={handleEditorFiles}
-              onChange={(nextHtml, nextText) => {
-                setHtml(nextHtml);
-                setText(nextText);
-              }}
-            />
-            <AttachmentList
-              attachments={attachments}
-              onRemove={(item) => void removeAttachment(item)}
-            />
-            <DialogFooter className="justify-between border-t bg-background/50 px-5 py-3 sm:justify-between">
-              <div className="flex gap-2">
-                <Button
-                  disabled={
-                    isPending || isUploading || !draft || identities.length === 0 || !text.trim()
-                  }
-                  type="submit"
-                >
-                  {isPending ? "Sending" : "Send"}
-                </Button>
-                <Button asChild size="icon" type="button" variant="ghost">
-                  <label aria-label="Add attachment" className="cursor-pointer">
-                    <Paperclip />
-                    <input
-                      className="sr-only"
-                      multiple
-                      type="file"
-                      onChange={(e) => {
-                        void upload(Array.from(e.target.files ?? []));
-                        e.currentTarget.value = "";
-                      }}
-                    />
-                  </label>
-                </Button>
-              </div>
+    <ComposeWindow
+      open={open}
+      status={
+        saveState === "saving"
+          ? "Saving draft…"
+          : saveState === "error"
+            ? "Draft not saved"
+            : "Draft saved"
+      }
+      title={replyTo ? "Reply" : "New message"}
+      onOpenChange={onOpenChange}
+    >
+      {!draft || !initialized.current ? (
+        <div className="grid min-h-60 flex-1 place-items-center text-sm text-muted-foreground">
+          Opening draft…
+        </div>
+      ) : (
+        <form className="flex min-h-0 flex-1 flex-col" onSubmit={(e) => void handleSubmit(e)}>
+          <ComposeFields
+            identities={identities}
+            replyTo={replyTo}
+            from={from}
+            to={to}
+            cc={cc}
+            bcc={bcc}
+            subject={subject}
+            setFrom={setFrom}
+            setTo={setTo}
+            setCc={setCc}
+            setBcc={setBcc}
+            setSubject={setSubject}
+          />
+          <RichEmailEditor
+            html={html}
+            onFiles={handleEditorFiles}
+            onChange={(nextHtml, nextText) => {
+              setHtml(nextHtml);
+              setText(nextText);
+            }}
+          />
+          <AttachmentList
+            attachments={attachments}
+            onRemove={(item) => void removeAttachment(item)}
+          />
+          <footer className="flex flex-col-reverse gap-2 border-t bg-background/50 px-5 py-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex gap-2">
               <Button
-                aria-label="Discard draft"
-                size="icon"
-                type="button"
-                variant="ghost"
-                onClick={() => void discard()}
+                disabled={
+                  isPending || isUploading || !draft || identities.length === 0 || !text.trim()
+                }
+                type="submit"
               >
-                <Trash2 />
+                {isPending ? "Sending" : "Send"}
               </Button>
-            </DialogFooter>
-          </form>
-        )}
-      </DialogContent>
-    </Dialog>
+              <Button asChild size="icon" type="button" variant="ghost">
+                <label aria-label="Add attachment" className="cursor-pointer">
+                  <Paperclip />
+                  <input
+                    className="sr-only"
+                    multiple
+                    type="file"
+                    onChange={(e) => {
+                      void upload(Array.from(e.target.files ?? []));
+                      e.currentTarget.value = "";
+                    }}
+                  />
+                </label>
+              </Button>
+            </div>
+            <Button
+              aria-label="Discard draft"
+              size="icon"
+              type="button"
+              variant="ghost"
+              onClick={() => void discard()}
+            >
+              <Trash2 />
+            </Button>
+          </footer>
+        </form>
+      )}
+    </ComposeWindow>
   );
 }

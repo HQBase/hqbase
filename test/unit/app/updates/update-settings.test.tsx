@@ -4,9 +4,9 @@ import type { UpdateStatus } from "@/features/updates/types";
 import { UpdateSettings } from "@/features/updates/update-settings";
 
 const availableStatus: UpdateStatus = {
-  edition: "pro",
+  product: "hqbase",
   installedVersion: "0.1.2",
-  installedSchemaVersion: 9,
+  installedSchemaVersion: 2,
   channel: "stable",
   checkedAt: "2026-07-13T12:00:00.000Z",
   available: true,

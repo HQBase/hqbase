@@ -28,7 +28,7 @@ export async function enforceRateLimit(
   const hash = await subjectHash(secret, input.scope, input.subject);
   const row = await db
     .prepare(
-      `INSERT INTO pro_rate_limits
+      `INSERT INTO rate_limits
        (scope, subject_hash, window_start, request_count, expires_at)
        VALUES (?, ?, ?, 1, ?)
        ON CONFLICT(scope, subject_hash, window_start) DO UPDATE SET

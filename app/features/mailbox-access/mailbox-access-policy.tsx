@@ -45,20 +45,17 @@ export function MailboxAccessCell({
   onManage: () => void;
 }): React.ReactElement {
   return (
-    <div className="flex items-center justify-between gap-2">
-      <span className="text-xs text-muted-foreground">
+    <Button
+      aria-label={`View access for ${mailbox.address}`}
+      className="h-auto min-h-10 max-w-full justify-start whitespace-normal px-0 py-1 text-left text-xs font-normal text-muted-foreground hover:bg-transparent hover:text-foreground"
+      type="button"
+      variant="ghost"
+      onClick={onManage}
+    >
+      <span className="line-clamp-2">
         {formatMailboxAccessSummary(mailbox.id, policies.grants, users, policies.loading)}
       </span>
-      <Button
-        aria-label={`Manage access for ${mailbox.address}`}
-        size="sm"
-        type="button"
-        variant="ghost"
-        onClick={onManage}
-      >
-        Manage access
-      </Button>
-    </div>
+    </Button>
   );
 }
 

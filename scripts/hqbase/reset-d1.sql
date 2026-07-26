@@ -1,0 +1,35 @@
+PRAGMA foreign_keys = OFF;
+
+DROP TABLE IF EXISTS oauthConsent;
+DROP TABLE IF EXISTS oauthAccessToken;
+DROP TABLE IF EXISTS oauthRefreshToken;
+DROP TABLE IF EXISTS oauthClient;
+DROP TABLE IF EXISTS message_sender_preferences;
+DROP TABLE IF EXISTS update_history;
+DROP TABLE IF EXISTS release_state;
+DROP TABLE IF EXISTS installation_identity;
+DROP TABLE IF EXISTS draft_attachments;
+DROP TABLE IF EXISTS drafts;
+DROP TABLE IF EXISTS domain_setup_operations;
+DROP TABLE IF EXISTS mailbox_addresses;
+DROP TABLE IF EXISTS mail_domains;
+DROP TABLE IF EXISTS workspace_hosts;
+DROP TABLE IF EXISTS deployment_state;
+DROP TABLE IF EXISTS operation_runs;
+DROP TABLE IF EXISTS retention_policies;
+DROP TABLE IF EXISTS rate_limits;
+DROP TABLE IF EXISTS audit_events;
+DROP TABLE IF EXISTS mailbox_grants;
+DROP TABLE IF EXISTS hqbase_schema_state;
+DROP TABLE IF EXISTS message_attachments;
+DROP TABLE IF EXISTS messages;
+DROP TABLE IF EXISTS threads;
+DROP TABLE IF EXISTS mailboxes;
+DROP TABLE IF EXISTS app_settings;
+DROP TABLE IF EXISTS verification;
+DROP TABLE IF EXISTS account;
+DROP TABLE IF EXISTS "session";
+DROP TABLE IF EXISTS "user";
+DROP TABLE IF EXISTS d1_migrations;
+
+PRAGMA foreign_keys = ON;

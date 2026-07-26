@@ -32,7 +32,7 @@ export function useSetupFlow(onComplete: () => void) {
 
   React.useEffect(() => {
     localStorage.setItem(
-      "hqb_pro_setup_draft_v1",
+      "hqb_setup_draft_v1",
       JSON.stringify({ activeStep, mailboxes, ownerEmail, ownerName })
     );
   }, [activeStep, mailboxes, ownerEmail, ownerName]);
@@ -117,7 +117,7 @@ export function useSetupFlow(onComplete: () => void) {
     setIsPending(true);
     try {
       await bootstrapSetup(input);
-      localStorage.removeItem("hqb_pro_setup_draft_v1");
+      localStorage.removeItem("hqb_setup_draft_v1");
       toast.success("HQBase is ready.");
       onComplete();
     } catch (error) {
@@ -190,7 +190,7 @@ function readSetupDraft(): {
   ownerName: string;
 } | null {
   try {
-    const value = JSON.parse(localStorage.getItem("hqb_pro_setup_draft_v1") ?? "null") as Record<
+    const value = JSON.parse(localStorage.getItem("hqb_setup_draft_v1") ?? "null") as Record<
       string,
       unknown
     > | null;

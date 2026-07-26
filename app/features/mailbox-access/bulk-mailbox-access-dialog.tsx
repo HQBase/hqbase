@@ -68,7 +68,7 @@ export function BulkMailboxAccessDialog({
     <Dialog open={open} onOpenChange={close}>
       <DialogContent className="w-[min(92vw,500px)]">
         <DialogHeader>
-          <DialogTitle>Set access</DialogTitle>
+          <DialogTitle>Manage access for selected</DialogTitle>
           <DialogDescription>
             Update one user's access to {count} selected {noun}.
           </DialogDescription>

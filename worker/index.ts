@@ -1,5 +1,4 @@
 import { handleInboundEmail } from "./email/inbound";
-import { refreshWorkspaceEntitlement } from "./features/billing/service";
 import { handleMcpRoute } from "./features/mcp/route";
 import { consumeJobs } from "./jobs/consumer";
 import type { WorkerEnv } from "./lib/env";
@@ -42,22 +41,21 @@ export default {
   },
 
   async scheduled(_controller: ScheduledController, env: WorkerEnv): Promise<void> {
-    await refreshWorkspaceEntitlement(env);
-    if (!env.PRO_JOBS) throw new Error("PRO_JOBS binding is required.");
+    if (!env.HQBASE_JOBS) throw new Error("HQBASE_JOBS binding is required.");
     const requestedAt = new Date().toISOString();
-    await env.PRO_JOBS.send({
+    await env.HQBASE_JOBS.send({
       id: `maintenance:${requestedAt.slice(0, 10)}`,
       kind: "maintenance",
       requestedAt
     });
-    await env.PRO_JOBS.send({
+    await env.HQBASE_JOBS.send({
       id: `integrity:${requestedAt.slice(0, 10)}`,
       kind: "integrity-scan",
       requestedAt
     });
   },
 
-  async queue(batch: MessageBatch<import("./jobs/types").ProJob>, env: WorkerEnv): Promise<void> {
+  async queue(batch: MessageBatch<import("./jobs/types").Job>, env: WorkerEnv): Promise<void> {
     await consumeJobs(batch, env);
   }
 };

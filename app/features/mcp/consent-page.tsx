@@ -11,7 +11,7 @@ type OAuthClient = {
 };
 
 const scopeDescriptions: Record<string, string> = {
-  "mail:read": "Read mailboxes and message text allowed by your Pro grants",
+  "mail:read": "Read mailboxes and message text allowed by your mailbox grants",
   "mail:write": "Change message state where you have agent access",
   "mail:send": "Send email and replies where you have agent access",
   offline_access: "Stay connected until you revoke access"
@@ -77,7 +77,7 @@ export function McpConsentPage(): React.ReactElement {
         <CardHeader className="space-y-2">
           <CardTitle className="text-lg font-medium tracking-tight">Connect {clientName}</CardTitle>
           <CardDescription>
-            Review what this client can do. Your live Pro mailbox grants still apply to every call.
+            Review what this client can do. Your live mailbox grants still apply to every call.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-5">

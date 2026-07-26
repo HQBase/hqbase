@@ -9,14 +9,7 @@ export const mailFolders = [
 
 export const folders = [...mailFolders, { id: "settings", label: "Settings" }] as const;
 
-export const settingsTabs = [
-  "mailboxes",
-  "users",
-  "domains",
-  "billing",
-  "updates",
-  "debug"
-] as const;
+export const settingsTabs = ["mailboxes", "users", "domains", "updates", "debug"] as const;
 
 export type MailFolderId = (typeof mailFolders)[number]["id"];
 export type FolderId = (typeof folders)[number]["id"];
@@ -31,8 +24,7 @@ const legacySettingsTabs: Record<string, SettingsTabId> = {
   domains: "domains",
   general: "debug",
   "mail-clients": "mailboxes",
-  updates: "updates",
-  upgrade: "debug"
+  updates: "updates"
 };
 
 export function readAppRoute(input: string | URL): AppRoute {

@@ -150,7 +150,7 @@ export function useSetupCloudflare(callbacks: {
     access: {
       error: tokenError,
       isLoading,
-      onNext: () => void handleTokenNext()
+      onNext: () => window.location.assign("/api/setup/cloudflare/oauth/start")
     },
     domain: {
       appHostname,

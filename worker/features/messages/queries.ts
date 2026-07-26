@@ -1,6 +1,5 @@
 import { newId, nowIso } from "../../db/client";
 import { AppError } from "../../lib/errors";
-import { recordMessageChange } from "../mail-bridge/change-log";
 import type { MessageAction } from "./actions";
 import { buildMessageActionPatch } from "./actions";
 import { normalizeSubject } from "./headers";
@@ -98,8 +97,6 @@ export async function insertMessage(
       input.sentFromAddressId ?? null
     )
     .run();
-
-  await recordMessageChange(db, id);
 
   const row = await getMessageRow(db, id);
   if (!row) {
@@ -233,8 +230,6 @@ export async function updateMessageAction(
       id
     )
     .run();
-
-  await recordMessageChange(db, id);
 
   const row = await getMessageRow(db, id);
   if (!row) {

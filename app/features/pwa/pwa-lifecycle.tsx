@@ -33,8 +33,8 @@ export function PwaLifecycle(): React.ReactElement | null {
     >
       <span>
         {online
-          ? "A new version of HQBase Pro is ready."
-          : "You're offline. HQBase Pro will reconnect when your connection returns."}
+          ? "A new version of HQBase is ready."
+          : "You're offline. HQBase will reconnect when your connection returns."}
       </span>
       {online && update ? (
         <button

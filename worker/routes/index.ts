@@ -1,13 +1,9 @@
 import { Hono } from "hono";
 
 import { createAuth } from "../auth/auth";
-import { appPasswordRoutes } from "../features/app-passwords/routes";
 import { auditRoutes } from "../features/audit/routes";
-import { requireConfigurationEntitlement } from "../features/billing/guard";
-import { billingRoutes } from "../features/billing/routes";
 import { domainRoutes } from "../features/domains/routes";
 import { draftRoutes } from "../features/drafts/routes";
-import { mailBridgeV2Routes } from "../features/mail-bridge/routes-v2";
 import { mailboxAccessRoutes } from "../features/mailbox-access/routes";
 import { mailboxRoutes } from "../features/mailboxes/routes";
 import { attachmentRoutes, messageRoutes } from "../features/messages/routes";
@@ -16,9 +12,6 @@ import { sendRoutes } from "../features/send/routes";
 import { sessionControlRoutes } from "../features/sessions/routes";
 import { setupRoutes } from "../features/setup/routes";
 import { updateRoutes } from "../features/updates/routes";
-import { inPlaceUpgradeRoutes } from "../features/upgrades/in-place-routes";
-import { upgradeRoutes } from "../features/upgrades/routes";
-import { enforceInPlaceUpgradeWritePause } from "../features/upgrades/write-pause";
 import { userRoutes } from "../features/users/routes";
 import type { HonoApp } from "../lib/env";
 import { errorBody, toAppError } from "../lib/errors";
@@ -29,8 +22,6 @@ import { healthRoutes } from "./health";
 import { meRoutes } from "./me";
 
 export const apiRoutes = new Hono<HonoApp>();
-
-apiRoutes.use("*", enforceInPlaceUpgradeWritePause);
 
 apiRoutes.use("*", async (c, next) => {
   const provided = c.req.header("x-request-id") ?? "";
@@ -55,28 +46,12 @@ apiRoutes.notFound((c) => {
 apiRoutes.route("/api/health", healthRoutes);
 apiRoutes.route("/api/setup", setupRoutes);
 apiRoutes.route("/api/me", meRoutes);
-apiRoutes.route("/api/pro/billing", billingRoutes);
-apiRoutes.use("/api/pro/upgrade/verify-cutover", requireConfigurationEntitlement);
-apiRoutes.use("/api/pro/app-passwords", requireConfigurationEntitlement);
-apiRoutes.use("/api/pro/app-passwords/*", requireConfigurationEntitlement);
-apiRoutes.use("/api/pro/domains", requireConfigurationEntitlement);
-apiRoutes.use("/api/pro/domains/*", requireConfigurationEntitlement);
-apiRoutes.use("/api/pro/mailbox-grants", requireConfigurationEntitlement);
-apiRoutes.use("/api/pro/mailbox-grants/*", requireConfigurationEntitlement);
-apiRoutes.use("/api/users", requireConfigurationEntitlement);
-apiRoutes.use("/api/users/*", requireConfigurationEntitlement);
-apiRoutes.use("/api/mailboxes", requireConfigurationEntitlement);
-apiRoutes.use("/api/mailboxes/*", requireConfigurationEntitlement);
-apiRoutes.route("/api/pro/app-passwords", appPasswordRoutes);
-apiRoutes.route("/api/pro/audit", auditRoutes);
-apiRoutes.route("/api/pro/domains", domainRoutes);
-apiRoutes.route("/api/pro/drafts", draftRoutes);
-apiRoutes.route("/api/pro/mailbox-grants", mailboxAccessRoutes);
-apiRoutes.route("/api/pro/mail-bridge/v2", mailBridgeV2Routes);
-apiRoutes.route("/api/pro/sessions", sessionControlRoutes);
-apiRoutes.route("/api/pro/operations", operationRoutes);
-apiRoutes.route("/api/pro/upgrade", upgradeRoutes);
-apiRoutes.route("/api/upgrades/pro", inPlaceUpgradeRoutes);
+apiRoutes.route("/api/audit", auditRoutes);
+apiRoutes.route("/api/domains", domainRoutes);
+apiRoutes.route("/api/drafts", draftRoutes);
+apiRoutes.route("/api/mailbox-grants", mailboxAccessRoutes);
+apiRoutes.route("/api/sessions", sessionControlRoutes);
+apiRoutes.route("/api/operations", operationRoutes);
 apiRoutes.route("/api/mailboxes", mailboxRoutes);
 apiRoutes.route("/api/messages", messageRoutes);
 apiRoutes.route("/api/attachments", attachmentRoutes);
@@ -101,13 +76,13 @@ apiRoutes.all("/api/auth/*", async (c) => {
     const email = typeof body.email === "string" ? body.email : "invalid";
     const ip = c.req.header("cf-connecting-ip") ?? "unknown";
     await Promise.all([
-      enforceRateLimit(c.env.DB, c.env.PRO_SESSION_SECRET, {
+      enforceRateLimit(c.env.DB, c.env.BETTER_AUTH_SECRET, {
         scope: "auth.email",
         subject: email,
         limit: 10,
         windowSeconds: 15 * 60
       }),
-      enforceRateLimit(c.env.DB, c.env.PRO_SESSION_SECRET, {
+      enforceRateLimit(c.env.DB, c.env.BETTER_AUTH_SECRET, {
         scope: "auth.ip",
         subject: ip,
         limit: 60,

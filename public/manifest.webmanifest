@@ -1,8 +1,8 @@
 {
   "id": "/",
-  "name": "HQBase Pro",
-  "short_name": "HQBase Pro",
-  "description": "HQBase Pro shared webmail for your Cloudflare account.",
+  "name": "HQBase",
+  "short_name": "HQBase",
+  "description": "HQBase shared webmail for your Cloudflare account.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

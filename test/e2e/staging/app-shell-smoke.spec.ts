@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-test("deployed Pro PWA shell is ready", async ({ page, request }) => {
+test("deployed HQBase PWA shell is ready", async ({ page, request }) => {
   await expect
     .poll(
       async () => {
@@ -19,7 +19,7 @@ test("deployed Pro PWA shell is ready", async ({ page, request }) => {
     expect(manifestResponse.ok()).toBeTruthy();
     expect(await manifestResponse.json()).toMatchObject({
       display: "standalone",
-      name: "HQBase Pro",
+      name: "HQBase",
       start_url: "/"
     });
 

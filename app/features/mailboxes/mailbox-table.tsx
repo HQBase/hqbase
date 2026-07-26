@@ -15,28 +15,41 @@ import { MailboxAccessCell } from "@/features/mailbox-access/mailbox-access-poli
 import type { WorkspaceUser } from "@/features/users/types";
 import type { Mailbox } from "./types";
 
+export function MailboxSelectionBar({
+  selectedCount,
+  onManage
+}: {
+  selectedCount: number;
+  onManage: () => void;
+}): React.ReactElement | null {
+  if (selectedCount === 0) return null;
+
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border bg-muted/35 px-3 py-2">
+      <span className="text-sm text-muted-foreground">{selectedCount} selected</span>
+      <Button size="sm" type="button" onClick={onManage}>
+        Manage access for selected
+      </Button>
+    </div>
+  );
+}
+
 export function MailboxTable({
   canManage,
   mailboxes,
   policies,
   selectedIds,
   users,
-  onAddAlias,
-  onManageAccess,
-  onRemoveAlias,
-  onSelectionChange,
-  onToggle
+  onOpenDetails,
+  onSelectionChange
 }: {
   canManage: boolean;
   mailboxes: Mailbox[];
   policies: MailboxAccessPolicies;
   selectedIds: string[];
   users: WorkspaceUser[];
-  onAddAlias: (mailbox: Mailbox) => void;
-  onManageAccess: (mailbox: Mailbox) => void;
-  onRemoveAlias: (mailbox: Mailbox, addressId: string) => void;
+  onOpenDetails: (mailbox: Mailbox) => void;
   onSelectionChange: (selectedIds: string[]) => void;
-  onToggle: (mailbox: Mailbox) => void;
 }): React.ReactElement {
   const selected = new Set(selectedIds);
   const visibleIds = mailboxes.map((mailbox) => mailbox.id);
@@ -75,13 +88,8 @@ export function MailboxTable({
           ) : null}
           <TableHead>Address</TableHead>
           <TableHead className="hidden sm:table-cell">Name</TableHead>
-          <TableHead className="w-28">Status</TableHead>
-          {canManage ? <TableHead className="w-56">Access</TableHead> : null}
-          {canManage ? (
-            <TableHead className="w-px text-right">
-              <span className="sr-only">Actions</span>
-            </TableHead>
-          ) : null}
+          <TableHead className="hidden w-28 md:table-cell">Status</TableHead>
+          <TableHead className="w-32 sm:w-48">Access</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
@@ -89,7 +97,7 @@ export function MailboxTable({
           <TableRow>
             <TableCell
               className="h-24 text-center text-muted-foreground"
-              colSpan={canManage ? 6 : 3}
+              colSpan={canManage ? 5 : 4}
             >
               No mailboxes yet.
             </TableCell>
@@ -98,9 +106,14 @@ export function MailboxTable({
         {mailboxes.map((mailbox) => {
           const isSelected = selected.has(mailbox.id);
           return (
-            <TableRow data-state={isSelected ? "selected" : undefined} key={mailbox.id}>
+            <TableRow
+              className="cursor-pointer"
+              data-state={isSelected ? "selected" : undefined}
+              key={mailbox.id}
+              onClick={() => onOpenDetails(mailbox)}
+            >
               {canManage ? (
-                <TableCell>
+                <TableCell onClick={(event) => event.stopPropagation()}>
                   <Checkbox
                     aria-label={`Select ${mailbox.address}`}
                     checked={isSelected}
@@ -109,66 +122,50 @@ export function MailboxTable({
                 </TableCell>
               ) : null}
               <TableCell className="max-w-52">
-                <span className="block truncate">{mailbox.address}</span>
-                {mailbox.addresses
-                  .filter((item) => !item.isPrimary)
-                  .map((item) => (
-                    <span
-                      className="mt-1 flex items-center gap-1 text-xs text-muted-foreground"
-                      key={item.id}
-                    >
-                      {item.address}
-                      {canManage ? (
-                        <Button
-                          className="h-5 px-1"
-                          type="button"
-                          variant="ghost"
-                          onClick={() => onRemoveAlias(mailbox, item.id)}
-                        >
-                          Remove
-                        </Button>
-                      ) : null}
-                    </span>
-                  ))}
+                <button
+                  className="block max-w-full truncate rounded-sm text-left font-medium underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  type="button"
+                  onClick={() => onOpenDetails(mailbox)}
+                >
+                  {mailbox.address}
+                </button>
+                <span className="mt-0.5 block truncate text-xs text-muted-foreground sm:hidden">
+                  {mailbox.displayName}
+                </span>
+                <Badge
+                  className="mt-1 md:hidden"
+                  variant={mailbox.isActive ? "secondary" : "outline"}
+                >
+                  {mailbox.isActive ? "Active" : "Disabled"}
+                </Badge>
               </TableCell>
               <TableCell className="hidden sm:table-cell">{mailbox.displayName}</TableCell>
-              <TableCell>
+              <TableCell className="hidden md:table-cell">
                 <Badge variant={mailbox.isActive ? "secondary" : "outline"}>
                   {mailbox.isActive ? "Active" : "Disabled"}
                 </Badge>
               </TableCell>
-              {canManage ? (
-                <TableCell>
+              <TableCell>
+                {canManage ? (
                   <MailboxAccessCell
                     mailbox={mailbox}
                     policies={policies}
                     users={users}
-                    onManage={() => onManageAccess(mailbox)}
+                    onManage={() => onOpenDetails(mailbox)}
                   />
-                </TableCell>
-              ) : null}
-              {canManage ? (
-                <TableCell className="whitespace-nowrap pl-1 text-right">
-                  <Button
-                    className="mr-2 px-2"
-                    size="sm"
+                ) : (
+                  <button
+                    className="min-h-10 rounded-sm text-left text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     type="button"
-                    variant="ghost"
-                    onClick={() => onAddAlias(mailbox)}
+                    onClick={() => onOpenDetails(mailbox)}
                   >
-                    Add alias
-                  </Button>
-                  <Button
-                    className="px-2"
-                    size="sm"
-                    type="button"
-                    variant="outline"
-                    onClick={() => onToggle(mailbox)}
-                  >
-                    {mailbox.isActive ? "Disable" : "Enable"}
-                  </Button>
-                </TableCell>
-              ) : null}
+                    Your access ·{" "}
+                    {mailbox.accessLevel
+                      ? `${mailbox.accessLevel.slice(0, 1).toUpperCase()}${mailbox.accessLevel.slice(1)}`
+                      : "None"}
+                  </button>
+                )}
+              </TableCell>
             </TableRow>
           );
         })}

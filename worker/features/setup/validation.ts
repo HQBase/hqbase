@@ -18,7 +18,6 @@ export const bootstrapSetupSchema = z
     ownerPassword: z.string().min(8).max(128),
     primaryDomain: domainSchema.optional(),
     portalHostname: domainSchema.optional(),
-    serviceHostname: domainSchema.optional(),
     emailDomains: z
       .array(
         z.object({
@@ -78,7 +77,6 @@ export const inspectCloudflareDomainSchema = z.object({
 export const configureCloudflareDomainSchema = inspectCloudflareDomainSchema
   .extend({
     appHostname: domainSchema.optional(),
-    serviceHostname: domainSchema.optional(),
     attachCustomDomain: z.boolean().default(true),
     enableSending: z.boolean().default(true)
   })

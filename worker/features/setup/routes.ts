@@ -1,12 +1,14 @@
 import { Hono } from "hono";
-
 import type { HonoApp } from "../../lib/env";
 import { readJson } from "../../lib/json";
 import { parseWith } from "../../lib/validation";
-import { getEntitlementStatus } from "../billing/queries";
-import { activateWorkspace } from "../billing/service";
-import { verifyUpgradeCutoverWithGrant } from "../upgrades/cutover";
-import { getUpgradeLifecycle } from "../upgrades/queries";
+import {
+  clearRuntimeCloudflareGrantCookie,
+  finishRuntimeCloudflareOAuth,
+  resolveRuntimeCloudflareGrant,
+  revokeRuntimeCloudflareGrant,
+  startRuntimeCloudflareOAuth
+} from "../cloudflare/oauth";
 
 import {
   configureCloudflareDomain,
@@ -14,7 +16,6 @@ import {
   listCloudflareZones,
   verifyCloudflareToken
 } from "./cloudflare";
-import { revokeSetupGrant } from "./oauth-cleanup";
 import { getSetupStatus } from "./queries";
 import { bootstrapSetup } from "./service";
 import {
@@ -26,21 +27,42 @@ import {
 } from "./validation";
 
 export const setupRoutes = new Hono<HonoApp>();
+const setupOAuthFlow = {
+  callbackPath: "/api/setup/cloudflare/oauth/callback",
+  operation: "setup",
+  returnPath: "/setup"
+} as const;
 
 setupRoutes.get("/status", async (c) => {
   return c.json(await getSetupStatus(c.env.DB));
 });
 
+setupRoutes.get("/cloudflare/oauth/start", async (c) => {
+  return startRuntimeCloudflareOAuth(c.req.raw, c.env, setupOAuthFlow);
+});
+
+setupRoutes.get("/cloudflare/oauth/callback", async (c) => {
+  return finishRuntimeCloudflareOAuth(c.req.raw, c.env, setupOAuthFlow);
+});
+
 setupRoutes.post("/cloudflare/zones", async (c) => {
   const input = parseWith(listCloudflareZonesSchema, await readJson(c.req.raw));
   return c.json({
-    zones: await listCloudflareZones({ ...input, apiToken: setupGrant(c.env) })
+    zones: await listCloudflareZones({
+      ...input,
+      apiToken: await resolveRuntimeCloudflareGrant(c.req.raw, c.env)
+    })
   });
 });
 
 setupRoutes.post("/cloudflare/access", async (c) => {
   const input = parseWith(verifyCloudflareAccessSchema, await readJson(c.req.raw));
-  return c.json(await verifyCloudflareToken({ ...input, apiToken: setupGrant(c.env) }));
+  return c.json(
+    await verifyCloudflareToken({
+      ...input,
+      apiToken: await resolveRuntimeCloudflareGrant(c.req.raw, c.env)
+    })
+  );
 });
 
 setupRoutes.post("/cloudflare/inspect", async (c) => {
@@ -48,7 +70,7 @@ setupRoutes.post("/cloudflare/inspect", async (c) => {
   return c.json(
     await inspectCloudflareDomain({
       ...input,
-      apiToken: setupGrant(c.env),
+      apiToken: await resolveRuntimeCloudflareGrant(c.req.raw, c.env),
       workerName: c.env.HQBASE_WORKER_NAME ?? input.workerName
     })
   );
@@ -56,51 +78,20 @@ setupRoutes.post("/cloudflare/inspect", async (c) => {
 
 setupRoutes.post("/cloudflare/configure", async (c) => {
   const input = parseWith(configureCloudflareDomainSchema, await readJson(c.req.raw));
-  const upgrade = await getUpgradeLifecycle(c.env.DB);
   return c.json(
     await configureCloudflareDomain({
       ...input,
-      apiToken: setupGrant(c.env),
-      workerName: c.env.HQBASE_WORKER_NAME ?? input.workerName,
-      replaceWorkerName: upgrade?.sourceWorkerName ?? undefined
+      apiToken: await resolveRuntimeCloudflareGrant(c.req.raw, c.env),
+      workerName: c.env.HQBASE_WORKER_NAME ?? input.workerName
     })
   );
 });
 
 setupRoutes.post("/bootstrap", async (c) => {
   const input = parseWith(bootstrapSetupSchema, await readJson(c.req.raw));
+  const grant = await resolveRuntimeCloudflareGrant(c.req.raw, c.env);
   const result = await bootstrapSetup(c.env, c.req.raw, input);
-  const upgrade = await getUpgradeLifecycle(c.env.DB);
-  if (upgrade && c.env.HQBASE_SETUP_OAUTH_ACCESS_TOKEN) {
-    try {
-      const entitlement = await getEntitlementStatus(c.env.DB);
-      if (entitlement.state === "unlicensed" && c.env.PRO_LICENSE_KEY) {
-        await activateWorkspace(c.env, {
-          licenseKey: c.env.PRO_LICENSE_KEY,
-          hostname: new URL(c.req.url).hostname
-        });
-      }
-      await verifyUpgradeCutoverWithGrant(c.env, c.env.HQBASE_SETUP_OAUTH_ACCESS_TOKEN);
-      c.executionCtx.waitUntil(
-        revokeSetupGrant(c.env, result.setup.domains[0]?.accountId).catch(() => undefined)
-      );
-    } catch {
-      // Keep the masked grant so the authenticated owner can retry explicit cutover verification.
-    }
-  } else {
-    c.executionCtx.waitUntil(
-      revokeSetupGrant(c.env, result.setup.domains[0]?.accountId).catch(() => undefined)
-    );
-  }
+  c.executionCtx.waitUntil(revokeRuntimeCloudflareGrant(grant, c.env).catch(() => undefined));
+  c.header("set-cookie", clearRuntimeCloudflareGrantCookie());
   return c.json(result, 201);
 });
-
-function setupGrant(env: HonoApp["Bindings"]): string {
-  const value = env.HQBASE_SETUP_OAUTH_ACCESS_TOKEN;
-  if (!value) {
-    throw new Error(
-      "The Cloudflare setup authorization expired. Restart Pro installation to authorize again."
-    );
-  }
-  return value;
-}

@@ -20,7 +20,7 @@ operationRoutes.get("/diagnostics", async (c) => {
   const auth = await requireAuthContext(c.env, c.req.raw);
   requireRole(auth, ["owner", "admin"]);
   const [schema, counts, operations] = await Promise.all([
-    c.env.DB.prepare("SELECT key, value, updated_at FROM pro_schema_state ORDER BY key").all<{
+    c.env.DB.prepare("SELECT key, value, updated_at FROM hqbase_schema_state ORDER BY key").all<{
       key: string;
       value: string;
       updated_at: string;
@@ -29,17 +29,15 @@ operationRoutes.get("/diagnostics", async (c) => {
       `SELECT
        (SELECT COUNT(*) FROM "user" WHERE COALESCE(banned, 0) = 0) AS users,
        (SELECT COUNT(*) FROM mailboxes WHERE is_active = 1) AS active_mailboxes,
-       (SELECT COUNT(*) FROM pro_mail_sessions WHERE revoked_at IS NULL AND expires_at > datetime('now')) AS active_bridge_sessions,
-       (SELECT COUNT(*) FROM pro_operation_runs WHERE status = 'failed') AS failed_operations`
+       (SELECT COUNT(*) FROM operation_runs WHERE status = 'failed') AS failed_operations`
     ).first<{
       users: number;
       active_mailboxes: number;
-      active_bridge_sessions: number;
       failed_operations: number;
     }>(),
     c.env.DB.prepare(
       `SELECT id, kind, status, counters_json, error_code, started_at, finished_at
-       FROM pro_operation_runs ORDER BY started_at DESC LIMIT 20`
+       FROM operation_runs ORDER BY started_at DESC LIMIT 20`
     ).all<{
       id: string;
       kind: string;
@@ -51,12 +49,11 @@ operationRoutes.get("/diagnostics", async (c) => {
     }>()
   ]);
   return c.json({
-    ready: schema.results.some((row) => row.key === "track1_operations" && row.value === "0004"),
+    ready: schema.results.some((row) => row.key === "product" && row.value === "hqbase"),
     schema: schema.results,
     counts: {
       users: counts?.users ?? 0,
       activeMailboxes: counts?.active_mailboxes ?? 0,
-      activeBridgeSessions: counts?.active_bridge_sessions ?? 0,
       failedOperations: counts?.failed_operations ?? 0
     },
     operations: operations.results.map((row) => ({
@@ -74,9 +71,9 @@ operationRoutes.get("/diagnostics", async (c) => {
 operationRoutes.post("/integrity-scan", async (c) => {
   const auth = await requireAuthContext(c.env, c.req.raw);
   requireRole(auth, ["owner", "admin"]);
-  if (!c.env.PRO_JOBS) throw new Error("PRO_JOBS binding is required.");
+  if (!c.env.HQBASE_JOBS) throw new Error("HQBASE_JOBS binding is required.");
   const id = `integrity:${crypto.randomUUID()}`;
-  await c.env.PRO_JOBS.send({ id, kind: "integrity-scan", requestedAt: nowIso() });
+  await c.env.HQBASE_JOBS.send({ id, kind: "integrity-scan", requestedAt: nowIso() });
   await recordAudit(c.env.DB, {
     correlationId: c.get("correlationId"),
     actorType: "user",
@@ -100,7 +97,7 @@ operationRoutes.get("/retention/:mailboxId", async (c) => {
   );
   const policy = await c.env.DB.prepare(
     `SELECT mailbox_id, message_days, trash_days, updated_at
-     FROM pro_retention_policies WHERE mailbox_id = ?`
+     FROM retention_policies WHERE mailbox_id = ?`
   )
     .bind(c.req.param("mailboxId"))
     .first();
@@ -115,7 +112,7 @@ operationRoutes.put("/retention/:mailboxId", async (c) => {
   await requireMailboxAccess(c.env.DB, auth.user.id, auth.user.role, mailboxId, "manager");
   const input = parseWith(retentionSchema, await readJson(c.req.raw));
   await c.env.DB.prepare(
-    `INSERT INTO pro_retention_policies
+    `INSERT INTO retention_policies
      (mailbox_id, message_days, trash_days, updated_by, updated_at)
      VALUES (?, ?, ?, ?, ?)
      ON CONFLICT(mailbox_id) DO UPDATE SET message_days = excluded.message_days,

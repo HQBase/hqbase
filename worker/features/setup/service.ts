@@ -20,7 +20,6 @@ type BootstrapInput = {
   ownerPassword: string;
   primaryDomain?: string | undefined;
   portalHostname?: string | undefined;
-  serviceHostname?: string | undefined;
   emailDomains?:
     | Array<{
         name: string;
@@ -75,16 +74,6 @@ export async function bootstrapSetup(
         domains.find((domain) => input.portalHostname?.endsWith(`.${domain.name}`))?.zoneId ?? null,
       kind: "portal",
       canonical: true
-    });
-  }
-  if (input.serviceHostname) {
-    await upsertWorkspaceHost(env.DB, {
-      hostname: input.serviceHostname,
-      zoneId:
-        domains.find((domain) => input.serviceHostname?.endsWith(`.${domain.name}`))?.zoneId ??
-        null,
-      kind: "service",
-      canonical: false
     });
   }
   await setChecklistAcknowledged(env.DB, input.checklistAcknowledged);

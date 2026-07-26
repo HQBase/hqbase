@@ -1,6 +1,6 @@
 export type ReleaseManifest = {
   format: "hqbase-release-v1";
-  edition: "community" | "pro";
+  product: "hqbase";
   channel: "stable";
   version: string;
   schemaVersion: number;
@@ -12,7 +12,7 @@ export type ReleaseManifest = {
 };
 
 export type UpdateStatus = {
-  edition: "community" | "pro";
+  product: "hqbase";
   installedVersion: string;
   installedSchemaVersion: number;
   channel: "stable";

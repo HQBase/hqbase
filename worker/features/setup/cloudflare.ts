@@ -22,10 +22,8 @@ type CloudflareZoneInput = CloudflareInput & {
 
 type CloudflareConfigureInput = CloudflareZoneInput & {
   appHostname?: string | undefined;
-  serviceHostname?: string | undefined;
   attachCustomDomain?: boolean | undefined;
   enableSending: boolean;
-  replaceWorkerName?: string | undefined;
 };
 
 const cloudflareZoneSchema = z.object({
@@ -160,27 +158,16 @@ export async function configureCloudflareDomain(
   }
 
   const steps: CloudflareStep[] = [];
-  const hostnames = [input.appHostname, input.serviceHostname].filter(
-    (hostname): hostname is string => Boolean(hostname)
-  );
-  if (input.attachCustomDomain && hostnames.length > 0) {
-    for (const [index, hostname] of hostnames.entries()) {
-      await recordStep(
-        steps,
-        index === 0 ? "custom-domain" : "service-domain",
-        index === 0 ? "Attach app URL" : "Attach service URL",
-        async () => {
-          const domain = await attachWorkerCustomDomain({
-            apiToken: input.apiToken,
-            hostname,
-            replaceWorkerName: input.replaceWorkerName,
-            workerName,
-            zone
-          });
-          return `${domain.hostname} now routes to Worker ${domain.service}.`;
-        }
-      );
-    }
+  if (input.attachCustomDomain && input.appHostname) {
+    await recordStep(steps, "custom-domain", "Attach app URL", async () => {
+      const domain = await attachWorkerCustomDomain({
+        apiToken: input.apiToken,
+        hostname: input.appHostname as string,
+        workerName,
+        zone
+      });
+      return `${domain.hostname} now routes to Worker ${domain.service}.`;
+    });
   } else {
     steps.push({
       id: "custom-domain",
@@ -261,7 +248,6 @@ export async function attachWorkerCustomDomain(input: {
   apiToken: string;
   hostname: string;
   workerName: string;
-  replaceWorkerName?: string | undefined;
   zone: CloudflareZone;
 }): Promise<z.infer<typeof workerDomainSchema>> {
   if (!input.zone.accountId) {
@@ -278,7 +264,7 @@ export async function attachWorkerCustomDomain(input: {
   );
   const existing = domains.find((domain) => domain.hostname === input.hostname);
   if (existing?.service === input.workerName) return existing;
-  if (existing && existing.service !== input.replaceWorkerName) {
+  if (existing) {
     throw new AppError(
       "CLOUDFLARE_WORKER_DOMAIN_CONFLICT",
       `${existing.hostname} already routes to Worker ${existing.service}. Choose another workspace address.`,
@@ -292,9 +278,6 @@ export async function attachWorkerCustomDomain(input: {
     {
       body: JSON.stringify({
         hostname: input.hostname,
-        ...(existing && existing.service === input.replaceWorkerName
-          ? { override_existing_origin: true }
-          : {}),
         service: input.workerName,
         zone_id: input.zone.id,
         zone_name: input.zone.name

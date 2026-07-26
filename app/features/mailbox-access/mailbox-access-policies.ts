@@ -18,6 +18,13 @@ export type MailboxAccessPolicies = {
   change: (mailboxId: string, userId: string, value: AccessChoice) => Promise<void>;
 };
 
+export type MailboxAccessEntry = {
+  id: string;
+  name: string;
+  email?: string;
+  accessLevel: MailboxAccessLevel;
+};
+
 export function useMailboxAccessPolicies(enabled: boolean): MailboxAccessPolicies {
   const [grants, setGrants] = React.useState<MailboxGrant[]>([]);
   const [busy, setBusy] = React.useState<string | null>(null);
@@ -97,15 +104,53 @@ export function formatMailboxAccessSummary(
   users: WorkspaceUser[],
   loading: boolean
 ): string {
-  if (loading) return "Loading…";
-  const eligibleUsers = new Set(
-    users.filter((user) => user.role !== "owner").map((user) => user.id)
-  );
-  const explicitUsers = new Set(
-    grants
-      .filter((grant) => grant.mailboxId === mailboxId && eligibleUsers.has(grant.userId))
-      .map((grant) => grant.userId)
-  );
-  if (explicitUsers.size === 0) return "Owner only";
-  return `Owner + ${explicitUsers.size} ${explicitUsers.size === 1 ? "user" : "users"}`;
+  if (loading) return "Loading access…";
+  const entries = getMailboxAccessEntries(mailboxId, grants, users);
+  const visible = entries.slice(0, 2);
+  const remaining = entries.length - visible.length;
+  const summary = visible
+    .map((entry) => `${entry.name} · ${formatAccessLevel(entry.accessLevel)}`)
+    .join(", ");
+  return remaining > 0 ? `${summary} +${remaining}` : summary;
+}
+
+export function getMailboxAccessEntries(
+  mailboxId: string,
+  grants: MailboxGrant[],
+  users: WorkspaceUser[]
+): MailboxAccessEntry[] {
+  const userById = new Map(users.map((user) => [user.id, user]));
+  const owners = users
+    .filter((user) => user.role === "owner")
+    .map((user) => ({
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      accessLevel: "manager" as const
+    }));
+  const explicit = grants
+    .filter((grant) => grant.mailboxId === mailboxId)
+    .flatMap((grant) => {
+      const user = userById.get(grant.userId);
+      if (!user || user.role === "owner") return [];
+      return [
+        {
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          accessLevel: grant.accessLevel
+        }
+      ];
+    });
+
+  return [
+    ...(owners.length
+      ? owners
+      : [{ id: "workspace-owners", name: "Owners", accessLevel: "manager" as const }]),
+    ...explicit
+  ];
+}
+
+export function formatAccessLevel(accessLevel: MailboxAccessLevel): string {
+  return `${accessLevel.slice(0, 1).toUpperCase()}${accessLevel.slice(1)}`;
 }

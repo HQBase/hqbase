@@ -7,7 +7,7 @@ export const healthRoutes = new Hono<HonoApp>();
 healthRoutes.get("/", (c) => {
   return c.json({
     ok: true,
-    service: "hqbase-pro",
+    service: "hqbase",
     time: new Date().toISOString()
   });
 });

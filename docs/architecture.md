@@ -1,34 +1,17 @@
 # Architecture
 
-HQBase is a Cloudflare-native SPA plus Worker API.
+HQBase is a single Cloudflare-native shared email workspace. The customer deployment owns the
+Worker, D1 database, R2 bucket, queues, routes, runtime secrets, mail, and workspace data.
 
-## Request Flow
+The Worker serves the web application and authenticated APIs, processes Cloudflare Email Routing
+messages, stores searchable metadata in D1 and MIME or attachment objects in R2, and dispatches
+background work through Cloudflare Queues.
 
-Static assets are built by Vite into `dist` and served by the Worker assets binding. API requests use `/api/*` and are routed by Hono. SPA routes fall back to the asset handler.
+Access is workspace-based: owners and administrators manage people and mailbox grants; members see
+only mailboxes granted to them. MCP uses OAuth 2.1 with PKCE and intersects requested scopes with the
+same live mailbox grants.
 
-## Auth Flow
-
-Better Auth is mounted at `/api/auth/*` and stores users, sessions, accounts, and verification records in D1. Public signup is blocked at the HTTP route. The setup route creates the first owner through Better Auth internally. Owner/admin users can create more users.
-
-## MCP Flow
-
-The installed Worker exposes a stateless Streamable HTTP MCP endpoint at `/mcp`. Better Auth is the
-OAuth 2.1 authorization server for public MCP clients, with PKCE, dynamic registration, explicit
-consent, and hashed opaque access tokens stored in the workspace. Every MCP call intersects OAuth
-scopes with the user's current Pro mailbox grants. Message-state changes, sending, and replies
-create content-free audit events.
-See [MCP](mcp.md).
-
-## Inbound Email Flow
-
-Cloudflare Email Routing delivers mail to the Worker `email(message, env, ctx)` handler. HQBase uses the SMTP envelope recipient, not only the `To:` header. Raw `.eml` is written to R2, metadata is parsed with Postal MIME, attachments are written to R2, and message metadata is written to D1.
-
-Known mailbox recipients land in `inbox`. Unknown recipients land in `catchall`.
-
-## Outbound Email Flow
-
-The compose API validates the selected active mailbox, calls the Cloudflare Email Sending binding, then stores a sent message in D1. Replies include `Message-ID`, `Date`, `In-Reply-To`, and `References` headers.
-
-## Storage Model
-
-D1 stores setup settings, mailboxes, threads, messages, attachment metadata, and Better Auth tables. R2 stores large or raw objects: raw inbound emails, HTML bodies, attachments, and outbound HTML bodies.
+Installation and updates consume signed public artifacts from GitHub Releases. A short-lived
+Cloudflare OAuth grant may mutate customer resources. It is encrypted in the customer deployment,
+scoped to the operation, and revoked afterward. Customer Cloudflare credentials are never copied
+to an HQBase service.

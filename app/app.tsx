@@ -6,9 +6,6 @@ import { Toaster } from "@/components/ui/sonner";
 import { getCurrentUser } from "@/features/auth/api";
 import { LoginPage } from "@/features/auth/login-page";
 import type { CurrentUser } from "@/features/auth/types";
-import { getEntitlementStatus } from "@/features/billing/api";
-import { BillingBanner } from "@/features/billing/billing-banner";
-import type { EntitlementStatus } from "@/features/billing/types";
 import { InboxPage } from "@/features/inbox/inbox-page";
 import { listMailboxes } from "@/features/mailboxes/api";
 import type { Mailbox } from "@/features/mailboxes/types";
@@ -20,9 +17,6 @@ import { SetupPage } from "@/features/setup/setup-page";
 import type { SetupStatus } from "@/features/setup/types";
 import { getUpdateStatus } from "@/features/updates/api";
 import type { UpdateStatus } from "@/features/updates/types";
-import { getUpgradeLifecycle } from "@/features/upgrades/api";
-import type { UpgradeLifecycle } from "@/features/upgrades/types";
-import { UpgradeComplete } from "@/features/upgrades/upgrade-complete";
 import { listUsers } from "@/features/users/api";
 import type { WorkspaceUser } from "@/features/users/types";
 import type { FolderId, MailFolderId, SettingsTabId } from "@/lib/routes";
@@ -37,8 +31,6 @@ export function App(): React.ReactElement {
   const [user, setUser] = React.useState<CurrentUser | null>(null);
   const [mailboxes, setMailboxes] = React.useState<Mailbox[]>([]);
   const [users, setUsers] = React.useState<WorkspaceUser[]>([]);
-  const [entitlement, setEntitlement] = React.useState<EntitlementStatus | null>(null);
-  const [upgrade, setUpgrade] = React.useState<UpgradeLifecycle | null>(null);
   const [messages, setMessages] = React.useState<MessageSummary[]>([]);
   const [mailboxId, setMailboxId] = React.useState("all");
   const [search, setSearch] = React.useState("");
@@ -57,14 +49,7 @@ export function App(): React.ReactElement {
     setMailboxes(nextMailboxes);
 
     if (currentUser.role === "owner" || currentUser.role === "admin") {
-      const [nextUsers, nextEntitlement, nextUpgrade] = await Promise.all([
-        listUsers(),
-        getEntitlementStatus(),
-        getUpgradeLifecycle()
-      ]);
-      setUsers(nextUsers);
-      setEntitlement(nextEntitlement);
-      setUpgrade(nextUpgrade);
+      setUsers(await listUsers());
       void getUpdateStatus()
         .then(setUpdateStatus)
         .catch(() => {
@@ -72,8 +57,6 @@ export function App(): React.ReactElement {
         });
     } else {
       setUsers([]);
-      setEntitlement(null);
-      setUpgrade(null);
       setUpdateStatus(null);
     }
   }, []);
@@ -153,11 +136,11 @@ export function App(): React.ReactElement {
   React.useEffect(() => {
     if (!user || isLoading || route.kind !== "settings") return;
     const canManage = user.role === "owner" || user.role === "admin";
-    const managementOnly = ["domains", "billing", "updates"].includes(route.tab);
-    if ((!canManage && managementOnly) || (route.tab === "billing" && !entitlement)) {
+    const managementOnly = ["domains", "updates"].includes(route.tab);
+    if (!canManage && managementOnly) {
       navigate({ kind: "settings", tab: "mailboxes" }, true);
     }
-  }, [entitlement, isLoading, navigate, route, user]);
+  }, [isLoading, navigate, route, user]);
 
   if (isLoading && setup === null) {
     return <FullScreenStatus label="Loading HQBase" />;
@@ -185,14 +168,6 @@ export function App(): React.ReactElement {
 
   return (
     <>
-      <UpgradeComplete
-        onOpenSettings={() => {
-          navigate({ kind: "settings", tab: "billing" });
-        }}
-        onAddDomain={() => {
-          navigate({ kind: "settings", tab: "domains" });
-        }}
-      />
       <AppShell
         activeFolder={activeFolder}
         mailboxId={mailboxId}
@@ -222,19 +197,14 @@ export function App(): React.ReactElement {
         }}
       >
         <div className="flex h-full flex-col">
-          {entitlement ? <BillingBanner status={entitlement} /> : null}
           <div className="min-h-0 flex-1">
             {activeFolder === "settings" ? (
               <SettingsPage
                 activeTab={settingsTab}
                 canManage={user.role === "owner" || user.role === "admin"}
-                entitlement={entitlement}
-                upgrade={upgrade}
                 mailboxes={mailboxes}
                 setup={setup}
                 users={users}
-                onEntitlementChanged={setEntitlement}
-                onUpgradeChanged={setUpgrade}
                 onRefresh={() => void reload()}
                 onTabChange={(tab) => navigate({ kind: "settings", tab })}
                 updateStatus={updateStatus}

@@ -27,14 +27,18 @@ describe("application routing", () => {
     }
   });
 
-  it("keeps OAuth return aliases and retired Settings tabs compatible", () => {
+  it("keeps OAuth return aliases and the retired General tab compatible", () => {
     expect(readAppRoute("/?cloudflare=connected&settings=domains")).toEqual({
       kind: "settings",
       tab: "domains"
     });
     expect(readAppRoute("/?settings=updates")).toEqual({ kind: "settings", tab: "updates" });
     expect(readAppRoute("/settings/general")).toEqual({ kind: "settings", tab: "debug" });
-    expect(readAppRoute("/?settings=upgrade")).toEqual({ kind: "settings", tab: "debug" });
+    expect(readAppRoute("/?settings=upgrade")).toEqual({
+      kind: "mail",
+      folder: "inbox",
+      messageId: null
+    });
     expect(readAppRoute("/catchall")).toEqual({
       kind: "mail",
       folder: "catchall",

@@ -1,5 +1,5 @@
 export type UpdateStatus = {
-  edition: "community" | "pro";
+  product: "hqbase";
   installedVersion: string;
   installedSchemaVersion: number;
   channel: "stable";

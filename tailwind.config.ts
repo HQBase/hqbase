@@ -65,11 +65,41 @@ export default {
           to: {
             height: "0"
           }
+        },
+        "overlay-in": {
+          from: { opacity: "0" },
+          to: { opacity: "1" }
+        },
+        "overlay-out": {
+          from: { opacity: "1" },
+          to: { opacity: "0" }
+        },
+        "sheet-in-left": {
+          from: { transform: "translateX(-100%)" },
+          to: { transform: "translateX(0)" }
+        },
+        "sheet-out-left": {
+          from: { transform: "translateX(0)" },
+          to: { transform: "translateX(-100%)" }
+        },
+        "sheet-in-right": {
+          from: { transform: "translateX(100%)" },
+          to: { transform: "translateX(0)" }
+        },
+        "sheet-out-right": {
+          from: { transform: "translateX(0)" },
+          to: { transform: "translateX(100%)" }
         }
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
-        "accordion-up": "accordion-up 0.2s ease-out"
+        "accordion-up": "accordion-up 0.2s ease-out",
+        "overlay-in": "overlay-in 0.18s ease-out",
+        "overlay-out": "overlay-out 0.18s ease-in",
+        "sheet-in-left": "sheet-in-left 0.22s ease-out",
+        "sheet-out-left": "sheet-out-left 0.18s ease-in",
+        "sheet-in-right": "sheet-in-right 0.22s ease-out",
+        "sheet-out-right": "sheet-out-right 0.18s ease-in"
       }
     }
   },

@@ -51,6 +51,8 @@ export function ComposeFields(props: {
         <>
           <Row label="To">
             <Input
+              autoFocus
+              data-compose-autofocus
               required
               value={props.to}
               onChange={(event) => props.setTo(event.target.value)}

@@ -2,7 +2,7 @@ import { newId, nowIso } from "../../db/client";
 
 export type AuditInput = {
   correlationId: string;
-  actorType: "user" | "bridge" | "system" | "operator";
+  actorType: "user" | "system" | "operator";
   actorId?: string | null;
   action: string;
   resourceType: string;
@@ -34,7 +34,7 @@ export async function recordAudit(db: D1Database, input: AuditInput): Promise<vo
   }
   await db
     .prepare(
-      `INSERT INTO pro_audit_events
+      `INSERT INTO audit_events
        (id, occurred_at, correlation_id, actor_type, actor_id, action, resource_type,
         resource_id, outcome, metadata_json)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`

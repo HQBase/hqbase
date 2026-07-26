@@ -60,18 +60,13 @@ describe("send service", () => {
     CLOUDFLARE_OAUTH_CLIENT_ID: "1c413f324b518b452096929b847e6703",
     DB: {} as D1Database,
     HQBASE_APP_VERSION: "0.1.3",
-    HQBASE_BILLING_URL: "https://billing.hqbase.io",
-    HQBASE_COMMUNITY_WORKER_NAME: "hqbase",
     HQBASE_RELEASE_PUBLIC_KEY: "MCowBQYDK2VwAyEAsVwKniCvpHDwbbnjTPP0SuIIG97cRL+iFBQvay9OrU4=",
-    HQBASE_RELEASES_URL: "https://billing.hqbase.io/v1/releases",
-    HQBASE_WORKER_NAME: "hqbase-pro",
+    HQBASE_RELEASE_MANIFEST_URL:
+      "https://github.com/HQBase/hqbase/releases/latest/download/stable.json",
+    HQBASE_WORKER_NAME: "hqbase",
     MAIL_OBJECTS: { put } as unknown as R2Bucket,
     MAIL_SENDER: { send } as unknown as SendEmail,
-    PRO_APP_PASSWORD_PEPPER: "test-app-password-pepper",
-    PRO_BRIDGE_TOKEN: "test-bridge-token",
-    PRO_ENTITLEMENT_SECRET: "test-entitlement-secret",
-    PRO_JOBS: {} as Queue,
-    PRO_SESSION_SECRET: "test-session-secret"
+    HQBASE_JOBS: {} as Queue
   } satisfies WorkerEnv;
 
   beforeEach(() => {

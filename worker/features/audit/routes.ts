@@ -18,7 +18,7 @@ auditRoutes.get("/", async (c) => {
   const result = await c.env.DB.prepare(
     `SELECT id, occurred_at, correlation_id, actor_type, actor_id, action, resource_type,
             resource_id, outcome, metadata_json
-     FROM pro_audit_events WHERE occurred_at < ? ORDER BY occurred_at DESC LIMIT ?`
+     FROM audit_events WHERE occurred_at < ? ORDER BY occurred_at DESC LIMIT ?`
   )
     .bind(input.before ?? "9999-12-31T23:59:59.999Z", input.limit)
     .all<{

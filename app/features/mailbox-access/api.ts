@@ -2,7 +2,7 @@ import { apiDelete, apiGet, apiPut } from "@/lib/api-client";
 import type { MailboxAccessLevel, MailboxGrant } from "./types";
 
 export function listMailboxGrants(): Promise<MailboxGrant[]> {
-  return apiGet("/api/pro/mailbox-grants");
+  return apiGet("/api/mailbox-grants");
 }
 
 export function setMailboxGrant(input: {
@@ -10,9 +10,9 @@ export function setMailboxGrant(input: {
   userId: string;
   accessLevel: MailboxAccessLevel;
 }): Promise<void> {
-  return apiPut("/api/pro/mailbox-grants", input);
+  return apiPut("/api/mailbox-grants", input);
 }
 
 export function revokeMailboxGrant(mailboxId: string, userId: string): Promise<void> {
-  return apiDelete(`/api/pro/mailbox-grants/${mailboxId}/${userId}`);
+  return apiDelete(`/api/mailbox-grants/${mailboxId}/${userId}`);
 }

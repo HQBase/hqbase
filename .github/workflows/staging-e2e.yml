@@ -6,94 +6,22 @@ on:
   workflow_dispatch:
     inputs:
       candidate_ref:
-        description: Reviewed Pro commit or ref to validate
+        description: Reviewed HQBase commit or ref to validate
         required: false
         default: main
-      community_ref:
-        description: Reviewed Community commit or ref for upgrade QA
-        required: false
-        default: a54934e4455de3d45e455c15fd23987f4054d63a
   workflow_run:
     workflows: [CI]
     types: [completed]
     branches: [main]
 
+permissions:
+  contents: read
+
 concurrency:
-  group: hqbase-pro-staging-e2e
+  group: hqbase-staging-e2e
   cancel-in-progress: false
 
 jobs:
-  community-upgrade-migration:
-    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
-    runs-on: ubuntu-latest
-    environment: hqbase-staging
-    timeout-minutes: 20
-    env:
-      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.HQBASE_E2E_CLOUDFLARE_ACCOUNT_ID }}
-      CLOUDFLARE_API_TOKEN: ${{ secrets.HQBASE_E2E_CLOUDFLARE_API_TOKEN }}
-      DEPLOYMENT_NAME: upgrade-${{ github.run_id }}
-      D1_NAME: hqbase-upgrade-${{ github.run_id }}
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ inputs.candidate_ref || github.event.workflow_run.head_sha || github.sha }}
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 11.7.0
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - name: Check out Community
-        uses: actions/checkout@v4
-        with:
-          repository: HQBase/hqbase
-          ref: ${{ inputs.community_ref || 'a54934e4455de3d45e455c15fd23987f4054d63a' }}
-          path: .staging/community
-      - name: Install Community operator dependencies
-        working-directory: .staging/community
-        run: pnpm install --frozen-lockfile
-      - name: Create remote Community data resources
-        working-directory: .staging/community
-        run: >-
-          pnpm hqbase install
-          --name "$DEPLOYMENT_NAME"
-          --d1-name "$D1_NAME"
-          --skip-build
-          --skip-deploy
-      - name: Seed Community retention marker
-        working-directory: .staging/community
-        run: >-
-          pnpm exec wrangler d1 execute "$D1_NAME"
-          --remote
-          --command
-          "INSERT INTO app_settings (key, value_json, created_at, updated_at)
-          VALUES ('e2e-upgrade-probe', '{\"retained\":true}', datetime('now'), datetime('now'))"
-      - name: Preflight Community to Pro migration
-        run: >-
-          pnpm hqbase-pro upgrade
-          --from-community
-          --database "$D1_NAME"
-          --remote
-          --dry-run
-      - name: Apply backed-up Community to Pro migration
-        run: >-
-          pnpm hqbase-pro upgrade
-          --from-community
-          --database "$D1_NAME"
-          --remote
-          --yes
-      - name: Verify Community data retention
-        run: |
-          result=$(pnpm exec wrangler d1 execute "$D1_NAME" --remote --json \
-            --command "SELECT value_json FROM app_settings WHERE key = 'e2e-upgrade-probe'")
-          jq -e '.[0].results[0].value_json == "{\"retained\":true}"' <<<"$result"
-      - name: Destroy Community upgrade resources
-        if: always()
-        working-directory: .staging/community
-        run: pnpm hqbase destroy --name "$DEPLOYMENT_NAME" --scope all --yes
-
   fresh-install:
     if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
@@ -102,13 +30,13 @@ jobs:
     env:
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.HQBASE_E2E_CLOUDFLARE_ACCOUNT_ID }}
       CLOUDFLARE_API_TOKEN: ${{ secrets.HQBASE_E2E_CLOUDFLARE_API_TOKEN }}
-      HQBASE_PRO_STAGING_ACCESS_CLIENT_ID: ${{ secrets.HQBASE_E2E_ACCESS_CLIENT_ID }}
-      HQBASE_PRO_STAGING_ACCESS_CLIENT_SECRET: ${{ secrets.HQBASE_E2E_ACCESS_CLIENT_SECRET }}
-      HQBASE_PRO_STAGING_EMAIL_DOMAIN: ${{ secrets.HQBASE_E2E_EMAIL_DOMAIN }}
-      HQBASE_PRO_STAGING_OWNER_EMAIL: owner@${{ secrets.HQBASE_E2E_EMAIL_DOMAIN }}
-      HQBASE_PRO_STAGING_OWNER_PASSWORD: ${{ secrets.HQBASE_E2E_OWNER_PASSWORD }}
-      HQBASE_PRO_STAGING_SENDER: hello@${{ secrets.HQBASE_E2E_EMAIL_DOMAIN }}
-      HQBASE_PRO_STAGING_URL: https://${{ secrets.HQBASE_E2E_APP_HOSTNAME }}
+      HQBASE_STAGING_ACCESS_CLIENT_ID: ${{ secrets.HQBASE_E2E_ACCESS_CLIENT_ID }}
+      HQBASE_STAGING_ACCESS_CLIENT_SECRET: ${{ secrets.HQBASE_E2E_ACCESS_CLIENT_SECRET }}
+      HQBASE_STAGING_EMAIL_DOMAIN: ${{ secrets.HQBASE_E2E_EMAIL_DOMAIN }}
+      HQBASE_STAGING_OWNER_EMAIL: owner@${{ secrets.HQBASE_E2E_EMAIL_DOMAIN }}
+      HQBASE_STAGING_OWNER_PASSWORD: ${{ secrets.HQBASE_E2E_OWNER_PASSWORD }}
+      HQBASE_STAGING_SENDER: hello@${{ secrets.HQBASE_E2E_EMAIL_DOMAIN }}
+      HQBASE_STAGING_URL: https://${{ secrets.HQBASE_E2E_APP_HOSTNAME }}
       DEPLOYMENT_NAME: e2e-${{ github.run_id }}
     steps:
       - uses: actions/checkout@v4
@@ -129,146 +57,62 @@ jobs:
           restore-keys: ${{ runner.os }}-${{ runner.arch }}-playwright-
       - run: pnpm install --frozen-lockfile
       - run: pnpm exec playwright install --with-deps chromium
-      - name: Deploy disposable Pro installation
+      - name: Create disposable customer resources
         run: >-
-          pnpm hqbase-pro install
+          pnpm hqbase install
           --name "$DEPLOYMENT_NAME"
-          --worker-name hqbase-pro-e2e-staging
-          --domain "$HQBASE_PRO_STAGING_EMAIL_DOMAIN"
+          --worker-name hqbase-e2e-staging
+          --domain "$HQBASE_STAGING_EMAIL_DOMAIN"
           --no-email
-          --app-domain "${HQBASE_PRO_STAGING_URL#https://}"
-      - name: Wait for the disposable Pro custom domain
+          --app-domain "${HQBASE_STAGING_URL#https://}"
+          --skip-build
+          --skip-deploy
+      - name: Deploy reviewed source candidate
+        run: |
+          config=".hqbase/deployments/$DEPLOYMENT_NAME/wrangler.jsonc"
+          AUTH_SECRET="$(openssl rand -base64 48)" node --input-type=module -e '
+            import { writeFileSync } from "node:fs";
+            writeFileSync("/tmp/hqbase-e2e-secrets.json", `${JSON.stringify({ BETTER_AUTH_SECRET: process.env.AUTH_SECRET })}\n`, { mode: 0o600 });
+          '
+          pnpm build
+          pnpm exec wrangler d1 migrations apply DB --remote --config "$config"
+          pnpm exec wrangler deploy --config "$config" --secrets-file /tmp/hqbase-e2e-secrets.json
+      - name: Wait for the disposable custom domain
         run: |
           for attempt in $(seq 1 150); do
             if curl --fail --silent --show-error \
-              -H "CF-Access-Client-Id: $HQBASE_PRO_STAGING_ACCESS_CLIENT_ID" \
-              -H "CF-Access-Client-Secret: $HQBASE_PRO_STAGING_ACCESS_CLIENT_SECRET" \
-              "$HQBASE_PRO_STAGING_URL/api/health" >/dev/null; then
+              -H "CF-Access-Client-Id: $HQBASE_STAGING_ACCESS_CLIENT_ID" \
+              -H "CF-Access-Client-Secret: $HQBASE_STAGING_ACCESS_CLIENT_SECRET" \
+              "$HQBASE_STAGING_URL/api/health" >/dev/null; then
               exit 0
             fi
             sleep 2
           done
-          echo "Disposable Pro custom domain was not healthy within 300 seconds"
+          echo "Disposable HQBase custom domain was not healthy within 300 seconds"
           exit 1
-      - name: Fail fast on PWA and app-shell readiness
-        run: pnpm test:e2e:staging:smoke
-      - name: Prepare an N-1 Pro installation
-        id: release-versions
-        run: |
-          current_version=$(node -p "require('./package.json').version")
-          previous_version=$(node -p "require('./package.json').hqbaseRelease.minimumVersion")
-          published_version=$(node --input-type=module -e '
-            const response = await fetch("https://billing.hqbase.io/v1/releases/pro/stable");
-            if (!response.ok) throw new Error(`Stable manifest failed (${response.status})`);
-            const envelope = await response.json();
-            const manifest = JSON.parse(Buffer.from(envelope.payload, "base64url").toString());
-            console.log(manifest.version);
-          ')
-          test "$current_version" != "$previous_version"
-          echo "current=$current_version" >> "$GITHUB_OUTPUT"
-          echo "previous=$previous_version" >> "$GITHUB_OUTPUT"
-          echo "published=$published_version" >> "$GITHUB_OUTPUT"
-          if [ "$published_version" = "$current_version" ]; then
-            echo "candidate_released=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "candidate_released=false" >> "$GITHUB_OUTPUT"
-            echo "Stable is $published_version; deferring signed $current_version discovery acceptance until publication."
-          fi
-          config=".hqbase-pro/deployments/$DEPLOYMENT_NAME/wrangler.jsonc"
-          secrets=".hqbase-pro/deployments/$DEPLOYMENT_NAME/secrets.json"
-          node --input-type=module -e '
-            import fs from "node:fs";
-            const path = process.argv[1];
-            const version = process.argv[2];
-            const config = JSON.parse(fs.readFileSync(path, "utf8"));
-            config.vars.HQBASE_APP_VERSION = version;
-            fs.writeFileSync(path, `${JSON.stringify(config, null, 2)}\n`);
-          ' "$config" "$previous_version"
-          pnpm exec wrangler d1 execute DB --remote --config "$config" \
-            --command "UPDATE pro_release_state SET installed_version = '$previous_version', updated_at = datetime('now') WHERE singleton = 1"
-          for attempt in $(seq 1 5); do
-            if pnpm exec wrangler deploy --config "$config" --secrets-file "$secrets"; then
-              break
-            fi
-            test "$attempt" -lt 5
-            echo "Worker trigger reconciliation failed; retrying in 15 seconds."
-            sleep 15
-          done
-      - name: Exercise the Pro web and authorization lifecycle
-        env:
-          HQBASE_PRO_STAGING_EXPECT_UPDATE_VERSION: ${{ steps.release-versions.outputs.candidate_released == 'true' && steps.release-versions.outputs.current || '' }}
-        run: pnpm test:e2e:staging:lifecycle
-      - name: Apply the guarded Pro N-1 update
-        run: |
-          current_version=$(node -p "require('./package.json').version")
-          previous_version="${{ steps.release-versions.outputs.previous }}"
-          config=".hqbase-pro/deployments/$DEPLOYMENT_NAME/wrangler.jsonc"
-          node --input-type=module -e '
-            import fs from "node:fs";
-            const path = process.argv[1];
-            const version = process.argv[2];
-            const config = JSON.parse(fs.readFileSync(path, "utf8"));
-            config.vars.HQBASE_APP_VERSION = version;
-            fs.writeFileSync(path, `${JSON.stringify(config, null, 2)}\n`);
-          ' "$config" "$current_version"
-          pnpm build
-          for attempt in $(seq 1 5); do
-            if HQBASE_TARGET_VERSION="$current_version" CONFIG_FILE="$config" node --input-type=module -e '
-              import { runDeployLifecycle } from "./scripts/hqbase-pro/deploy.mjs";
-              runDeployLifecycle({ configFile: process.env.CONFIG_FILE });
-            '; then
-              break
-            fi
-            test "$attempt" -lt 5
-            echo "Guarded Worker redeploy failed; retrying in 15 seconds."
-            sleep 15
-          done
-          release=$(pnpm exec wrangler d1 execute DB --remote --config "$config" --json \
-            --command "SELECT installed_version FROM pro_release_state WHERE singleton = 1")
-          history=$(pnpm exec wrangler d1 execute DB --remote --config "$config" --json \
-            --command "SELECT from_version, to_version, state FROM pro_update_history ORDER BY started_at DESC LIMIT 1")
-          jq -e --arg version "$current_version" '.[0].results[0].installed_version == $version' <<<"$release"
-          jq -e --arg from "$previous_version" --arg version "$current_version" \
-            '.[0].results[0] == {"from_version":$from,"to_version":$version,"state":"verified"}' \
-            <<<"$history"
-      - name: Verify web health after redeploy
-        run: |
-          curl --fail --silent --show-error \
-            -H "CF-Access-Client-Id: $HQBASE_PRO_STAGING_ACCESS_CLIENT_ID" \
-            -H "CF-Access-Client-Secret: $HQBASE_PRO_STAGING_ACCESS_CLIENT_SECRET" \
-            "$HQBASE_PRO_STAGING_URL/api/health" >/dev/null
+      - name: Verify PWA, app shell, access, and operator lifecycle
+        run: pnpm test:e2e:staging
       - name: Exercise populated remote backup and restore
         run: |
-          config=".hqbase-pro/deployments/$DEPLOYMENT_NAME/wrangler.jsonc"
-          database="hqbase-pro-$DEPLOYMENT_NAME"
+          config=".hqbase/deployments/$DEPLOYMENT_NAME/wrangler.jsonc"
+          database="hqbase-$DEPLOYMENT_NAME"
           pnpm exec wrangler d1 execute "$database" --remote --config "$config" \
-            --command "INSERT INTO app_settings (key, value_json, created_at, updated_at) VALUES ('track1-restore-probe', '{\"state\":\"before\"}', datetime('now'), datetime('now'))"
-          pnpm hqbase-pro backup --name "$DEPLOYMENT_NAME" --output /tmp/track1-backup.json
+            --command "INSERT INTO app_settings (key, value_json, created_at, updated_at) VALUES ('staging-restore-probe', '{\"state\":\"before\"}', datetime('now'), datetime('now'))"
+          pnpm hqbase backup --name "$DEPLOYMENT_NAME" --output /tmp/hqbase-backup.json
           pnpm exec wrangler d1 execute "$database" --remote --config "$config" \
-            --command "UPDATE app_settings SET value_json = '{\"state\":\"after\"}', updated_at = datetime('now') WHERE key = 'track1-restore-probe'"
-          pnpm hqbase-pro restore --name "$DEPLOYMENT_NAME" --backup /tmp/track1-backup.json --yes
+            --command "UPDATE app_settings SET value_json = '{\"state\":\"after\"}', updated_at = datetime('now') WHERE key = 'staging-restore-probe'"
+          pnpm hqbase restore --name "$DEPLOYMENT_NAME" --backup /tmp/hqbase-backup.json --yes
           result=$(pnpm exec wrangler d1 execute "$database" --remote --config "$config" --json \
-            --command "SELECT value_json FROM app_settings WHERE key = 'track1-restore-probe'")
+            --command "SELECT value_json FROM app_settings WHERE key = 'staging-restore-probe'")
           jq -e '.[0].results[0].value_json == "{\"state\":\"before\"}"' <<<"$result"
-          curl --fail --silent --show-error \
-            -H "CF-Access-Client-Id: $HQBASE_PRO_STAGING_ACCESS_CLIENT_ID" \
-            -H "CF-Access-Client-Secret: $HQBASE_PRO_STAGING_ACCESS_CLIENT_SECRET" \
-            "$HQBASE_PRO_STAGING_URL/api/health" >/dev/null
-      - name: Verify the successful run is a healthy persistent staging anchor
-        run: |
-          config=".hqbase-pro/deployments/$DEPLOYMENT_NAME/wrangler.jsonc"
-          pnpm exec wrangler d1 info "hqbase-pro-$DEPLOYMENT_NAME" --config "$config" >/dev/null
-          pnpm exec wrangler r2 bucket info "hqbase-pro-$DEPLOYMENT_NAME-mail" >/dev/null
-          pnpm exec wrangler queues info "hqbase-pro-$DEPLOYMENT_NAME-jobs" >/dev/null
-          curl --fail --silent --show-error \
-            -H "CF-Access-Client-Id: $HQBASE_PRO_STAGING_ACCESS_CLIENT_ID" \
-            -H "CF-Access-Client-Secret: $HQBASE_PRO_STAGING_ACCESS_CLIENT_SECRET" \
-            "$HQBASE_PRO_STAGING_URL/api/health" >/dev/null
-      - name: Retain the non-secret staging manifest for verified cleanup
+      - name: Upload non-secret deployment record
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: hqbase-pro-staging-manifest-${{ github.run_id }}
-          path: .hqbase-pro/deployments/e2e-${{ github.run_id }}/manifest.json
-          if-no-files-found: error
+          name: hqbase-staging-manifest-${{ github.run_id }}
+          path: .hqbase/deployments/e2e-${{ github.run_id }}/manifest.json
+          if-no-files-found: warn
           retention-days: 30
+      - name: Destroy disposable resources
+        if: always()
+        run: pnpm hqbase destroy --name "$DEPLOYMENT_NAME" --scope all --yes

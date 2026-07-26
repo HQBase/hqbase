@@ -1,5 +1,5 @@
-import { LogOut, MailPlus, Search } from "lucide-react";
-import type * as React from "react";
+import { Cable, LogOut, MailPlus, Search } from "lucide-react";
+import * as React from "react";
 
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -23,6 +23,7 @@ import {
 import { signOut } from "@/features/auth/api";
 import type { CurrentUser } from "@/features/auth/types";
 import type { Mailbox } from "@/features/mailboxes/types";
+import { McpConnectionDialog } from "@/features/mcp/connection-dialog";
 import { initials } from "@/lib/format";
 
 type TopBarProps = {
@@ -46,6 +47,9 @@ export function TopBar({
   onSearchChange,
   onSignedOut
 }: TopBarProps): React.ReactElement {
+  const [mcpOpen, setMcpOpen] = React.useState(false);
+  const mcpTriggerRef = React.useRef<HTMLButtonElement>(null);
+
   async function handleSignOut() {
     await signOut();
     onSignedOut();
@@ -82,9 +86,32 @@ export function TopBar({
           <MailPlus />
           <span className="hidden sm:inline">Compose</span>
         </Button>
+        <div aria-hidden="true" className="hidden h-5 w-px bg-border md:block" />
+        <Button
+          className="hidden h-8 px-3 md:inline-flex"
+          onClick={() => setMcpOpen(true)}
+          ref={mcpTriggerRef}
+          type="button"
+          variant="outline"
+        >
+          <Cable />
+          Connect MCP
+        </Button>
+        <McpConnectionDialog
+          open={mcpOpen}
+          restoreFocusRef={mcpTriggerRef}
+          user={user}
+          onOpenChange={setMcpOpen}
+        />
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button className="size-8 rounded-full" size="icon" type="button" variant="ghost">
+            <Button
+              aria-label="Open profile menu"
+              className="size-8 rounded-full"
+              size="icon"
+              type="button"
+              variant="ghost"
+            >
               <Avatar className="size-7 border">
                 <AvatarFallback className="text-[11px] font-medium">
                   {initials(user.name)}

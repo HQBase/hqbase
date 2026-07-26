@@ -1,10 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  parseTimeTravelBookmark,
-  parseWorkerVersion
-} from "../../../scripts/hqbase-pro/backup.mjs";
-import { validateBackupManifest } from "../../../scripts/hqbase-pro/restore.mjs";
+import { parseTimeTravelBookmark, parseWorkerVersion } from "../../../scripts/hqbase/backup.mjs";
+import { validateBackupManifest } from "../../../scripts/hqbase/restore.mjs";
 
 describe("operator recovery manifests", () => {
   it("extracts D1 bookmarks and Worker versions from nested Wrangler JSON", () => {
@@ -20,7 +17,7 @@ describe("operator recovery manifests", () => {
 
   it("rejects malformed and cross-deployment restores", () => {
     const valid = {
-      format: "hqbase-pro-backup-v1",
+      format: "hqbase-backup-v1",
       deployment: "staging",
       d1: { bookmark: "bk-123" },
       worker: { version: "ver-456" }

@@ -2,34 +2,21 @@ import { env, SELF } from "cloudflare:test";
 import { beforeAll, describe, expect, it } from "vitest";
 
 import initialMigration from "../../../migrations/0001_initial.sql?raw";
-import proMigration from "../../../migrations/0002_pro_mail_bridge.sql?raw";
-import bridgeV2Migration from "../../../migrations/0003_mail_bridge_v2.sql?raw";
-import operationsMigration from "../../../migrations/0004_track1_operations.sql?raw";
-import multiDomainMigration from "../../../migrations/0005_multi_domain.sql?raw";
-import updatesMigration from "../../../migrations/0009_updates.sql?raw";
-import mcpMigration from "../../../migrations/0012_mcp_oauth.sql?raw";
+import workspaceMigration from "../../../migrations/0002_workspace.sql?raw";
 import { hashOAuthToken } from "../../../worker/auth/oauth-token";
 
-const origin = "https://hqbase-pro.test";
+const origin = "https://hqbase.test";
 const userId = "usr_mcp_member";
 const sessionId = "ses_mcp_member";
-const token = "hqb_access_mcp-pro-access-token";
+const token = "hqb_access_mcp-hqbase-access-token";
 
-describe("Pro MCP server", () => {
+describe("HQBase MCP server", () => {
   beforeAll(async () => {
-    for (const migration of [
-      initialMigration,
-      proMigration,
-      bridgeV2Migration,
-      operationsMigration,
-      multiDomainMigration,
-      updatesMigration,
-      mcpMigration
-    ]) {
+    for (const migration of [initialMigration, workspaceMigration]) {
       await applyMigration(migration);
     }
     const now = new Date();
-    const storedAccessToken = await hashOAuthToken("mcp-pro-access-token");
+    const storedAccessToken = await hashOAuthToken("mcp-hqbase-access-token");
     await env.DB.batch([
       env.DB.prepare(
         `INSERT INTO "user"
@@ -43,7 +30,7 @@ describe("Pro MCP server", () => {
       ).bind(
         sessionId,
         new Date(now.getTime() + 60 * 60 * 1000).toISOString(),
-        "session-token-mcp-pro",
+        "session-token-mcp-hqbase",
         now.toISOString(),
         now.toISOString(),
         userId
@@ -57,14 +44,14 @@ describe("Pro MCP server", () => {
          VALUES ('mbx_hidden', 'hidden@example.com', 'Hidden', 1, ?, ?)`
       ).bind(now.toISOString(), now.toISOString()),
       env.DB.prepare(
-        `INSERT INTO pro_mailbox_grants
+        `INSERT INTO mailbox_grants
          (mailbox_id, user_id, access_level, created_by, created_at, updated_at)
          VALUES ('mbx_allowed', ?, 'read', ?, ?, ?)`
       ).bind(userId, userId, now.toISOString(), now.toISOString()),
       env.DB.prepare(
         `INSERT INTO oauthClient
          (id, clientId, disabled, redirectUris, public, requirePKCE, createdAt, updatedAt)
-         VALUES ('oc_mcp_pro', 'client_mcp_pro', 0, ?, 1, 1, ?, ?)`
+         VALUES ('oc_mcp_hqbase', 'client_mcp_hqbase', 0, ?, 1, 1, ?, ?)`
       ).bind(
         JSON.stringify(["https://client.example/callback"]),
         now.toISOString(),
@@ -73,12 +60,12 @@ describe("Pro MCP server", () => {
       env.DB.prepare(
         `INSERT INTO oauthConsent
          (id, clientId, userId, scopes, createdAt, updatedAt)
-         VALUES ('consent_mcp_pro', 'client_mcp_pro', ?, ?, ?, ?)`
+         VALUES ('consent_mcp_hqbase', 'client_mcp_hqbase', ?, ?, ?, ?)`
       ).bind(userId, JSON.stringify(["mail:read"]), now.toISOString(), now.toISOString()),
       env.DB.prepare(
         `INSERT INTO oauthAccessToken
          (id, token, clientId, sessionId, userId, expiresAt, createdAt, scopes)
-         VALUES ('access_mcp_pro', ?, 'client_mcp_pro', ?, ?, ?, ?, ?)`
+         VALUES ('access_mcp_hqbase', ?, 'client_mcp_hqbase', ?, ?, ?, ?, ?)`
       ).bind(
         storedAccessToken,
         sessionId,
@@ -126,7 +113,7 @@ describe("Pro MCP server", () => {
     ]);
   });
 
-  it("filters mailbox results through live Pro grants", async () => {
+  it("filters mailbox results through live mailbox grants", async () => {
     const response = await mcpRequest(
       {
         jsonrpc: "2.0",
@@ -151,7 +138,7 @@ function mcpRequest(body: unknown, accessToken?: string): Promise<Response> {
   const headers = new Headers({
     accept: "application/json, text/event-stream",
     "content-type": "application/json",
-    "mcp-protocol-version": "2025-11-25"
+    "mcp-hqbasetocol-version": "2025-11-25"
   });
   if (accessToken) headers.set("authorization", `Bearer ${accessToken}`);
   return SELF.fetch(`${origin}/mcp`, {

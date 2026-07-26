@@ -1,15 +1,16 @@
-# HQBase Pro Guide
+# HQBase Guide
 
-Complete, independently evolving HQBase Pro product. Source-available under the HQBase Commercial Source License 1.0.
+Public AGPL HQBase product for customer-owned Cloudflare infrastructure.
 
 ## Boundaries
 
-- Support fresh Pro installation and explicitly supported Community upgrades.
-- Do not configure Community as an upstream or depend on routine cross-product merges.
-- Record every schema change as a migration with fresh-install and upgrade tests.
-- Keep app-password verification, entitlement, authorization, and persistent IMAP identity in Pro.
+- Keep one public product identity and one signed public release channel.
+- Record every schema change as a migration with fresh-install and update tests.
+- Keep customer mail and Cloudflare credentials in customer infrastructure.
+- Keep dormant mail-client compatibility out of launch routes, bindings, migrations, UI, and
+  release acceptance.
 - Never log credentials or mail content.
-- Never mutate Cloudflare resources outside `.hqbase-pro/deployments/<name>/manifest.json`.
+- Never mutate Cloudflare resources outside `.hqbase/deployments/<name>/manifest.json`.
 
 ## Quality gate
 
@@ -18,4 +19,4 @@ pnpm check
 pnpm deploy:dry-run
 ```
 
-Run `pnpm cf:typegen` after changing `wrangler.jsonc`. Pro owns its staging E2E gate.
+Run `pnpm cf:typegen` after changing `wrangler.jsonc`. HQBase owns its staging E2E gate.

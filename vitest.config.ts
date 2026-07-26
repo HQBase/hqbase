@@ -19,17 +19,11 @@ export default defineConfig({
         "app/**/*.tsx",
         "app/main.tsx",
         "worker/index.ts",
-        "worker/features/mail-bridge/change-log.ts",
-        "worker/features/mail-bridge/cursor.ts",
-        "worker/features/mail-bridge/mutations.ts",
-        "worker/features/mail-bridge/raw.ts",
-        "worker/features/mail-bridge/routes-v2.ts",
-        "worker/features/mail-bridge/sync.ts",
         "worker/features/domains/queries.ts",
         "worker/features/domains/routes.ts",
         "worker/features/drafts/queries.ts",
         "worker/features/drafts/routes.ts",
-        "worker/features/mail-bridge/readiness.ts"
+        "worker/features/setup/cloudflare.ts"
       ],
       thresholds: {
         branches: 20,

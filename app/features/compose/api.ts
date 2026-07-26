@@ -27,17 +27,17 @@ export type DraftInput = Omit<Draft, "id" | "version" | "updatedAt" | "attachmen
   version?: number;
 };
 
-export const listDrafts = () => apiGet<Draft[]>("/api/pro/drafts");
-export const createDraft = (input: DraftInput) => apiPost<Draft>("/api/pro/drafts", input);
+export const listDrafts = () => apiGet<Draft[]>("/api/drafts");
+export const createDraft = (input: DraftInput) => apiPost<Draft>("/api/drafts", input);
 export const updateDraft = (id: string, input: DraftInput) =>
-  apiPatch<Draft>(`/api/pro/drafts/${id}`, input);
-export const deleteDraft = (id: string) => apiDelete(`/api/pro/drafts/${id}`);
+  apiPatch<Draft>(`/api/drafts/${id}`, input);
+export const deleteDraft = (id: string) => apiDelete(`/api/drafts/${id}`);
 export const deleteDraftAttachment = (draftId: string, id: string) =>
-  apiDelete(`/api/pro/drafts/${draftId}/attachments/${id}`);
+  apiDelete(`/api/drafts/${draftId}/attachments/${id}`);
 export async function uploadDraftAttachment(draftId: string, file: File): Promise<DraftAttachment> {
   const form = new FormData();
   form.set("file", file);
-  const response = await fetch(`/api/pro/drafts/${draftId}/attachments`, {
+  const response = await fetch(`/api/drafts/${draftId}/attachments`, {
     method: "POST",
     body: form,
     credentials: "include"

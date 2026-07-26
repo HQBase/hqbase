@@ -13,7 +13,7 @@ import type { CloudflareZone } from "./types";
 import type { ConfiguredDomain } from "./use-setup-cloudflare";
 
 export const previewStates = [
-  ["deploying", "Purchase and deployment"],
+  ["deploying", "Deployment"],
   ["loading", "Access loading"],
   ["failure", "Access failure"],
   ["domain", "Domain selection"],
@@ -89,7 +89,7 @@ export function renderPreviewFixture(input: FixtureInput): React.ReactNode {
         aria-live="polite"
       >
         <Spinner className="text-foreground" />
-        <span>Deploying HQBase Pro resources to Cloudflare…</span>
+        <span>Deploying HQBase resources to Cloudflare…</span>
       </div>
     );
   }
@@ -224,7 +224,7 @@ function readinessFailureFixture(): ConfiguredDomain[] {
         ],
         status: {
           zone,
-          workerName: "hqbase-pro-preview",
+          workerName: "hqbase-preview",
           routing: {
             enabled: true,
             status: "active",
@@ -235,7 +235,7 @@ function readinessFailureFixture(): ConfiguredDomain[] {
           catchAll: {
             enabled: true,
             configuredForWorker: true,
-            workerNames: ["hqbase-pro-preview"],
+            workerNames: ["hqbase-preview"],
             error: null
           },
           sending: {

@@ -27,7 +27,7 @@ export async function serveMcp(
   _ctx: ExecutionContext,
   principal: McpPrincipal
 ): Promise<Response> {
-  const server = new McpServer({ name: "HQBase Pro", version: "1.0.0" });
+  const server = new McpServer({ name: "HQBase", version: "1.0.0" });
   registerTools(server, env, principal);
   const url = new URL(request.url);
   const transport = new WebStandardStreamableHTTPServerTransport({
@@ -44,7 +44,7 @@ function registerTools(server: McpServer, env: WorkerEnv, principal: McpPrincipa
     server.registerTool(
       "list_mailboxes",
       {
-        description: "List only Pro mailboxes currently visible to the connected user.",
+        description: "List only mailboxes currently visible to the connected user.",
         annotations: { readOnlyHint: true, openWorldHint: false }
       },
       () =>
@@ -58,7 +58,7 @@ function registerTools(server: McpServer, env: WorkerEnv, principal: McpPrincipa
       "search_messages",
       {
         description:
-          "Search recent messages across Pro mailboxes where the connected user has read access.",
+          "Search recent messages across mailboxes where the connected user has read access.",
         inputSchema: {
           folder: z.enum(["inbox", "sent", "archived", "trash", "catchall"]).optional(),
           mailboxId: z.string().min(1).max(100).optional(),
@@ -217,7 +217,7 @@ function registerTools(server: McpServer, env: WorkerEnv, principal: McpPrincipa
 }
 
 function enforceSendRateLimit(env: WorkerEnv, userId: string): Promise<void> {
-  return enforceRateLimit(env.DB, env.PRO_SESSION_SECRET, {
+  return enforceRateLimit(env.DB, env.BETTER_AUTH_SECRET, {
     scope: "mcp.mail.send",
     subject: userId,
     limit: 60,

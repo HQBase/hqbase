@@ -1,6 +1,6 @@
 {
   "$schema": "./node_modules/wrangler/config-schema.json",
-  "name": "hqbase-pro",
+  "name": "hqbase",
   "main": "worker/index.ts",
   "preview_urls": false,
   "compatibility_date": "2026-07-11",
@@ -8,25 +8,20 @@
   "assets": {
     "directory": "./dist",
     "binding": "ASSETS",
-    "not_found_handling": "single-page-application"
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*", "/mcp", "/.well-known/*"]
   },
   "observability": {
     "enabled": true,
     "head_sampling_rate": 1
   },
   "secrets": {
-    "required": [
-      "BETTER_AUTH_SECRET",
-      "PRO_APP_PASSWORD_PEPPER",
-      "PRO_BRIDGE_TOKEN",
-      "PRO_SESSION_SECRET",
-      "PRO_ENTITLEMENT_SECRET"
-    ]
+    "required": ["BETTER_AUTH_SECRET"]
   },
   "d1_databases": [
     {
       "binding": "DB",
-      "database_name": "hqbase-pro",
+      "database_name": "hqbase",
       "database_id": "00000000-0000-0000-0000-000000000000",
       "migrations_dir": "migrations"
     }
@@ -34,15 +29,15 @@
   "r2_buckets": [
     {
       "binding": "MAIL_OBJECTS",
-      "bucket_name": "hqbase-pro-mail"
+      "bucket_name": "hqbase-mail"
     }
   ],
   "queues": {
-    "producers": [{ "binding": "PRO_JOBS", "queue": "hqbase-pro-jobs" }],
+    "producers": [{ "binding": "HQBASE_JOBS", "queue": "hqbase-jobs" }],
     "consumers": [
       {
-        "queue": "hqbase-pro-jobs",
-        "dead_letter_queue": "hqbase-pro-jobs-dlq",
+        "queue": "hqbase-jobs",
+        "dead_letter_queue": "hqbase-jobs-dlq",
         "max_batch_size": 10,
         "max_batch_timeout": 5,
         "max_retries": 3

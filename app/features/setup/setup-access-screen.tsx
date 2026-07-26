@@ -26,7 +26,7 @@ export function AccessStep({
         <div className="flex flex-col items-start gap-2 py-1" role="alert">
           <p className="text-sm leading-6 text-muted-foreground">{error}</p>
           <Button className="mt-1" size="sm" type="button" variant="outline" onClick={onNext}>
-            Retry verification
+            Authorize Cloudflare
           </Button>
         </div>
       ) : null}

@@ -11,7 +11,7 @@ import { ConnectDomainDialog } from "./connect-domain-dialog";
 import { DomainTable } from "./domain-table";
 import type { MailDomain } from "./types";
 
-const PENDING_OPERATION_KEY = "hqb_pro_cloudflare_operation_v1";
+const PENDING_OPERATION_KEY = "hqb_cloudflare_operation_v1";
 
 type PendingCloudflareOperation =
   | { action: "connect" }
@@ -172,7 +172,7 @@ export function DomainSettings({
         </form>
       </div>
       <CloudflareAuthorizationDialog
-        authorizeHref="/api/pro/domains/cloudflare/oauth/start"
+        authorizeHref="/api/domains/cloudflare/oauth/start"
         description="To save this change, HQBase needs temporary access to your Cloudflare account. You’ll return to Domains automatically, and HQBase will update the workspace portal."
         open={authorizationOperation?.action === "portal"}
         onAuthorize={() => {

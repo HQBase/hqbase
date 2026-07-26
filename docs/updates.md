@@ -1,21 +1,22 @@
 # Updates
 
-Owners and admins see **Update available** in the normal application shell when a newer signed Pro
-stable release exists. Settings -> Updates contains compatibility, release notes, and the guarded
-Workers Builds action.
+HQBase has one public stable release channel. The canonical repository publishes a signed
+`stable.json` release asset at:
 
-The public `HQBase/hqbase-pro-deploy` repository contains the persistent generic updater, not Pro
-product source. A build uses its masked license secret to request a ten-minute artifact token from
-the HQBase billing service. Inactive licenses cannot download new releases; the already-installed
-mail service continues under the billing safety policy.
+`https://github.com/HQBase/hqbase/releases/latest/download/stable.json`
 
-Before a Pro-to-Pro migration the updater records D1 Time Travel and the active Worker version.
-The artifact signature and SHA-256 digest are verified before extraction. Migrations run before the
-Worker replacement, and exact D1 and Worker recovery commands are printed on failure.
+The updater downloads that stable URL directly rather than polling the GitHub API. It verifies the
+Ed25519 signature, confirms `product: "hqbase"`, verifies the archive SHA-256 digest and size, and
+checks the installed version and schema compatibility before changing customer resources.
 
-Each signed release declares its minimum supported source version and schema. Version-specific
-compatibility and migration details live in that release's notes rather than this current-state
-guide. Unsupported installations stop before mutation with an explicit update path.
+An update records the active Worker version and a D1 Time Travel bookmark, applies migrations,
+deploys the verified public artifact, and verifies the result. A failed deployment restores the
+previous Worker version. Database rollback remains a deliberate operator action because it can
+discard writes made after the bookmark.
 
-Public version-specific history lives in
-[`HQBase/hqbase-pro-deploy/RELEASE_NOTES.md`](https://github.com/HQBase/hqbase-pro-deploy/blob/main/RELEASE_NOTES.md).
+Starting an update from the app requires a short-lived Cloudflare OAuth grant. HQBase revokes the
+grant after use. The browser talks directly to Cloudflare, and the verified release comes directly
+from the canonical public repository.
+
+Release artifacts, manifests, checksums, and release notes are public GitHub Release assets owned
+by the canonical repository.

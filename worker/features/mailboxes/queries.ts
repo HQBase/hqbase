@@ -84,7 +84,7 @@ export async function listMailboxesForUser(
   const result = await db
     .prepare(
       `SELECT m.*, g.access_level FROM mailboxes m
-       LEFT JOIN pro_mailbox_grants g ON g.mailbox_id = m.id AND g.user_id = ?
+       LEFT JOIN mailbox_grants g ON g.mailbox_id = m.id AND g.user_id = ?
        WHERE ? = 1 OR g.access_level IS NOT NULL
        ORDER BY m.is_active DESC, m.address ASC`
     )

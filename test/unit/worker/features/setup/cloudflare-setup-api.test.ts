@@ -350,65 +350,6 @@ describe("Cloudflare setup API", () => {
     );
   });
 
-  it("reassigns an upgrade portal only from the recorded Community Worker", async () => {
-    const fetchMock = vi.fn<typeof fetch>((input, init) => {
-      const url = fetchInputUrl(input);
-      if (url === `${API_BASE}/accounts/account-1/workers/domains` && init?.method === "PUT") {
-        return Promise.resolve(
-          jsonResponse({
-            result: {
-              hostname: "hqbase.example.com",
-              id: "domain-1",
-              service: "hqbase-pro",
-              zone_id: "zone-1",
-              zone_name: "example.com"
-            }
-          })
-        );
-      }
-      return Promise.resolve(
-        jsonResponse({
-          result: [
-            {
-              hostname: "hqbase.example.com",
-              id: "domain-1",
-              service: "hqbase-community",
-              zone_id: "zone-1",
-              zone_name: "example.com"
-            }
-          ]
-        })
-      );
-    });
-    vi.stubGlobal("fetch", fetchMock);
-
-    await expect(
-      attachWorkerCustomDomain({
-        apiToken: "token-123",
-        hostname: "hqbase.example.com",
-        replaceWorkerName: "hqbase-community",
-        workerName: "hqbase-pro",
-        zone: {
-          accountId: "account-1",
-          accountName: "HQBase",
-          id: "zone-1",
-          name: "example.com",
-          status: "active",
-          type: "full"
-        }
-      })
-    ).resolves.toMatchObject({ service: "hqbase-pro" });
-    expect(fetchMock.mock.calls.find(([, init]) => init?.method === "PUT")?.[1]?.body).toBe(
-      JSON.stringify({
-        hostname: "hqbase.example.com",
-        override_existing_origin: true,
-        service: "hqbase-pro",
-        zone_id: "zone-1",
-        zone_name: "example.com"
-      })
-    );
-  });
-
   it("does not take over a portal from an unrelated Worker", async () => {
     vi.stubGlobal(
       "fetch",
@@ -433,8 +374,7 @@ describe("Cloudflare setup API", () => {
       attachWorkerCustomDomain({
         apiToken: "token-123",
         hostname: "hqbase.example.com",
-        replaceWorkerName: "hqbase-community",
-        workerName: "hqbase-pro",
+        workerName: "hqbase",
         zone: {
           accountId: "account-1",
           accountName: "HQBase",

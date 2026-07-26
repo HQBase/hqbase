@@ -116,7 +116,7 @@ export function ConnectDomainDialog({
         <DialogHeader>
           <DialogTitle>Connect domain</DialogTitle>
           <DialogDescription>
-            Load an active Cloudflare zone, then connect it to HQBase Pro.
+            Load an active Cloudflare zone, then connect it to HQBase.
           </DialogDescription>
         </DialogHeader>
         {authorized ? (
@@ -157,7 +157,7 @@ export function ConnectDomainDialog({
               Cloudflare will ask you to approve temporary access for this domain connection.
             </p>
             <Button asChild className="self-start">
-              <a href="/api/pro/domains/cloudflare/oauth/start" onClick={onAuthorize}>
+              <a href="/api/domains/cloudflare/oauth/start" onClick={onAuthorize}>
                 Authorize Cloudflare
               </a>
             </Button>

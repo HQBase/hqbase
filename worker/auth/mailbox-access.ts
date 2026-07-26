@@ -22,7 +22,7 @@ export async function mailboxAccess(
   if (role === "owner") return "manager";
   const row = await db
     .prepare(
-      `SELECT g.access_level FROM pro_mailbox_grants g
+      `SELECT g.access_level FROM mailbox_grants g
        JOIN "user" u ON u.id = g.user_id
        WHERE g.mailbox_id = ? AND g.user_id = ? AND COALESCE(u.banned, 0) = 0`
     )
@@ -59,7 +59,7 @@ export async function accessibleMailboxIds(
   const placeholders = allowed.map(() => "?").join(", ");
   const result = await db
     .prepare(
-      `SELECT mailbox_id FROM pro_mailbox_grants
+      `SELECT mailbox_id FROM mailbox_grants
        WHERE user_id = ? AND access_level IN (${placeholders})`
     )
     .bind(userId, ...allowed)
