@@ -30,11 +30,6 @@ Do not use the HQBase name, logo, or branding to:
 
 Unofficial forks should use a distinct name and should clearly state that they are not affiliated with or endorsed by HQBase.
 
-## Commercial Offerings
-
-Commercial HQBase products and paid services may use HQBase branding only when offered by the
-project owner or with written permission.
-
 ## Questions
 
 Open an issue before using HQBase branding in a public product, package, event, or service where users could reasonably think the use is official.
