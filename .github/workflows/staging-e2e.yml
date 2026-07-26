@@ -70,7 +70,10 @@ jobs:
       - name: Deploy reviewed source candidate
         run: |
           config=".hqbase/deployments/$DEPLOYMENT_NAME/wrangler.jsonc"
-          AUTH_SECRET="$(openssl rand -base64 48)" node --input-type=module -e '
+          AUTH_SECRET="$(openssl rand -base64 48)"
+          echo "::add-mask::$AUTH_SECRET"
+          echo "HQBASE_STAGING_AUTH_SECRET=$AUTH_SECRET" >> "$GITHUB_ENV"
+          AUTH_SECRET="$AUTH_SECRET" node --input-type=module -e '
             import { writeFileSync } from "node:fs";
             writeFileSync("/tmp/hqbase-e2e-secrets.json", `${JSON.stringify({ BETTER_AUTH_SECRET: process.env.AUTH_SECRET })}\n`, { mode: 0o600 });
           '

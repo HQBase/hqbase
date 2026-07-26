@@ -1,3 +1,4 @@
+import { createCipheriv, createHash, randomBytes } from "node:crypto";
 import { expect, request as playwrightRequest, test } from "@playwright/test";
 
 const email = required("HQBASE_STAGING_OWNER_EMAIL");
@@ -45,6 +46,7 @@ test("HQBase web lifecycle remains healthy", async ({ page, request }) => {
   expect(status.ok()).toBeTruthy();
   const setup = (await status.json()) as { isComplete: boolean };
   if (!setup.isComplete) {
+    const grantCookie = stagingSetupGrantCookie(required("HQBASE_STAGING_AUTH_SECRET"));
     const bootstrap = await request.post("/api/setup/bootstrap", {
       data: {
         checklistAcknowledged: true,
@@ -53,7 +55,8 @@ test("HQBase web lifecycle remains healthy", async ({ page, request }) => {
         ownerName: "HQBase E2E Owner",
         ownerPassword: password,
         primaryDomain: domain
-      }
+      },
+      headers: { cookie: grantCookie }
     });
     expect(bootstrap.status()).toBe(201);
     await expect(bootstrap.json()).resolves.toMatchObject({ setup: { isComplete: true } });
@@ -197,6 +200,18 @@ function accessHeaders(): Record<string, string> {
   return clientId && clientSecret
     ? { "CF-Access-Client-Id": clientId, "CF-Access-Client-Secret": clientSecret }
     : {};
+}
+
+function stagingSetupGrantCookie(secret: string): string {
+  const iv = randomBytes(12);
+  const key = createHash("sha256").update(`hqbase-runtime-cloudflare-oauth:${secret}`).digest();
+  const cipher = createCipheriv("aes-256-gcm", key, iv);
+  const encrypted = Buffer.concat([
+    cipher.update("hqbase-staging-oauth-grant", "utf8"),
+    cipher.final(),
+    cipher.getAuthTag()
+  ]);
+  return `hqb_cf_oauth_grant=${encodeURIComponent(`${iv.toString("base64url")}.${encrypted.toString("base64url")}`)}`;
 }
 
 function required(name: string): string {
