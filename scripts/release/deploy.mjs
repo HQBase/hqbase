@@ -14,27 +14,18 @@ const stableManifestUrl = "https://github.com/HQBase/hqbase/releases/latest/down
 export async function deploy(options = {}) {
   const configFile = resolve(options.configFile ?? resolve(root, "wrangler.jsonc"));
   if (process.env.HQBASE_FORCE_SOURCE_DEPLOY === "1") return sourceDeploy(root);
-  const response = await fetch(process.env.HQBASE_RELEASE_MANIFEST_URL ?? stableManifestUrl);
-  if (!response.ok) throw new Error(`Release check failed (${response.status}).`);
-  const manifest = verifyManifest(await response.json());
-  if (compareVersions(manifest.version, packageVersion) < 0) {
-    throw new Error(
-      `HQBase ${packageVersion} has not been published as a signed stable release yet.`
-    );
-  }
+  const { bytes, manifest } = await loadVerifiedRelease({
+    artifactFile: options.artifactFile ?? process.env.HQBASE_RELEASE_ARTIFACT_FILE,
+    checkedOutVersion: packageVersion,
+    expectedVersion: options.expectedVersion ?? process.env.HQBASE_EXPECTED_RELEASE_VERSION,
+    fetcher: options.fetcher,
+    manifestFile: options.manifestFile ?? process.env.HQBASE_RELEASE_MANIFEST_FILE,
+    manifestUrl: process.env.HQBASE_RELEASE_MANIFEST_URL
+  });
 
   const workspace = mkdtempSync(resolve(tmpdir(), "hqbase-release-"));
   let recovery = null;
   try {
-    const artifactResponse = await fetch(manifest.artifact.url);
-    if (!artifactResponse.ok)
-      throw new Error(`Release download failed (${artifactResponse.status}).`);
-    const bytes = Buffer.from(await artifactResponse.arrayBuffer());
-    if (
-      bytes.length !== manifest.artifact.size ||
-      createHash("sha256").update(bytes).digest("hex") !== manifest.artifact.sha256
-    )
-      throw new Error("Release artifact integrity check failed.");
     const archive = resolve(workspace, "release.tar.gz");
     const source = resolve(workspace, "source");
     writeFileSync(archive, bytes);
@@ -180,6 +171,47 @@ export async function deploy(options = {}) {
   } finally {
     rmSync(workspace, { recursive: true, force: true });
   }
+}
+
+export async function loadVerifiedRelease(options = {}) {
+  const fetcher = options.fetcher ?? fetch;
+  let envelope;
+  if (options.manifestFile) {
+    envelope = JSON.parse(readFileSync(resolve(options.manifestFile), "utf8"));
+  } else {
+    const response = await fetcher(options.manifestUrl ?? stableManifestUrl);
+    if (!response.ok) throw new Error(`Release check failed (${response.status}).`);
+    envelope = await response.json();
+  }
+  const manifest = verifyManifest(envelope, options.publicKeyBase64);
+  if (options.expectedVersion) {
+    if (manifest.version !== options.expectedVersion) {
+      throw new Error(
+        `Expected signed HQBase ${options.expectedVersion}, received ${manifest.version}.`
+      );
+    }
+  } else if (compareVersions(manifest.version, options.checkedOutVersion ?? packageVersion) < 0) {
+    throw new Error(
+      `HQBase ${options.checkedOutVersion ?? packageVersion} has not been published as a signed stable release yet.`
+    );
+  }
+
+  let bytes;
+  if (options.artifactFile) {
+    bytes = readFileSync(resolve(options.artifactFile));
+  } else {
+    const artifactResponse = await fetcher(manifest.artifact.url);
+    if (!artifactResponse.ok)
+      throw new Error(`Release download failed (${artifactResponse.status}).`);
+    bytes = Buffer.from(await artifactResponse.arrayBuffer());
+  }
+  if (
+    bytes.length !== manifest.artifact.size ||
+    createHash("sha256").update(bytes).digest("hex") !== manifest.artifact.sha256
+  ) {
+    throw new Error("Release artifact integrity check failed.");
+  }
+  return { bytes, manifest };
 }
 
 export function verifyManifest(envelope, publicKeyBase64 = publicKey) {

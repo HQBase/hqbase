@@ -16,9 +16,10 @@ The installer creates a D1 database, R2 bucket, queue, Worker, and routes using 
 signed public release artifacts from `HQBase/hqbase`. It generates the Better Auth secret if one is
 not supplied.
 
-## Required secret
+## Runtime secret
 
-- `BETTER_AUTH_SECRET`
+The first Workers Build generates `BETTER_AUTH_SECRET` inside the customer account when it does not
+already exist. Operators may supply it explicitly for controlled automation.
 
 Cloudflare OAuth client configuration is compiled public product configuration. Temporary OAuth
 grants used for setup or updates are encrypted, scoped to the operation, and revoked after use.
@@ -38,7 +39,7 @@ resources.
 
 See [updates.md](updates.md). Update safety includes signed manifests, digest and size checks,
 schema compatibility, a D1 Time Travel bookmark, Worker version capture, verification, and Worker
-rollback on deployment failure.
+and D1 recovery commands on failure.
 
 ## Removal
 

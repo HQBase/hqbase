@@ -35,12 +35,15 @@ export async function handleMcpRoute(
     );
   }
 
-  const auth = createAuth(env, request);
   if (
     url.pathname === "/.well-known/oauth-authorization-server" ||
     url.pathname === "/.well-known/oauth-authorization-server/api/auth"
   ) {
-    return oauthProviderAuthServerMetadata(auth, { headers: discoveryHeaders() })(request);
+    const auth = createAuth(env, request);
+    // The provider endpoint exists at runtime, but the 1.7 RC plugin declaration
+    // mismatch prevents Better Auth from carrying it into the inferred API type.
+    const metadataAuth = auth as unknown as Parameters<typeof oauthProviderAuthServerMetadata>[0];
+    return oauthProviderAuthServerMetadata(metadataAuth, { headers: discoveryHeaders() })(request);
   }
   if (url.pathname !== "/mcp") return null;
 

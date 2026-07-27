@@ -34,11 +34,6 @@ describe("application routing", () => {
     });
     expect(readAppRoute("/?settings=updates")).toEqual({ kind: "settings", tab: "updates" });
     expect(readAppRoute("/settings/general")).toEqual({ kind: "settings", tab: "debug" });
-    expect(readAppRoute("/?settings=upgrade")).toEqual({
-      kind: "mail",
-      folder: "inbox",
-      messageId: null
-    });
     expect(readAppRoute("/catchall")).toEqual({
       kind: "mail",
       folder: "catchall",

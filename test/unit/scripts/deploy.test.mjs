@@ -1,5 +1,7 @@
-import { generateKeyPairSync, sign } from "node:crypto";
-import { existsSync, readFileSync, statSync } from "node:fs";
+import { createHash, generateKeyPairSync, sign } from "node:crypto";
+import { existsSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   inspectActiveRelease,
@@ -10,6 +12,7 @@ import {
   compareVersions,
   deploySource,
   hqbaseReleaseTag,
+  loadVerifiedRelease,
   needsInitialAuthSecret,
   normalizeConfig,
   verifyManifest,
@@ -42,6 +45,63 @@ describe("HQBase release deployment", () => {
   it("selects only newer semantic releases", () => {
     expect(compareVersions("0.2.0", "0.1.9")).toBeGreaterThan(0);
     expect(compareVersions("0.1.0", "0.1.0")).toBe(0);
+  });
+  it("loads an exact signed candidate from local release files without weakening verification", async () => {
+    const workspace = mkdtempSync(resolve(tmpdir(), "hqbase-candidate-test-"));
+    const { privateKey, publicKey } = generateKeyPairSync("ed25519");
+    const artifact = Buffer.from("signed candidate");
+    const manifest = {
+      format: "hqbase-release-v1",
+      product: "hqbase",
+      channel: "stable",
+      version: "1.2.3",
+      minVersion: "1.2.0",
+      artifact: {
+        url: "https://github.com/HQBase/hqbase/releases/download/v1.2.3/hqbase-1.2.3.tar.gz",
+        sha256: createHash("sha256").update(artifact).digest("hex"),
+        size: artifact.length
+      }
+    };
+    const payload = Buffer.from(JSON.stringify(manifest)).toString("base64url");
+    const envelope = {
+      payload,
+      signature: sign(null, Buffer.from(payload, "base64url"), privateKey).toString("base64url")
+    };
+    const manifestFile = resolve(workspace, "stable.json");
+    const artifactFile = resolve(workspace, "hqbase-1.2.3.tar.gz");
+    writeFileSync(manifestFile, JSON.stringify(envelope));
+    writeFileSync(artifactFile, artifact);
+    const publicKeyBase64 = publicKey.export({ type: "spki", format: "der" }).toString("base64");
+
+    try {
+      await expect(
+        loadVerifiedRelease({
+          artifactFile,
+          expectedVersion: "1.2.3",
+          manifestFile,
+          publicKeyBase64
+        })
+      ).resolves.toMatchObject({ manifest: { version: "1.2.3" } });
+      await expect(
+        loadVerifiedRelease({
+          artifactFile,
+          expectedVersion: "1.2.4",
+          manifestFile,
+          publicKeyBase64
+        })
+      ).rejects.toThrow("Expected signed HQBase 1.2.4");
+      writeFileSync(artifactFile, "tampered");
+      await expect(
+        loadVerifiedRelease({
+          artifactFile,
+          expectedVersion: "1.2.3",
+          manifestFile,
+          publicKeyBase64
+        })
+      ).rejects.toThrow("integrity");
+    } finally {
+      rmSync(workspace, { recursive: true, force: true });
+    }
   });
   it("rebases customer deployment paths onto the verified release source", () => {
     expect(

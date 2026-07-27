@@ -43,9 +43,11 @@ Run `pnpm cf:typegen` after changing `wrangler.jsonc`.
 - `docs/operations.md`: doctor, backup, restore, queues, retention, and incident order.
 - `docs/updates.md`: public signed releases, update checks, verification, and recovery.
 
-Pushes to `main` run the full quality gate and deployed staging E2E. Signed publication is a
-separate workflow that creates public GitHub Release assets. Customer installations and updates
-verify the signed manifest and artifact digest before deployment.
+Pushes to `main` run the full quality gate and deployment dry-run. Deployed staging is manual and
+also runs inside the signed release workflow. A release stays draft while the previous stable
+version is upgraded to the exact signed candidate; only a passing candidate becomes public.
+Customer installations and updates verify the signed manifest and artifact digest before
+deployment.
 
 ## License
 

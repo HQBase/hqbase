@@ -6,5 +6,11 @@ allowBuilds:
   sharp: true
   workerd: true
 
+overrides:
+  '@better-auth/core': 1.7.0-rc.2
+  '@hono/node-server': 2.0.12
+  fast-uri: 3.1.4
+  postcss: 8.5.23
+
 minimumReleaseAgeExclude:
   - '@cloudflare/workers-types@5.20260711.1'

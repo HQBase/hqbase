@@ -1,6 +1,6 @@
 name: Staging E2E
 
-run-name: Staging E2E · ${{ inputs.candidate_ref || github.event.workflow_run.head_sha || github.sha }}
+run-name: Staging E2E · ${{ inputs.candidate_ref || github.sha }}
 
 on:
   workflow_dispatch:
@@ -9,10 +9,6 @@ on:
         description: Reviewed HQBase commit or ref to validate
         required: false
         default: main
-  workflow_run:
-    workflows: [CI]
-    types: [completed]
-    branches: [main]
 
 permissions:
   contents: read
@@ -23,7 +19,6 @@ concurrency:
 
 jobs:
   fresh-install:
-    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     environment: hqbase-staging
     timeout-minutes: 30
@@ -39,18 +34,18 @@ jobs:
       HQBASE_STAGING_URL: https://${{ secrets.HQBASE_E2E_APP_HOSTNAME }}
       DEPLOYMENT_NAME: e2e-${{ github.run_id }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
-          ref: ${{ inputs.candidate_ref || github.event.workflow_run.head_sha || github.sha }}
-      - uses: pnpm/action-setup@v4
+          ref: ${{ inputs.candidate_ref || github.sha }}
+      - uses: pnpm/action-setup@v6
         with:
           version: 11.7.0
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: 24
           cache: pnpm
       - name: Cache Playwright Chromium
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/.cache/ms-playwright
           key: ${{ runner.os }}-${{ runner.arch }}-playwright-${{ hashFiles('pnpm-lock.yaml') }}
@@ -110,7 +105,7 @@ jobs:
           jq -e '.[0].results[0].value_json == "{\"state\":\"before\"}"' <<<"$result"
       - name: Upload non-secret deployment record
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: hqbase-staging-manifest-${{ github.run_id }}
           path: .hqbase/deployments/e2e-${{ github.run_id }}/manifest.json

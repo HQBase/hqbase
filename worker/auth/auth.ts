@@ -32,6 +32,10 @@ export function createAuth(env: WorkerEnv, request: Request) {
           member: memberRole
         }
       }),
+      // Better Auth 1.7 RC currently publishes an OAuth provider endpoint type whose
+      // OpenAPI metadata is narrower than BetterAuthPlugin. Keep the concrete plugin
+      // type for API inference while upstream resolves the declaration mismatch.
+      // @ts-expect-error Upstream @better-auth/oauth-provider 1.7 declaration mismatch.
       oauthProvider({
         allowDynamicClientRegistration: true,
         allowUnauthenticatedClientRegistration: true,
@@ -48,7 +52,8 @@ export function createAuth(env: WorkerEnv, request: Request) {
         },
         scopes: ["mail:read", "mail:write", "mail:send", "offline_access"],
         storeTokens: { hash: hashOAuthToken },
-        validAudiences: [mcpResource(env, request)]
+        resources: [mcpResource(env, request)],
+        enforcePerClientResources: false
       })
     ]
   });
