@@ -1,3 +1,63 @@
+CREATE TABLE account_next (
+  id TEXT PRIMARY KEY NOT NULL,
+  issuer TEXT NOT NULL,
+  providerAccountId TEXT NOT NULL,
+  providerId TEXT NOT NULL,
+  userId TEXT NOT NULL REFERENCES "user"(id) ON DELETE CASCADE,
+  accessToken TEXT,
+  refreshToken TEXT,
+  idToken TEXT,
+  accessTokenExpiresAt TEXT,
+  refreshTokenExpiresAt TEXT,
+  scope TEXT,
+  password TEXT,
+  createdAt TEXT NOT NULL,
+  updatedAt TEXT NOT NULL
+);
+
+INSERT INTO account_next (
+  id,
+  issuer,
+  providerAccountId,
+  providerId,
+  userId,
+  accessToken,
+  refreshToken,
+  idToken,
+  accessTokenExpiresAt,
+  refreshTokenExpiresAt,
+  scope,
+  password,
+  createdAt,
+  updatedAt
+)
+SELECT
+  id,
+  CASE
+    WHEN providerId = 'credential' THEN 'local:credential'
+    ELSE 'local:oauth:' || providerId
+  END,
+  accountId,
+  providerId,
+  userId,
+  accessToken,
+  refreshToken,
+  idToken,
+  accessTokenExpiresAt,
+  refreshTokenExpiresAt,
+  scope,
+  password,
+  createdAt,
+  updatedAt
+FROM account;
+
+DROP TABLE account;
+ALTER TABLE account_next RENAME TO account;
+
+CREATE UNIQUE INDEX account_issuer_providerAccountId_uidx
+ON account(issuer, providerAccountId);
+CREATE INDEX account_userId_idx ON account(userId);
+
 ALTER TABLE oauthClient ADD COLUMN backchannelLogoutUri TEXT;
 ALTER TABLE oauthClient ADD COLUMN backchannelLogoutSessionRequired INTEGER;
 ALTER TABLE oauthClient ADD COLUMN jwks TEXT;
