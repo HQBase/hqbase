@@ -2,13 +2,6 @@ name: Signed HQBase release
 
 on:
   workflow_dispatch:
-    inputs:
-      version:
-        description: Semantic release version
-        required: true
-      min_version:
-        description: Oldest HQBase version supported by this release
-        required: false
 
 permissions:
   contents: write
@@ -33,35 +26,36 @@ jobs:
         with:
           node-version: 24
           cache: pnpm
+      - name: Resolve committed release version
+        run: |
+          release_version="$(node --input-type=module -e '
+            import { readFileSync } from "node:fs";
+            const { version } = JSON.parse(readFileSync("package.json", "utf8"));
+            if (!/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(version)) {
+              throw new Error("package.json version must be semantic.");
+            }
+            process.stdout.write(version);
+          ')"
+          echo "HQBASE_RELEASE_VERSION=$release_version" >> "$GITHUB_ENV"
       - run: pnpm install --frozen-lockfile
       - run: pnpm check
       - run: pnpm deploy:dry-run
-      - name: Verify release input and signing key
+      - name: Verify committed release and signing key
         env:
           HQBASE_RELEASE_PRIVATE_KEY: ${{ secrets.HQBASE_RELEASE_PRIVATE_KEY }}
-          HQBASE_RELEASE_VERSION: ${{ inputs.version }}
         run: |
           test -n "$HQBASE_RELEASE_PRIVATE_KEY"
-          release_version="${HQBASE_RELEASE_VERSION#v}"
-          test "$release_version" = "$(node -p "require('./package.json').version")"
           test "$GITHUB_REF_NAME" = "main"
-          if gh release view "v${release_version}" >/dev/null 2>&1; then
-            echo "Release v${release_version} already exists and is immutable." >&2
+          if gh release view "v${HQBASE_RELEASE_VERSION}" >/dev/null 2>&1; then
+            echo "Release v${HQBASE_RELEASE_VERSION} already exists and is immutable." >&2
             exit 1
           fi
       - name: Package and sign public release
         env:
           HQBASE_RELEASE_PRIVATE_KEY: ${{ secrets.HQBASE_RELEASE_PRIVATE_KEY }}
-          HQBASE_RELEASE_VERSION: ${{ inputs.version }}
-          HQBASE_MIN_VERSION: ${{ inputs.min_version }}
-        run: |
-          export HQBASE_RELEASE_VERSION="${HQBASE_RELEASE_VERSION#v}"
-          pnpm release:package
+        run: pnpm release:package
       - name: Extract release notes
-        env:
-          HQBASE_RELEASE_VERSION: ${{ inputs.version }}
         run: |
-          export HQBASE_RELEASE_VERSION="${HQBASE_RELEASE_VERSION#v}"
           node --input-type=module -e '
             import { readFileSync, writeFileSync } from "node:fs";
             const version = process.env.HQBASE_RELEASE_VERSION;
@@ -76,25 +70,20 @@ jobs:
       - name: Publish immutable GitHub Release assets
         env:
           GH_TOKEN: ${{ github.token }}
-          HQBASE_RELEASE_VERSION: ${{ inputs.version }}
         run: |
-          release_version="${HQBASE_RELEASE_VERSION#v}"
-          gh release create "v${release_version}" \
+          gh release create "v${HQBASE_RELEASE_VERSION}" \
             --target "$GITHUB_SHA" \
-            --title "HQBase ${release_version}" \
+            --title "HQBase ${HQBASE_RELEASE_VERSION}" \
             --notes-file release/notes.md \
             --latest \
-            "release/hqbase-${release_version}.tar.gz" \
-            "release/hqbase-${release_version}.sha256" \
-            "release/manifest-${release_version}.json" \
+            "release/hqbase-${HQBASE_RELEASE_VERSION}.tar.gz" \
+            "release/hqbase-${HQBASE_RELEASE_VERSION}.sha256" \
+            "release/manifest-${HQBASE_RELEASE_VERSION}.json" \
             "release/stable.json"
       - name: Verify public stable asset, signature, and digest
-        env:
-          HQBASE_RELEASE_VERSION: ${{ inputs.version }}
         run: |
-          release_version="${HQBASE_RELEASE_VERSION#v}"
           stable_url="https://github.com/HQBase/hqbase/releases/latest/download/stable.json"
-          artifact_url="https://github.com/HQBase/hqbase/releases/download/v${release_version}/hqbase-${release_version}.tar.gz"
+          artifact_url="https://github.com/HQBase/hqbase/releases/download/v${HQBASE_RELEASE_VERSION}/hqbase-${HQBASE_RELEASE_VERSION}.tar.gz"
           for attempt in $(seq 1 30); do
             if curl --fail --location --silent --show-error "$stable_url" --output /tmp/stable.json &&
                curl --fail --location --silent --show-error "$artifact_url" --output /tmp/hqbase.tar.gz; then
@@ -106,7 +95,7 @@ jobs:
           node --input-type=module -e '
             import { createHash, createPublicKey, verify } from "node:crypto";
             import { readFileSync, statSync } from "node:fs";
-            const version = process.env.HQBASE_RELEASE_VERSION.replace(/^v/, "");
+            const version = process.env.HQBASE_RELEASE_VERSION;
             const config = JSON.parse(readFileSync("config/product.json", "utf8"));
             const envelope = JSON.parse(readFileSync("/tmp/stable.json", "utf8"));
             const key = createPublicKey({
