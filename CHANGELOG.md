@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.15
+
+- Send new messages, replies, and forwards with Command+Enter on macOS or Control+Enter elsewhere.
+- Keep the account menu below Settings in desktop and mobile sidebars, simplify the mobile toolbar
+  to navigation, search, and New email, and present one combined Inbox message list.
+- Add quiet, locally generated sounds for new inbound mail, confirmed sends, and toast status while
+  keeping loading states silent and honoring reduced-motion preferences.
+
 ## 0.1.14
 
 - Keep Cloudflare authorization inside HQBase when the current session is no longer recent.
