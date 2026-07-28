@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.13
+
+- Default replies to the exact authorized address that received the original message.
+- Add editable To, Cc, and Bcc fields to replies across desktop, mobile, the send API, and MCP.
+- Mark unread messages read when opened so the unread dot clears from the message list.
+- Make empty-body draft autosave revision-safe and reliably return to **Draft saved**.
+
 ## 0.1.12
 
 - Add Gmail-style responsive conversations with list-only compact navigation and immersive message
