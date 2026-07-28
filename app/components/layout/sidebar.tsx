@@ -3,14 +3,18 @@ import { Archive, Inbox, Send, Settings, Star, Trash2, TriangleAlert } from "luc
 import type * as React from "react";
 
 import { Button } from "@/components/ui/button";
+import type { CurrentUser } from "@/features/auth/types";
 import { cn } from "@/lib/cn";
 import type { FolderId } from "@/lib/routes";
 import { appRoutePath, mailFolders } from "@/lib/routes";
+import { AccountMenu } from "./account-menu";
 
 type SidebarProps = {
   activeFolder: FolderId;
   drawerAction?: React.ReactNode;
+  user: CurrentUser;
   onFolderChange: (folder: FolderId) => void;
+  onSignedOut: () => void;
   variant?: "desktop" | "drawer";
 };
 
@@ -27,7 +31,9 @@ const icons: Record<FolderId, LucideIcon> = {
 export function Sidebar({
   activeFolder,
   drawerAction,
+  user,
   onFolderChange,
+  onSignedOut,
   variant = "desktop"
 }: SidebarProps): React.ReactElement {
   const isDrawer = variant === "drawer";
@@ -73,8 +79,8 @@ export function Sidebar({
             </Button>
           );
         })}
-        <div className="mt-auto border-t pt-2">
-          {isDrawer && drawerAction ? <div className="mb-0.5">{drawerAction}</div> : null}
+        <div className="mt-auto flex flex-col gap-0.5 border-t pt-2">
+          {isDrawer && drawerAction ? drawerAction : null}
           <Button
             asChild
             className={cn(
@@ -97,6 +103,7 @@ export function Sidebar({
               Settings
             </a>
           </Button>
+          <AccountMenu drawer={isDrawer} user={user} onSignedOut={onSignedOut} />
         </div>
       </nav>
     </aside>

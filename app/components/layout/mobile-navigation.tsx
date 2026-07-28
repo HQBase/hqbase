@@ -6,25 +6,25 @@ import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/s
 import type { CurrentUser } from "@/features/auth/types";
 import { McpConnectionDialog } from "@/features/mcp/connection-dialog";
 import type { FolderId } from "@/lib/routes";
-import { folders } from "@/lib/routes";
 import { Sidebar } from "./sidebar";
 
 type MobileNavigationProps = {
   activeFolder: FolderId;
   user: CurrentUser;
   onFolderChange: (folder: FolderId) => void;
+  onSignedOut: () => void;
 };
 
 export function MobileNavigation({
   activeFolder,
   user,
-  onFolderChange
+  onFolderChange,
+  onSignedOut
 }: MobileNavigationProps): React.ReactElement {
   const [open, setOpen] = React.useState(false);
   const [mcpOpen, setMcpOpen] = React.useState(false);
   const menuTriggerRef = React.useRef<HTMLButtonElement>(null);
   const drawerRef = React.useRef<HTMLDivElement>(null);
-  const activeLabel = folders.find((folder) => folder.id === activeFolder)?.label ?? "Navigation";
 
   function handleFolderChange(folder: FolderId): void {
     onFolderChange(folder);
@@ -32,19 +32,19 @@ export function MobileNavigation({
   }
 
   return (
-    <div className="flex h-14 items-center gap-2 border-b px-2 md:hidden">
+    <>
       <Sheet open={open} onOpenChange={setOpen}>
         <SheetTrigger asChild>
           <Button
             aria-label="Open navigation"
-            className="size-11 text-muted-foreground"
+            className="size-11 shrink-0 text-muted-foreground md:hidden"
             ref={menuTriggerRef}
             size="icon"
             title="Open navigation"
             type="button"
             variant="ghost"
           >
-            <Menu className="size-5" />
+            <Menu />
           </Button>
         </SheetTrigger>
         <SheetContent
@@ -75,17 +75,18 @@ export function MobileNavigation({
               </Button>
             }
             onFolderChange={handleFolderChange}
+            onSignedOut={onSignedOut}
+            user={user}
             variant="drawer"
           />
         </SheetContent>
       </Sheet>
-      <span className="truncate text-sm font-medium">{activeLabel}</span>
       <McpConnectionDialog
         open={mcpOpen}
         restoreFocusRef={menuTriggerRef}
         user={user}
         onOpenChange={setMcpOpen}
       />
-    </div>
+    </>
   );
 }

@@ -1,16 +1,7 @@
-import { Cable, LogOut, MailPlus, Search } from "lucide-react";
+import { Cable, MailPlus, Search } from "lucide-react";
 import * as React from "react";
 
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuGroup,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuTrigger
-} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -20,29 +11,33 @@ import {
   SelectTrigger,
   SelectValue
 } from "@/components/ui/select";
-import { signOut } from "@/features/auth/api";
 import type { CurrentUser } from "@/features/auth/types";
 import type { Mailbox } from "@/features/mailboxes/types";
 import { McpConnectionDialog } from "@/features/mcp/connection-dialog";
-import { initials } from "@/lib/format";
+import type { FolderId } from "@/lib/routes";
+import { MobileNavigation } from "./mobile-navigation";
 
 type TopBarProps = {
+  activeFolder: FolderId;
   user: CurrentUser;
   mailboxes: Mailbox[];
   mailboxId: string;
   search: string;
   onCompose: () => void;
+  onFolderChange: (folder: FolderId) => void;
   onMailboxChange: (mailboxId: string) => void;
   onSearchChange: (search: string) => void;
   onSignedOut: () => void;
 };
 
 export function TopBar({
+  activeFolder,
   user,
   mailboxes,
   mailboxId,
   search,
   onCompose,
+  onFolderChange,
   onMailboxChange,
   onSearchChange,
   onSignedOut
@@ -50,13 +45,14 @@ export function TopBar({
   const [mcpOpen, setMcpOpen] = React.useState(false);
   const mcpTriggerRef = React.useRef<HTMLButtonElement>(null);
 
-  async function handleSignOut() {
-    await signOut();
-    onSignedOut();
-  }
-
   return (
     <header className="flex h-14 w-full shrink-0 items-center gap-2 border-b bg-background px-3 md:px-4">
+      <MobileNavigation
+        activeFolder={activeFolder}
+        user={user}
+        onFolderChange={onFolderChange}
+        onSignedOut={onSignedOut}
+      />
       <div className="relative min-w-0 max-w-xl flex-1">
         <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
         <Input
@@ -82,7 +78,7 @@ export function TopBar({
             </SelectGroup>
           </SelectContent>
         </Select>
-        <Button aria-label="Compose" className="h-8 px-3" onClick={onCompose} type="button">
+        <Button aria-label="New email" className="h-8 px-3" onClick={onCompose} type="button">
           <MailPlus />
           <span className="hidden sm:inline">Compose</span>
         </Button>
@@ -103,37 +99,6 @@ export function TopBar({
           user={user}
           onOpenChange={setMcpOpen}
         />
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              aria-label="Open profile menu"
-              className="size-8 rounded-full"
-              size="icon"
-              type="button"
-              variant="ghost"
-            >
-              <Avatar className="size-7 border">
-                <AvatarFallback className="text-[11px] font-medium">
-                  {initials(user.name)}
-                </AvatarFallback>
-              </Avatar>
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuLabel>
-              <div className="flex flex-col gap-1">
-                <span>{user.name}</span>
-                <span className="text-xs font-normal text-muted-foreground">{user.role}</span>
-              </div>
-            </DropdownMenuLabel>
-            <DropdownMenuGroup>
-              <DropdownMenuItem onSelect={() => void handleSignOut()}>
-                <LogOut />
-                Sign out
-              </DropdownMenuItem>
-            </DropdownMenuGroup>
-          </DropdownMenuContent>
-        </DropdownMenu>
       </div>
     </header>
   );
