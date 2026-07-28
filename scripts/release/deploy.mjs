@@ -58,7 +58,7 @@ export async function deploy(options = {}) {
         source
       );
       deploySource(source, { releaseTag });
-      sql(
+      executeSql(
         source,
         `UPDATE release_state SET installed_version = ${quote(manifest.version)}, installed_schema_version = ${manifest.schemaVersion}, updated_at = datetime('now') WHERE singleton = 1`
       );
@@ -118,7 +118,7 @@ export async function deploy(options = {}) {
       source
     );
     const updateId = crypto.randomUUID();
-    sql(
+    executeSql(
       source,
       `INSERT INTO update_history (id, from_version, to_version, checkpoint_bookmark, worker_version, state, started_at) VALUES (${quote(updateId)}, ${quote(activeRelease.version)}, ${quote(manifest.version)}, ${quote(bookmark)}, ${quote(workerVersion)}, 'started', datetime('now'))`
     );
@@ -153,7 +153,7 @@ export async function deploy(options = {}) {
       ],
       source
     );
-    sql(
+    executeSql(
       source,
       `UPDATE release_state SET installed_version = ${quote(manifest.version)}, installed_schema_version = ${manifest.schemaVersion}, updated_at = datetime('now') WHERE singleton = 1; UPDATE update_history SET state = 'verified', completed_at = datetime('now') WHERE id = ${quote(updateId)}`
     );
@@ -366,8 +366,9 @@ export function needsInitialAuthSecret(result, secretName) {
   }
   throw result.error ?? new Error(`wrangler secret list exited with status ${result.status}.`);
 }
-function sql(cwd, command) {
-  run(
+export function executeSql(cwd, command, options = {}) {
+  const execute = options.attempt ?? attemptRun;
+  const result = execute(
     "pnpm",
     [
       "exec",
@@ -382,6 +383,12 @@ function sql(cwd, command) {
       "wrangler.jsonc"
     ],
     cwd
+  );
+  if (result.status === 0) return;
+  (options.emit ?? emitCommandOutput)(result);
+  throw (
+    result.error ??
+    new Error(`wrangler d1 execute exited with status ${result.status ?? "signal"}.`)
   );
 }
 function run(command, args, cwd) {
