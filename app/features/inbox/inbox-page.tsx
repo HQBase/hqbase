@@ -7,6 +7,7 @@ import { MessageList } from "@/features/messages/message-list";
 import type { MessageDetail as MessageDetailType, MessageSummary } from "@/features/messages/types";
 import { cn } from "@/lib/cn";
 import type { MailFolderId } from "@/lib/routes";
+import { mailFolders } from "@/lib/routes";
 
 type InboxPageProps = {
   activeFolder: MailFolderId;
@@ -27,6 +28,7 @@ export function InboxPage({
   onMessageRouteChange,
   onSelect
 }: InboxPageProps): React.ReactElement {
+  const activeLabel = mailFolders.find((folder) => folder.id === activeFolder)?.label ?? "Messages";
   const [thread, setThread] = React.useState<MessageDetailType[]>([]);
   const [detailError, setDetailError] = React.useState<string | null>(null);
   const [detailLoading, setDetailLoading] = React.useState(false);
@@ -107,7 +109,10 @@ export function InboxPage({
         data-mobile-view="message-list"
       >
         <div className="flex h-12 shrink-0 items-center justify-between border-b px-4">
-          <h1 className="text-sm font-medium">Messages</h1>
+          <h1 className="text-sm font-medium">
+            <span className="md:hidden">{activeLabel}</span>
+            <span className="hidden md:inline">Messages</span>
+          </h1>
           <span className="font-mono text-[11px] text-muted-foreground">{messages.length}</span>
         </div>
         <MessageList

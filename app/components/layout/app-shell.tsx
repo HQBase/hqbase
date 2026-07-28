@@ -5,7 +5,6 @@ import type { UpdateStatus } from "@/features/updates/types";
 import { UpdateBanner } from "@/features/updates/update-banner";
 import { cn } from "@/lib/cn";
 import type { FolderId } from "@/lib/routes";
-import { MobileNavigation } from "./mobile-navigation";
 import { Sidebar } from "./sidebar";
 import { TopBar } from "./top-bar";
 
@@ -29,25 +28,27 @@ type AppShellProps = {
 export function AppShell(props: AppShellProps): React.ReactElement {
   return (
     <div className="flex h-screen overflow-hidden bg-background text-foreground">
-      <Sidebar activeFolder={props.activeFolder} onFolderChange={props.onFolderChange} />
+      <Sidebar
+        activeFolder={props.activeFolder}
+        user={props.user}
+        onFolderChange={props.onFolderChange}
+        onSignedOut={props.onSignedOut}
+      />
       <div className="flex min-w-0 flex-1 flex-col">
         <div className={cn(props.immersiveOnCompact && "hidden lg:contents")}>
           <TopBar
+            activeFolder={props.activeFolder}
             mailboxId={props.mailboxId}
             mailboxes={props.mailboxes}
             search={props.search}
             user={props.user}
             onCompose={props.onCompose}
+            onFolderChange={props.onFolderChange}
             onMailboxChange={props.onMailboxChange}
             onSearchChange={props.onSearchChange}
             onSignedOut={props.onSignedOut}
           />
           <UpdateBanner status={props.updateStatus} onOpen={props.onOpenUpdates} />
-          <MobileNavigation
-            activeFolder={props.activeFolder}
-            user={props.user}
-            onFolderChange={props.onFolderChange}
-          />
         </div>
         <main className="min-h-0 flex-1 overflow-hidden bg-card/30">{props.children}</main>
       </div>
