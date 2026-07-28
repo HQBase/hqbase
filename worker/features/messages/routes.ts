@@ -152,7 +152,7 @@ for (const action of actions) {
       auth.user.id,
       auth.user.role,
       await getMessageMailboxId(c.env.DB, c.req.param("id")),
-      "agent"
+      action === "read" || action === "unread" ? "read" : "agent"
     );
     return c.json(await updateMessageAction(c.env.DB, c.req.param("id"), action));
   });

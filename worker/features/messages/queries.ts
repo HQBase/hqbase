@@ -13,6 +13,11 @@ import type {
   StoredAttachment
 } from "./types";
 
+const messageSelect = `SELECT messages.*,
+  (SELECT address FROM mailbox_addresses
+   WHERE id = messages.delivered_to_address_id) AS delivered_to_address
+  FROM messages`;
+
 export type ListMessageFilters = {
   folder?: string | undefined;
   limit?: number | undefined;
@@ -171,7 +176,7 @@ export async function listMessages(
   }
 
   const limit = Math.min(Math.max(filters.limit ?? 100, 1), 100);
-  const sql = `SELECT * FROM messages ${where.length ? `WHERE ${where.join(" AND ")}` : ""}
+  const sql = `${messageSelect} ${where.length ? `WHERE ${where.join(" AND ")}` : ""}
     ORDER BY COALESCE(received_at, sent_at, created_at) DESC LIMIT ?`;
   params.push(limit);
 
@@ -200,7 +205,7 @@ export async function listThreadMessages(
   if (mailboxIds.length === 0) return [];
   const result = await db
     .prepare(
-      `SELECT * FROM messages
+      `${messageSelect}
        WHERE thread_id = ? AND mailbox_id IN (${mailboxIds.map(() => "?").join(", ")})
        ORDER BY COALESCE(received_at, sent_at, created_at) ASC
        LIMIT 100`
@@ -215,6 +220,7 @@ async function mapMessageDetail(db: D1Database, row: MessageRow): Promise<Messag
     ...mapMessageSummary(row),
     cc: parseJsonList(row.cc_json),
     bcc: parseJsonList(row.bcc_json),
+    deliveredToAddress: row.delivered_to_address,
     textBody: row.text_body,
     htmlAvailable: row.html_r2_key !== null,
     messageId: row.message_id,
@@ -297,7 +303,7 @@ export async function getAttachmentMailboxId(db: D1Database, id: string): Promis
 }
 
 async function getMessageRow(db: D1Database, id: string): Promise<MessageRow | null> {
-  return db.prepare("SELECT * FROM messages WHERE id = ?").bind(id).first<MessageRow>();
+  return db.prepare(`${messageSelect} WHERE messages.id = ?`).bind(id).first<MessageRow>();
 }
 
 async function listAttachments(db: D1Database, messageId: string): Promise<StoredAttachment[]> {

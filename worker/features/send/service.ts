@@ -67,11 +67,14 @@ export async function replyToMessage(
   const references = [...original.references, original.messageId].filter(
     (value): value is string => value !== null
   );
+  const to = input.to?.length ? input.to : [original.fromAddress];
 
   const attachments = await loadAttachments(env, input.attachmentIds, userId);
   const sendResult = await env.MAIL_SENDER.send({
     from: input.from,
-    to: [original.fromAddress],
+    to,
+    ...(input.cc.length ? { cc: input.cc } : {}),
+    ...(input.bcc.length ? { bcc: input.bcc } : {}),
     subject: ensureReplySubject(original.subject),
     text: input.text,
     headers: {
@@ -84,9 +87,9 @@ export async function replyToMessage(
 
   return storeSentMessage(env, {
     from: input.from,
-    to: [original.fromAddress],
-    cc: [],
-    bcc: [],
+    to,
+    cc: input.cc,
+    bcc: input.bcc,
     subject: ensureReplySubject(original.subject),
     text: input.text,
     ...(input.html ? { html: input.html } : {}),

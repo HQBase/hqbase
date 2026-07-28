@@ -8,13 +8,11 @@ import {
   SelectTrigger,
   SelectValue
 } from "@/components/ui/select";
-import type { MessageDetail } from "@/features/messages/types";
 import type { ComposeMode } from "./compose-state";
 
 export type SendingIdentity = { mailboxId: string; address: string };
 export function ComposeFields(props: {
   identities: SendingIdentity[];
-  message: MessageDetail | null;
   mode: ComposeMode;
   from: string;
   to: string;
@@ -48,50 +46,44 @@ export function ComposeFields(props: {
           </SelectContent>
         </Select>
       </Row>
-      {props.mode === "reply" && props.message ? (
-        <div className="border-b py-3 text-xs text-muted-foreground">
-          Replying to <span className="text-foreground">{props.message.fromAddress}</span>
+      <Row label="To">
+        <Input
+          aria-label="To"
+          autoFocus={props.mode !== "reply"}
+          data-compose-autofocus={props.mode !== "reply" ? "" : undefined}
+          required
+          value={props.to}
+          onChange={(event) => props.setTo(event.target.value)}
+        />
+      </Row>
+      <div className="grid grid-cols-1 border-b sm:grid-cols-2 sm:divide-x">
+        <Row label="Cc" border={false}>
+          <Input
+            aria-label="Cc"
+            value={props.cc}
+            onChange={(event) => props.setCc(event.target.value)}
+          />
+        </Row>
+        <div className="sm:pl-4">
+          <Row label="Bcc" border={false}>
+            <Input
+              aria-label="Bcc"
+              value={props.bcc}
+              onChange={(event) => props.setBcc(event.target.value)}
+            />
+          </Row>
         </div>
-      ) : (
-        <>
-          <Row label="To">
-            <Input
-              aria-label="To"
-              autoFocus
-              data-compose-autofocus
-              required
-              value={props.to}
-              onChange={(event) => props.setTo(event.target.value)}
-            />
-          </Row>
-          <div className="grid grid-cols-1 border-b sm:grid-cols-2 sm:divide-x">
-            <Row label="Cc" border={false}>
-              <Input
-                aria-label="Cc"
-                value={props.cc}
-                onChange={(event) => props.setCc(event.target.value)}
-              />
-            </Row>
-            <div className="sm:pl-4">
-              <Row label="Bcc" border={false}>
-                <Input
-                  aria-label="Bcc"
-                  value={props.bcc}
-                  onChange={(event) => props.setBcc(event.target.value)}
-                />
-              </Row>
-            </div>
-          </div>
-          <Row label="Subject">
-            <Input
-              aria-label="Subject"
-              required
-              value={props.subject}
-              onChange={(event) => props.setSubject(event.target.value)}
-            />
-          </Row>
-        </>
-      )}
+      </div>
+      {props.mode !== "reply" ? (
+        <Row label="Subject">
+          <Input
+            aria-label="Subject"
+            required
+            value={props.subject}
+            onChange={(event) => props.setSubject(event.target.value)}
+          />
+        </Row>
+      ) : null}
     </div>
   );
 }

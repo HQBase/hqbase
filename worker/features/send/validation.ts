@@ -29,14 +29,28 @@ export const sendMessageSchema = z
     }
   });
 
-export const replyMessageSchema = z.object({
-  messageId: z.string().min(1),
-  from: emailAddressSchema,
-  text: z.string().trim().min(1).max(100_000),
-  html: z.string().trim().max(200_000).optional(),
-  attachmentIds: z.array(z.string().min(1).max(100)).max(20).default([]),
-  draftId: z.string().min(1).max(100).optional()
-});
+export const replyMessageSchema = z
+  .object({
+    messageId: z.string().min(1),
+    from: emailAddressSchema,
+    to: z.array(emailAddressSchema).max(50).optional(),
+    cc: optionalRecipientListSchema,
+    bcc: optionalRecipientListSchema,
+    text: z.string().trim().min(1).max(100_000),
+    html: z.string().trim().max(200_000).optional(),
+    attachmentIds: z.array(z.string().min(1).max(100)).max(20).default([]),
+    draftId: z.string().min(1).max(100).optional()
+  })
+  .superRefine((message, context) => {
+    const recipientCount = (message.to?.length || 1) + message.cc.length + message.bcc.length;
+    if (recipientCount > maxTotalRecipients) {
+      context.addIssue({
+        code: "custom",
+        message: "Cloudflare Email Sending allows up to 50 total recipients.",
+        path: ["to"]
+      });
+    }
+  });
 
 export type SendMessageInput = z.infer<typeof sendMessageSchema>;
 export type ReplyMessageInput = z.infer<typeof replyMessageSchema>;

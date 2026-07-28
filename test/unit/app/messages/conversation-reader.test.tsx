@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import { InboxPage } from "@/features/inbox/inbox-page";
 import { MessageDetail } from "@/features/messages/message-detail";
+import { MessageListItem } from "@/features/messages/message-list-item";
 import type { MessageDetail as MessageDetailType, MessageSummary } from "@/features/messages/types";
 
 const firstMessage: MessageDetailType = {
@@ -15,6 +16,7 @@ const firstMessage: MessageDetailType = {
   to: ["support@example.com"],
   cc: [],
   bcc: [],
+  deliveredToAddress: "support@example.com",
   subject: "Account access",
   snippet: "I cannot sign in",
   textBody: "I cannot sign in.",
@@ -100,5 +102,27 @@ describe("conversation reader", () => {
     expect(listHtml).toContain("lg:block hidden");
     expect(conversationHtml).toContain("lg:flex lg:border-r hidden");
     expect(conversationHtml).toContain("lg:block block");
+  });
+
+  it("labels the unread indicator and removes it once the message is read", () => {
+    const unreadHtml = renderToStaticMarkup(
+      <MessageListItem
+        href="/inbox/msg_1"
+        isActive={false}
+        message={firstMessage}
+        onSelect={() => undefined}
+      />
+    );
+    const readHtml = renderToStaticMarkup(
+      <MessageListItem
+        href="/inbox/msg_1"
+        isActive={false}
+        message={{ ...firstMessage, readAt: "2026-07-27T14:05:00.000Z" }}
+        onSelect={() => undefined}
+      />
+    );
+
+    expect(unreadHtml).toContain('aria-label="Unread"');
+    expect(readHtml).not.toContain('aria-label="Unread"');
   });
 });

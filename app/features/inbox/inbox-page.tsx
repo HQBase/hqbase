@@ -30,6 +30,10 @@ export function InboxPage({
   const [thread, setThread] = React.useState<MessageDetailType[]>([]);
   const [detailError, setDetailError] = React.useState<string | null>(null);
   const [detailLoading, setDetailLoading] = React.useState(false);
+  const onRefreshRef = React.useRef(onRefresh);
+  React.useEffect(() => {
+    onRefreshRef.current = onRefresh;
+  }, [onRefresh]);
 
   const loadThread = React.useCallback(async (messageId: string) => {
     const messages = await getMessageThread(messageId);
@@ -49,7 +53,22 @@ export function InboxPage({
     setDetailLoading(true);
     void getMessageThread(selectedId)
       .then((messages) => {
-        if (!cancelled) setThread(messages);
+        if (cancelled) return;
+        setThread(messages);
+        const selected = messages.find((message) => message.id === selectedId);
+        if (selected?.readAt === null) {
+          void runMessageAction(selectedId, "read")
+            .then((updated) => {
+              if (cancelled) return;
+              setThread((current) =>
+                current.map((message) =>
+                  message.id === updated.id ? { ...message, readAt: updated.readAt } : message
+                )
+              );
+              onRefreshRef.current();
+            })
+            .catch(() => undefined);
+        }
       })
       .catch((error: unknown) => {
         if (!cancelled) {

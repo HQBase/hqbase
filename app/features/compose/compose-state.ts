@@ -24,6 +24,24 @@ export const splitRecipients = (value: string) =>
     .map((part) => part.trim())
     .filter(Boolean);
 
+export function replySendingIdentity(
+  message: MessageDetail,
+  identities: SendingIdentity[]
+): SendingIdentity | null {
+  const addresses = [message.deliveredToAddress, ...message.to].filter(
+    (address): address is string => Boolean(address)
+  );
+  for (const address of addresses) {
+    const identity = identities.find(
+      (candidate) => candidate.address.toLowerCase() === address.toLowerCase()
+    );
+    if (identity) return identity;
+  }
+  return (
+    identities.find((identity) => identity.mailboxId === message.mailboxId) ?? identities[0] ?? null
+  );
+}
+
 export function sendingIdentities(mailboxes: Mailbox[]): SendingIdentity[] {
   return mailboxes
     .filter(
@@ -47,7 +65,11 @@ export const serializeDraft = (
   subject: string,
   text: string,
   html: string
-) => JSON.stringify({ from, to, cc, bcc, subject, text, html });
+) => JSON.stringify({ from, to, cc, bcc, subject, text, html: normalizeDraftHtml(text, html) });
+
+export function normalizeDraftHtml(text: string, html: string): string {
+  return text.trim() ? html : "";
+}
 
 type Recovery = {
   from: string;

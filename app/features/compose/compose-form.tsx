@@ -2,7 +2,6 @@ import { Paperclip, Trash2 } from "lucide-react";
 import type * as React from "react";
 
 import { Button } from "@/components/ui/button";
-import type { MessageDetail } from "@/features/messages/types";
 import { cn } from "@/lib/cn";
 import type { DraftAttachment } from "./api";
 import { AttachmentList } from "./attachment-list";
@@ -19,7 +18,6 @@ type ComposeFormProps = {
   html: string;
   identities: SendingIdentity[];
   isPending: boolean;
-  message: MessageDetail | null;
   mode: ComposeMode;
   presentation: "window" | "thread";
   ready: boolean;
@@ -57,7 +55,6 @@ export function ComposeForm(props: ComposeFormProps): React.ReactElement {
         >
           <ComposeFields
             identities={props.identities}
-            message={props.message}
             mode={props.mode}
             from={props.from}
             to={props.to}

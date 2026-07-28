@@ -71,6 +71,9 @@ export async function sendMessage(input: {
 export async function replyToMessage(input: {
   messageId: string;
   from: string;
+  to: string[];
+  cc: string[];
+  bcc: string[];
   text: string;
   html?: string;
   attachmentIds?: string[];
