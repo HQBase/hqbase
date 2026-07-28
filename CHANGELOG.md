@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.19
+
+- Group replies into one inbox conversation using standard email reply headers, while keeping
+  unrelated messages with the same subject separate.
+- Show the latest conversation activity with aggregate unread, starred, attachment, and message
+  count state, and apply inbox actions across the accessible conversation.
+- Repair existing subject-grouped message history during the update migration.
+
 ## 0.1.18
 
 - Restore notification sounds on iPhone by unlocking a local audio player during the first
