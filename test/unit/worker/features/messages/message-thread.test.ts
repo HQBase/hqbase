@@ -12,6 +12,7 @@ const row: MessageRow = {
   to_json: '["support@example.com"]',
   cc_json: "[]",
   bcc_json: "[]",
+  delivered_to_address: "support@example.com",
   subject: "Account access",
   snippet: "Help",
   text_body: "Help",
@@ -46,8 +47,13 @@ describe("message threads", () => {
     ]);
 
     expect(result).toHaveLength(1);
-    expect(result[0]).toMatchObject({ id: "msg_1", attachments: [] });
+    expect(result[0]).toMatchObject({
+      id: "msg_1",
+      attachments: [],
+      deliveredToAddress: "support@example.com"
+    });
     expect(prepare.mock.calls[0]?.[0]).toContain("ORDER BY COALESCE");
+    expect(prepare.mock.calls[0]?.[0]).toContain("delivered_to_address_id");
     expect(threadBind).toHaveBeenCalledWith("thr_1", "mbx_allowed", "mbx_second");
   });
 

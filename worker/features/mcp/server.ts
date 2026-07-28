@@ -182,6 +182,9 @@ function registerTools(server: McpServer, env: WorkerEnv, principal: McpPrincipa
         inputSchema: {
           from: z.string().email(),
           messageId: z.string().min(1).max(100),
+          to: z.array(z.string().email()).min(1).max(50).optional(),
+          cc: z.array(z.string().email()).max(50).default([]),
+          bcc: z.array(z.string().email()).max(50).default([]),
           text: z.string().trim().min(1).max(100_000)
         },
         annotations: { destructiveHint: false, idempotentHint: false, openWorldHint: true }

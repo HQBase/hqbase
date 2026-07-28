@@ -36,6 +36,7 @@ export type MessageSummary = {
 export type MessageDetail = MessageSummary & {
   cc: string[];
   bcc: string[];
+  deliveredToAddress: string | null;
   textBody: string;
   htmlAvailable: boolean;
   messageId: string | null;
@@ -72,6 +73,7 @@ export type MessageRow = {
   has_attachments: number;
   created_at: string;
   updated_at: string;
+  delivered_to_address: string | null;
 };
 
 export type AttachmentRow = {

@@ -21,6 +21,7 @@ export type MessageSummary = {
 export type MessageDetail = MessageSummary & {
   cc: string[];
   bcc: string[];
+  deliveredToAddress: string | null;
   textBody: string;
   htmlAvailable: boolean;
   messageId: string | null;

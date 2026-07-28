@@ -107,6 +107,7 @@ describe("send service", () => {
       attachments: [],
       bcc: [],
       cc: [],
+      deliveredToAddress: "support@example.com",
       direction: "inbound",
       folder: "inbox",
       fromAddress: "owner@example.com",
@@ -120,24 +121,34 @@ describe("send service", () => {
 
     await replyToMessage(env, {
       attachmentIds: [],
+      bcc: ["audit@example.com"],
+      cc: ["manager@example.com"],
       from: mailbox.address,
       messageId: "message-1",
-      text: "Reply"
+      text: "Reply",
+      to: ["alternate@example.com"]
     });
 
     expect(send).toHaveBeenCalledWith({
       from: mailbox.address,
+      bcc: ["audit@example.com"],
+      cc: ["manager@example.com"],
       headers: {
         "In-Reply-To": "<original@example.com>",
         References: "<earlier@example.com> <original@example.com>"
       },
       subject: "Re: Hello",
       text: "Reply",
-      to: ["owner@example.com"]
+      to: ["alternate@example.com"]
     });
     expect(insertMessage).toHaveBeenCalledWith(
       env.DB,
-      expect.objectContaining({ messageId: "<cloudflare-reply@example.com>" })
+      expect.objectContaining({
+        bcc: ["audit@example.com"],
+        cc: ["manager@example.com"],
+        messageId: "<cloudflare-reply@example.com>",
+        to: ["alternate@example.com"]
+      })
     );
   });
 });

@@ -43,7 +43,12 @@ export function MessageListItem({
       <div className="flex min-w-0 items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-2">
           {message.readAt === null && (
-            <span className="size-1.5 shrink-0 rounded-full bg-foreground" />
+            <span
+              aria-label="Unread"
+              className="size-1.5 shrink-0 rounded-full bg-foreground"
+              role="status"
+              title="Unread"
+            />
           )}
           <span className={cn("truncate text-[13px]", message.readAt === null && "font-medium")}>
             {message.fromAddress}
