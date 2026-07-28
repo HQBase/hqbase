@@ -1,5 +1,6 @@
 import * as React from "react";
 
+import { readUpdateProgress } from "@/features/updates/update-progress";
 import { type PwaUpdate, registerPwa } from "./register";
 
 export function PwaLifecycle(): React.ReactElement | null {
@@ -13,7 +14,10 @@ export function PwaLifecycle(): React.ReactElement | null {
     window.addEventListener("offline", handleOffline);
 
     const unregisterLifecycle = import.meta.env.PROD
-      ? registerPwa({ onUpdateReady: setUpdate })
+      ? registerPwa({
+          onUpdateReady: setUpdate,
+          watchForUpdate: readUpdateProgress() !== null
+        })
       : () => undefined;
 
     return () => {

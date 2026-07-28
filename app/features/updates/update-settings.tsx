@@ -6,19 +6,29 @@ import { CloudflareAuthorizationDialog } from "@/features/settings/cloudflare-au
 import { SettingsSection } from "@/features/settings/settings-section";
 import { applyUpdate, getUpdateStatus } from "./api";
 import type { UpdateStatus } from "./types";
+import type { UpdateProgress } from "./update-progress";
 
 export function UpdateSettings({
-  initialStatus
+  initialStatus,
+  progress,
+  onStatusChange,
+  onUpdateStarted
 }: {
   initialStatus: UpdateStatus | null;
+  progress: UpdateProgress | null;
+  onStatusChange: (status: UpdateStatus) => void;
+  onUpdateStarted: (buildId: string) => void;
 }): React.ReactElement {
   const [status, setStatus] = React.useState(initialStatus);
   const [checkError, setCheckError] = React.useState<string | null>(null);
   const [applyError, setApplyError] = React.useState<string | null>(null);
-  const [buildId, setBuildId] = React.useState<string | null>(null);
   const [pendingAction, setPendingAction] = React.useState<"check" | "apply" | null>(null);
   const [authorizationOpen, setAuthorizationOpen] = React.useState(false);
   const resumedRef = React.useRef(false);
+
+  React.useEffect(() => {
+    setStatus(initialStatus);
+  }, [initialStatus]);
 
   React.useEffect(() => {
     if (resumedRef.current) return;
@@ -44,18 +54,20 @@ export function UpdateSettings({
 
     setPendingAction("apply");
     void applyUpdate()
-      .then((result) => setBuildId(result.buildId))
+      .then((result) => onUpdateStarted(result.buildId))
       .catch((nextError: unknown) => {
         setApplyError(nextError instanceof Error ? nextError.message : "Update could not start.");
       })
       .finally(() => setPendingAction(null));
-  }, []);
+  }, [onUpdateStarted]);
 
   async function check(): Promise<void> {
     setPendingAction("check");
     setCheckError(null);
     try {
-      setStatus(await getUpdateStatus());
+      const nextStatus = await getUpdateStatus();
+      setStatus(nextStatus);
+      onStatusChange(nextStatus);
     } catch (nextError) {
       setCheckError(nextError instanceof Error ? nextError.message : "Update check failed.");
     } finally {
@@ -78,12 +90,12 @@ export function UpdateSettings({
           <AlertDescription>{applyError}</AlertDescription>
         </Alert>
       ) : null}
-      {buildId ? (
+      {progress ? (
         <Alert>
           <AlertTitle>Update started</AlertTitle>
           <AlertDescription>
-            Cloudflare build <span className="font-mono">{buildId}</span> is running. HQBase remains
-            available during the build and will reconnect after deployment.
+            Cloudflare build <span className="font-mono">{progress.buildId}</span> is running.
+            HQBase remains available during the build and will reconnect after deployment.
           </AlertDescription>
         </Alert>
       ) : null}
@@ -100,7 +112,7 @@ export function UpdateSettings({
           {pendingAction === "check" ? "Checking…" : "Check updates"}
         </Button>
       </div>
-      {status?.available ? (
+      {status?.available && !progress ? (
         <div className="flex flex-col gap-4">
           <Separator />
           <div>

@@ -4,13 +4,15 @@ import { Button } from "@/components/ui/button";
 import type { UpdateStatus } from "./types";
 
 export function UpdateBanner({
+  inProgress,
   status,
   onOpen
 }: {
+  inProgress: boolean;
   status: UpdateStatus | null;
   onOpen: () => void;
 }): React.ReactElement | null {
-  if (!status?.available) return null;
+  if (inProgress || !status?.available) return null;
   return (
     <div
       aria-live="polite"

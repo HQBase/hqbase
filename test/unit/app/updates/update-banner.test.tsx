@@ -10,12 +10,26 @@ describe("update banner", () => {
       available: true,
       release: { version: "0.2.0" }
     } as UpdateStatus;
-    const html = renderToStaticMarkup(<UpdateBanner status={status} onOpen={() => undefined} />);
+    const html = renderToStaticMarkup(
+      <UpdateBanner inProgress={false} status={status} onOpen={() => undefined} />
+    );
     expect(html).toContain("Update available");
     expect(html).toContain("0.2.0");
     expect(html).toContain("Review update");
     expect(html).toContain('role="status"');
     expect(html).toContain("bg-muted/45");
     expect(html).not.toContain("blue-");
+  });
+
+  it("stays hidden after the update starts", () => {
+    const status = {
+      installedVersion: "0.1.0",
+      available: true,
+      release: { version: "0.2.0" }
+    } as UpdateStatus;
+    const html = renderToStaticMarkup(
+      <UpdateBanner inProgress status={status} onOpen={() => undefined} />
+    );
+    expect(html).toBe("");
   });
 });

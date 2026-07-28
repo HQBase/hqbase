@@ -16,8 +16,7 @@ import { SettingsPage } from "@/features/settings/settings-page";
 import { getSetupStatus } from "@/features/setup/api";
 import { SetupPage } from "@/features/setup/setup-page";
 import type { SetupStatus } from "@/features/setup/types";
-import { getUpdateStatus } from "@/features/updates/api";
-import type { UpdateStatus } from "@/features/updates/types";
+import { useUpdateMonitor } from "@/features/updates/use-update-monitor";
 import { listUsers } from "@/features/users/api";
 import type { WorkspaceUser } from "@/features/users/types";
 import { playNotificationSound } from "@/lib/notification-sounds";
@@ -38,7 +37,6 @@ export function App(): React.ReactElement {
   const [search, setSearch] = React.useState("");
   const [composeOpen, setComposeOpen] = React.useState(false);
   const [isLoading, setIsLoading] = React.useState(true);
-  const [updateStatus, setUpdateStatus] = React.useState<UpdateStatus | null>(null);
   const knownIncomingMessageIds = React.useRef<Set<string> | null>(null);
   const { navigate, route } = useAppRoute(setup?.isComplete);
   const activeFolder: FolderId = route.kind === "settings" ? "settings" : route.folder;
@@ -49,6 +47,8 @@ export function App(): React.ReactElement {
     () => mailboxes.filter((mailbox) => mailbox.accessLevel !== null),
     [mailboxes]
   );
+  const canManageUpdates = user?.role === "owner" || user?.role === "admin";
+  const updateMonitor = useUpdateMonitor(canManageUpdates);
 
   const loadWorkspace = React.useCallback(async (currentUser: CurrentUser) => {
     const [nextSetup, nextMailboxes] = await Promise.all([getSetupStatus(), listMailboxes()]);
@@ -57,14 +57,8 @@ export function App(): React.ReactElement {
 
     if (currentUser.role === "owner" || currentUser.role === "admin") {
       setUsers(await listUsers());
-      void getUpdateStatus()
-        .then(setUpdateStatus)
-        .catch(() => {
-          // Update discovery never delays workspace startup.
-        });
     } else {
       setUsers([]);
-      setUpdateStatus(null);
     }
   }, []);
 
@@ -107,21 +101,6 @@ export function App(): React.ReactElement {
       toast.error(error instanceof Error ? error.message : "Conversations failed to load.");
     });
   }, [reloadConversations]);
-
-  React.useEffect(() => {
-    if (!user || (user.role !== "owner" && user.role !== "admin")) return;
-    const interval = window.setInterval(
-      () => {
-        void getUpdateStatus()
-          .then(setUpdateStatus)
-          .catch(() => {
-            // Update discovery must never interrupt mail work.
-          });
-      },
-      6 * 60 * 60 * 1000
-    );
-    return () => window.clearInterval(interval);
-  }, [user]);
 
   React.useEffect(() => {
     knownIncomingMessageIds.current = null;
@@ -207,7 +186,8 @@ export function App(): React.ReactElement {
         mailboxes={contentMailboxes}
         search={search}
         user={user}
-        updateStatus={updateStatus}
+        updateInProgress={updateMonitor.progress !== null}
+        updateStatus={updateMonitor.status}
         onOpenUpdates={() => {
           navigate({ kind: "settings", tab: "updates" });
         }}
@@ -239,7 +219,10 @@ export function App(): React.ReactElement {
                 users={users}
                 onRefresh={() => void reload()}
                 onTabChange={(tab) => navigate({ kind: "settings", tab })}
-                updateStatus={updateStatus}
+                onUpdateStarted={updateMonitor.start}
+                onUpdateStatusChange={updateMonitor.acceptStatus}
+                updateProgress={updateMonitor.progress}
+                updateStatus={updateMonitor.status}
               />
             ) : (
               <InboxPage
