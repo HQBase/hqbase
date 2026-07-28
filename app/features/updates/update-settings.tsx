@@ -23,6 +23,13 @@ export function UpdateSettings({
   React.useEffect(() => {
     if (resumedRef.current) return;
     const url = new URL(window.location.href);
+    if (url.searchParams.get("reauth") === "required") {
+      resumedRef.current = true;
+      url.searchParams.delete("reauth");
+      window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
+      setAuthorizationOpen(true);
+      return;
+    }
     const oauthResult = url.searchParams.get("cloudflare");
     if (!oauthResult || url.searchParams.get("settings") !== "updates") return;
     resumedRef.current = true;
@@ -130,14 +137,14 @@ export function UpdateSettings({
               </Button>
             )}
           </div>
-          <CloudflareAuthorizationDialog
-            authorizeHref="/api/updates/cloudflare/oauth/start"
-            description="To install this update, HQBase needs temporary access to your Cloudflare account. You’ll return to Updates automatically, and HQBase will start the update."
-            open={authorizationOpen}
-            onOpenChange={setAuthorizationOpen}
-          />
         </div>
       ) : null}
+      <CloudflareAuthorizationDialog
+        authorizeHref="/api/updates/cloudflare/oauth/start"
+        description="To install this update, HQBase needs temporary access to your Cloudflare account. You’ll return to Updates automatically, and HQBase will start the update."
+        open={authorizationOpen}
+        onOpenChange={setAuthorizationOpen}
+      />
     </SettingsSection>
   );
 }

@@ -1,5 +1,6 @@
 import {
   finishRuntimeCloudflareOAuth,
+  recentAuthenticationRedirect,
   resolveRuntimeCloudflareGrant,
   revokeRuntimeCloudflareGrant,
   startRuntimeCloudflareOAuth
@@ -26,6 +27,20 @@ const setupFlow = {
 } as const;
 
 describe("HQBase runtime Cloudflare OAuth", () => {
+  it("returns stale sessions to the originating settings modal", () => {
+    const response = recentAuthenticationRedirect(
+      new Request("https://mail.example.com/api/updates/cloudflare/oauth/start"),
+      "updates"
+    );
+
+    expect(response.status).toBe(303);
+    expect(response.headers.get("location")).toBe(
+      "https://mail.example.com/settings/updates?reauth=required"
+    );
+    expect(response.headers.get("cache-control")).toBe("no-store");
+    expect(response.body).toBeNull();
+  });
+
   it("starts operation-scoped PKCE without exposing the verifier", async () => {
     const response = await startRuntimeCloudflareOAuth(
       new Request("https://mail.example.com/settings"),

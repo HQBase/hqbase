@@ -48,6 +48,20 @@ export function DomainSettings({
   React.useEffect(() => {
     if (resumedRef.current) return;
     const url = new URL(window.location.href);
+    if (url.searchParams.get("reauth") === "required") {
+      resumedRef.current = true;
+      url.searchParams.delete("reauth");
+      window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
+      const pending = readPendingOperation();
+      if (pending?.action === "connect") {
+        setConnectOpen(true);
+      } else if (pending?.action === "portal") {
+        setAuthorizationOperation(pending);
+      } else {
+        toast.error("Sign in again, then restart the Cloudflare change.");
+      }
+      return;
+    }
     const result = url.searchParams.get("cloudflare");
     if (!result || url.searchParams.get("settings") !== "domains") return;
     resumedRef.current = true;
