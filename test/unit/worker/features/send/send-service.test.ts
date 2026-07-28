@@ -13,21 +13,24 @@ vi.mock("@worker/features/mailboxes/address-queries", () => ({
 }));
 
 vi.mock("@worker/features/messages/queries", () => ({
-  ensureThread: vi.fn(),
   getMessageDetail: vi.fn(),
   getMessageHtmlKey: vi.fn(),
   insertAttachment: vi.fn(),
   insertMessage: vi.fn()
 }));
+vi.mock("@worker/features/messages/threading", () => ({
+  createThread: vi.fn(),
+  touchThread: vi.fn()
+}));
 
 import { findMailboxForSending } from "@worker/features/mailboxes/queries";
 import {
-  ensureThread,
   getMessageDetail,
   getMessageHtmlKey,
   insertAttachment,
   insertMessage
 } from "@worker/features/messages/queries";
+import { createThread, touchThread } from "@worker/features/messages/threading";
 import { replyToMessage, sendNewMessage } from "@worker/features/send/service";
 import type { WorkerEnv } from "@worker/lib/env";
 
@@ -81,7 +84,8 @@ describe("send service", () => {
   beforeEach(() => {
     vi.resetAllMocks();
     vi.mocked(findMailboxForSending).mockResolvedValue(mailbox);
-    vi.mocked(ensureThread).mockResolvedValue("thread-1");
+    vi.mocked(createThread).mockResolvedValue("thread-1");
+    vi.mocked(touchThread).mockResolvedValue();
     vi.mocked(insertMessage).mockResolvedValue(sentSummary);
   });
 
@@ -108,6 +112,7 @@ describe("send service", () => {
       env.DB,
       expect.objectContaining({ messageId: "<cloudflare-new@example.com>" })
     );
+    expect(createThread).toHaveBeenCalledWith(env.DB, "Hello", "2026-07-10T00:00:00.000Z");
   });
 
   it("keeps only allowlisted threading headers on replies", async () => {
@@ -166,6 +171,8 @@ describe("send service", () => {
         to: ["alternate@example.com"]
       })
     );
+    expect(createThread).not.toHaveBeenCalled();
+    expect(touchThread).toHaveBeenCalledWith(env.DB, "thread-1", "2026-07-10T00:00:00.000Z");
     expect(put).toHaveBeenCalledWith("sent/2026-07-10/html-1.html", quotedHtml, {
       httpMetadata: { contentType: "text/html; charset=utf-8" }
     });

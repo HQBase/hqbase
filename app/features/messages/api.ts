@@ -1,5 +1,6 @@
 import { apiGet, apiPost } from "@/lib/api-client";
-import type { MessageDetail, MessageHtml, MessageSummary } from "./types";
+import type { MailFolderId } from "@/lib/routes";
+import type { ConversationSummary, MessageDetail, MessageHtml, MessageSummary } from "./types";
 
 export type MessageListParams = {
   folder?: string | undefined;
@@ -14,6 +15,15 @@ export async function listMessages(params: MessageListParams): Promise<MessageSu
   if (params.search) query.set("search", params.search);
   const suffix = query.toString() ? `?${query.toString()}` : "";
   return apiGet<MessageSummary[]>(`/api/messages${suffix}`);
+}
+
+export async function listConversations(
+  params: MessageListParams & { folder: MailFolderId }
+): Promise<ConversationSummary[]> {
+  const query = new URLSearchParams({ folder: params.folder });
+  if (params.mailboxId) query.set("mailboxId", params.mailboxId);
+  if (params.search) query.set("search", params.search);
+  return apiGet<ConversationSummary[]>(`/api/conversations?${query.toString()}`);
 }
 
 export async function getMessage(id: string): Promise<MessageDetail> {
@@ -38,4 +48,12 @@ export async function runMessageAction(
   action: "read" | "unread" | "star" | "unstar" | "archive" | "trash"
 ): Promise<MessageSummary> {
   return apiPost<MessageSummary>(`/api/messages/${id}/${action}`);
+}
+
+export async function runConversationAction(
+  id: string,
+  action: "read" | "unread" | "star" | "unstar" | "archive" | "trash",
+  folder: MailFolderId
+): Promise<{ affected: number; threadId: string }> {
+  return apiPost(`/api/conversations/${id}/${action}`, { folder });
 }

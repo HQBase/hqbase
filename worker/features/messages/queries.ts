@@ -2,7 +2,6 @@ import { newId, nowIso } from "../../db/client";
 import { AppError } from "../../lib/errors";
 import type { MessageAction } from "./actions";
 import { buildMessageActionPatch } from "./actions";
-import { normalizeSubject } from "./headers";
 import type {
   AttachmentRow,
   InsertAttachmentInput,
@@ -25,37 +24,6 @@ export type ListMessageFilters = {
   search?: string | undefined;
   mailboxIds?: string[] | undefined;
 };
-
-export async function ensureThread(
-  db: D1Database,
-  subject: string,
-  timestamp: string
-): Promise<string> {
-  const subjectNormalized = normalizeSubject(subject);
-  const existing = await db
-    .prepare("SELECT id FROM threads WHERE subject_normalized = ? LIMIT 1")
-    .bind(subjectNormalized)
-    .first<{ id: string }>();
-
-  if (existing) {
-    await db
-      .prepare("UPDATE threads SET last_message_at = ?, updated_at = ? WHERE id = ?")
-      .bind(timestamp, timestamp, existing.id)
-      .run();
-    return existing.id;
-  }
-
-  const id = newId("thr");
-  await db
-    .prepare(
-      `INSERT INTO threads (id, subject_normalized, last_message_at, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?)`
-    )
-    .bind(id, subjectNormalized, timestamp, timestamp, timestamp)
-    .run();
-
-  return id;
-}
 
 export async function insertMessage(
   db: D1Database,

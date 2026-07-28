@@ -54,6 +54,10 @@ export function MessageDetail({
       ? selected
       : ([...messages].reverse().find((message) => message.direction === "inbound") ?? selected);
   const composeTarget = composeMode === "reply" ? replyTarget : selected;
+  const isUnread = messages.some(
+    (message) => message.direction === "inbound" && message.readAt === null
+  );
+  const isStarred = messages.some((message) => message.starredAt !== null);
 
   return (
     <article className="flex h-full flex-col bg-background">
@@ -74,21 +78,21 @@ export function MessageDetail({
           </h1>
           <div className="flex shrink-0 flex-wrap gap-0.5 rounded-md border bg-card p-0.5">
             <IconButton
-              label={selected.readAt ? "Mark unread" : "Mark read"}
-              onClick={() => onAction(selected.readAt ? "unread" : "read")}
+              label={isUnread ? "Mark conversation read" : "Mark conversation unread"}
+              onClick={() => onAction(isUnread ? "read" : "unread")}
             >
               <MailOpen />
             </IconButton>
             <IconButton
-              label={selected.starredAt ? "Unstar" : "Star"}
-              onClick={() => onAction(selected.starredAt ? "unstar" : "star")}
+              label={isStarred ? "Unstar conversation" : "Star conversation"}
+              onClick={() => onAction(isStarred ? "unstar" : "star")}
             >
               <Star />
             </IconButton>
-            <IconButton label="Archive" onClick={() => onAction("archive")}>
+            <IconButton label="Archive conversation" onClick={() => onAction("archive")}>
               <Archive />
             </IconButton>
-            <IconButton label="Trash" onClick={() => onAction("trash")}>
+            <IconButton label="Trash conversation" onClick={() => onAction("trash")}>
               <Trash2 />
             </IconButton>
           </div>

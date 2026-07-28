@@ -102,12 +102,12 @@ describe("mail shell", () => {
     expect(html.indexOf("Settings")).toBeLessThan(html.indexOf("Open profile menu"));
   });
 
-  it("combines the compact folder label and message count in one list header", () => {
+  it("combines the compact folder label and conversation count in one list header", () => {
     const html = renderToStaticMarkup(
       <InboxPage
         activeFolder="inbox"
+        conversations={[]}
         mailboxes={[]}
-        messages={[]}
         selectedId={null}
         onMessageRouteChange={() => undefined}
         onRefresh={() => undefined}
@@ -116,7 +116,7 @@ describe("mail shell", () => {
     );
 
     expect(html).toContain('<span class="md:hidden">Inbox</span>');
-    expect(html).toContain('<span class="hidden md:inline">Messages</span>');
+    expect(html).toContain('<span class="hidden md:inline">Conversations</span>');
     expect(html).not.toContain("Navigation");
   });
 
