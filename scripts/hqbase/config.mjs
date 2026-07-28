@@ -11,11 +11,17 @@ export function writeWranglerConfig(manifest, options = {}) {
     return;
   }
 
+  const config = createWranglerConfig(manifest);
+  fs.writeFileSync(configPath(manifest.name), `${JSON.stringify(config, null, 2)}\n`);
+}
+
+export function createWranglerConfig(manifest) {
+  const cloudflareOAuth = manifest.cloudflareOAuth ?? { mode: "official" };
   const config = {
     $schema: `${rootFromDeployment}/node_modules/wrangler/config-schema.json`,
     name: manifest.worker.name,
     main: `${rootFromDeployment}/worker/index.ts`,
-    compatibility_date: "2026-07-11",
+    compatibility_date: "2026-07-28",
     compatibility_flags: ["nodejs_compat"],
     assets: {
       directory: `${rootFromDeployment}/dist`,
@@ -24,7 +30,10 @@ export function writeWranglerConfig(manifest, options = {}) {
     },
     observability: {
       enabled: true,
-      head_sampling_rate: 1
+      logs: {
+        enabled: true,
+        invocation_logs: false
+      }
     },
     secrets: {
       required: ["BETTER_AUTH_SECRET"]
@@ -64,8 +73,12 @@ export function writeWranglerConfig(manifest, options = {}) {
   };
 
   config.vars = {
+    CLOUDFLARE_OAUTH_MODE: cloudflareOAuth.mode,
     HQBASE_APP_VERSION: appVersion,
     HQBASE_WORKER_NAME: manifest.worker.name,
+    ...(cloudflareOAuth.mode === "customer"
+      ? { CLOUDFLARE_OAUTH_CLIENT_ID: cloudflareOAuth.clientId }
+      : {}),
     ...(manifest.authUrl ? { BETTER_AUTH_URL: manifest.authUrl } : {})
   };
   const customDomains = [manifest.appDomain].filter(Boolean);
@@ -73,5 +86,5 @@ export function writeWranglerConfig(manifest, options = {}) {
     config.routes = customDomains.map((pattern) => ({ pattern, custom_domain: true }));
   }
 
-  fs.writeFileSync(configPath(manifest.name), `${JSON.stringify(config, null, 2)}\n`);
+  return config;
 }

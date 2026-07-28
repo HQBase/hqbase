@@ -16,8 +16,10 @@ commands. Both rollbacks remain deliberate operator actions because a database r
 writes made after the bookmark.
 
 Starting an update from the app requires a short-lived Cloudflare OAuth grant. HQBase revokes the
-grant after use. The browser talks directly to Cloudflare, and the verified release comes directly
-from the canonical public repository.
+grant after use. The verified public client uses the public HQBase relay; customer-managed clients
+redirect directly between the customer Worker and Cloudflare. In both modes the customer Worker
+performs the token exchange, and the verified release comes directly from the canonical public
+repository.
 
 Release artifacts, manifests, checksums, and release notes are public GitHub Release assets owned
 by the canonical repository.

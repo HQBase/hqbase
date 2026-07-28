@@ -224,5 +224,5 @@ function readPendingOperation(): PendingCloudflareOperation | null {
 function oauthErrorMessage(result: string): string {
   if (result === "denied") return "Cloudflare authorization was cancelled.";
   if (result === "invalid") return "Cloudflare authorization expired. Please try again.";
-  return "Cloudflare could not authorize this change. If your organization blocks HQBase, ask a Cloudflare administrator to allow the OAuth application.";
+  return "Cloudflare could not authorize this change. Ask a Cloudflare administrator to allow HQBase or configure customer-managed OAuth from the deployment guide.";
 }

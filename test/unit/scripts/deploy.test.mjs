@@ -337,5 +337,23 @@ describe("HQBase release deployment", () => {
       HQBASE_APP_VERSION: "0.1.23",
       HQBASE_WORKER_NAME: wranglerConfig.name
     });
+    expect(normalized.observability.logs.invocation_logs).toBe(false);
+    const customerManaged = normalizeConfig(
+      {
+        ...wranglerConfig,
+        vars: {
+          BETTER_AUTH_URL: "https://mail.example.com",
+          CLOUDFLARE_OAUTH_CLIENT_ID: "customer-client",
+          CLOUDFLARE_OAUTH_MODE: "customer"
+        }
+      },
+      "0.1.23",
+      "b".repeat(64)
+    );
+    expect(customerManaged.vars).toMatchObject({
+      BETTER_AUTH_URL: "https://mail.example.com",
+      CLOUDFLARE_OAUTH_CLIENT_ID: "customer-client",
+      CLOUDFLARE_OAUTH_MODE: "customer"
+    });
   });
 });

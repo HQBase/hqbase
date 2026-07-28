@@ -144,6 +144,7 @@ jobs:
       HQBASE_STAGING_EMAIL_DOMAIN: ${{ secrets.HQBASE_E2E_EMAIL_DOMAIN }}
       HQBASE_STAGING_OWNER_EMAIL: owner@${{ secrets.HQBASE_E2E_EMAIL_DOMAIN }}
       HQBASE_STAGING_OWNER_PASSWORD: ${{ secrets.HQBASE_E2E_OWNER_PASSWORD }}
+      HQBASE_STAGING_OAUTH_CLIENT_ID: ${{ vars.HQBASE_E2E_OAUTH_CLIENT_ID }}
       HQBASE_STAGING_SENDER: hello@${{ secrets.HQBASE_E2E_EMAIL_DOMAIN }}
       HQBASE_STAGING_URL: https://${{ secrets.HQBASE_E2E_APP_HOSTNAME }}
       DEPLOYMENT_NAME: release-${{ github.run_id }}
@@ -220,6 +221,12 @@ jobs:
         run: pnpm test:e2e:staging:lifecycle
       - name: Apply the exact signed candidate
         run: |
+          pnpm hqbase oauth \
+            --name "$DEPLOYMENT_NAME" \
+            --mode customer \
+            --auth-url "$HQBASE_STAGING_URL" \
+            --client-id "$HQBASE_STAGING_OAUTH_CLIENT_ID" \
+            --skip-deploy
           config=".hqbase/deployments/$DEPLOYMENT_NAME/wrangler.jsonc"
           HQBASE_AUTH_SECRET="$HQBASE_STAGING_AUTH_SECRET" \
           HQBASE_EXPECTED_RELEASE_VERSION="$CANDIDATE_VERSION" \

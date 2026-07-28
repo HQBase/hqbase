@@ -6,6 +6,7 @@ import { updateDeployButton } from "./button.mjs";
 import { destroy } from "./destroy.mjs";
 import { doctor } from "./doctor.mjs";
 import { install } from "./install.mjs";
+import { configureOAuth } from "./oauth.mjs";
 import { printPostDeploy } from "./postdeploy.mjs";
 import { reset } from "./reset.mjs";
 import { restore } from "./restore.mjs";
@@ -25,6 +26,9 @@ try {
       break;
     case "doctor":
       doctor(flags);
+      break;
+    case "oauth":
+      configureOAuth(flags);
       break;
     case "backup":
       backup(flags);
@@ -59,6 +63,7 @@ function printHelp() {
 Usage:
   pnpm hqbase button --repo-url https://github.com/OWNER/REPO
   pnpm hqbase install --name dev-01 [--domain example.com]
+  pnpm hqbase oauth --name dev-01 --mode official|customer
   pnpm hqbase doctor --name dev-01
   pnpm hqbase backup --name dev-01 [--output backup.json]
   pnpm hqbase restore --name dev-01 --backup backup.json --yes
@@ -76,10 +81,19 @@ Install options:
   --no-sending           Skip Email Sending enablement.
   --app-domain <host>    Attach a custom Worker domain in the generated config.
   --auth-url <origin>    Set BETTER_AUTH_URL explicitly. Usually unnecessary.
+  --oauth-mode <mode>    Use official (default) or customer-managed OAuth.
+  --oauth-client-id <id> Customer OAuth client ID. Requires --oauth-mode customer and --auth-url.
   HQBASE_AUTH_SECRET     Preserve an existing Better Auth secret without exposing it in argv.
   --auth-secret <value>  Compatibility fallback. Prefer HQBASE_AUTH_SECRET.
   --skip-build           Skip pnpm build.
   --skip-deploy          Create resources/config/migrations without deploying Worker.
   --dry-run              Print commands without mutating Cloudflare.
+
+OAuth options:
+  --mode <mode>          Use official or customer-managed OAuth.
+  --client-id <id>       Customer OAuth client ID. Required for customer mode.
+  --auth-url <origin>    Exact canonical HTTPS HQBase origin. Required for customer mode.
+  --skip-deploy          Validate and write local deployment configuration without deploying.
+  --dry-run              Validate without writing or deploying.
 `);
 }

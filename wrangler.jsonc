@@ -3,7 +3,7 @@
   "name": "hqbase",
   "main": "worker/index.ts",
   "preview_urls": false,
-  "compatibility_date": "2026-07-11",
+  "compatibility_date": "2026-07-28",
   "compatibility_flags": ["nodejs_compat"],
   "assets": {
     "directory": "./dist",
@@ -13,7 +13,10 @@
   },
   "observability": {
     "enabled": true,
-    "head_sampling_rate": 1
+    "logs": {
+      "enabled": true,
+      "invocation_logs": false
+    }
   },
   "secrets": {
     "required": ["BETTER_AUTH_SECRET"]
