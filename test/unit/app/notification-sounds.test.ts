@@ -1,16 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-const tiks = vi.hoisted(() => ({
-  error: vi.fn(),
-  init: vi.fn(),
-  notify: vi.fn(),
-  pop: vi.fn(),
-  success: vi.fn(),
-  swoosh: vi.fn(),
-  warning: vi.fn()
-}));
-
-vi.mock("@rexa-developer/tiks", () => ({ tiks }));
+const audioInstances: MockAudio[] = [];
 
 import {
   initializeNotificationSounds,
@@ -20,7 +10,15 @@ import {
 } from "@/lib/notification-sounds";
 
 describe("notification sounds", () => {
-  it("maps mail and toast events to quiet, non-blocking synthesized sounds", () => {
+  it("maps events and plays local audio after an explicit interaction", async () => {
+    const documentTarget = Object.assign(new EventTarget(), { visibilityState: "visible" });
+    const windowTarget = Object.assign(new EventTarget(), {
+      matchMedia: vi.fn(() => ({ matches: false }))
+    });
+    vi.stubGlobal("document", documentTarget);
+    vi.stubGlobal("window", windowTarget);
+    vi.stubGlobal("Audio", MockAudio);
+
     expect(notificationSoundForToastType("success")).toBe("toast-success");
     expect(notificationSoundForToastType("warning")).toBe("toast-warning");
     expect(notificationSoundForToastType("error")).toBe("toast-error");
@@ -31,29 +29,44 @@ describe("notification sounds", () => {
 
     initializeNotificationSounds();
     initializeNotificationSounds();
+    expect(audioInstances).toHaveLength(0);
+
+    documentTarget.dispatchEvent(new Event("touchend"));
+    await Promise.resolve();
+    expect(audioInstances).toHaveLength(1);
+    const audio = audioInstances[0];
+    if (!audio) throw new Error("Expected the interaction to create an audio player.");
+    expect(audio.src).toBe("/sounds/unlock.wav");
+    expect(audio.play).toHaveBeenCalledOnce();
+
     playNotificationSound("incoming-email");
+    expect(audio.src).toBe("/sounds/incoming-email.wav");
     playNotificationSound("outgoing-email");
+    expect(audio.src).toBe("/sounds/outgoing-email.wav");
     playNotificationSound("toast-success");
+    expect(audio.src).toBe("/sounds/toast-success.wav");
     playNotificationSound("toast-warning");
+    expect(audio.src).toBe("/sounds/toast-warning.wav");
     playNotificationSound("toast-error");
+    expect(audio.src).toBe("/sounds/toast-error.wav");
     playNotificationSound("toast-information");
+    expect(audio.src).toBe("/sounds/toast-information.wav");
 
-    expect(tiks.init).toHaveBeenCalledOnce();
-    expect(tiks.init).toHaveBeenCalledWith({
-      theme: "soft",
-      volume: 0.18,
-      respectReducedMotion: true
-    });
-    expect(tiks.notify).toHaveBeenCalledOnce();
-    expect(tiks.swoosh).toHaveBeenCalledOnce();
-    expect(tiks.success).toHaveBeenCalledOnce();
-    expect(tiks.warning).toHaveBeenCalledOnce();
-    expect(tiks.error).toHaveBeenCalledOnce();
-    expect(tiks.pop).toHaveBeenCalledOnce();
-
-    tiks.error.mockImplementationOnce(() => {
-      throw new Error("Audio unavailable");
-    });
-    expect(() => playNotificationSound("toast-error")).not.toThrow();
+    expect(audio.play).toHaveBeenCalledTimes(7);
+    expect(audio.volume).toBe(0.55);
   });
 });
+
+class MockAudio {
+  currentTime = 0;
+  pause = vi.fn();
+  play = vi.fn(() => Promise.resolve());
+  preload = "";
+  src: string;
+  volume = 1;
+
+  constructor(src = "") {
+    this.src = src;
+    audioInstances.push(this);
+  }
+}

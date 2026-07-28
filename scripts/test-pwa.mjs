@@ -55,6 +55,8 @@ try {
   });
   assert.ok(cacheState.names.some((name) => name.startsWith("hqbase-pwa-")));
   assert.ok(cacheState.urls.includes("/offline.html"));
+  assert.ok(cacheState.urls.includes("/sounds/incoming-email.wav"));
+  assert.ok(cacheState.urls.includes("/sounds/unlock.wav"));
   assert.equal(
     cacheState.urls.some((url) => url.startsWith("/api/")),
     false

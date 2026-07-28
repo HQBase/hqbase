@@ -6,6 +6,7 @@ const allowedPrecachePaths = [
   /^\/assets\//,
   /^\/fonts\//,
   /^\/icons\//,
+  /^\/sounds\//,
   /^\/logo\.svg$/,
   /^\/manifest\.webmanifest$/,
   /^\/offline\.html$/

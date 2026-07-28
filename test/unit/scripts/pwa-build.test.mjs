@@ -30,6 +30,7 @@ describe("PWA build contract", () => {
   it("allows only public shell assets into the precache", () => {
     expect(isAllowedPrecacheUrl("/assets/app-abc.js")).toBe(true);
     expect(isAllowedPrecacheUrl("/offline.html")).toBe(true);
+    expect(isAllowedPrecacheUrl("/sounds/incoming-email.wav")).toBe(true);
     expect(isAllowedPrecacheUrl("/api/me")).toBe(false);
     expect(isAllowedPrecacheUrl("/api/messages/123/attachment")).toBe(false);
     expect(isAllowedPrecacheUrl("/setup")).toBe(false);
