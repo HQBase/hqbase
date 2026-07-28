@@ -20,6 +20,10 @@ export async function getMessage(id: string): Promise<MessageDetail> {
   return apiGet<MessageDetail>(`/api/messages/${id}`);
 }
 
+export async function getMessageThread(id: string): Promise<MessageDetail[]> {
+  return apiGet<MessageDetail[]>(`/api/messages/${id}/thread`);
+}
+
 export async function getMessageHtml(id: string, loadRemoteImages = false): Promise<MessageHtml> {
   const suffix = loadRemoteImages ? "?loadRemoteImages=1" : "";
   return apiGet<MessageHtml>(`/api/messages/${id}/html${suffix}`);

@@ -4,6 +4,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 import initialMigration from "../../../migrations/0001_initial.sql?raw";
 import workspaceMigration from "../../../migrations/0002_workspace.sql?raw";
 import oauthResourcesMigration from "../../../migrations/0003_oauth_resources.sql?raw";
+import conversationMigration from "../../../migrations/0004_conversations.sql?raw";
 import { hashOAuthToken } from "../../../worker/auth/oauth-token";
 
 const origin = "https://hqbase.test";
@@ -13,7 +14,12 @@ const token = "hqb_access_mcp-hqbase-access-token";
 
 describe("HQBase MCP server", () => {
   beforeAll(async () => {
-    for (const migration of [initialMigration, workspaceMigration, oauthResourcesMigration]) {
+    for (const migration of [
+      initialMigration,
+      workspaceMigration,
+      oauthResourcesMigration,
+      conversationMigration
+    ]) {
       await applyMigration(migration);
     }
     const now = new Date();

@@ -1,0 +1,104 @@
+import { renderToStaticMarkup } from "react-dom/server";
+import { describe, expect, it } from "vitest";
+
+import { InboxPage } from "@/features/inbox/inbox-page";
+import { MessageDetail } from "@/features/messages/message-detail";
+import type { MessageDetail as MessageDetailType, MessageSummary } from "@/features/messages/types";
+
+const firstMessage: MessageDetailType = {
+  id: "msg_1",
+  threadId: "thr_1",
+  mailboxId: "mbx_1",
+  direction: "inbound",
+  folder: "inbox",
+  fromAddress: "customer@example.com",
+  to: ["support@example.com"],
+  cc: [],
+  bcc: [],
+  subject: "Account access",
+  snippet: "I cannot sign in",
+  textBody: "I cannot sign in.",
+  htmlAvailable: false,
+  messageId: "<first@example.com>",
+  inReplyTo: null,
+  references: [],
+  attachments: [],
+  receivedAt: "2026-07-27T14:00:00.000Z",
+  sentAt: null,
+  readAt: null,
+  starredAt: null,
+  hasAttachments: false,
+  createdAt: "2026-07-27T14:00:00.000Z"
+};
+
+const secondMessage: MessageDetailType = {
+  ...firstMessage,
+  id: "msg_2",
+  direction: "outbound",
+  folder: "sent",
+  fromAddress: "support@example.com",
+  to: ["customer@example.com"],
+  textBody: "We can help.",
+  snippet: "We can help",
+  messageId: "<second@example.com>",
+  inReplyTo: "<first@example.com>",
+  references: ["<first@example.com>"],
+  receivedAt: null,
+  sentAt: "2026-07-27T14:05:00.000Z",
+  readAt: "2026-07-27T14:05:00.000Z",
+  createdAt: "2026-07-27T14:05:00.000Z"
+};
+
+describe("conversation reader", () => {
+  it("renders the complete thread and keeps Reply and Forward at the bottom", () => {
+    const html = renderToStaticMarkup(
+      <MessageDetail
+        mailboxes={[]}
+        messages={[firstMessage, secondMessage]}
+        selectedId={secondMessage.id}
+        onAction={() => undefined}
+        onBack={() => undefined}
+        onSent={() => undefined}
+      />
+    );
+
+    expect(html.indexOf("I cannot sign in.")).toBeLessThan(html.indexOf("We can help."));
+    expect(html.indexOf("We can help.")).toBeLessThan(html.lastIndexOf(">Reply<"));
+    expect(html).toContain(">Forward<");
+    expect(html).toContain('aria-label="Back to messages"');
+    expect(html).not.toContain('aria-label="Reply"');
+    expect(html).toContain('aria-label="Archive"');
+  });
+
+  it("uses list-only and conversation-only compact states", () => {
+    const summary: MessageSummary = firstMessage;
+    const listHtml = renderToStaticMarkup(
+      <InboxPage
+        activeFolder="inbox"
+        mailboxes={[]}
+        messages={[summary]}
+        selectedId={null}
+        onMessageRouteChange={() => undefined}
+        onRefresh={() => undefined}
+        onSelect={() => undefined}
+      />
+    );
+    const conversationHtml = renderToStaticMarkup(
+      <InboxPage
+        activeFolder="inbox"
+        mailboxes={[]}
+        messages={[summary]}
+        selectedId={summary.id}
+        onMessageRouteChange={() => undefined}
+        onRefresh={() => undefined}
+        onSelect={() => undefined}
+      />
+    );
+
+    expect(listHtml).toContain('data-mobile-view="message-list"');
+    expect(listHtml).toContain('data-mobile-view="conversation"');
+    expect(listHtml).toContain("lg:block hidden");
+    expect(conversationHtml).toContain("lg:flex lg:border-r hidden");
+    expect(conversationHtml).toContain("lg:block block");
+  });
+});

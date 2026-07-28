@@ -4,6 +4,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 import initialMigration from "../../../migrations/0001_initial.sql?raw";
 import workspaceMigration from "../../../migrations/0002_workspace.sql?raw";
 import oauthResourcesMigration from "../../../migrations/0003_oauth_resources.sql?raw";
+import conversationMigration from "../../../migrations/0004_conversations.sql?raw";
 import { createAuth } from "../../../worker/auth/auth";
 
 const origin = "https://hqbase.test";
@@ -28,6 +29,7 @@ describe("Better Auth schema", () => {
     ]);
 
     await applyMigration(oauthResourcesMigration);
+    await applyMigration(conversationMigration);
   });
 
   it("backfills the Better Auth 1.7 account identity without losing credential rows", async () => {
@@ -50,6 +52,11 @@ describe("Better Auth schema", () => {
       userId: "usr_legacy",
       password: "legacy-hash"
     });
+  });
+
+  it("applies the conversation draft migration on an existing schema", async () => {
+    const columns = await env.DB.prepare("PRAGMA table_info(drafts)").all<{ name: string }>();
+    expect(columns.results.map((column) => column.name)).toContain("forward_of_message_id");
   });
 
   it("creates and signs in a fresh email/password account after migration", async () => {

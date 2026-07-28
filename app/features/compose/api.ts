@@ -11,6 +11,7 @@ export type Draft = {
   id: string;
   mailboxId: string | null;
   replyToMessageId: string | null;
+  forwardOfMessageId: string | null;
   from: string;
   to: string[];
   cc: string[];

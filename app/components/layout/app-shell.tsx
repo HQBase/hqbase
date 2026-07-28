@@ -3,6 +3,7 @@ import type { CurrentUser } from "@/features/auth/types";
 import type { Mailbox } from "@/features/mailboxes/types";
 import type { UpdateStatus } from "@/features/updates/types";
 import { UpdateBanner } from "@/features/updates/update-banner";
+import { cn } from "@/lib/cn";
 import type { FolderId } from "@/lib/routes";
 import { MobileNavigation } from "./mobile-navigation";
 import { Sidebar } from "./sidebar";
@@ -13,6 +14,7 @@ type AppShellProps = {
   children: React.ReactNode;
   mailboxId: string;
   mailboxes: Mailbox[];
+  immersiveOnCompact?: boolean;
   search: string;
   user: CurrentUser;
   updateStatus: UpdateStatus | null;
@@ -29,22 +31,24 @@ export function AppShell(props: AppShellProps): React.ReactElement {
     <div className="flex h-screen overflow-hidden bg-background text-foreground">
       <Sidebar activeFolder={props.activeFolder} onFolderChange={props.onFolderChange} />
       <div className="flex min-w-0 flex-1 flex-col">
-        <TopBar
-          mailboxId={props.mailboxId}
-          mailboxes={props.mailboxes}
-          search={props.search}
-          user={props.user}
-          onCompose={props.onCompose}
-          onMailboxChange={props.onMailboxChange}
-          onSearchChange={props.onSearchChange}
-          onSignedOut={props.onSignedOut}
-        />
-        <UpdateBanner status={props.updateStatus} onOpen={props.onOpenUpdates} />
-        <MobileNavigation
-          activeFolder={props.activeFolder}
-          user={props.user}
-          onFolderChange={props.onFolderChange}
-        />
+        <div className={cn(props.immersiveOnCompact && "hidden lg:contents")}>
+          <TopBar
+            mailboxId={props.mailboxId}
+            mailboxes={props.mailboxes}
+            search={props.search}
+            user={props.user}
+            onCompose={props.onCompose}
+            onMailboxChange={props.onMailboxChange}
+            onSearchChange={props.onSearchChange}
+            onSignedOut={props.onSignedOut}
+          />
+          <UpdateBanner status={props.updateStatus} onOpen={props.onOpenUpdates} />
+          <MobileNavigation
+            activeFolder={props.activeFolder}
+            user={props.user}
+            onFolderChange={props.onFolderChange}
+          />
+        </div>
         <main className="min-h-0 flex-1 overflow-hidden bg-card/30">{props.children}</main>
       </div>
     </div>

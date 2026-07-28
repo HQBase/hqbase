@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  forwardedMessage,
   readDraftRecovery,
   sendingIdentities,
   splitRecipients
@@ -49,9 +50,33 @@ describe("composer state", () => {
               isPrimary: false
             }
           ]
+        },
+        {
+          id: "mbx_2",
+          address: "sales@example.net",
+          displayName: "Sales",
+          isActive: true,
+          accessLevel: "manager",
+          createdAt: "now",
+          updatedAt: "now",
+          addresses: [
+            {
+              id: "addr_3",
+              mailboxId: "mbx_2",
+              mailDomainId: "dom_2",
+              address: "sales@example.net",
+              displayName: "Sales",
+              receiveEnabled: true,
+              sendEnabled: true,
+              isPrimary: true
+            }
+          ]
         }
       ])
-    ).toEqual([{ mailboxId: "mbx_1", address: "support@example.com" }]);
+    ).toEqual([
+      { mailboxId: "mbx_1", address: "support@example.com" },
+      { mailboxId: "mbx_2", address: "sales@example.net" }
+    ]);
   });
 
   it("uses crash recovery only when it is newer than the server draft", () => {
@@ -72,5 +97,38 @@ describe("composer state", () => {
       subject: "Recovered"
     });
     expect(readDraftRecovery("key", new Date(300).toISOString())).toBeNull();
+  });
+
+  it("builds safe forwarded context from the selected message", () => {
+    const forwarded = forwardedMessage({
+      id: "msg_1",
+      threadId: "thr_1",
+      mailboxId: "mbx_1",
+      direction: "inbound",
+      folder: "inbox",
+      fromAddress: "sender@example.com",
+      to: ["support@example.com"],
+      cc: [],
+      bcc: [],
+      subject: "Account access",
+      snippet: "Please help",
+      textBody: "Please help <script>alert(1)</script>",
+      htmlAvailable: false,
+      messageId: "<msg@example.com>",
+      inReplyTo: null,
+      references: [],
+      attachments: [],
+      receivedAt: "2026-07-27T14:00:00.000Z",
+      sentAt: null,
+      readAt: null,
+      starredAt: null,
+      hasAttachments: false,
+      createdAt: "2026-07-27T14:00:00.000Z"
+    });
+
+    expect(forwarded.text).toContain("---------- Forwarded message ---------");
+    expect(forwarded.text).toContain("From: sender@example.com");
+    expect(forwarded.html).toContain("&lt;script&gt;");
+    expect(forwarded.html).not.toContain("<script>");
   });
 });

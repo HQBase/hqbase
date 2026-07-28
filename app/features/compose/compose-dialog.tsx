@@ -1,7 +1,6 @@
-import { Paperclip, Trash2 } from "lucide-react";
 import * as React from "react";
 import { toast } from "sonner";
-import { Button } from "@/components/ui/button";
+
 import {
   createDraft,
   type Draft,
@@ -14,25 +13,30 @@ import {
   updateDraft,
   uploadDraftAttachment
 } from "./api";
-import { AttachmentList } from "./attachment-list";
-import { ComposeFields } from "./compose-fields";
+import { ComposeForm } from "./compose-form";
 import {
   type ComposeDialogProps,
+  composeTitle,
+  type DraftSaveState,
+  draftStatus,
+  forwardedMessage,
   readDraftRecovery,
   sendingIdentities,
   serializeDraft,
   splitRecipients
 } from "./compose-state";
-import { ComposeWindow } from "./compose-window";
-import { RichEmailEditor } from "./rich-email-editor";
+import { ComposeSurface } from "./compose-surface";
 
 export function ComposeDialog({
   mailboxes,
+  message = null,
+  mode = "new",
   open,
-  replyTo,
+  presentation = "window",
+  threadContext,
   onOpenChange,
   onSent
-}: ComposeDialogProps): React.ReactElement {
+}: ComposeDialogProps): React.ReactElement | null {
   const identities = React.useMemo(() => sendingIdentities(mailboxes), [mailboxes]);
   const [draft, setDraft] = React.useState<Draft | null>(null);
   const [from, setFrom] = React.useState("");
@@ -45,10 +49,13 @@ export function ComposeDialog({
   const [attachments, setAttachments] = React.useState<DraftAttachment[]>([]);
   const [isPending, setIsPending] = React.useState(false);
   const [isUploading, setIsUploading] = React.useState(false);
-  const [saveState, setSaveState] = React.useState<"saved" | "saving" | "error">("saved");
+  const [saveState, setSaveState] = React.useState<DraftSaveState>("saved");
   const initialized = React.useRef(false);
   const lastSaved = React.useRef("");
-  const recoveryKey = `hqbase:compose:${replyTo?.id ?? "new"}`;
+  const formId = React.useId();
+  const replyToMessageId = mode === "reply" ? (message?.id ?? null) : null;
+  const forwardOfMessageId = mode === "forward" ? (message?.id ?? null) : null;
+  const recoveryKey = `hqbase:compose:${mode}:${message?.id ?? "new"}`;
 
   React.useEffect(() => {
     if (!open) return;
@@ -56,19 +63,31 @@ export function ComposeDialog({
     void (async () => {
       try {
         const drafts = await listDrafts();
-        const existing = drafts.find((d) => d.replyToMessageId === (replyTo?.id ?? null)) ?? null;
+        const existing =
+          drafts.find(
+            (item) =>
+              item.replyToMessageId === replyToMessageId &&
+              item.forwardOfMessageId === forwardOfMessageId
+          ) ?? null;
+        const forwarded = mode === "forward" && message ? forwardedMessage(message) : null;
         const initial =
           existing ??
           (await createDraft({
             mailboxId: identities[0]?.mailboxId ?? null,
-            replyToMessageId: replyTo?.id ?? null,
+            replyToMessageId,
+            forwardOfMessageId,
             from: identities[0]?.address ?? "",
-            to: replyTo ? [replyTo.fromAddress] : [],
+            to: mode === "reply" && message ? [message.fromAddress] : [],
             cc: [],
             bcc: [],
-            subject: replyTo ? `Re: ${replyTo.subject.replace(/^re:\s*/i, "")}` : "",
-            text: "",
-            html: "<p></p>"
+            subject:
+              mode === "reply" && message
+                ? `Re: ${message.subject.replace(/^re:\s*/i, "")}`
+                : mode === "forward" && message
+                  ? `Fwd: ${message.subject.replace(/^(fw|fwd):\s*/i, "")}`
+                  : "",
+            text: forwarded?.text ?? "",
+            html: forwarded?.html ?? "<p></p>"
           }));
         const recovered = readDraftRecovery(recoveryKey, initial.updatedAt);
         setDraft(initial);
@@ -95,7 +114,7 @@ export function ComposeDialog({
         toast.error(error instanceof Error ? error.message : "Draft could not be opened.");
       }
     })();
-  }, [open, replyTo, identities, recoveryKey]);
+  }, [open, message, mode, identities, recoveryKey, replyToMessageId, forwardOfMessageId]);
 
   React.useEffect(() => {
     if (!open || !initialized.current) return;
@@ -112,8 +131,9 @@ export function ComposeDialog({
     setSaveState("saving");
     const timer = window.setTimeout(() => {
       void updateDraft(draft.id, {
-        mailboxId: identities.find((i) => i.address === from)?.mailboxId ?? null,
-        replyToMessageId: replyTo?.id ?? null,
+        mailboxId: identities.find((identity) => identity.address === from)?.mailboxId ?? null,
+        replyToMessageId,
+        forwardOfMessageId,
         from,
         to: splitRecipients(to),
         cc: splitRecipients(cc),
@@ -135,7 +155,21 @@ export function ComposeDialog({
         });
     }, 800);
     return () => window.clearTimeout(timer);
-  }, [open, draft, from, to, cc, bcc, subject, text, html, replyTo, identities, recoveryKey]);
+  }, [
+    open,
+    draft,
+    from,
+    to,
+    cc,
+    bcc,
+    subject,
+    text,
+    html,
+    replyToMessageId,
+    forwardOfMessageId,
+    identities,
+    recoveryKey
+  ]);
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
@@ -146,11 +180,12 @@ export function ComposeDialog({
         from,
         text,
         html,
-        attachmentIds: attachments.map((a) => a.id),
+        attachmentIds: attachments.map((attachment) => attachment.id),
         draftId: draft.id
       };
-      if (replyTo) await replyToMessage({ ...common, messageId: replyTo.id });
-      else
+      if (mode === "reply" && message) {
+        await replyToMessage({ ...common, messageId: message.id });
+      } else {
         await sendMessage({
           ...common,
           to: splitRecipients(to),
@@ -158,7 +193,8 @@ export function ComposeDialog({
           bcc: splitRecipients(bcc),
           subject
         });
-      toast.success("Message sent.");
+      }
+      toast.success(mode === "reply" ? "Reply sent." : "Message sent.");
       initialized.current = false;
       setDraft(null);
       localStorage.removeItem(recoveryKey);
@@ -170,6 +206,7 @@ export function ComposeDialog({
       setIsPending(false);
     }
   }
+
   const upload = React.useCallback(
     async (files: File[]) => {
       if (!draft || files.length === 0) return;
@@ -188,12 +225,12 @@ export function ComposeDialog({
     },
     [draft]
   );
-  const handleEditorFiles = React.useCallback((files: File[]) => void upload(files), [upload]);
   async function removeAttachment(item: DraftAttachment) {
     if (!draft) return;
     await deleteDraftAttachment(draft.id, item.id);
-    setAttachments((current) => current.filter((a) => a.id !== item.id));
+    setAttachments((current) => current.filter((attachment) => attachment.id !== item.id));
   }
+
   async function discard() {
     if (draft) await deleteDraft(draft.id);
     initialized.current = false;
@@ -201,88 +238,60 @@ export function ComposeDialog({
     localStorage.removeItem(recoveryKey);
     onOpenChange(false);
   }
+
+  if (!open) return null;
+  const sendDisabled =
+    isPending ||
+    isUploading ||
+    !draft ||
+    identities.length === 0 ||
+    !text.trim() ||
+    (mode !== "reply" && splitRecipients(to).length === 0);
+  const content = (
+    <ComposeForm
+      attachments={attachments}
+      bcc={bcc}
+      cc={cc}
+      formId={formId}
+      from={from}
+      html={html}
+      identities={identities}
+      isPending={isPending}
+      message={message}
+      mode={mode}
+      presentation={presentation}
+      ready={Boolean(draft && initialized.current)}
+      sendDisabled={sendDisabled}
+      subject={subject}
+      threadContext={threadContext}
+      to={to}
+      onDiscard={() => void discard()}
+      onEditorChange={(nextHtml, nextText) => {
+        setHtml(nextHtml);
+        setText(nextText);
+      }}
+      onFiles={(files) => void upload(files)}
+      onRemoveAttachment={(item) => void removeAttachment(item)}
+      onSetBcc={setBcc}
+      onSetCc={setCc}
+      onSetFrom={setFrom}
+      onSetSubject={setSubject}
+      onSetTo={setTo}
+      onSubmit={(event) => void handleSubmit(event)}
+    />
+  );
+
   return (
-    <ComposeWindow
+    <ComposeSurface
+      formId={formId}
       open={open}
-      status={
-        saveState === "saving"
-          ? "Saving draft…"
-          : saveState === "error"
-            ? "Draft not saved"
-            : "Draft saved"
-      }
-      title={replyTo ? "Reply" : "New message"}
+      presentation={presentation}
+      sendDisabled={sendDisabled}
+      status={draftStatus(saveState)}
+      title={composeTitle(mode)}
       onOpenChange={onOpenChange}
     >
-      {!draft || !initialized.current ? (
-        <div className="grid min-h-60 flex-1 place-items-center text-sm text-muted-foreground">
-          Opening draft…
-        </div>
-      ) : (
-        <form className="flex min-h-0 flex-1 flex-col" onSubmit={(e) => void handleSubmit(e)}>
-          <ComposeFields
-            identities={identities}
-            replyTo={replyTo}
-            from={from}
-            to={to}
-            cc={cc}
-            bcc={bcc}
-            subject={subject}
-            setFrom={setFrom}
-            setTo={setTo}
-            setCc={setCc}
-            setBcc={setBcc}
-            setSubject={setSubject}
-          />
-          <RichEmailEditor
-            html={html}
-            onFiles={handleEditorFiles}
-            onChange={(nextHtml, nextText) => {
-              setHtml(nextHtml);
-              setText(nextText);
-            }}
-          />
-          <AttachmentList
-            attachments={attachments}
-            onRemove={(item) => void removeAttachment(item)}
-          />
-          <footer className="flex flex-col-reverse gap-2 border-t bg-background/50 px-5 py-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex gap-2">
-              <Button
-                disabled={
-                  isPending || isUploading || !draft || identities.length === 0 || !text.trim()
-                }
-                type="submit"
-              >
-                {isPending ? "Sending" : "Send"}
-              </Button>
-              <Button asChild size="icon" type="button" variant="ghost">
-                <label aria-label="Add attachment" className="cursor-pointer">
-                  <Paperclip />
-                  <input
-                    className="sr-only"
-                    multiple
-                    type="file"
-                    onChange={(e) => {
-                      void upload(Array.from(e.target.files ?? []));
-                      e.currentTarget.value = "";
-                    }}
-                  />
-                </label>
-              </Button>
-            </div>
-            <Button
-              aria-label="Discard draft"
-              size="icon"
-              type="button"
-              variant="ghost"
-              onClick={() => void discard()}
-            >
-              <Trash2 />
-            </Button>
-          </footer>
-        </form>
-      )}
-    </ComposeWindow>
+      {content}
+    </ComposeSurface>
   );
 }
