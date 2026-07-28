@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.18
+
+- Restore notification sounds on iPhone by unlocking a local audio player during the first
+  interaction and reusing it for mail and toast sounds.
+
 ## 0.1.17
 
 - Preserve sanitized formatting, links, tables, remote image references, and matching inline images
@@ -13,8 +18,6 @@
 
 - Include the selected message as quoted HTML and plain text in replies so email clients can
   collapse and expand the previous content.
-- Restore notification sounds on iPhone by unlocking a local audio player during the first
-  interaction and reusing it for mail and toast sounds.
 
 ## 0.1.15
 
