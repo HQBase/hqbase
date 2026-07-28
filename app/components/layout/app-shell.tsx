@@ -16,6 +16,7 @@ type AppShellProps = {
   immersiveOnCompact?: boolean;
   search: string;
   user: CurrentUser;
+  updateInProgress: boolean;
   updateStatus: UpdateStatus | null;
   onCompose: () => void;
   onFolderChange: (folder: FolderId) => void;
@@ -48,7 +49,11 @@ export function AppShell(props: AppShellProps): React.ReactElement {
             onSearchChange={props.onSearchChange}
             onSignedOut={props.onSignedOut}
           />
-          <UpdateBanner status={props.updateStatus} onOpen={props.onOpenUpdates} />
+          <UpdateBanner
+            inProgress={props.updateInProgress}
+            status={props.updateStatus}
+            onOpen={props.onOpenUpdates}
+          />
         </div>
         <main className="min-h-0 flex-1 overflow-hidden bg-card/30">{props.children}</main>
       </div>

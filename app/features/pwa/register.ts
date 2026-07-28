@@ -1,19 +1,29 @@
+import { UPDATE_STARTED_EVENT } from "@/features/updates/update-progress";
+
 export type PwaUpdate = {
   activate: () => void;
 };
 
 type RegisterPwaOptions = {
   onUpdateReady: (update: PwaUpdate) => void;
+  watchForUpdate?: boolean;
 };
 
-const UPDATE_INTERVAL_MS = 60 * 60 * 1000;
+const UPDATE_INTERVAL_MS = 15 * 60 * 1000;
+const ACTIVE_UPDATE_INTERVAL_MS = 10_000;
+const ACTIVE_UPDATE_LIFETIME_MS = 30 * 60 * 1000;
 
-export function registerPwa({ onUpdateReady }: RegisterPwaOptions): () => void {
+export function registerPwa({
+  onUpdateReady,
+  watchForUpdate = false
+}: RegisterPwaOptions): () => void {
   if (!("serviceWorker" in navigator)) return () => undefined;
 
   let registration: ServiceWorkerRegistration | undefined;
   let refreshAfterActivation = false;
   let disposed = false;
+  let activeUpdateInterval: number | undefined;
+  let activeUpdateDeadline = 0;
 
   const activate = (): void => {
     if (!registration?.waiting) return;
@@ -23,6 +33,7 @@ export function registerPwa({ onUpdateReady }: RegisterPwaOptions): () => void {
 
   const announceWaitingWorker = (): void => {
     if (registration?.waiting && navigator.serviceWorker.controller) {
+      stopActiveUpdateWatch();
       onUpdateReady({ activate });
     }
   };
@@ -34,6 +45,25 @@ export function registerPwa({ onUpdateReady }: RegisterPwaOptions): () => void {
     });
   };
 
+  const startActiveUpdateWatch = (): void => {
+    activeUpdateDeadline = Date.now() + ACTIVE_UPDATE_LIFETIME_MS;
+    checkForUpdate();
+    if (activeUpdateInterval !== undefined) return;
+    activeUpdateInterval = window.setInterval(() => {
+      if (Date.now() >= activeUpdateDeadline) {
+        stopActiveUpdateWatch();
+        return;
+      }
+      checkForUpdate();
+    }, ACTIVE_UPDATE_INTERVAL_MS);
+  };
+
+  function stopActiveUpdateWatch(): void {
+    if (activeUpdateInterval === undefined) return;
+    window.clearInterval(activeUpdateInterval);
+    activeUpdateInterval = undefined;
+  }
+
   const handleControllerChange = (): void => {
     if (!refreshAfterActivation) return;
     refreshAfterActivation = false;
@@ -42,11 +72,13 @@ export function registerPwa({ onUpdateReady }: RegisterPwaOptions): () => void {
 
   const handleFocus = (): void => checkForUpdate();
   const handleOnline = (): void => checkForUpdate();
+  const handleUpdateStarted = (): void => startActiveUpdateWatch();
   const interval = window.setInterval(checkForUpdate, UPDATE_INTERVAL_MS);
 
   navigator.serviceWorker.addEventListener("controllerchange", handleControllerChange);
   window.addEventListener("focus", handleFocus);
   window.addEventListener("online", handleOnline);
+  window.addEventListener(UPDATE_STARTED_EVENT, handleUpdateStarted);
 
   void navigator.serviceWorker
     .register("/service-worker.js", { scope: "/", updateViaCache: "none" })
@@ -54,6 +86,7 @@ export function registerPwa({ onUpdateReady }: RegisterPwaOptions): () => void {
       if (disposed) return;
       registration = nextRegistration;
       announceWaitingWorker();
+      if (watchForUpdate) startActiveUpdateWatch();
       registration.addEventListener("updatefound", () => {
         const installing = registration?.installing;
         if (!installing) return;
@@ -69,8 +102,10 @@ export function registerPwa({ onUpdateReady }: RegisterPwaOptions): () => void {
   return () => {
     disposed = true;
     window.clearInterval(interval);
+    stopActiveUpdateWatch();
     navigator.serviceWorker.removeEventListener("controllerchange", handleControllerChange);
     window.removeEventListener("focus", handleFocus);
     window.removeEventListener("online", handleOnline);
+    window.removeEventListener(UPDATE_STARTED_EVENT, handleUpdateStarted);
   };
 }

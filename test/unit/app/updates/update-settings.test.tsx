@@ -21,7 +21,7 @@ const availableStatus: UpdateStatus = {
 
 describe("update settings", () => {
   it("does not present an unknown update state as success", () => {
-    const html = renderToStaticMarkup(<UpdateSettings initialStatus={null} />);
+    const html = renderSettings(null);
     expect(html).toContain("Not checked");
     expect(html).not.toContain("Up to date");
     expect(html).toContain("Unknown");
@@ -29,7 +29,7 @@ describe("update settings", () => {
   });
 
   it("opens authorization from the update action without a credential field", () => {
-    const html = renderToStaticMarkup(<UpdateSettings initialStatus={availableStatus} />);
+    const html = renderSettings(availableStatus);
     expect(html).toContain("Install update");
     expect(html).not.toContain('href="/api/updates/cloudflare/oauth/start"');
     expect(html).not.toContain("Authorize Cloudflare and update");
@@ -45,11 +45,34 @@ describe("update settings", () => {
   });
 
   it("makes incompatible releases explicit and disables the action", () => {
-    const html = renderToStaticMarkup(
-      <UpdateSettings initialStatus={{ ...availableStatus, compatible: false }} />
-    );
+    const html = renderSettings({ ...availableStatus, compatible: false });
     expect(html).toContain("Direct update unavailable");
     expect(html).toContain("cannot update directly");
     expect(html).toContain('disabled=""');
   });
+
+  it("shows the accepted build without offering to start it again", () => {
+    const html = renderToStaticMarkup(
+      <UpdateSettings
+        initialStatus={availableStatus}
+        progress={{ buildId: "build-123", startedAt: Date.now() }}
+        onStatusChange={() => undefined}
+        onUpdateStarted={() => undefined}
+      />
+    );
+    expect(html).toContain("Update started");
+    expect(html).toContain("build-123");
+    expect(html).not.toContain("Install update");
+  });
 });
+
+function renderSettings(status: UpdateStatus | null): string {
+  return renderToStaticMarkup(
+    <UpdateSettings
+      initialStatus={status}
+      progress={null}
+      onStatusChange={() => undefined}
+      onUpdateStarted={() => undefined}
+    />
+  );
+}

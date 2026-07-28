@@ -126,7 +126,7 @@ test("HQBase web lifecycle remains healthy", async ({ page, request }) => {
       )
       .toEqual({ available: true, version: expectedUpdate });
     await expect(async () => {
-      await page.reload();
+      await page.evaluate(() => window.dispatchEvent(new Event("focus")));
       await expect(page.getByText("Update available", { exact: true })).toBeVisible({
         timeout: 15_000
       });

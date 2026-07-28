@@ -204,6 +204,9 @@ describe("settings presentation", () => {
         users={[]}
         onRefresh={() => undefined}
         onTabChange={() => undefined}
+        onUpdateStarted={() => undefined}
+        onUpdateStatusChange={() => undefined}
+        updateProgress={null}
       />
     );
 

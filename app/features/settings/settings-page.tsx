@@ -8,6 +8,7 @@ import { DebugSettings } from "@/features/settings/debug-settings";
 import { SettingsSection } from "@/features/settings/settings-section";
 import type { SetupStatus } from "@/features/setup/types";
 import type { UpdateStatus } from "@/features/updates/types";
+import type { UpdateProgress } from "@/features/updates/update-progress";
 import { UpdateSettings } from "@/features/updates/update-settings";
 import type { WorkspaceUser } from "@/features/users/types";
 import { UserSettings } from "@/features/users/user-settings";
@@ -21,6 +22,9 @@ type SettingsPageProps = {
   users: WorkspaceUser[];
   onRefresh: () => void;
   onTabChange: (tab: SettingsTabId) => void;
+  onUpdateStarted: (buildId: string) => void;
+  onUpdateStatusChange: (status: UpdateStatus) => void;
+  updateProgress: UpdateProgress | null;
   updateStatus: UpdateStatus | null;
 };
 
@@ -32,6 +36,9 @@ export function SettingsPage({
   users,
   onRefresh,
   onTabChange,
+  onUpdateStarted,
+  onUpdateStatusChange,
+  updateProgress,
   updateStatus
 }: SettingsPageProps): React.ReactElement {
   return (
@@ -72,7 +79,12 @@ export function SettingsPage({
           ) : null}
           {canManage ? (
             <TabsContent className="mt-5" value="updates">
-              <UpdateSettings initialStatus={updateStatus} />
+              <UpdateSettings
+                initialStatus={updateStatus}
+                progress={updateProgress}
+                onStatusChange={onUpdateStatusChange}
+                onUpdateStarted={onUpdateStarted}
+              />
             </TabsContent>
           ) : null}
           <TabsContent className="mt-5" value="debug">

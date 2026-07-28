@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.1.20
+
+- Hide the available-update banner and duplicate install action after Cloudflare accepts the update
+  build.
+- Check for signed releases when HQBase opens, returns to the foreground, and periodically while it
+  remains open.
+- Detect the replacement application worker during an active update and show the reload prompt
+  without requiring a manual browser refresh.
+
 ## 0.1.19
 
 - Group replies into one inbox conversation using standard email reply headers, while keeping
