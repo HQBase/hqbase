@@ -1,6 +1,8 @@
 import * as React from "react";
 import { toast } from "sonner";
 
+import { playNotificationSound } from "@/lib/notification-sounds";
+
 import {
   createDraft,
   type Draft,
@@ -168,7 +170,10 @@ export function ComposeDialog({
           subject
         });
       }
-      toast.success(mode === "reply" ? "Reply sent." : "Message sent.");
+      playNotificationSound("outgoing-email");
+      toast.success(mode === "reply" ? "Reply sent." : "Message sent.", {
+        id: `outgoing-email:${draft.id}`
+      });
       initialized.current = false;
       setDraft(null);
       resetAutosave();

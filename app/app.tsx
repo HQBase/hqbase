@@ -10,6 +10,7 @@ import { InboxPage } from "@/features/inbox/inbox-page";
 import { listMailboxes } from "@/features/mailboxes/api";
 import type { Mailbox } from "@/features/mailboxes/types";
 import { listMessages } from "@/features/messages/api";
+import { mergeIncomingMessageIds } from "@/features/messages/incoming-sound";
 import type { MessageSummary } from "@/features/messages/types";
 import { SettingsPage } from "@/features/settings/settings-page";
 import { getSetupStatus } from "@/features/setup/api";
@@ -19,6 +20,7 @@ import { getUpdateStatus } from "@/features/updates/api";
 import type { UpdateStatus } from "@/features/updates/types";
 import { listUsers } from "@/features/users/api";
 import type { WorkspaceUser } from "@/features/users/types";
+import { playNotificationSound } from "@/lib/notification-sounds";
 import type { FolderId, MailFolderId, SettingsTabId } from "@/lib/routes";
 import { useAppRoute } from "@/lib/use-app-route";
 
@@ -37,10 +39,12 @@ export function App(): React.ReactElement {
   const [composeOpen, setComposeOpen] = React.useState(false);
   const [isLoading, setIsLoading] = React.useState(true);
   const [updateStatus, setUpdateStatus] = React.useState<UpdateStatus | null>(null);
+  const knownIncomingMessageIds = React.useRef<Set<string> | null>(null);
   const { navigate, route } = useAppRoute(setup?.isComplete);
   const activeFolder: FolderId = route.kind === "settings" ? "settings" : route.folder;
   const selectedId = route.kind === "mail" ? route.messageId : null;
   const settingsTab: SettingsTabId = route.kind === "settings" ? route.tab : "mailboxes";
+  const currentUserId = user?.id ?? null;
   const contentMailboxes = React.useMemo(
     () => mailboxes.filter((mailbox) => mailbox.accessLevel !== null),
     [mailboxes]
@@ -123,6 +127,38 @@ export function App(): React.ReactElement {
     );
     return () => window.clearInterval(interval);
   }, [user]);
+
+  React.useEffect(() => {
+    knownIncomingMessageIds.current = null;
+    if (!currentUserId) return;
+    let active = true;
+    let checking = false;
+    const checkIncomingMail = async () => {
+      if (checking) return;
+      checking = true;
+      try {
+        const latestMessages = await listMessages({});
+        if (!active) return;
+        const snapshot = mergeIncomingMessageIds(knownIncomingMessageIds.current, latestMessages);
+        knownIncomingMessageIds.current = snapshot.knownIds;
+        if (snapshot.hasNewMessages) playNotificationSound("incoming-email");
+      } catch {
+        // Incoming-mail discovery never interrupts the current workspace.
+      } finally {
+        checking = false;
+      }
+    };
+
+    void checkIncomingMail();
+    const interval = window.setInterval(() => {
+      if (active) void checkIncomingMail();
+    }, 10_000);
+
+    return () => {
+      active = false;
+      window.clearInterval(interval);
+    };
+  }, [currentUserId]);
 
   React.useEffect(() => {
     if (!user || activeFolder === "settings") return;
