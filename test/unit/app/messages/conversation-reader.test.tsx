@@ -2,6 +2,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
 import { InboxPage } from "@/features/inbox/inbox-page";
+import { ConversationMessages } from "@/features/messages/conversation-messages";
 import { MessageDetail } from "@/features/messages/message-detail";
 import { MessageListItem } from "@/features/messages/message-list-item";
 import type { MessageDetail as MessageDetailType, MessageSummary } from "@/features/messages/types";
@@ -124,5 +125,24 @@ describe("conversation reader", () => {
 
     expect(unreadHtml).toContain('aria-label="Unread"');
     expect(readHtml).not.toContain('aria-label="Unread"');
+  });
+
+  it("collapses messages between the first and final two behind a counted divider", () => {
+    const messages = Array.from({ length: 6 }, (_, index) => ({
+      ...firstMessage,
+      id: `msg_${index + 1}`,
+      fromAddress: `sender-${index + 1}@example.com`,
+      textBody: `Message body ${index + 1}`
+    }));
+    const html = renderToStaticMarkup(<ConversationMessages messages={messages} />);
+
+    expect(html).toContain("Message body 1");
+    expect(html).not.toContain("Message body 2");
+    expect(html).not.toContain("Message body 3");
+    expect(html).not.toContain("Message body 4");
+    expect(html).toContain("Message body 5");
+    expect(html).toContain("Message body 6");
+    expect(html).toContain("3 earlier messages");
+    expect(html).toContain('aria-expanded="false"');
   });
 });

@@ -10,7 +10,8 @@ type ReplySource = Pick<
 
 export function buildReplyBody(
   authored: { html?: string | undefined; text: string },
-  original: ReplySource
+  original: ReplySource,
+  richQuoteHtml?: string
 ): { html?: string | undefined; text: string } {
   const attribution = `On ${formatTimestamp(
     original.receivedAt ?? original.sentAt ?? original.createdAt
@@ -22,7 +23,7 @@ export function buildReplyBody(
 
   return {
     text,
-    html: `${authored.html.trimEnd()}${quoteHtml(attribution, quoted)}`
+    html: `${authored.html.trimEnd()}${quoteHtml(attribution, richQuoteHtml ?? plainTextHtml(quoted))}`
   };
 }
 
@@ -39,8 +40,11 @@ function quotePlainText(value: string): string {
     .join("\n");
 }
 
-function quoteHtml(attribution: string, value: string): string {
-  const quotedHtml = escapeHtml(value).replaceAll("\n", "<br>");
+function plainTextHtml(value: string): string {
+  return escapeHtml(value).replaceAll("\n", "<br>");
+}
+
+function quoteHtml(attribution: string, quotedHtml: string): string {
   return [
     '<div class="gmail_quote gmail_quote_container">',
     `<div dir="ltr" class="gmail_attr"><br>${escapeHtml(attribution)}<br></div>`,

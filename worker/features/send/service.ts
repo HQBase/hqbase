@@ -5,13 +5,16 @@ import { draftAttachmentObjects } from "../drafts/queries";
 import { findAddressIdentity } from "../mailboxes/address-queries";
 import { findMailboxForSending } from "../mailboxes/queries";
 import { ensureReplySubject } from "../messages/headers";
+import { sanitizeQuotedMessageHtml } from "../messages/html-sanitizer";
+import { isSafeInlineImage } from "../messages/inline-media";
 import {
   ensureThread,
   getMessageDetail,
+  getMessageHtmlKey,
   insertAttachment,
   insertMessage
 } from "../messages/queries";
-import type { MessageSummary } from "../messages/types";
+import type { MessageSummary, StoredAttachment } from "../messages/types";
 
 import { buildReplyBody } from "./reply-body";
 import type { ReplyMessageInput, SendMessageInput } from "./validation";
@@ -69,9 +72,18 @@ export async function replyToMessage(
     (value): value is string => value !== null
   );
   const to = input.to?.length ? input.to : [original.fromAddress];
-  const body = buildReplyBody(input, original);
-
   const attachments = await loadAttachments(env, input.attachmentIds, userId);
+  const quoted =
+    input.html && original.htmlAvailable
+      ? await loadQuotedMessageHtml(
+          env,
+          original.id,
+          original.attachments,
+          maxAttachmentBytes - totalAttachmentBytes(attachments)
+        )
+      : { html: undefined, inlineAttachments: [] };
+  const body = buildReplyBody(input, original, quoted.html);
+  const outgoingAttachments = [...attachments, ...quoted.inlineAttachments];
   const sendResult = await env.MAIL_SENDER.send({
     from: input.from,
     to,
@@ -84,7 +96,9 @@ export async function replyToMessage(
       References: references.join(" ")
     },
     ...(body.html ? { html: body.html } : {}),
-    ...(attachments.length ? { attachments: attachments.map(asEmailAttachment) } : {})
+    ...(outgoingAttachments.length
+      ? { attachments: outgoingAttachments.map(asEmailAttachment) }
+      : {})
   });
 
   return storeSentMessage(env, {
@@ -99,7 +113,7 @@ export async function replyToMessage(
     messageId: sendResult.messageId,
     references,
     sentAt: timestamp,
-    storedAttachments: attachments,
+    storedAttachments: outgoingAttachments,
     draftId: input.draftId ?? null,
     userId: userId ?? null
   });
@@ -129,7 +143,7 @@ async function storeSentMessage(
     messageId: string;
     references: string[];
     sentAt: string;
-    storedAttachments: StoredDraftAttachment[];
+    storedAttachments: StoredOutgoingAttachment[];
     draftId: string | null;
     userId: string | null;
   }
@@ -178,7 +192,7 @@ async function storeSentMessage(
       filename: attachment.filename,
       contentType: attachment.contentType,
       sizeBytes: attachment.sizeBytes,
-      contentId: null,
+      contentId: attachment.contentId,
       r2Key: attachment.r2Key
     });
   }
@@ -190,14 +204,94 @@ async function storeSentMessage(
   return message;
 }
 
+const maxAttachmentBytes = 25 * 1024 * 1024;
+
 type StoredDraftAttachment = Awaited<ReturnType<typeof draftAttachmentObjects>>[number];
-async function loadAttachments(env: WorkerEnv, ids: string[], userId?: string) {
+type StoredOutgoingAttachment = StoredDraftAttachment & {
+  contentId: string | null;
+  disposition: "attachment" | "inline";
+};
+
+async function loadAttachments(
+  env: WorkerEnv,
+  ids: string[],
+  userId?: string
+): Promise<StoredOutgoingAttachment[]> {
   if (ids.length === 0) return [];
   if (!userId)
     throw new AppError("ATTACHMENTS_FORBIDDEN", "Attachments require a user session.", 403);
-  return draftAttachmentObjects(env.DB, env.MAIL_OBJECTS, userId, ids);
+  return (await draftAttachmentObjects(env.DB, env.MAIL_OBJECTS, userId, ids)).map(
+    (attachment) => ({
+      ...attachment,
+      contentId: null,
+      disposition: "attachment"
+    })
+  );
 }
-function asEmailAttachment(attachment: StoredDraftAttachment): EmailAttachment {
+
+async function loadQuotedMessageHtml(
+  env: WorkerEnv,
+  messageId: string,
+  attachments: StoredAttachment[],
+  availableBytes: number
+): Promise<{ html?: string; inlineAttachments: StoredOutgoingAttachment[] }> {
+  const htmlKey = await getMessageHtmlKey(env.DB, messageId);
+  if (!htmlKey) return { inlineAttachments: [] };
+  const htmlObject = await env.MAIL_OBJECTS.get(htmlKey);
+  if (!htmlObject) return { inlineAttachments: [] };
+  const sourceHtml = await htmlObject.text();
+  const candidates = attachments.filter(
+    (attachment) => attachment.contentId && isSafeInlineImage(attachment.contentType)
+  );
+  const referenced = new Set(
+    sanitizeQuotedMessageHtml({ attachments: candidates, html: sourceHtml }).inlineAttachmentIds
+  );
+  let remainingBytes = Math.max(0, availableBytes);
+  const selected = candidates.filter((attachment) => {
+    if (!referenced.has(attachment.id) || attachment.sizeBytes > remainingBytes) return false;
+    remainingBytes -= attachment.sizeBytes;
+    return true;
+  });
+  const hydrated = (
+    await Promise.all(
+      selected.map(async (attachment): Promise<StoredOutgoingAttachment | null> => {
+        const object = await env.MAIL_OBJECTS.get(attachment.r2Key);
+        if (!object || !attachment.contentId) return null;
+        return {
+          id: attachment.id,
+          filename: attachment.filename,
+          contentType: attachment.contentType,
+          sizeBytes: attachment.sizeBytes,
+          r2Key: attachment.r2Key,
+          content: await object.arrayBuffer(),
+          contentId: stripContentIdBrackets(attachment.contentId),
+          disposition: "inline"
+        };
+      })
+    )
+  ).filter((attachment): attachment is StoredOutgoingAttachment => attachment !== null);
+  const sanitized = sanitizeQuotedMessageHtml({ attachments: hydrated, html: sourceHtml });
+  return { html: sanitized.html, inlineAttachments: hydrated };
+}
+
+function totalAttachmentBytes(attachments: StoredOutgoingAttachment[]): number {
+  return attachments.reduce((total, attachment) => total + attachment.sizeBytes, 0);
+}
+
+function stripContentIdBrackets(value: string): string {
+  return value.trim().replace(/^<|>$/g, "");
+}
+
+function asEmailAttachment(attachment: StoredOutgoingAttachment): EmailAttachment {
+  if (attachment.disposition === "inline" && attachment.contentId) {
+    return {
+      disposition: "inline",
+      contentId: attachment.contentId,
+      filename: attachment.filename,
+      type: attachment.contentType,
+      content: attachment.content
+    };
+  }
   return {
     disposition: "attachment",
     filename: attachment.filename,

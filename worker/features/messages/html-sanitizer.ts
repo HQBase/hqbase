@@ -1,5 +1,6 @@
 import sanitizeHtml from "sanitize-html";
 
+import { isSafeInlineImage } from "./inline-media";
 import type { StoredAttachment } from "./types";
 
 const allowedTags = [
@@ -132,6 +133,7 @@ const remoteCssResource = /(?:https?:)?\/\//i;
 export type SanitizedMessageHtml = {
   hasRemoteImages: boolean;
   html: string;
+  quotedHtml: string | null;
 };
 
 export function sanitizeMessageHtml(input: {
@@ -141,6 +143,72 @@ export function sanitizeMessageHtml(input: {
   messageId: string;
   origin: string;
 }): SanitizedMessageHtml {
+  const parts = splitQuotedHtml(input.html);
+  const body = sanitizeDisplayHtml({ ...input, html: parts.body });
+  const quote = parts.quote ? sanitizeDisplayHtml({ ...input, html: parts.quote }) : null;
+  return {
+    hasRemoteImages: body.hasRemoteImages || Boolean(quote?.hasRemoteImages),
+    html: body.html,
+    quotedHtml: quote?.html || null
+  };
+}
+
+export function sanitizeQuotedMessageHtml(input: {
+  attachments: Array<Pick<StoredAttachment, "contentId" | "contentType" | "id">>;
+  html: string;
+}): { html: string; inlineAttachmentIds: string[] } {
+  const attachmentsByContentId = new Map(
+    input.attachments.flatMap((attachment) =>
+      attachment.contentId && isSafeInlineImage(attachment.contentType)
+        ? [[normalizeContentId(attachment.contentId), attachment] as const]
+        : []
+    )
+  );
+  const inlineAttachmentIds = new Set<string>();
+  const bounded = boundedHtml(input.html);
+  const html = sanitizeHtml(bounded, {
+    ...sanitizerOptions(),
+    allowedSchemesByTag: {
+      img: ["cid", "http", "https"]
+    },
+    transformTags: {
+      a: (tagName, attributes) => ({ tagName, attribs: safeLinkAttributes(attributes) }),
+      img: (tagName, attributes) => {
+        const source = attributes.src?.trim() ?? "";
+        const next: sanitizeHtml.Attributes = { ...attributes };
+        delete next.srcset;
+        if (source.toLowerCase().startsWith("cid:")) {
+          const attachment = attachmentsByContentId.get(normalizeContentId(source.slice(4)));
+          if (attachment?.contentId) {
+            const contentId = stripContentIdBrackets(attachment.contentId);
+            inlineAttachmentIds.add(attachment.id);
+            next.src = `cid:${contentId}`;
+          } else {
+            delete next.src;
+          }
+        } else {
+          const remoteSource = absoluteRemoteUrl(source);
+          if (remoteSource) {
+            next.src = remoteSource;
+            next.referrerpolicy = "no-referrer";
+          } else {
+            delete next.src;
+          }
+        }
+        return { tagName, attribs: next };
+      }
+    }
+  });
+  return { html, inlineAttachmentIds: [...inlineAttachmentIds] };
+}
+
+function sanitizeDisplayHtml(input: {
+  allowRemoteImages: boolean;
+  attachments: StoredAttachment[];
+  html: string;
+  messageId: string;
+  origin: string;
+}): Omit<SanitizedMessageHtml, "quotedHtml"> {
   const origin = safeOrigin(input.origin);
   const contentIds = new Map(
     input.attachments.flatMap((attachment) =>
@@ -152,27 +220,7 @@ export function sanitizeMessageHtml(input: {
   let hasRemoteImages = false;
 
   const html = sanitizeHtml(input.html, {
-    allowProtocolRelative: false,
-    allowedAttributes: {
-      "*": ["align", "dir", "lang", "style", "title", "valign"],
-      a: ["href", "rel", "target", "title"],
-      col: ["span", "width"],
-      img: ["alt", "height", "loading", "referrerpolicy", "src", "title", "width"],
-      li: ["value"],
-      ol: ["start", "type"],
-      table: ["align", "bgcolor", "border", "cellpadding", "cellspacing", "height", "width"],
-      td: ["align", "bgcolor", "colspan", "height", "rowspan", "valign", "width"],
-      th: ["align", "bgcolor", "colspan", "height", "rowspan", "scope", "valign", "width"]
-    },
-    allowedSchemes: ["http", "https", "mailto", "tel"],
-    allowedStyles: {
-      "*": Object.fromEntries(styleProperties.map((property) => [property, [safeStyleValue]]))
-    },
-    allowedTags,
-    disallowedTagsMode: "discard",
-    enforceHtmlBoundary: false,
-    nestingLimit: 80,
-    nonTextTags: ["script", "style", "textarea", "option", "noscript"],
+    ...sanitizerOptions(),
     onOpenTag(name, attributes) {
       if (hasRemoteReference(name, attributes, origin)) hasRemoteImages = true;
     },
@@ -208,6 +256,64 @@ export function sanitizeMessageHtml(input: {
   });
 
   return { hasRemoteImages, html };
+}
+
+function sanitizerOptions(): sanitizeHtml.IOptions {
+  return {
+    allowProtocolRelative: false,
+    allowedAttributes: {
+      "*": ["align", "dir", "lang", "style", "title", "valign"],
+      a: ["href", "rel", "target", "title"],
+      col: ["span", "width"],
+      img: ["alt", "height", "loading", "referrerpolicy", "src", "title", "width"],
+      li: ["value"],
+      ol: ["start", "type"],
+      table: ["align", "bgcolor", "border", "cellpadding", "cellspacing", "height", "width"],
+      td: ["align", "bgcolor", "colspan", "height", "rowspan", "valign", "width"],
+      th: ["align", "bgcolor", "colspan", "height", "rowspan", "scope", "valign", "width"]
+    },
+    allowedSchemes: ["http", "https", "mailto", "tel"],
+    allowedStyles: {
+      "*": Object.fromEntries(styleProperties.map((property) => [property, [safeStyleValue]]))
+    },
+    allowedTags,
+    disallowedTagsMode: "discard",
+    enforceHtmlBoundary: false,
+    nestingLimit: 80,
+    nonTextTags: ["script", "style", "textarea", "option", "noscript"]
+  };
+}
+
+function splitQuotedHtml(html: string): { body: string; quote: string | null } {
+  const match =
+    /<div\b[^>]*\bclass\s*=\s*(?:"[^"]*\bgmail_quote(?:_container)?\b[^"]*"|'[^']*\bgmail_quote(?:_container)?\b[^']*')[^>]*>/i.exec(
+      html
+    );
+  if (!match) return { body: html, quote: null };
+  if (match.index === 0) return { body: "", quote: html };
+  return {
+    body: html.slice(0, match.index).trimEnd(),
+    quote: html.slice(match.index)
+  };
+}
+
+function boundedHtml(html: string): string {
+  const maxCharacters = 200_000;
+  if (html.length <= maxCharacters) return html;
+  return `${html.slice(0, maxCharacters)}<p>[Previous message truncated by HQBase]</p>`;
+}
+
+function absoluteRemoteUrl(value: string): string | null {
+  try {
+    const url = new URL(value);
+    return ["http:", "https:"].includes(url.protocol) ? url.href : null;
+  } catch {
+    return null;
+  }
+}
+
+function stripContentIdBrackets(value: string): string {
+  return value.trim().replace(/^<|>$/g, "");
 }
 
 function hasRemoteReference(

@@ -6,6 +6,7 @@ import { AppError } from "../../lib/errors";
 
 import type { MessageAction } from "./actions";
 import { sanitizeMessageHtml } from "./html-sanitizer";
+import { isSafeInlineImage, normalizedContentType } from "./inline-media";
 import {
   findAttachment,
   getAttachmentMailboxId,
@@ -17,6 +18,8 @@ import {
   updateMessageAction
 } from "./queries";
 import { isRemoteMediaTrusted, trustRemoteMediaSender } from "./remote-media";
+
+export { isSafeInlineImage } from "./inline-media";
 
 export const messageRoutes = new Hono<HonoApp>();
 
@@ -185,13 +188,3 @@ attachmentRoutes.get("/:id", async (c) => {
   headers.set("content-disposition", `attachment; filename="${attachment.filename}"`);
   return new Response(object.body, { headers });
 });
-
-export function isSafeInlineImage(contentType: string): boolean {
-  return ["image/avif", "image/gif", "image/jpeg", "image/png", "image/webp"].includes(
-    normalizedContentType(contentType)
-  );
-}
-
-function normalizedContentType(contentType: string): string {
-  return contentType.split(";", 1)[0]?.trim().toLowerCase() ?? "application/octet-stream";
-}

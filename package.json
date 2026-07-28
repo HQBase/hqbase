@@ -1,6 +1,6 @@
 {
   "name": "hqbase",
-  "version": "0.1.16",
+  "version": "0.1.17",
   "private": true,
   "type": "module",
   "packageManager": "pnpm@11.7.0",
