@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.14
+
+- Keep Cloudflare authorization inside HQBase when the current session is no longer recent.
+- Confirm the current HQBase password in the originating update or domain dialog, then continue the
+  exact operation without exposing a raw API error.
+- Rate-limit and audit successful and denied infrastructure reauthentication attempts.
+
 ## 0.1.13
 
 - Default replies to the exact authorized address that received the original message.
