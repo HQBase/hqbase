@@ -7,6 +7,8 @@ import { cn } from "@/lib/cn";
 export const Select = SelectPrimitive.Root;
 export const SelectGroup = SelectPrimitive.Group;
 export const SelectValue = SelectPrimitive.Value;
+const selectContentClasses =
+  "relative z-[60] max-h-80 min-w-32 overflow-hidden rounded-md border bg-popover text-popover-foreground shadow-md";
 
 export const SelectTrigger = React.forwardRef<
   React.ElementRef<typeof SelectPrimitive.Trigger>,
@@ -33,14 +35,7 @@ export const SelectContent = React.forwardRef<
   React.ComponentPropsWithoutRef<typeof SelectPrimitive.Content>
 >(({ className, children, ...props }, ref) => (
   <SelectPrimitive.Portal>
-    <SelectPrimitive.Content
-      className={cn(
-        "relative max-h-80 min-w-32 overflow-hidden rounded-md border bg-popover text-popover-foreground shadow-md",
-        className
-      )}
-      ref={ref}
-      {...props}
-    >
+    <SelectPrimitive.Content className={cn(selectContentClasses, className)} ref={ref} {...props}>
       <SelectPrimitive.Viewport className="p-1">{children}</SelectPrimitive.Viewport>
     </SelectPrimitive.Content>
   </SelectPrimitive.Portal>

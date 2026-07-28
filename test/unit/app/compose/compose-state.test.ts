@@ -49,9 +49,33 @@ describe("composer state", () => {
               isPrimary: false
             }
           ]
+        },
+        {
+          id: "mbx_2",
+          address: "sales@example.net",
+          displayName: "Sales",
+          isActive: true,
+          accessLevel: "manager",
+          createdAt: "now",
+          updatedAt: "now",
+          addresses: [
+            {
+              id: "addr_3",
+              mailboxId: "mbx_2",
+              mailDomainId: "dom_2",
+              address: "sales@example.net",
+              displayName: "Sales",
+              receiveEnabled: true,
+              sendEnabled: true,
+              isPrimary: true
+            }
+          ]
         }
       ])
-    ).toEqual([{ mailboxId: "mbx_1", address: "support@example.com" }]);
+    ).toEqual([
+      { mailboxId: "mbx_1", address: "support@example.com" },
+      { mailboxId: "mbx_2", address: "sales@example.net" }
+    ]);
   });
 
   it("uses crash recovery only when it is newer than the server draft", () => {
