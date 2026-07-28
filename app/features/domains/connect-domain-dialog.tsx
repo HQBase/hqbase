@@ -21,6 +21,7 @@ import {
   SelectTrigger,
   SelectValue
 } from "@/components/ui/select";
+import { CloudflareAuthorizationFlow } from "@/features/settings/cloudflare-authorization-dialog";
 import type { CloudflareZone } from "@/features/setup/types";
 import { listAvailableCloudflareZones, provisionDomain } from "./api";
 import type { MailDomain } from "./types";
@@ -152,16 +153,13 @@ export function ConnectDomainDialog({
             </DialogFooter>
           </form>
         ) : (
-          <div className="flex flex-col gap-4">
-            <p className="text-sm leading-6 text-muted-foreground">
-              Cloudflare will ask you to approve temporary access for this domain connection.
-            </p>
-            <Button asChild className="self-start">
-              <a href="/api/domains/cloudflare/oauth/start" onClick={onAuthorize}>
-                Authorize Cloudflare
-              </a>
-            </Button>
-          </div>
+          <CloudflareAuthorizationFlow
+            active={open}
+            authorizeHref="/api/domains/cloudflare/oauth/start"
+            description="Cloudflare will ask you to approve temporary access for this domain connection."
+            layout="inline"
+            onAuthorize={onAuthorize}
+          />
         )}
       </DialogContent>
     </Dialog>

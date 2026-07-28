@@ -1,4 +1,4 @@
-import { env } from "cloudflare:test";
+import { env, SELF } from "cloudflare:test";
 import { beforeAll, describe, expect, it } from "vitest";
 
 import initialMigration from "../../../migrations/0001_initial.sql?raw";
@@ -92,8 +92,80 @@ describe("Better Auth schema", () => {
       })
     );
     expect(signIn.status, await signIn.text()).toBe(200);
+    const staleSessionCookie = extractSessionCookie(signIn);
+
+    const recent = await SELF.fetch(`${origin}/api/sessions/recent-authentication`, {
+      headers: { cookie: staleSessionCookie }
+    });
+    expect(await recent.json()).toEqual({ recent: true });
+
+    await env.DB.prepare(
+      `UPDATE "session"
+       SET createdAt = ?
+       WHERE userId = (SELECT id FROM "user" WHERE email = ?)`
+    )
+      .bind(new Date(0).toISOString(), email)
+      .run();
+
+    const stale = await SELF.fetch(`${origin}/api/sessions/recent-authentication`, {
+      headers: { cookie: staleSessionCookie }
+    });
+    expect(await stale.json()).toEqual({ recent: false });
+
+    const rejected = await SELF.fetch(`${origin}/api/sessions/reauthenticate`, {
+      body: JSON.stringify({ password: "incorrect-password" }),
+      headers: {
+        "cf-connecting-ip": "192.0.2.1",
+        "content-type": "application/json",
+        cookie: staleSessionCookie,
+        origin
+      },
+      method: "POST"
+    });
+    expect(rejected.status).toBe(401);
+    expect(await rejected.json()).toEqual({
+      error: {
+        code: "REAUTHENTICATION_FAILED",
+        message: "The password is incorrect. Try again."
+      }
+    });
+
+    const reauthenticated = await SELF.fetch(`${origin}/api/sessions/reauthenticate`, {
+      body: JSON.stringify({ password }),
+      headers: {
+        "cf-connecting-ip": "192.0.2.1",
+        "content-type": "application/json",
+        cookie: staleSessionCookie,
+        origin
+      },
+      method: "POST"
+    });
+    expect(reauthenticated.status, await reauthenticated.text()).toBe(200);
+    const recentSessionCookie = extractSessionCookie(reauthenticated);
+
+    const refreshed = await SELF.fetch(`${origin}/api/sessions/recent-authentication`, {
+      headers: { cookie: recentSessionCookie }
+    });
+    expect(await refreshed.json()).toEqual({ recent: true });
+
+    const audits = await env.DB.prepare(
+      `SELECT outcome
+       FROM audit_events
+       WHERE action = 'session.reauthenticate'
+       ORDER BY occurred_at, id`
+    ).all<{ outcome: string }>();
+    expect(audits.results.map(({ outcome }) => outcome).sort()).toEqual(["denied", "success"]);
   });
 });
+
+function extractSessionCookie(response: Response): string {
+  const serialized = response.headers.get("set-cookie") ?? "";
+  const match = serialized.match(/(?:^|,\s*)((?:__Secure-)?better-auth\.session_token=[^;,]+)/);
+  if (!match?.[1]) {
+    throw new Error("Better Auth session cookie was not returned.");
+  }
+  return match[1];
+}
 
 async function applyMigration(source: string): Promise<void> {
   for (const statement of source

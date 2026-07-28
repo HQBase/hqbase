@@ -1,9 +1,15 @@
 import { Hono } from "hono";
-import { requireAuthContext, requireRecentSession, requireRole } from "../../auth/session";
+import {
+  isRecentSession,
+  requireAuthContext,
+  requireRecentSession,
+  requireRole
+} from "../../auth/session";
 import type { HonoApp } from "../../lib/env";
 import {
   clearRuntimeCloudflareGrantCookie,
   finishRuntimeCloudflareOAuth,
+  recentAuthenticationRedirect,
   resolveRuntimeCloudflareGrant,
   revokeRuntimeCloudflareGrant,
   startRuntimeCloudflareOAuth
@@ -24,7 +30,9 @@ updateRoutes.get("/", async (c) => {
 updateRoutes.get("/cloudflare/oauth/start", async (c) => {
   const auth = await requireAuthContext(c.env, c.req.raw);
   requireRole(auth, ["owner", "admin"]);
-  requireRecentSession(auth);
+  if (!isRecentSession(auth)) {
+    return recentAuthenticationRedirect(c.req.raw, "updates");
+  }
   return startRuntimeCloudflareOAuth(c.req.raw, c.env, updateOAuthFlow);
 });
 updateRoutes.get("/cloudflare/oauth/callback", async (c) => {

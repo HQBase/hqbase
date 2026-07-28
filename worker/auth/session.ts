@@ -79,11 +79,19 @@ export function requireRole(
 }
 
 export function requireRecentSession(authContext: AuthContext, maxAgeMs = 10 * 60 * 1000): void {
-  if (Date.now() - authContext.session.createdAt.getTime() > maxAgeMs) {
+  if (!isRecentSession(authContext, maxAgeMs)) {
     throw new AppError(
       "RECENT_AUTH_REQUIRED",
       "Sign in again before changing workspace infrastructure.",
       403
     );
   }
+}
+
+export function isRecentSession(
+  authContext: AuthContext,
+  maxAgeMs = 10 * 60 * 1000,
+  now = Date.now()
+): boolean {
+  return now - authContext.session.createdAt.getTime() <= maxAgeMs;
 }

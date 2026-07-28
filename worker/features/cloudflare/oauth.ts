@@ -146,6 +146,16 @@ export function clearRuntimeCloudflareGrantCookie(): string {
   return secureCookie(GRANT_COOKIE, "", 0);
 }
 
+export function recentAuthenticationRedirect(
+  request: Request,
+  settingsTab: "domains" | "updates"
+): Response {
+  const target = new URL(`/settings/${settingsTab}`, request.url);
+  target.searchParams.set("reauth", "required");
+  const headers = new Headers({ "cache-control": "no-store", location: target.toString() });
+  return new Response(null, { headers, status: 303 });
+}
+
 async function readGrant(request: Request, env: OAuthCookieEnv): Promise<string | null> {
   const encrypted = parseCookies(request.headers.get("cookie")).get(GRANT_COOKIE);
   if (!encrypted) return null;
