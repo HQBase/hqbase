@@ -124,11 +124,15 @@ describe("send service", () => {
       bcc: ["audit@example.com"],
       cc: ["manager@example.com"],
       from: mailbox.address,
+      html: "<p>Reply</p>",
       messageId: "message-1",
       text: "Reply",
       to: ["alternate@example.com"]
     });
 
+    const quotedText = "Reply\n\nOn 2026-07-10 at 00:00 UTC, owner@example.com wrote:\n> Original";
+    const quotedHtml =
+      '<p>Reply</p><div class="gmail_quote gmail_quote_container"><div dir="ltr" class="gmail_attr"><br>On 2026-07-10 at 00:00 UTC, owner@example.com wrote:<br></div><blockquote class="gmail_quote" style="margin:0 0 0 .8ex;border-left:1px #ccc solid;padding-left:1ex">Original</blockquote></div>';
     expect(send).toHaveBeenCalledWith({
       from: mailbox.address,
       bcc: ["audit@example.com"],
@@ -137,8 +141,9 @@ describe("send service", () => {
         "In-Reply-To": "<original@example.com>",
         References: "<earlier@example.com> <original@example.com>"
       },
+      html: quotedHtml,
       subject: "Re: Hello",
-      text: "Reply",
+      text: quotedText,
       to: ["alternate@example.com"]
     });
     expect(insertMessage).toHaveBeenCalledWith(
@@ -146,9 +151,14 @@ describe("send service", () => {
       expect.objectContaining({
         bcc: ["audit@example.com"],
         cc: ["manager@example.com"],
+        htmlR2Key: "sent/2026-07-10/html-1.html",
         messageId: "<cloudflare-reply@example.com>",
+        textBody: quotedText,
         to: ["alternate@example.com"]
       })
     );
+    expect(put).toHaveBeenCalledWith("sent/2026-07-10/html-1.html", quotedHtml, {
+      httpMetadata: { contentType: "text/html; charset=utf-8" }
+    });
   });
 });
