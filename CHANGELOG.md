@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.21
+
+- Use the official HQBase logo for the signed-out screen, favicon, and installed PWA icons.
+- Refine sidebar and dropdown controls with slimmer icons and clearer account-section separation.
+- Keep the mobile drawer within iPhone safe areas and prevent form fields from zooming on focus.
+
 ## 0.1.20
 
 - Hide the available-update banner and duplicate install action after Cloudflare accepts the update

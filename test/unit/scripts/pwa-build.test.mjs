@@ -13,16 +13,20 @@ describe("PWA build contract", () => {
     const manifest = JSON.parse(await readFile("public/manifest.webmanifest", "utf8"));
     expect(() => validateManifest(manifest)).not.toThrow();
     expect(manifest.name).toBe("HQBase");
-    expect(manifest.theme_color).toBe("#09090b");
+    expect(manifest.theme_color).toBe("#080808");
   });
 
   it("keeps lifecycle metadata revalidated and hashed assets immutable", async () => {
-    const [html, headers] = await Promise.all([
+    const [html, headers, iconGenerator] = await Promise.all([
       readFile("index.html", "utf8"),
-      readFile("public/_headers", "utf8")
+      readFile("public/_headers", "utf8"),
+      readFile("scripts/generate-pwa-icons.mjs", "utf8")
     ]);
     expect(html).toContain('rel="manifest" href="/manifest.webmanifest"');
+    expect(html).toContain('rel="icon" href="/logo.svg" type="image/svg+xml"');
     expect(html).toContain('rel="apple-touch-icon"');
+    expect(html).toContain("viewport-fit=cover");
+    expect(iconGenerator).toContain('readFile(path.join(root, "public/logo.svg"), "utf8")');
     expect(headers).toMatch(/\/service-worker\.js[\s\S]*no-cache, no-store, must-revalidate/);
     expect(headers).toMatch(/\/assets\/\*[\s\S]*max-age=31536000, immutable/);
   });

@@ -12,15 +12,21 @@ export const SheetTitle = DialogPrimitive.Title;
 export const SheetDescription = DialogPrimitive.Description;
 
 type SheetContentProps = React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content> & {
+  overlayClassName?: string;
   side?: "left" | "right";
 };
 
 export const SheetContent = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Content>,
   SheetContentProps
->(({ className, children, side = "right", ...props }, ref) => (
+>(({ className, children, overlayClassName, side = "right", ...props }, ref) => (
   <SheetPortal>
-    <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-foreground/25 data-[state=closed]:animate-overlay-out data-[state=open]:animate-overlay-in motion-reduce:animate-none" />
+    <DialogPrimitive.Overlay
+      className={cn(
+        "fixed inset-0 z-50 bg-foreground/25 data-[state=closed]:animate-overlay-out data-[state=open]:animate-overlay-in motion-reduce:animate-none",
+        overlayClassName
+      )}
+    />
     <DialogPrimitive.Content
       className={cn(
         "fixed inset-y-0 z-50 w-[min(92vw,480px)] bg-background p-5 shadow-lg motion-reduce:animate-none",

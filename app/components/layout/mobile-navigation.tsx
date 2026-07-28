@@ -50,6 +50,7 @@ export function MobileNavigation({
         <SheetContent
           aria-describedby={undefined}
           className="w-[min(86vw,18rem)] p-0"
+          overlayClassName="before:pointer-events-none before:fixed before:inset-x-0 before:top-0 before:h-[env(safe-area-inset-top)] before:bg-background after:pointer-events-none after:fixed after:inset-x-0 after:bottom-0 after:h-[env(safe-area-inset-bottom)] after:bg-background"
           ref={drawerRef}
           side="left"
           onOpenAutoFocus={(event) => {

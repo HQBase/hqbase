@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { MobileNavigation } from "@/components/layout/mobile-navigation";
 import { Sidebar } from "@/components/layout/sidebar";
 import { TopBar } from "@/components/layout/top-bar";
+import { LoginPage } from "@/features/auth/login-page";
 import { ComposeWindow } from "@/features/compose/compose-window";
 import { InboxPage } from "@/features/inbox/inbox-page";
 import { McpConnectionDetails } from "@/features/mcp/connection-dialog";
@@ -61,8 +62,17 @@ describe("mail shell", () => {
     expect(html).toContain("Open profile menu");
     expect(html).toContain("OB");
     expect(html.indexOf("Settings")).toBeLessThan(html.indexOf("Open profile menu"));
+    expect(html.match(/border-t pt-2/g)).toHaveLength(2);
+    expect(html).toContain('stroke-width="1.5"');
     expect(html).not.toContain(">HQ<");
     expect(html).not.toContain(">Mail</div>");
+  });
+
+  it("uses the canonical logo on the signed-out surface", () => {
+    const html = renderToStaticMarkup(<LoginPage onLogin={() => undefined} />);
+
+    expect(html).toContain('src="/logo.svg"');
+    expect(html).not.toContain(">HQ</span>");
   });
 
   it("uses a labelled hamburger trigger instead of a mobile folder select", () => {
@@ -100,6 +110,7 @@ describe("mail shell", () => {
     expect(html).toContain('aria-current="page"');
     expect(html).toContain("Connect MCP");
     expect(html.indexOf("Settings")).toBeLessThan(html.indexOf("Open profile menu"));
+    expect(html.match(/border-t pt-2/g)).toHaveLength(2);
   });
 
   it("combines the compact folder label and conversation count in one list header", () => {
