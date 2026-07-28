@@ -78,12 +78,12 @@ test("HQBase web lifecycle remains healthy", async ({ page, request }) => {
     login.ok(),
     `Owner API sign-in failed (${login.status()}): ${await login.text()}`
   ).toBeTruthy();
-  const compose = page.getByRole("button", { name: "Compose" });
+  const newEmail = page.getByRole("button", { name: "New email" });
   const loginEmail = page.getByLabel("Email");
   try {
     await page.goto("/", { waitUntil: "domcontentloaded" });
     await expect(
-      loginEmail.or(compose),
+      loginEmail.or(newEmail),
       "HQBase app shell renders its authenticated state"
     ).toBeVisible({ timeout: 60_000 });
   } catch (error) {
@@ -101,7 +101,7 @@ test("HQBase web lifecycle remains healthy", async ({ page, request }) => {
     await page.getByLabel("Password").fill(password);
     await page.getByRole("button", { name: "Continue" }).click();
   }
-  await expect(compose).toBeVisible({ timeout: 60_000 });
+  await expect(newEmail).toBeVisible({ timeout: 60_000 });
   const expectedUpdate = process.env.HQBASE_STAGING_EXPECT_UPDATE_VERSION;
   if (expectedUpdate) {
     await expect
