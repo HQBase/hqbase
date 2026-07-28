@@ -6,6 +6,7 @@ import { cn } from "@/lib/cn";
 import type { DraftAttachment } from "./api";
 import { AttachmentList } from "./attachment-list";
 import { ComposeFields, type SendingIdentity } from "./compose-fields";
+import { submitComposeOnShortcut } from "./compose-shortcuts";
 import type { ComposeMode } from "./compose-state";
 import { RichEmailEditor } from "./rich-email-editor";
 
@@ -51,6 +52,7 @@ export function ComposeForm(props: ComposeFormProps): React.ReactElement {
             props.presentation === "thread" && "lg:flex-none"
           )}
           id={props.formId}
+          onKeyDownCapture={(event) => submitComposeOnShortcut(event, props.sendDisabled)}
           onSubmit={props.onSubmit}
         >
           <ComposeFields
