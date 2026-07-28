@@ -334,9 +334,8 @@ jobs:
     env:
       GH_TOKEN: ${{ github.token }}
     steps:
-      - name: Remove the failed draft and its temporary tag
+      - name: Remove the failed draft
         run: >-
           gh release delete "v${{ needs.candidate.outputs.version }}"
           --repo "${{ github.repository }}"
-          --cleanup-tag
           --yes

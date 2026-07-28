@@ -78,19 +78,23 @@ test("HQBase web lifecycle remains healthy", async ({ page, request }) => {
     login.ok(),
     `Owner API sign-in failed (${login.status()}): ${await login.text()}`
   ).toBeTruthy();
-  const newEmail = page.getByRole("button", { name: "New email" });
+  const primaryEmailAction = page.getByRole("button", {
+    name: /^(?:Compose|New email)$/
+  });
   const loginEmail = page.getByLabel("Email");
   try {
     await page.goto("/", { waitUntil: "domcontentloaded" });
     await expect(
-      loginEmail.or(newEmail),
+      loginEmail.or(primaryEmailAction),
       "HQBase app shell renders its authenticated state"
     ).toBeVisible({ timeout: 60_000 });
   } catch (error) {
     const shell = await page.evaluate(() => ({
       path: window.location.pathname,
       rootChildren: document.querySelector("#root")?.childElementCount ?? -1,
-      scripts: [...document.scripts].map((script) => new URL(script.src).pathname),
+      scripts: [...document.scripts].map((script) =>
+        script.src ? new URL(script.src).pathname : "(inline)"
+      ),
       title: document.title
     }));
     console.error("HQBase app shell diagnostics", { appShellErrors, shell });
@@ -101,7 +105,7 @@ test("HQBase web lifecycle remains healthy", async ({ page, request }) => {
     await page.getByLabel("Password").fill(password);
     await page.getByRole("button", { name: "Continue" }).click();
   }
-  await expect(newEmail).toBeVisible({ timeout: 60_000 });
+  await expect(primaryEmailAction).toBeVisible({ timeout: 60_000 });
   const expectedUpdate = process.env.HQBASE_STAGING_EXPECT_UPDATE_VERSION;
   if (expectedUpdate) {
     await expect
