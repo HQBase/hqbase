@@ -13,6 +13,7 @@ import {
 } from "../messages/queries";
 import type { MessageSummary } from "../messages/types";
 
+import { buildReplyBody } from "./reply-body";
 import type { ReplyMessageInput, SendMessageInput } from "./validation";
 
 export async function sendNewMessage(
@@ -68,6 +69,7 @@ export async function replyToMessage(
     (value): value is string => value !== null
   );
   const to = input.to?.length ? input.to : [original.fromAddress];
+  const body = buildReplyBody(input, original);
 
   const attachments = await loadAttachments(env, input.attachmentIds, userId);
   const sendResult = await env.MAIL_SENDER.send({
@@ -76,12 +78,12 @@ export async function replyToMessage(
     ...(input.cc.length ? { cc: input.cc } : {}),
     ...(input.bcc.length ? { bcc: input.bcc } : {}),
     subject: ensureReplySubject(original.subject),
-    text: input.text,
+    text: body.text,
     headers: {
       "In-Reply-To": original.messageId ?? original.id,
       References: references.join(" ")
     },
-    ...(input.html ? { html: input.html } : {}),
+    ...(body.html ? { html: body.html } : {}),
     ...(attachments.length ? { attachments: attachments.map(asEmailAttachment) } : {})
   });
 
@@ -91,8 +93,8 @@ export async function replyToMessage(
     cc: input.cc,
     bcc: input.bcc,
     subject: ensureReplySubject(original.subject),
-    text: input.text,
-    ...(input.html ? { html: input.html } : {}),
+    text: body.text,
+    ...(body.html ? { html: body.html } : {}),
     inReplyTo: original.messageId ?? original.id,
     messageId: sendResult.messageId,
     references,

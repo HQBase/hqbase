@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.16
+
+- Include the selected message as quoted HTML and plain text in replies so email clients can
+  collapse and expand the previous content.
+
 ## 0.1.15
 
 - Send new messages, replies, and forwards with Command+Enter on macOS or Control+Enter elsewhere.
