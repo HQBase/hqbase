@@ -11,6 +11,7 @@ import {
 import {
   compareVersions,
   deploySource,
+  executeSql,
   hqbaseReleaseTag,
   loadVerifiedRelease,
   needsInitialAuthSecret,
@@ -289,6 +290,32 @@ describe("HQBase release deployment", () => {
         "BETTER_AUTH_SECRET"
       )
     ).toThrow("wrangler secret list exited");
+  });
+  it("hides successful release bookkeeping output but preserves D1 failures", () => {
+    let emitted = "";
+    executeSql("/release", "UPDATE release_state SET installed_version = '0.1.12'", {
+      attempt: (command, args, cwd) => {
+        expect(command).toBe("pnpm");
+        expect(args).toContain("execute");
+        expect(args).toContain("UPDATE release_state SET installed_version = '0.1.12'");
+        expect(cwd).toBe("/release");
+        return { status: 0, stdout: '[{"success":true}]', stderr: "" };
+      },
+      emit: () => {
+        emitted = "unexpected output";
+      }
+    });
+    expect(emitted).toBe("");
+
+    expect(() =>
+      executeSql("/release", "UPDATE release_state SET installed_version = '0.1.12'", {
+        attempt: () => ({ status: 1, stdout: "", stderr: "D1 update failed" }),
+        emit: (result) => {
+          emitted = result.stderr;
+        }
+      })
+    ).toThrow("wrangler d1 execute exited with status 1");
+    expect(emitted).toBe("D1 update failed");
   });
   it("keeps the generated secret out of Deploy to Cloudflare form metadata", () => {
     const packageJson = JSON.parse(readFileSync("package.json", "utf8"));
