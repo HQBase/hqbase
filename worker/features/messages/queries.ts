@@ -189,6 +189,28 @@ export async function getMessageDetail(db: D1Database, id: string): Promise<Mess
     return null;
   }
 
+  return mapMessageDetail(db, row);
+}
+
+export async function listThreadMessages(
+  db: D1Database,
+  threadId: string,
+  mailboxIds: string[]
+): Promise<MessageDetail[]> {
+  if (mailboxIds.length === 0) return [];
+  const result = await db
+    .prepare(
+      `SELECT * FROM messages
+       WHERE thread_id = ? AND mailbox_id IN (${mailboxIds.map(() => "?").join(", ")})
+       ORDER BY COALESCE(received_at, sent_at, created_at) ASC
+       LIMIT 100`
+    )
+    .bind(threadId, ...mailboxIds)
+    .all<MessageRow>();
+  return Promise.all(result.results.map((row) => mapMessageDetail(db, row)));
+}
+
+async function mapMessageDetail(db: D1Database, row: MessageRow): Promise<MessageDetail> {
   return {
     ...mapMessageSummary(row),
     cc: parseJsonList(row.cc_json),
@@ -198,7 +220,7 @@ export async function getMessageDetail(db: D1Database, id: string): Promise<Mess
     messageId: row.message_id,
     inReplyTo: row.in_reply_to,
     references: parseJsonList(row.references_json),
-    attachments: await listAttachments(db, id)
+    attachments: await listAttachments(db, row.id)
   };
 }
 

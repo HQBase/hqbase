@@ -13,12 +13,15 @@ import {
 } from "lucide-react";
 import * as React from "react";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/cn";
 
 export function RichEmailEditor({
+  contained = true,
   html,
   onChange,
   onFiles
 }: {
+  contained?: boolean;
   html: string;
   onChange: (html: string, text: string) => void;
   onFiles: (files: File[]) => void;
@@ -39,7 +42,8 @@ export function RichEmailEditor({
       editorProps: {
         attributes: {
           class:
-            "prose prose-sm min-h-60 max-w-none px-5 py-4 text-sm outline-none [&_a]:text-primary [&_a]:underline [&_blockquote]:border-l-2 [&_blockquote]:pl-3 [&_p]:my-2"
+            "prose prose-sm min-h-60 max-w-none px-5 py-4 text-sm outline-none [&_a]:text-primary [&_a]:underline [&_blockquote]:border-l-2 [&_blockquote]:pl-3 [&_p]:my-2",
+          "data-compose-autofocus": ""
         },
         handleDrop: (_view, event) => {
           const files = Array.from(event.dataTransfer?.files ?? []);
@@ -70,7 +74,7 @@ export function RichEmailEditor({
     else editor.chain().focus().extendMarkRange("link").setLink({ href }).run();
   };
   return (
-    <div className="min-h-0 flex-1 overflow-auto">
+    <div className={cn(contained && "min-h-0 flex-1 overflow-auto")}>
       <div
         className="sticky top-0 z-10 flex flex-wrap gap-1 border-b bg-card px-4 py-2"
         role="toolbar"

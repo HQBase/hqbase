@@ -13,6 +13,7 @@ import {
   getMessageHtmlKey,
   getMessageMailboxId,
   listMessages,
+  listThreadMessages,
   updateMessageAction
 } from "./queries";
 import { isRemoteMediaTrusted, trustRemoteMediaSender } from "./remote-media";
@@ -32,6 +33,17 @@ messageRoutes.get("/", async (c) => {
       mailboxIds
     })
   );
+});
+
+messageRoutes.get("/:id/thread", async (c) => {
+  const auth = await requireAuthContext(c.env, c.req.raw);
+  const message = await getMessageDetail(c.env.DB, c.req.param("id"));
+  if (!message) {
+    throw new AppError("MESSAGE_NOT_FOUND", "Message not found.", 404);
+  }
+  await requireMailboxAccess(c.env.DB, auth.user.id, auth.user.role, message.mailboxId, "read");
+  const mailboxIds = await accessibleMailboxIds(c.env.DB, auth.user.id, auth.user.role, "read");
+  return c.json(await listThreadMessages(c.env.DB, message.threadId, mailboxIds));
 });
 
 messageRoutes.get("/:id", async (c) => {

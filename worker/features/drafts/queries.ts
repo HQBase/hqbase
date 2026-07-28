@@ -6,6 +6,7 @@ type DraftRow = {
   id: string;
   mailbox_id: string | null;
   reply_to_message_id: string | null;
+  forward_of_message_id: string | null;
   from_address: string;
   to_json: string;
   cc_json: string;
@@ -54,6 +55,7 @@ async function mapDraft(db: D1Database, row: DraftRow): Promise<Draft> {
     id: row.id,
     mailboxId: row.mailbox_id,
     replyToMessageId: row.reply_to_message_id,
+    forwardOfMessageId: row.forward_of_message_id,
     from: row.from_address,
     to: parse(row.to_json),
     cc: parse(row.cc_json),
@@ -87,6 +89,7 @@ export async function saveDraft(
     id?: string | undefined;
     mailboxId: string | null;
     replyToMessageId: string | null;
+    forwardOfMessageId: string | null;
     from: string;
     to: string[];
     cc: string[];
@@ -106,13 +109,14 @@ export async function saveDraft(
   const nextVersion = current ? current.version + 1 : 1;
   await db
     .prepare(
-      `INSERT INTO drafts (id, user_id, mailbox_id, reply_to_message_id, from_address, to_json, cc_json, bcc_json, subject, text_body, html_body, version, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET mailbox_id=excluded.mailbox_id, reply_to_message_id=excluded.reply_to_message_id, from_address=excluded.from_address, to_json=excluded.to_json, cc_json=excluded.cc_json, bcc_json=excluded.bcc_json, subject=excluded.subject, text_body=excluded.text_body, html_body=excluded.html_body, version=excluded.version, updated_at=excluded.updated_at`
+      `INSERT INTO drafts (id, user_id, mailbox_id, reply_to_message_id, forward_of_message_id, from_address, to_json, cc_json, bcc_json, subject, text_body, html_body, version, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET mailbox_id=excluded.mailbox_id, reply_to_message_id=excluded.reply_to_message_id, forward_of_message_id=excluded.forward_of_message_id, from_address=excluded.from_address, to_json=excluded.to_json, cc_json=excluded.cc_json, bcc_json=excluded.bcc_json, subject=excluded.subject, text_body=excluded.text_body, html_body=excluded.html_body, version=excluded.version, updated_at=excluded.updated_at`
     )
     .bind(
       id,
       userId,
       input.mailboxId,
       input.replyToMessageId,
+      input.forwardOfMessageId,
       input.from,
       JSON.stringify(input.to),
       JSON.stringify(input.cc),

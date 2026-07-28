@@ -10,7 +10,7 @@ import { InboxPage } from "@/features/inbox/inbox-page";
 import { listMailboxes } from "@/features/mailboxes/api";
 import type { Mailbox } from "@/features/mailboxes/types";
 import { listMessages } from "@/features/messages/api";
-import type { MessageDetail, MessageSummary } from "@/features/messages/types";
+import type { MessageSummary } from "@/features/messages/types";
 import { SettingsPage } from "@/features/settings/settings-page";
 import { getSetupStatus } from "@/features/setup/api";
 import { SetupPage } from "@/features/setup/setup-page";
@@ -35,13 +35,16 @@ export function App(): React.ReactElement {
   const [mailboxId, setMailboxId] = React.useState("all");
   const [search, setSearch] = React.useState("");
   const [composeOpen, setComposeOpen] = React.useState(false);
-  const [replyTo, setReplyTo] = React.useState<MessageDetail | null>(null);
   const [isLoading, setIsLoading] = React.useState(true);
   const [updateStatus, setUpdateStatus] = React.useState<UpdateStatus | null>(null);
   const { navigate, route } = useAppRoute(setup?.isComplete);
   const activeFolder: FolderId = route.kind === "settings" ? "settings" : route.folder;
   const selectedId = route.kind === "mail" ? route.messageId : null;
   const settingsTab: SettingsTabId = route.kind === "settings" ? route.tab : "mailboxes";
+  const contentMailboxes = React.useMemo(
+    () => mailboxes.filter((mailbox) => mailbox.accessLevel !== null),
+    [mailboxes]
+  );
 
   const loadWorkspace = React.useCallback(async (currentUser: CurrentUser) => {
     const [nextSetup, nextMailboxes] = await Promise.all([getSetupStatus(), listMailboxes()]);
@@ -164,12 +167,11 @@ export function App(): React.ReactElement {
     );
   }
 
-  const contentMailboxes = mailboxes.filter((mailbox) => mailbox.accessLevel !== null);
-
   return (
     <>
       <AppShell
         activeFolder={activeFolder}
+        immersiveOnCompact={activeFolder !== "settings" && selectedId !== null}
         mailboxId={mailboxId}
         mailboxes={contentMailboxes}
         search={search}
@@ -179,7 +181,6 @@ export function App(): React.ReactElement {
           navigate({ kind: "settings", tab: "updates" });
         }}
         onCompose={() => {
-          setReplyTo(null);
           setComposeOpen(true);
         }}
         onFolderChange={(folder) => {
@@ -212,13 +213,10 @@ export function App(): React.ReactElement {
             ) : (
               <InboxPage
                 activeFolder={activeFolder as MailFolderId}
+                mailboxes={contentMailboxes}
                 messages={messages}
                 selectedId={selectedId}
                 onRefresh={() => void reloadMessages()}
-                onReply={(message) => {
-                  setReplyTo(message);
-                  setComposeOpen(true);
-                }}
                 onMessageRouteChange={(folder, messageId) =>
                   navigate({ kind: "mail", folder, messageId })
                 }
@@ -234,8 +232,8 @@ export function App(): React.ReactElement {
         <React.Suspense fallback={null}>
           <ComposeDialog
             mailboxes={contentMailboxes}
+            mode="new"
             open={composeOpen}
-            replyTo={replyTo}
             onOpenChange={setComposeOpen}
             onSent={() => void reloadMessages()}
           />

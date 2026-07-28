@@ -6,6 +6,7 @@ export const draftSchema = z.object({
   id: z.string().min(1).max(100).optional(),
   mailboxId: z.string().min(1).max(100).nullable().default(null),
   replyToMessageId: z.string().min(1).max(100).nullable().default(null),
+  forwardOfMessageId: z.string().min(1).max(100).nullable().default(null),
   from: z.union([z.literal(""), emailAddressSchema]).default(""),
   to: recipients,
   cc: recipients,

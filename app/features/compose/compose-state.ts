@@ -1,11 +1,19 @@
+import type * as React from "react";
 import type { Mailbox } from "@/features/mailboxes/types";
 import type { MessageDetail } from "@/features/messages/types";
+import { formatDateTime } from "@/lib/format";
 import type { SendingIdentity } from "./compose-fields";
+
+export type ComposeMode = "new" | "reply" | "forward";
+export type DraftSaveState = "saved" | "saving" | "error";
 
 export type ComposeDialogProps = {
   mailboxes: Mailbox[];
+  message?: MessageDetail | null;
+  mode?: ComposeMode;
   open: boolean;
-  replyTo: MessageDetail | null;
+  presentation?: "window" | "thread";
+  threadContext?: React.ReactNode;
   onOpenChange: (open: boolean) => void;
   onSent: () => void;
 };
@@ -60,4 +68,44 @@ export function readDraftRecovery(key: string, serverUpdatedAt: string): Recover
   } catch {
     return null;
   }
+}
+
+export function composeTitle(mode: ComposeMode): string {
+  return mode === "reply" ? "Reply" : mode === "forward" ? "Forward" : "New message";
+}
+
+export function draftStatus(state: DraftSaveState): string {
+  return state === "saving"
+    ? "Saving draft…"
+    : state === "error"
+      ? "Draft not saved"
+      : "Draft saved";
+}
+
+export function forwardedMessage(message: MessageDetail): { html: string; text: string } {
+  const timestamp = message.receivedAt ?? message.sentAt ?? message.createdAt;
+  const lines = [
+    "---------- Forwarded message ---------",
+    `From: ${message.fromAddress}`,
+    `Date: ${formatDateTime(timestamp)}`,
+    `Subject: ${message.subject}`,
+    `To: ${message.to.join(", ")}`,
+    ...(message.cc.length ? [`Cc: ${message.cc.join(", ")}`] : []),
+    "",
+    message.textBody || message.snippet
+  ];
+  const text = lines.join("\n");
+  return {
+    text,
+    html: `<p></p><blockquote>${escapeHtml(text).replaceAll("\n", "<br>")}</blockquote>`
+  };
+}
+
+function escapeHtml(value: string): string {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
 }

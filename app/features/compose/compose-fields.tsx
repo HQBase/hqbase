@@ -9,11 +9,13 @@ import {
   SelectValue
 } from "@/components/ui/select";
 import type { MessageDetail } from "@/features/messages/types";
+import type { ComposeMode } from "./compose-state";
 
 export type SendingIdentity = { mailboxId: string; address: string };
 export function ComposeFields(props: {
   identities: SendingIdentity[];
-  replyTo: MessageDetail | null;
+  message: MessageDetail | null;
+  mode: ComposeMode;
   from: string;
   to: string;
   cc: string;
@@ -29,7 +31,10 @@ export function ComposeFields(props: {
     <div className="flex flex-col px-5">
       <Row label="From">
         <Select required value={props.from} onValueChange={props.setFrom}>
-          <SelectTrigger className="h-10 rounded-none border-0 bg-transparent px-0 shadow-none focus:ring-0">
+          <SelectTrigger
+            aria-label="From"
+            className="h-10 rounded-none border-0 bg-transparent px-0 shadow-none focus:ring-0"
+          >
             <SelectValue placeholder="Choose address" />
           </SelectTrigger>
           <SelectContent>
@@ -43,14 +48,15 @@ export function ComposeFields(props: {
           </SelectContent>
         </Select>
       </Row>
-      {props.replyTo ? (
+      {props.mode === "reply" && props.message ? (
         <div className="border-b py-3 text-xs text-muted-foreground">
-          Replying to <span className="text-foreground">{props.replyTo.fromAddress}</span>
+          Replying to <span className="text-foreground">{props.message.fromAddress}</span>
         </div>
       ) : (
         <>
           <Row label="To">
             <Input
+              aria-label="To"
               autoFocus
               data-compose-autofocus
               required
@@ -60,16 +66,25 @@ export function ComposeFields(props: {
           </Row>
           <div className="grid grid-cols-1 border-b sm:grid-cols-2 sm:divide-x">
             <Row label="Cc" border={false}>
-              <Input value={props.cc} onChange={(event) => props.setCc(event.target.value)} />
+              <Input
+                aria-label="Cc"
+                value={props.cc}
+                onChange={(event) => props.setCc(event.target.value)}
+              />
             </Row>
             <div className="sm:pl-4">
               <Row label="Bcc" border={false}>
-                <Input value={props.bcc} onChange={(event) => props.setBcc(event.target.value)} />
+                <Input
+                  aria-label="Bcc"
+                  value={props.bcc}
+                  onChange={(event) => props.setBcc(event.target.value)}
+                />
               </Row>
             </div>
           </div>
           <Row label="Subject">
             <Input
+              aria-label="Subject"
               required
               value={props.subject}
               onChange={(event) => props.setSubject(event.target.value)}

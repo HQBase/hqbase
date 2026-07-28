@@ -1,78 +1,87 @@
-import { Archive, Download, MailOpen, MailPlus, Star, Trash2 } from "lucide-react";
-import type * as React from "react";
-import { Badge } from "@/components/ui/badge";
+import { Archive, ArrowLeft, Forward, MailOpen, Reply, Star, Trash2 } from "lucide-react";
+import * as React from "react";
+
 import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
-import { formatDateTime } from "@/lib/format";
-import { MessageHtml } from "./message-html";
+import type { ComposeMode } from "@/features/compose/compose-state";
+import type { Mailbox } from "@/features/mailboxes/types";
+import { ConversationMessages } from "./conversation-messages";
 import type { MessageDetail as MessageDetailType } from "./types";
+
+const ComposeDialog = React.lazy(() =>
+  import("@/features/compose/compose-dialog").then((module) => ({ default: module.ComposeDialog }))
+);
 
 type MessageDetailProps = {
   error?: string | null;
   isLoading?: boolean;
-  message: MessageDetailType | null;
+  mailboxes: Mailbox[];
+  messages: MessageDetailType[];
+  selectedId: string | null;
   onAction: (action: "read" | "unread" | "star" | "unstar" | "archive" | "trash") => void;
-  onReply: (message: MessageDetailType) => void;
+  onBack: () => void;
+  onSent: () => void;
 };
 
 export function MessageDetail({
   error = null,
   isLoading = false,
-  message,
+  mailboxes,
+  messages,
+  selectedId,
   onAction,
-  onReply
+  onBack,
+  onSent
 }: MessageDetailProps): React.ReactElement {
+  const [composeMode, setComposeMode] = React.useState<Extract<
+    ComposeMode,
+    "reply" | "forward"
+  > | null>(null);
+
   if (isLoading) {
-    return <MessageReaderStatus label="Loading message" />;
+    return <MessageReaderStatus label="Loading conversation" />;
   }
 
   if (error) {
-    return <MessageReaderStatus description={error} label="Message unavailable" />;
+    return <MessageReaderStatus description={error} label="Conversation unavailable" />;
   }
 
-  if (!message) {
+  const selected = messages.find((message) => message.id === selectedId) ?? messages.at(-1) ?? null;
+  if (!selected) {
     return <MessageReaderStatus label="Select a message" />;
   }
-
-  const timestamp = message.receivedAt ?? message.sentAt ?? message.createdAt;
+  const replyTarget =
+    selected.direction === "inbound"
+      ? selected
+      : ([...messages].reverse().find((message) => message.direction === "inbound") ?? selected);
+  const composeTarget = composeMode === "reply" ? replyTarget : selected;
 
   return (
     <article className="flex h-full flex-col bg-background">
-      <div className="border-b px-4 py-4 sm:px-6 sm:py-5">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div className="min-w-0 flex-1">
-            <h2 className="break-words text-lg font-medium tracking-tight sm:text-xl">
-              {message.subject}
-            </h2>
-            <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
-              <span className="text-foreground">{message.fromAddress}</span>
-              <span aria-hidden="true">→</span>
-              <span>{message.to.join(", ")}</span>
-              <span aria-hidden="true">·</span>
-              <span className="font-mono text-[10px]">{formatDateTime(timestamp)}</span>
-              {message.folder === "catchall" && (
-                <Badge className="h-5 px-1.5 text-[10px]" variant="outline">
-                  Catch-all
-                </Badge>
-              )}
-            </div>
-            {message.cc.length > 0 && (
-              <div className="mt-1 text-xs text-muted-foreground">Cc {message.cc.join(", ")}</div>
-            )}
-          </div>
+      <div className="shrink-0 border-b bg-background px-3 py-3 sm:px-5">
+        <div className="flex items-start gap-2">
+          <Button
+            aria-label="Back to messages"
+            className="size-10 shrink-0 lg:hidden"
+            size="icon"
+            type="button"
+            variant="ghost"
+            onClick={onBack}
+          >
+            <ArrowLeft />
+          </Button>
+          <h1 className="min-w-0 flex-1 break-words pt-2 text-lg font-medium tracking-tight sm:text-xl lg:pt-1">
+            {selected.subject}
+          </h1>
           <div className="flex shrink-0 flex-wrap gap-0.5 rounded-md border bg-card p-0.5">
-            <IconButton label="Reply" onClick={() => onReply(message)}>
-              <MailPlus />
-            </IconButton>
             <IconButton
-              label={message.readAt ? "Mark unread" : "Mark read"}
-              onClick={() => onAction(message.readAt ? "unread" : "read")}
+              label={selected.readAt ? "Mark unread" : "Mark read"}
+              onClick={() => onAction(selected.readAt ? "unread" : "read")}
             >
               <MailOpen />
             </IconButton>
             <IconButton
-              label={message.starredAt ? "Unstar" : "Star"}
-              onClick={() => onAction(message.starredAt ? "unstar" : "star")}
+              label={selected.starredAt ? "Unstar" : "Star"}
+              onClick={() => onAction(selected.starredAt ? "unstar" : "star")}
             >
               <Star />
             </IconButton>
@@ -85,32 +94,53 @@ export function MessageDetail({
           </div>
         </div>
       </div>
-      <div className="min-h-0 flex-1 overflow-auto px-4 py-6 sm:px-6 sm:py-8">
-        <div className="max-w-3xl">
-          {message.htmlAvailable ? (
-            <MessageHtml message={message} />
+      <div className="min-h-0 flex-1 overflow-auto">
+        <ConversationMessages messages={messages} />
+        <div className="px-4 pb-8 pt-2 sm:px-6">
+          {composeMode ? (
+            <React.Suspense
+              fallback={
+                <div className="grid min-h-60 place-items-center text-sm text-muted-foreground">
+                  Opening editor…
+                </div>
+              }
+            >
+              <ComposeDialog
+                mailboxes={mailboxes}
+                message={composeTarget}
+                mode={composeMode}
+                open
+                presentation="thread"
+                threadContext={<ConversationMessages compact messages={messages} />}
+                onOpenChange={(nextOpen) => {
+                  if (!nextOpen) setComposeMode(null);
+                }}
+                onSent={onSent}
+              />
+            </React.Suspense>
           ) : (
-            <pre className="whitespace-pre-wrap break-words font-sans text-sm leading-7 text-foreground/90">
-              {message.textBody || message.snippet}
-            </pre>
-          )}
-          {message.attachments.length > 0 && (
-            <>
-              <Separator className="my-6" />
-              <div className="flex flex-col gap-2">
-                <div className="text-xs font-medium text-muted-foreground">Attachments</div>
-                {message.attachments.map((attachment) => (
-                  <a
-                    className="flex w-fit items-center gap-2 rounded-md border bg-card px-3 py-2 text-xs hover:bg-muted"
-                    href={`/api/attachments/${attachment.id}`}
-                    key={attachment.id}
-                  >
-                    <Download className="size-3.5" />
-                    {attachment.filename}
-                  </a>
-                ))}
-              </div>
-            </>
+            <div className="grid grid-cols-2 gap-3 lg:flex">
+              <Button
+                className="h-11 justify-center gap-2 px-5 lg:min-w-32"
+                size="lg"
+                type="button"
+                variant="outline"
+                onClick={() => setComposeMode("reply")}
+              >
+                <Reply />
+                Reply
+              </Button>
+              <Button
+                className="h-11 justify-center gap-2 px-5 lg:min-w-32"
+                size="lg"
+                type="button"
+                variant="outline"
+                onClick={() => setComposeMode("forward")}
+              >
+                <Forward />
+                Forward
+              </Button>
+            </div>
           )}
         </div>
       </div>
@@ -150,7 +180,7 @@ function IconButton({
   return (
     <Button
       aria-label={label}
-      className="size-8 text-muted-foreground hover:text-foreground"
+      className="size-9 text-muted-foreground hover:text-foreground"
       onClick={onClick}
       size="icon"
       title={label}
