@@ -28,7 +28,7 @@ type AppShellProps = {
 
 export function AppShell(props: AppShellProps): React.ReactElement {
   return (
-    <div className="flex h-screen overflow-hidden bg-background text-foreground">
+    <div className="flex h-screen h-[100dvh] overflow-hidden bg-background text-foreground">
       <Sidebar
         activeFolder={props.activeFolder}
         user={props.user}

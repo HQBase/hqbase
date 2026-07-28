@@ -75,6 +75,10 @@
     --radius: 0.5rem;
   }
 
+  html {
+    background-color: hsl(var(--background));
+  }
+
   * {
     @apply border-border;
   }
@@ -82,8 +86,22 @@
   body {
     @apply bg-background text-foreground antialiased;
     min-width: 320px;
+    min-height: 100dvh;
+    overscroll-behavior: none;
     font-feature-settings:
       "rlig" 1,
       "calt" 1;
+  }
+
+  #root {
+    min-height: 100dvh;
+  }
+}
+
+@media (max-width: 767px) {
+  input:not([type="checkbox"]):not([type="radio"]),
+  textarea[class],
+  [contenteditable="true"][class] {
+    font-size: 16px;
   }
 }

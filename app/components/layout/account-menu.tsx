@@ -1,4 +1,4 @@
-import { ChevronsUpDown, LogOut } from "lucide-react";
+import { ChevronDown, LogOut } from "lucide-react";
 import type * as React from "react";
 
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -53,7 +53,11 @@ export function AccountMenu({
             <span className="block truncate text-[13px] text-foreground">{user.name}</span>
             <span className="block truncate text-[11px] text-muted-foreground">{user.role}</span>
           </span>
-          <ChevronsUpDown aria-hidden="true" />
+          <ChevronDown
+            aria-hidden="true"
+            className="size-3.5 text-muted-foreground"
+            strokeWidth={1.5}
+          />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-52" side="top">
@@ -64,8 +68,8 @@ export function AccountMenu({
           </div>
         </DropdownMenuLabel>
         <DropdownMenuGroup>
-          <DropdownMenuItem onSelect={() => void handleSignOut()}>
-            <LogOut />
+          <DropdownMenuItem className="gap-2" onSelect={() => void handleSignOut()}>
+            <LogOut className="size-4" strokeWidth={1.5} />
             Sign out
           </DropdownMenuItem>
         </DropdownMenuGroup>

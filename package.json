@@ -1,6 +1,6 @@
 {
   "name": "hqbase",
-  "version": "0.1.20",
+  "version": "0.1.21",
   "private": true,
   "type": "module",
   "packageManager": "pnpm@11.7.0",
@@ -29,6 +29,7 @@
     "test:e2e:staging": "playwright test --config playwright.config.ts app-shell-smoke.spec.ts lifecycle.spec.ts",
     "test:e2e:staging:smoke": "playwright test --config playwright.config.ts app-shell-smoke.spec.ts",
     "test:e2e:staging:lifecycle": "playwright test --config playwright.config.ts lifecycle.spec.ts",
+    "pwa:icons": "node scripts/generate-pwa-icons.mjs",
     "check": "pnpm code:check && pnpm typecheck && pnpm test && pnpm test:coverage && pnpm test:architecture && pnpm build",
     "deploy:dry-run": "pnpm build && wrangler deploy --dry-run",
     "hqbase": "node scripts/hqbase/cli.mjs",

@@ -41,8 +41,10 @@ export function Sidebar({
   return (
     <aside
       className={cn(
-        "w-56 shrink-0 flex-col bg-background p-3",
-        isDrawer ? "flex h-full w-full" : "hidden border-r md:flex"
+        "w-56 shrink-0 flex-col bg-background px-3 py-3",
+        isDrawer
+          ? "flex h-full w-full pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-[max(0.75rem,env(safe-area-inset-top))]"
+          : "hidden border-r md:flex"
       )}
     >
       <div className="mb-7 flex h-9 items-center gap-2.5 px-2">
@@ -79,31 +81,35 @@ export function Sidebar({
             </Button>
           );
         })}
-        <div className="mt-auto flex flex-col gap-0.5 border-t pt-2">
-          {isDrawer && drawerAction ? drawerAction : null}
-          <Button
-            asChild
-            className={cn(
-              "h-8 w-full justify-start gap-2.5 px-2.5 text-[13px] font-normal text-muted-foreground",
-              isDrawer && "h-11 text-sm",
-              activeFolder === "settings" && "bg-muted text-foreground"
-            )}
-            variant="ghost"
-          >
-            <a
-              aria-current={activeFolder === "settings" ? "page" : undefined}
-              href={appRoutePath({ kind: "settings", tab: "mailboxes" })}
-              onClick={(event) => {
-                if (isModifiedNavigation(event)) return;
-                event.preventDefault();
-                onFolderChange("settings");
-              }}
+        <div className="mt-auto">
+          <div className="flex flex-col gap-0.5 border-t pt-2">
+            {isDrawer && drawerAction ? drawerAction : null}
+            <Button
+              asChild
+              className={cn(
+                "h-8 w-full justify-start gap-2.5 px-2.5 text-[13px] font-normal text-muted-foreground",
+                isDrawer && "h-11 text-sm",
+                activeFolder === "settings" && "bg-muted text-foreground"
+              )}
+              variant="ghost"
             >
-              <Settings />
-              Settings
-            </a>
-          </Button>
-          <AccountMenu drawer={isDrawer} user={user} onSignedOut={onSignedOut} />
+              <a
+                aria-current={activeFolder === "settings" ? "page" : undefined}
+                href={appRoutePath({ kind: "settings", tab: "mailboxes" })}
+                onClick={(event) => {
+                  if (isModifiedNavigation(event)) return;
+                  event.preventDefault();
+                  onFolderChange("settings");
+                }}
+              >
+                <Settings />
+                Settings
+              </a>
+            </Button>
+          </div>
+          <div className="mt-2 border-t pt-2">
+            <AccountMenu drawer={isDrawer} user={user} onSignedOut={onSignedOut} />
+          </div>
         </div>
       </nav>
     </aside>
