@@ -5,7 +5,10 @@ import { InboxPage } from "@/features/inbox/inbox-page";
 import { ConversationMessages } from "@/features/messages/conversation-messages";
 import { MessageDetail } from "@/features/messages/message-detail";
 import { MessageListItem } from "@/features/messages/message-list-item";
-import type { MessageDetail as MessageDetailType, MessageSummary } from "@/features/messages/types";
+import type {
+  ConversationSummary,
+  MessageDetail as MessageDetailType
+} from "@/features/messages/types";
 
 const firstMessage: MessageDetailType = {
   id: "msg_1",
@@ -52,6 +55,14 @@ const secondMessage: MessageDetailType = {
   createdAt: "2026-07-27T14:05:00.000Z"
 };
 
+const conversation: ConversationSummary = {
+  ...secondMessage,
+  hasAttachments: false,
+  isStarred: false,
+  messageCount: 2,
+  unreadCount: 1
+};
+
 describe("conversation reader", () => {
   it("renders the complete thread and keeps Reply and Forward at the bottom", () => {
     const html = renderToStaticMarkup(
@@ -70,16 +81,15 @@ describe("conversation reader", () => {
     expect(html).toContain(">Forward<");
     expect(html).toContain('aria-label="Back to messages"');
     expect(html).not.toContain('aria-label="Reply"');
-    expect(html).toContain('aria-label="Archive"');
+    expect(html).toContain('aria-label="Archive conversation"');
   });
 
   it("uses list-only and conversation-only compact states", () => {
-    const summary: MessageSummary = firstMessage;
     const listHtml = renderToStaticMarkup(
       <InboxPage
         activeFolder="inbox"
+        conversations={[conversation]}
         mailboxes={[]}
-        messages={[summary]}
         selectedId={null}
         onMessageRouteChange={() => undefined}
         onRefresh={() => undefined}
@@ -89,9 +99,9 @@ describe("conversation reader", () => {
     const conversationHtml = renderToStaticMarkup(
       <InboxPage
         activeFolder="inbox"
+        conversations={[conversation]}
         mailboxes={[]}
-        messages={[summary]}
-        selectedId={summary.id}
+        selectedId={conversation.id}
         onMessageRouteChange={() => undefined}
         onRefresh={() => undefined}
         onSelect={() => undefined}
@@ -108,22 +118,26 @@ describe("conversation reader", () => {
   it("labels the unread indicator and removes it once the message is read", () => {
     const unreadHtml = renderToStaticMarkup(
       <MessageListItem
+        activeFolder="inbox"
+        conversation={conversation}
         href="/inbox/msg_1"
         isActive={false}
-        message={firstMessage}
         onSelect={() => undefined}
       />
     );
     const readHtml = renderToStaticMarkup(
       <MessageListItem
+        activeFolder="inbox"
+        conversation={{ ...conversation, unreadCount: 0 }}
         href="/inbox/msg_1"
         isActive={false}
-        message={{ ...firstMessage, readAt: "2026-07-27T14:05:00.000Z" }}
         onSelect={() => undefined}
       />
     );
 
     expect(unreadHtml).toContain('aria-label="Unread"');
+    expect(unreadHtml).toContain('title="2 messages"');
+    expect(unreadHtml).toContain("2 messages</span>");
     expect(readHtml).not.toContain('aria-label="Unread"');
   });
 

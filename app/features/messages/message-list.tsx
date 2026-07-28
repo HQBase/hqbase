@@ -2,33 +2,34 @@ import type * as React from "react";
 
 import { appRoutePath, type MailFolderId } from "@/lib/routes";
 import { EmptyMessageList, MessageListItem } from "./message-list-item";
-import type { MessageSummary } from "./types";
+import type { ConversationSummary } from "./types";
 
 type MessageListProps = {
   activeFolder: MailFolderId;
-  messages: MessageSummary[];
-  selectedId: string | null;
-  onSelect: (message: MessageSummary) => void;
+  conversations: ConversationSummary[];
+  selectedThreadId: string | null;
+  onSelect: (conversation: ConversationSummary) => void;
 };
 
 export function MessageList({
   activeFolder,
-  messages,
-  selectedId,
+  conversations,
+  selectedThreadId,
   onSelect
 }: MessageListProps): React.ReactElement {
-  if (messages.length === 0) {
+  if (conversations.length === 0) {
     return <EmptyMessageList />;
   }
 
   return (
     <div className="h-full overflow-auto">
-      {messages.map((message) => (
+      {conversations.map((conversation) => (
         <MessageListItem
-          href={appRoutePath({ kind: "mail", folder: activeFolder, messageId: message.id })}
-          isActive={message.id === selectedId}
-          key={message.id}
-          message={message}
+          activeFolder={activeFolder}
+          conversation={conversation}
+          href={appRoutePath({ kind: "mail", folder: activeFolder, messageId: conversation.id })}
+          isActive={conversation.threadId === selectedThreadId}
+          key={conversation.threadId}
           onSelect={onSelect}
         />
       ))}

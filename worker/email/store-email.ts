@@ -1,12 +1,8 @@
 import { newId, nowIso } from "../db/client";
 import { findAddressIdentity } from "../features/mailboxes/address-queries";
 import { findMailboxByAddress } from "../features/mailboxes/queries";
-import {
-  ensureThread,
-  getMessageDetail,
-  insertAttachment,
-  insertMessage
-} from "../features/messages/queries";
+import { getMessageDetail, insertAttachment, insertMessage } from "../features/messages/queries";
+import { resolveInboundThread } from "../features/messages/threading";
 import type { MessageDetail, MessageSummary } from "../features/messages/types";
 
 import { attachmentBody, attachmentSize } from "./attachments";
@@ -57,7 +53,13 @@ export async function storeInboundEmail(
     mailboxId: mailbox?.id ?? null,
     parsed: input.parsed
   });
-  const threadId = await ensureThread(db, input.parsed.subject, timestamp);
+  const threadId = await resolveInboundThread(db, {
+    inReplyTo: input.parsed.inReplyTo,
+    lastMessageAt: timestamp,
+    mailboxId: plan.mailboxId,
+    references: input.parsed.references,
+    subject: input.parsed.subject
+  });
   const message = await insertMessage(db, {
     threadId,
     mailboxId: plan.mailboxId,

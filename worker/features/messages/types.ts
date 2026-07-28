@@ -1,8 +1,17 @@
 export const messageFolders = ["inbox", "sent", "drafts", "archived", "trash", "catchall"] as const;
 export const messageDirections = ["inbound", "outbound"] as const;
+export const conversationFolders = [
+  "inbox",
+  "sent",
+  "starred",
+  "archived",
+  "trash",
+  "catchall"
+] as const;
 
 export type MessageFolder = (typeof messageFolders)[number];
 export type MessageDirection = (typeof messageDirections)[number];
+export type ConversationFolder = (typeof conversationFolders)[number];
 
 export type StoredAttachment = {
   id: string;
@@ -45,6 +54,12 @@ export type MessageDetail = MessageSummary & {
   attachments: StoredAttachment[];
 };
 
+export type ConversationSummary = MessageSummary & {
+  isStarred: boolean;
+  messageCount: number;
+  unreadCount: number;
+};
+
 export type MessageRow = {
   id: string;
   thread_id: string;
@@ -74,6 +89,13 @@ export type MessageRow = {
   created_at: string;
   updated_at: string;
   delivered_to_address: string | null;
+};
+
+export type ConversationRow = Omit<MessageRow, "delivered_to_address"> & {
+  has_thread_attachments: number;
+  is_starred: number;
+  message_count: number;
+  unread_count: number;
 };
 
 export type AttachmentRow = {

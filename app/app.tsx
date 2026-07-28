@@ -9,9 +9,9 @@ import type { CurrentUser } from "@/features/auth/types";
 import { InboxPage } from "@/features/inbox/inbox-page";
 import { listMailboxes } from "@/features/mailboxes/api";
 import type { Mailbox } from "@/features/mailboxes/types";
-import { listMessages } from "@/features/messages/api";
+import { listConversations, listMessages } from "@/features/messages/api";
 import { mergeIncomingMessageIds } from "@/features/messages/incoming-sound";
-import type { MessageSummary } from "@/features/messages/types";
+import type { ConversationSummary } from "@/features/messages/types";
 import { SettingsPage } from "@/features/settings/settings-page";
 import { getSetupStatus } from "@/features/setup/api";
 import { SetupPage } from "@/features/setup/setup-page";
@@ -33,7 +33,7 @@ export function App(): React.ReactElement {
   const [user, setUser] = React.useState<CurrentUser | null>(null);
   const [mailboxes, setMailboxes] = React.useState<Mailbox[]>([]);
   const [users, setUsers] = React.useState<WorkspaceUser[]>([]);
-  const [messages, setMessages] = React.useState<MessageSummary[]>([]);
+  const [conversations, setConversations] = React.useState<ConversationSummary[]>([]);
   const [mailboxId, setMailboxId] = React.useState("all");
   const [search, setSearch] = React.useState("");
   const [composeOpen, setComposeOpen] = React.useState(false);
@@ -88,19 +88,14 @@ export function App(): React.ReactElement {
     }
   }, [loadWorkspace]);
 
-  const reloadMessages = React.useCallback(async () => {
+  const reloadConversations = React.useCallback(async () => {
     if (!user || activeFolder === "settings") return;
-    const folder = activeFolder === "starred" ? undefined : activeFolder;
-    const nextMessages = await listMessages({
-      folder,
+    const nextConversations = await listConversations({
+      folder: activeFolder,
       mailboxId: mailboxId === "all" ? undefined : mailboxId,
       search: search || undefined
     });
-    const filtered =
-      activeFolder === "starred"
-        ? nextMessages.filter((message) => message.starredAt)
-        : nextMessages;
-    setMessages(filtered);
+    setConversations(nextConversations);
   }, [activeFolder, mailboxId, search, user]);
 
   React.useEffect(() => {
@@ -108,10 +103,10 @@ export function App(): React.ReactElement {
   }, [reload]);
 
   React.useEffect(() => {
-    void reloadMessages().catch((error) => {
-      toast.error(error instanceof Error ? error.message : "Messages failed to load.");
+    void reloadConversations().catch((error) => {
+      toast.error(error instanceof Error ? error.message : "Conversations failed to load.");
     });
-  }, [reloadMessages]);
+  }, [reloadConversations]);
 
   React.useEffect(() => {
     if (!user || (user.role !== "owner" && user.role !== "admin")) return;
@@ -164,13 +159,13 @@ export function App(): React.ReactElement {
     if (!user || activeFolder === "settings") return;
 
     const interval = window.setInterval(() => {
-      void reloadMessages().catch(() => {
+      void reloadConversations().catch(() => {
         // Keep background refresh failures quiet; the next interval will retry.
       });
     }, 10_000);
 
     return () => window.clearInterval(interval);
-  }, [activeFolder, reloadMessages, user]);
+  }, [activeFolder, reloadConversations, user]);
 
   React.useEffect(() => {
     if (!user || isLoading || route.kind !== "settings") return;
@@ -230,7 +225,7 @@ export function App(): React.ReactElement {
         onSearchChange={setSearch}
         onSignedOut={() => {
           setUser(null);
-          setMessages([]);
+          setConversations([]);
         }}
       >
         <div className="flex h-full flex-col">
@@ -249,10 +244,10 @@ export function App(): React.ReactElement {
             ) : (
               <InboxPage
                 activeFolder={activeFolder as MailFolderId}
+                conversations={conversations}
                 mailboxes={contentMailboxes}
-                messages={messages}
                 selectedId={selectedId}
-                onRefresh={() => void reloadMessages()}
+                onRefresh={() => void reloadConversations()}
                 onMessageRouteChange={(folder, messageId) =>
                   navigate({ kind: "mail", folder, messageId })
                 }
@@ -271,7 +266,7 @@ export function App(): React.ReactElement {
             mode="new"
             open={composeOpen}
             onOpenChange={setComposeOpen}
-            onSent={() => void reloadMessages()}
+            onSent={() => void reloadConversations()}
           />
         </React.Suspense>
       ) : null}

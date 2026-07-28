@@ -5,6 +5,7 @@ import initialMigration from "../../../migrations/0001_initial.sql?raw";
 import workspaceMigration from "../../../migrations/0002_workspace.sql?raw";
 import oauthResourcesMigration from "../../../migrations/0003_oauth_resources.sql?raw";
 import conversationMigration from "../../../migrations/0004_conversations.sql?raw";
+import threadRebuildMigration from "../../../migrations/0005_rebuild_threads.sql?raw";
 import { hashOAuthToken } from "../../../worker/auth/oauth-token";
 
 const origin = "https://hqbase.test";
@@ -18,7 +19,8 @@ describe("HQBase MCP server", () => {
       initialMigration,
       workspaceMigration,
       oauthResourcesMigration,
-      conversationMigration
+      conversationMigration,
+      threadRebuildMigration
     ]) {
       await applyMigration(migration);
     }

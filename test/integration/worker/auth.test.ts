@@ -5,6 +5,7 @@ import initialMigration from "../../../migrations/0001_initial.sql?raw";
 import workspaceMigration from "../../../migrations/0002_workspace.sql?raw";
 import oauthResourcesMigration from "../../../migrations/0003_oauth_resources.sql?raw";
 import conversationMigration from "../../../migrations/0004_conversations.sql?raw";
+import threadRebuildMigration from "../../../migrations/0005_rebuild_threads.sql?raw";
 import { createAuth } from "../../../worker/auth/auth";
 
 const origin = "https://hqbase.test";
@@ -30,6 +31,7 @@ describe("Better Auth schema", () => {
 
     await applyMigration(oauthResourcesMigration);
     await applyMigration(conversationMigration);
+    await applyMigration(threadRebuildMigration);
   });
 
   it("backfills the Better Auth 1.7 account identity without losing credential rows", async () => {

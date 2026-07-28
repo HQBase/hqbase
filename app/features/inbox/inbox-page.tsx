@@ -1,18 +1,21 @@
 import * as React from "react";
 
 import type { Mailbox } from "@/features/mailboxes/types";
-import { getMessageThread, runMessageAction } from "@/features/messages/api";
+import { getMessageThread, runConversationAction } from "@/features/messages/api";
 import { MessageDetail } from "@/features/messages/message-detail";
 import { MessageList } from "@/features/messages/message-list";
-import type { MessageDetail as MessageDetailType, MessageSummary } from "@/features/messages/types";
+import type {
+  ConversationSummary,
+  MessageDetail as MessageDetailType
+} from "@/features/messages/types";
 import { cn } from "@/lib/cn";
 import type { MailFolderId } from "@/lib/routes";
 import { mailFolders } from "@/lib/routes";
 
 type InboxPageProps = {
   activeFolder: MailFolderId;
+  conversations: ConversationSummary[];
   mailboxes: Mailbox[];
-  messages: MessageSummary[];
   selectedId: string | null;
   onRefresh: () => void;
   onMessageRouteChange: (folder: MailFolderId, messageId: string | null) => void;
@@ -21,8 +24,8 @@ type InboxPageProps = {
 
 export function InboxPage({
   activeFolder,
+  conversations,
   mailboxes,
-  messages,
   selectedId,
   onRefresh,
   onMessageRouteChange,
@@ -57,16 +60,21 @@ export function InboxPage({
       .then((messages) => {
         if (cancelled) return;
         setThread(messages);
-        const selected = messages.find((message) => message.id === selectedId);
-        if (selected?.readAt === null) {
-          void runMessageAction(selectedId, "read")
+        if (
+          messages.some((message) => message.direction === "inbound" && message.readAt === null)
+        ) {
+          void runConversationAction(selectedId, "read", activeFolder)
             .then((updated) => {
               if (cancelled) return;
-              setThread((current) =>
-                current.map((message) =>
-                  message.id === updated.id ? { ...message, readAt: updated.readAt } : message
-                )
-              );
+              if (updated.affected > 0) {
+                setThread((current) =>
+                  current.map((message) =>
+                    message.direction === "inbound"
+                      ? { ...message, readAt: new Date().toISOString() }
+                      : message
+                  )
+                );
+              }
               onRefreshRef.current();
             })
             .catch(() => undefined);
@@ -83,20 +91,41 @@ export function InboxPage({
     return () => {
       cancelled = true;
     };
-  }, [selectedId]);
+  }, [activeFolder, selectedId]);
 
-  async function handleAction(action: Parameters<typeof runMessageAction>[1]) {
+  const selectedThreadId =
+    thread[0]?.threadId ??
+    conversations.find((conversation) => conversation.id === selectedId)?.threadId ??
+    null;
+  const selectedConversation = conversations.find(
+    (conversation) => conversation.threadId === selectedThreadId
+  );
+  const readerSelectedId = selectedConversation?.id ?? selectedId;
+
+  React.useEffect(() => {
+    if (
+      !selectedId ||
+      !selectedConversation ||
+      thread.some((message) => message.id === selectedConversation.id)
+    ) {
+      return;
+    }
+    void loadThread(selectedConversation.id);
+  }, [loadThread, selectedConversation, selectedId, thread]);
+
+  async function handleAction(action: Parameters<typeof runConversationAction>[1]) {
     if (!selectedId) return;
-    const updated = await runMessageAction(selectedId, action);
+    await runConversationAction(selectedId, action, activeFolder);
     onRefresh();
-    await loadThread(selectedId);
     if (
       action === "archive" ||
       action === "trash" ||
       (activeFolder === "starred" && action === "unstar")
     ) {
-      onMessageRouteChange(updated.folder, updated.id);
+      onMessageRouteChange(activeFolder, null);
+      return;
     }
+    await loadThread(selectedId);
   }
 
   return (
@@ -111,15 +140,17 @@ export function InboxPage({
         <div className="flex h-12 shrink-0 items-center justify-between border-b px-4">
           <h1 className="text-sm font-medium">
             <span className="md:hidden">{activeLabel}</span>
-            <span className="hidden md:inline">Messages</span>
+            <span className="hidden md:inline">Conversations</span>
           </h1>
-          <span className="font-mono text-[11px] text-muted-foreground">{messages.length}</span>
+          <span className="font-mono text-[11px] text-muted-foreground">
+            {conversations.length}
+          </span>
         </div>
         <MessageList
           activeFolder={activeFolder}
-          messages={messages}
-          selectedId={selectedId}
-          onSelect={(message) => onSelect(message.id)}
+          conversations={conversations}
+          selectedThreadId={selectedThreadId}
+          onSelect={(conversation) => onSelect(conversation.id)}
         />
       </section>
       <section
@@ -132,7 +163,7 @@ export function InboxPage({
           key={selectedId ?? "empty"}
           mailboxes={mailboxes}
           messages={thread}
-          selectedId={selectedId}
+          selectedId={readerSelectedId}
           onAction={(action) => void handleAction(action)}
           onBack={() => onMessageRouteChange(activeFolder, null)}
           onSent={() => {

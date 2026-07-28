@@ -18,6 +18,12 @@ export type MessageSummary = {
   createdAt: string;
 };
 
+export type ConversationSummary = MessageSummary & {
+  isStarred: boolean;
+  messageCount: number;
+  unreadCount: number;
+};
+
 export type MessageDetail = MessageSummary & {
   cc: string[];
   bcc: string[];

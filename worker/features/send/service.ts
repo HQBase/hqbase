@@ -8,12 +8,12 @@ import { ensureReplySubject } from "../messages/headers";
 import { sanitizeQuotedMessageHtml } from "../messages/html-sanitizer";
 import { isSafeInlineImage } from "../messages/inline-media";
 import {
-  ensureThread,
   getMessageDetail,
   getMessageHtmlKey,
   insertAttachment,
   insertMessage
 } from "../messages/queries";
+import { createThread, touchThread } from "../messages/threading";
 import type { MessageSummary, StoredAttachment } from "../messages/types";
 
 import { buildReplyBody } from "./reply-body";
@@ -41,6 +41,7 @@ export async function sendNewMessage(
     ...(input.html ? { html: input.html } : {}),
     ...(attachments.length ? { attachments: attachments.map(asEmailAttachment) } : {})
   });
+  const threadId = await createThread(env.DB, input.subject, timestamp);
 
   return storeSentMessage(env, {
     ...input,
@@ -49,6 +50,7 @@ export async function sendNewMessage(
     references: [],
     sentAt: timestamp,
     subject: input.subject,
+    threadId,
     storedAttachments: attachments,
     draftId: input.draftId ?? null,
     userId: userId ?? null
@@ -113,6 +115,7 @@ export async function replyToMessage(
     messageId: sendResult.messageId,
     references,
     sentAt: timestamp,
+    threadId: original.threadId,
     storedAttachments: outgoingAttachments,
     draftId: input.draftId ?? null,
     userId: userId ?? null
@@ -143,6 +146,7 @@ async function storeSentMessage(
     messageId: string;
     references: string[];
     sentAt: string;
+    threadId: string;
     storedAttachments: StoredOutgoingAttachment[];
     draftId: string | null;
     userId: string | null;
@@ -160,10 +164,10 @@ async function storeSentMessage(
     });
   }
 
-  const threadId = await ensureThread(env.DB, input.subject, input.sentAt);
+  await touchThread(env.DB, input.threadId, input.sentAt);
   const sendingIdentity = await findAddressIdentity(env.DB, input.from, "send");
   const message = await insertMessage(env.DB, {
-    threadId,
+    threadId: input.threadId,
     mailboxId: mailbox.id,
     direction: "outbound",
     folder: "sent",
