@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.1.17
+
+- Preserve sanitized formatting, links, tables, remote image references, and matching inline images
+  when quoting an HTML message in a reply.
+- Collapse quoted history behind an ellipsis in the HQBase reader for both HTML and plain-text
+  messages.
+- Show the first and final two messages in longer conversations and place intervening messages
+  behind a counted divider.
+
 ## 0.1.16
 
 - Include the selected message as quoted HTML and plain text in replies so email clients can

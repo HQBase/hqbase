@@ -39,5 +39,6 @@ export type MessageDetail = MessageSummary & {
 export type MessageHtml = {
   hasRemoteImages: boolean;
   html: string;
+  quotedHtml: string | null;
   remoteMediaTrusted: boolean;
 };

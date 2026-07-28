@@ -1,4 +1,7 @@
-import { sanitizeMessageHtml } from "@worker/features/messages/html-sanitizer";
+import {
+  sanitizeMessageHtml,
+  sanitizeQuotedMessageHtml
+} from "@worker/features/messages/html-sanitizer";
 import { describe, expect, it } from "vitest";
 
 const attachment = {
@@ -92,5 +95,38 @@ describe("email HTML sanitizer", () => {
 
     expect(result.hasRemoteImages).toBe(true);
     expect(result.html).not.toContain("images.example.com");
+  });
+
+  it("separates Gmail-compatible quoted history for reader disclosure", () => {
+    const result = sanitizeMessageHtml({
+      allowRemoteImages: false,
+      attachments: [],
+      origin: "https://mail.example.com",
+      html: `<p>New reply</p><div class="gmail_quote gmail_quote_container"><div class="gmail_attr">On Tuesday, Pat wrote:</div><blockquote class="gmail_quote"><strong>Earlier reply</strong></blockquote></div>`,
+      messageId: "msg-1"
+    });
+
+    expect(result.html).toBe("<p>New reply</p>");
+    expect(result.quotedHtml).toContain("<strong>Earlier reply</strong>");
+    expect(result.quotedHtml).not.toContain("gmail_quote");
+  });
+
+  it("preserves safe rich HTML, remote images, and referenced CID images for outbound quotes", () => {
+    const result = sanitizeQuotedMessageHtml({
+      attachments: [attachment],
+      html: `<script>alert(1)</script><table style="width: 100%; position: fixed"><tbody><tr><td><strong>Rich reply</strong></td></tr></tbody></table>
+        <img src="cid:signature-logo@example.com" onerror="alert(1)">
+        <img src="https://images.example.com/banner.png">
+        <img src="cid:missing@example.com">`
+    });
+
+    expect(result.html).toContain("<table");
+    expect(result.html).toContain("<strong>Rich reply</strong>");
+    expect(result.html).toContain('src="cid:signature-logo@example.com"');
+    expect(result.html).toContain('src="https://images.example.com/banner.png"');
+    expect(result.html).not.toContain("position");
+    expect(result.html).not.toContain("onerror");
+    expect(result.html).not.toContain("missing@example.com");
+    expect(result.inlineAttachmentIds).toEqual(["att-logo"]);
   });
 });
