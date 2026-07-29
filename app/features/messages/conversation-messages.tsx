@@ -70,7 +70,7 @@ export function ConversationMessages({
             </time>
           </div>
         </header>
-        <div className="max-w-3xl">
+        <div className="min-w-0">
           {message.htmlAvailable ? (
             <MessageHtml message={message} />
           ) : (

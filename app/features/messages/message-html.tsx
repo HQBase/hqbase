@@ -21,9 +21,7 @@ export function MessageHtml({ message }: MessageHtmlProps): React.ReactElement {
   const [loadingImages, setLoadingImages] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [savingTrust, setSavingTrust] = React.useState(false);
-  const [frameHeight, setFrameHeight] = React.useState(320);
   const [quoteExpanded, setQuoteExpanded] = React.useState(false);
-  const [quoteFrameHeight, setQuoteFrameHeight] = React.useState(240);
 
   React.useEffect(() => {
     let active = true;
@@ -120,17 +118,7 @@ export function MessageHtml({ message }: MessageHtmlProps): React.ReactElement {
         />
       )}
       {error && <p className="text-xs text-destructive">{error}</p>}
-      <iframe
-        className="w-full rounded-md border bg-background"
-        height={frameHeight}
-        onLoad={(event) => {
-          const height = event.currentTarget.contentDocument?.documentElement.scrollHeight;
-          if (height) setFrameHeight(Math.max(320, height));
-        }}
-        sandbox="allow-popups allow-popups-to-escape-sandbox allow-same-origin"
-        srcDoc={rendered}
-        title={`Message body: ${message.subject}`}
-      />
+      <EmailFrame srcDoc={rendered} title={`Message body: ${message.subject}`} />
       {renderedQuote ? (
         <>
           <QuotedContentDivider
@@ -138,14 +126,7 @@ export function MessageHtml({ message }: MessageHtmlProps): React.ReactElement {
             onToggle={() => setQuoteExpanded((expanded) => !expanded)}
           />
           {quoteExpanded ? (
-            <iframe
-              className="w-full rounded-md border bg-background"
-              height={quoteFrameHeight}
-              onLoad={(event) => {
-                const height = event.currentTarget.contentDocument?.documentElement.scrollHeight;
-                if (height) setQuoteFrameHeight(Math.max(240, height));
-              }}
-              sandbox="allow-popups allow-popups-to-escape-sandbox allow-same-origin"
+            <EmailFrame
               srcDoc={renderedQuote}
               title={`Quoted message history: ${message.subject}`}
             />
@@ -154,6 +135,69 @@ export function MessageHtml({ message }: MessageHtmlProps): React.ReactElement {
       ) : null}
     </div>
   );
+}
+
+export function EmailFrame({
+  srcDoc,
+  title
+}: {
+  srcDoc: string;
+  title: string;
+}): React.ReactElement {
+  const [height, setHeight] = React.useState(0);
+  const observerCleanup = React.useRef<(() => void) | null>(null);
+
+  React.useEffect(
+    () => () => {
+      observerCleanup.current?.();
+    },
+    []
+  );
+
+  return (
+    <iframe
+      className="block w-full border-0 bg-transparent"
+      height={height}
+      onLoad={(event) => {
+        observerCleanup.current?.();
+        observerCleanup.current = observeFrameHeight(event.currentTarget, setHeight);
+      }}
+      sandbox="allow-popups allow-popups-to-escape-sandbox allow-same-origin"
+      srcDoc={srcDoc}
+      title={title}
+    />
+  );
+}
+
+function observeFrameHeight(
+  frame: HTMLIFrameElement,
+  setHeight: React.Dispatch<React.SetStateAction<number>>
+): () => void {
+  const document = frame.contentDocument;
+  if (!document) return () => undefined;
+
+  const update = (): void => {
+    const nextHeight = Math.ceil(
+      Math.max(
+        document.body?.offsetHeight ?? 0,
+        document.body?.scrollHeight ?? 0,
+        document.documentElement.offsetHeight,
+        document.documentElement.scrollHeight
+      )
+    );
+    setHeight((current) => (current === nextHeight ? current : nextHeight));
+  };
+
+  update();
+  const observer = new ResizeObserver(update);
+  observer.observe(document.documentElement);
+  if (document.body) observer.observe(document.body);
+  document.addEventListener("load", update, true);
+
+  return () => {
+    observer.disconnect();
+    document.removeEventListener("load", update, true);
+  };
 }
 
 export function QuotedContentDivider({
