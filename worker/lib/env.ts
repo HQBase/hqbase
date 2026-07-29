@@ -12,6 +12,9 @@ type WorkerEnvOverrides = {
   HQBASE_RELEASE_PUBLIC_KEY?: string;
   HQBASE_INSTALLATION_ID?: string;
   HQBASE_JOBS?: Queue;
+  VAPID_PRIVATE_KEY?: string;
+  VAPID_PUBLIC_KEY?: string;
+  VAPID_SUBJECT?: string;
 };
 
 export type WorkerEnv = Omit<Cloudflare.Env, keyof WorkerEnvOverrides> & WorkerEnvOverrides;

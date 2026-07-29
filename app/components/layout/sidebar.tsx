@@ -4,6 +4,7 @@ import type * as React from "react";
 
 import { Button } from "@/components/ui/button";
 import type { CurrentUser } from "@/features/auth/types";
+import type { UnreadCounts } from "@/features/notifications/types";
 import { ThemeSwitcher } from "@/features/theme/theme-switcher";
 import { cn } from "@/lib/cn";
 import type { FolderId } from "@/lib/routes";
@@ -14,6 +15,7 @@ type SidebarProps = {
   activeFolder: FolderId;
   drawerAction?: React.ReactNode;
   user: CurrentUser;
+  unread: UnreadCounts;
   onFolderChange: (folder: FolderId) => void;
   onSignedOut: () => void;
   variant?: "desktop" | "drawer";
@@ -32,6 +34,7 @@ const icons: Record<FolderId, LucideIcon> = {
 export function Sidebar({
   activeFolder,
   drawerAction,
+  unread,
   user,
   onFolderChange,
   onSignedOut,
@@ -55,6 +58,8 @@ export function Sidebar({
       <nav className="flex flex-1 flex-col gap-0.5">
         {mailFolders.map((folder) => {
           const Icon = icons[folder.id];
+          const unreadCount =
+            folder.id === "inbox" ? unread.inbox : folder.id === "catchall" ? unread.catchall : 0;
           return (
             <Button
               asChild
@@ -77,7 +82,13 @@ export function Sidebar({
                 }}
               >
                 <Icon />
-                {folder.label}
+                <span className="min-w-0 flex-1 truncate">{folder.label}</span>
+                {unreadCount > 0 ? (
+                  <span className="ml-auto font-mono text-[11px] text-foreground">
+                    <span className="sr-only">{unreadCount} unread</span>
+                    <span aria-hidden="true">{unreadCount.toLocaleString()}</span>
+                  </span>
+                ) : null}
               </a>
             </Button>
           );

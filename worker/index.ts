@@ -1,5 +1,6 @@
 import { handleInboundEmail } from "./email/inbound";
 import { handleMcpRoute } from "./features/mcp/route";
+import { notifyInboundMessage } from "./features/notifications/delivery";
 import { consumeJobs } from "./jobs/consumer";
 import type { WorkerEnv } from "./lib/env";
 import { apiRoutes } from "./routes";
@@ -35,9 +36,16 @@ export default {
   async email(
     message: ForwardableEmailMessage,
     env: WorkerEnv,
-    _ctx: ExecutionContext
+    ctx: ExecutionContext
   ): Promise<void> {
-    await handleInboundEmail(message, env);
+    const stored = await handleInboundEmail(message, env);
+    if (stored.inserted) {
+      ctx.waitUntil(
+        notifyInboundMessage(env, stored.message).catch(() => {
+          // Push delivery is additive and never changes accepted inbound mail.
+        })
+      );
+    }
   },
 
   async scheduled(_controller: ScheduledController, env: WorkerEnv): Promise<void> {

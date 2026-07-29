@@ -12,6 +12,7 @@ import type { Mailbox } from "@/features/mailboxes/types";
 import { listConversations, listMessages } from "@/features/messages/api";
 import { mergeIncomingMessageIds } from "@/features/messages/incoming-sound";
 import type { ConversationSummary } from "@/features/messages/types";
+import { useNotifications } from "@/features/notifications/use-notifications";
 import { SettingsPage } from "@/features/settings/settings-page";
 import { getSetupStatus } from "@/features/setup/api";
 import { SetupPage } from "@/features/setup/setup-page";
@@ -91,6 +92,9 @@ export function App(): React.ReactElement {
     });
     setConversations(nextConversations);
   }, [activeFolder, mailboxId, search, user]);
+  const notifications = useNotifications(currentUserId, () => {
+    void reloadConversations();
+  });
 
   React.useEffect(() => {
     void reload();
@@ -184,6 +188,7 @@ export function App(): React.ReactElement {
         immersiveOnCompact={activeFolder !== "settings" && selectedId !== null}
         mailboxId={mailboxId}
         mailboxes={contentMailboxes}
+        unread={notifications.unread}
         search={search}
         user={user}
         updateInProgress={updateMonitor.progress !== null}
@@ -215,6 +220,7 @@ export function App(): React.ReactElement {
                 activeTab={settingsTab}
                 canManage={user.role === "owner" || user.role === "admin"}
                 mailboxes={mailboxes}
+                notifications={notifications}
                 setup={setup}
                 users={users}
                 onRefresh={() => void reload()}
@@ -231,6 +237,7 @@ export function App(): React.ReactElement {
                 mailboxes={contentMailboxes}
                 selectedId={selectedId}
                 onRefresh={() => void reloadConversations()}
+                onUnreadChange={notifications.refresh}
                 onMessageRouteChange={(folder, messageId) =>
                   navigate({ kind: "mail", folder, messageId })
                 }

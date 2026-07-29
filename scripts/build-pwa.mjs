@@ -71,6 +71,59 @@ self.addEventListener("message", (event) => {
   if (event.data?.type === "SKIP_WAITING") self.skipWaiting();
 });
 
+self.addEventListener("push", (event) => {
+  const payload = readPushPayload(event.data);
+  const unreadCount =
+    Number.isSafeInteger(payload.unreadCount) && payload.unreadCount >= 0
+      ? payload.unreadCount
+      : 0;
+  const body =
+    unreadCount === 1
+      ? "1 unread message in HQBase"
+      : \`\${unreadCount} unread messages in HQBase\`;
+  const tasks = [
+    self.registration.showNotification("New email", {
+      badge: "/icons/icon-192.png",
+      body,
+      data: { url: safeNotificationPath(payload.url) },
+      icon: "/icons/icon-192.png",
+      tag: typeof payload.tag === "string" ? payload.tag : "hqbase-new-mail"
+    }),
+    self.clients
+      .matchAll({ includeUncontrolled: true, type: "window" })
+      .then((clients) =>
+        Promise.all(
+          clients.map((client) =>
+            client.postMessage({ type: "hqbase:push-received", unreadCount })
+          )
+        )
+      )
+  ];
+  if (self.navigator.setAppBadge) {
+    tasks.push(
+      unreadCount > 0
+        ? self.navigator.setAppBadge(unreadCount)
+        : self.navigator.clearAppBadge?.()
+    );
+  }
+  event.waitUntil(Promise.all(tasks.filter(Boolean)));
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const target = new URL(safeNotificationPath(event.notification.data?.url), self.location.origin);
+  event.waitUntil(
+    self.clients.matchAll({ includeUncontrolled: true, type: "window" }).then(async (clients) => {
+      const client = clients.find((candidate) => new URL(candidate.url).origin === target.origin);
+      if (client) {
+        if ("navigate" in client) await client.navigate(target.href);
+        return client.focus();
+      }
+      return self.clients.openWindow(target.href);
+    })
+  );
+});
+
 self.addEventListener("fetch", (event) => {
   const request = event.request;
   const url = new URL(request.url);
@@ -93,6 +146,22 @@ self.addEventListener("fetch", (event) => {
     event.respondWith(caches.match(request).then((cached) => cached || fetch(request)));
   }
 });
+
+function readPushPayload(data) {
+  if (!data) return {};
+  try {
+    const value = data.json();
+    return value && typeof value === "object" ? value : {};
+  } catch {
+    return {};
+  }
+}
+
+function safeNotificationPath(value) {
+  if (typeof value !== "string" || !value.startsWith("/")) return "/inbox";
+  const url = new URL(value, self.location.origin);
+  return url.origin === self.location.origin ? \`\${url.pathname}\${url.search}\` : "/inbox";
+}
 `;
 }
 

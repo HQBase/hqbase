@@ -1,3 +1,4 @@
+import { disableCurrentDeviceNotificationsBeforeSignOut } from "@/features/notifications/sign-out";
 import { apiGet } from "@/lib/api-client";
 import type { CurrentUser } from "./types";
 
@@ -30,6 +31,9 @@ export async function signIn(email: string, password: string): Promise<string | 
 }
 
 export async function signOut(): Promise<void> {
+  await disableCurrentDeviceNotificationsBeforeSignOut().catch(() => {
+    // Signing out remains available if browser notification cleanup is unavailable.
+  });
   await fetch("/api/auth/sign-out", {
     body: JSON.stringify({}),
     credentials: "include",

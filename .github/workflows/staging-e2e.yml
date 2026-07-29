@@ -70,7 +70,13 @@ jobs:
           echo "HQBASE_STAGING_AUTH_SECRET=$AUTH_SECRET" >> "$GITHUB_ENV"
           AUTH_SECRET="$AUTH_SECRET" node --input-type=module -e '
             import { writeFileSync } from "node:fs";
-            writeFileSync("/tmp/hqbase-e2e-secrets.json", `${JSON.stringify({ BETTER_AUTH_SECRET: process.env.AUTH_SECRET })}\n`, { mode: 0o600 });
+            import webpush from "web-push";
+            const vapid = webpush.generateVAPIDKeys();
+            writeFileSync("/tmp/hqbase-e2e-secrets.json", `${JSON.stringify({
+              BETTER_AUTH_SECRET: process.env.AUTH_SECRET,
+              VAPID_PUBLIC_KEY: vapid.publicKey,
+              VAPID_PRIVATE_KEY: vapid.privateKey
+            })}\n`, { mode: 0o600 });
           '
           pnpm build
           pnpm exec wrangler d1 migrations apply DB --remote --config "$config"

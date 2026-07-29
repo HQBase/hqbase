@@ -14,6 +14,7 @@ const user = {
   name: "Olivia Berman",
   role: "owner" as const
 };
+const unread = { catchall: 2, inbox: 7, total: 9 };
 
 describe("mail shell", () => {
   it("uses the full header width and keeps mail actions in a right-aligned group", () => {
@@ -23,6 +24,7 @@ describe("mail shell", () => {
         mailboxId="all"
         mailboxes={[]}
         search=""
+        unread={unread}
         user={user}
         onCompose={() => undefined}
         onFolderChange={() => undefined}
@@ -49,6 +51,7 @@ describe("mail shell", () => {
     const html = renderToStaticMarkup(
       <Sidebar
         activeFolder="inbox"
+        unread={unread}
         user={user}
         onFolderChange={() => undefined}
         onSignedOut={() => undefined}
@@ -59,6 +62,8 @@ describe("mail shell", () => {
     expect(html).toContain('href="/inbox"');
     expect(html).toContain('href="/catch-all"');
     expect(html).toContain('href="/settings/mailboxes"');
+    expect(html).toContain("7 unread");
+    expect(html).toContain("2 unread");
     expect(html).toContain("Open profile menu");
     expect(html).toContain("OB");
     expect(html.indexOf("Settings")).toBeLessThan(html.indexOf("Open profile menu"));
@@ -83,6 +88,7 @@ describe("mail shell", () => {
     const html = renderToStaticMarkup(
       <MobileNavigation
         activeFolder="catchall"
+        unread={unread}
         user={user}
         onFolderChange={() => undefined}
         onSignedOut={() => undefined}
@@ -102,6 +108,7 @@ describe("mail shell", () => {
       <Sidebar
         activeFolder="inbox"
         drawerAction={<button type="button">Connect MCP</button>}
+        unread={unread}
         user={user}
         onFolderChange={() => undefined}
         onSignedOut={() => undefined}
@@ -127,6 +134,7 @@ describe("mail shell", () => {
         onMessageRouteChange={() => undefined}
         onRefresh={() => undefined}
         onSelect={() => undefined}
+        onUnreadChange={() => undefined}
       />
     );
 

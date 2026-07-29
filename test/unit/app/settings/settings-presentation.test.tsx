@@ -62,6 +62,15 @@ const connectedDomain: MailDomain = {
   isEnabled: true,
   updatedAt: "2026-07-20T00:00:00.000Z"
 };
+const notifications = {
+  deviceState: "enabled" as const,
+  disable: async () => undefined,
+  enable: async () => undefined,
+  error: null,
+  isBusy: false,
+  refresh: async () => undefined,
+  unread: { catchall: 1, inbox: 2, total: 3 }
+};
 
 describe("settings presentation", () => {
   it("renders mailbox content at the top level and opens creation from a dialog trigger", () => {
@@ -199,6 +208,7 @@ describe("settings presentation", () => {
         activeTab="mailboxes"
         canManage
         mailboxes={[]}
+        notifications={notifications}
         setup={setup}
         updateStatus={null}
         users={[]}
@@ -215,7 +225,9 @@ describe("settings presentation", () => {
     expect(html).not.toContain('value="access"');
     expect(html).not.toContain("Mail clients");
     expect(html).toContain(">Debug<");
+    expect(html).toContain(">Notifications<");
     expect(html).toContain('href="/settings/mailboxes"');
+    expect(html).toContain('href="/settings/notifications"');
     expect(html).toContain('href="/settings/debug"');
     expect(html.indexOf(">Debug<")).toBeGreaterThan(html.indexOf(">Updates<"));
   });

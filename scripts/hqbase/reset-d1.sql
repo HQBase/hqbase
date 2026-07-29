@@ -4,6 +4,7 @@ DROP TABLE IF EXISTS oauthConsent;
 DROP TABLE IF EXISTS oauthAccessToken;
 DROP TABLE IF EXISTS oauthRefreshToken;
 DROP TABLE IF EXISTS oauthClient;
+DROP TABLE IF EXISTS push_subscriptions;
 DROP TABLE IF EXISTS message_sender_preferences;
 DROP TABLE IF EXISTS update_history;
 DROP TABLE IF EXISTS release_state;

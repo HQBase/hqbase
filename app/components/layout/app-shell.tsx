@@ -1,6 +1,7 @@
 import type * as React from "react";
 import type { CurrentUser } from "@/features/auth/types";
 import type { Mailbox } from "@/features/mailboxes/types";
+import type { UnreadCounts } from "@/features/notifications/types";
 import type { UpdateStatus } from "@/features/updates/types";
 import { UpdateBanner } from "@/features/updates/update-banner";
 import { cn } from "@/lib/cn";
@@ -18,6 +19,7 @@ type AppShellProps = {
   user: CurrentUser;
   updateInProgress: boolean;
   updateStatus: UpdateStatus | null;
+  unread: UnreadCounts;
   onCompose: () => void;
   onFolderChange: (folder: FolderId) => void;
   onMailboxChange: (mailboxId: string) => void;
@@ -31,6 +33,7 @@ export function AppShell(props: AppShellProps): React.ReactElement {
     <div className="flex h-screen h-[100dvh] overflow-hidden bg-background pt-[env(safe-area-inset-top)] text-foreground">
       <Sidebar
         activeFolder={props.activeFolder}
+        unread={props.unread}
         user={props.user}
         onFolderChange={props.onFolderChange}
         onSignedOut={props.onSignedOut}
@@ -39,6 +42,7 @@ export function AppShell(props: AppShellProps): React.ReactElement {
         <div className={cn(props.immersiveOnCompact && "hidden lg:contents")}>
           <TopBar
             activeFolder={props.activeFolder}
+            unread={props.unread}
             mailboxId={props.mailboxId}
             mailboxes={props.mailboxes}
             search={props.search}

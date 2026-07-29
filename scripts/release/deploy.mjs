@@ -4,6 +4,7 @@ import { createHash, createPublicKey, randomBytes, verify } from "node:crypto";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
+import webpush from "web-push";
 import { inspectActiveRelease, isWorkerNotFound } from "./active-version.mjs";
 
 const root = resolve(import.meta.dirname, "../..");
@@ -312,35 +313,52 @@ export function deploySource(cwd, options = {}) {
     ["exec", "wrangler", "secret", "list", "--format", "json"],
     cwd
   );
-  let needsSecret;
+  let missingSecrets;
   try {
-    needsSecret = needsInitialAuthSecret(inspection, "BETTER_AUTH_SECRET");
+    missingSecrets = missingRequiredSecrets(inspection, [
+      "BETTER_AUTH_SECRET",
+      "VAPID_PUBLIC_KEY",
+      "VAPID_PRIVATE_KEY"
+    ]);
   } catch (error) {
     emitCommandOutput(inspection);
     throw error;
   }
-  if (!needsSecret) {
+  if (missingSecrets.length === 0) {
     execute("pnpm", deployArgs, cwd);
     return;
   }
 
-  deployArgs.push(
-    "--var",
-    `HQBASE_INSTALLATION_ID:${options.randomUUID?.() ?? crypto.randomUUID()}`
-  );
+  if (missingSecrets.includes("BETTER_AUTH_SECRET")) {
+    deployArgs.push(
+      "--var",
+      `HQBASE_INSTALLATION_ID:${options.randomUUID?.() ?? crypto.randomUUID()}`
+    );
+  }
 
   const workspace = mkdtempSync(resolve(tmpdir(), "hqbase-secrets-"));
   const secretsFile = resolve(workspace, "secrets.json");
   try {
-    const configuredSecret = process.env.HQBASE_AUTH_SECRET;
-    const bytes = configuredSecret ? null : (options.randomBytes ?? randomBytes)(32);
-    writeFileSync(
-      secretsFile,
-      `${JSON.stringify({
-        BETTER_AUTH_SECRET: configuredSecret ?? bytes?.toString("base64url")
-      })}\n`,
-      { mode: 0o600 }
-    );
+    const secrets = {};
+    if (missingSecrets.includes("BETTER_AUTH_SECRET")) {
+      const configuredSecret = process.env.HQBASE_AUTH_SECRET;
+      const bytes = configuredSecret ? null : (options.randomBytes ?? randomBytes)(32);
+      secrets.BETTER_AUTH_SECRET = configuredSecret ?? bytes?.toString("base64url");
+    }
+    if (
+      missingSecrets.includes("VAPID_PUBLIC_KEY") ||
+      missingSecrets.includes("VAPID_PRIVATE_KEY")
+    ) {
+      const configuredPublicKey = process.env.HQBASE_VAPID_PUBLIC_KEY;
+      const configuredPrivateKey = process.env.HQBASE_VAPID_PRIVATE_KEY;
+      const generated =
+        configuredPublicKey && configuredPrivateKey
+          ? { publicKey: configuredPublicKey, privateKey: configuredPrivateKey }
+          : (options.generateVapidKeys ?? webpush.generateVAPIDKeys)();
+      secrets.VAPID_PUBLIC_KEY = generated.publicKey;
+      secrets.VAPID_PRIVATE_KEY = generated.privateKey;
+    }
+    writeFileSync(secretsFile, `${JSON.stringify(secrets)}\n`, { mode: 0o600 });
     execute("pnpm", [...deployArgs, "--secrets-file", secretsFile], cwd);
   } finally {
     rmSync(workspace, { recursive: true, force: true });
@@ -356,13 +374,17 @@ function workerNameFromConfigFile(configFile) {
   return workerNameFromConfig(JSON.parse(readFileSync(configFile, "utf8")));
 }
 export function needsInitialAuthSecret(result, secretName) {
+  return missingRequiredSecrets(result, [secretName]).length > 0;
+}
+export function missingRequiredSecrets(result, secretNames) {
   if (result.status === 0) {
     const secrets = JSON.parse(result.stdout || "[]");
     if (!Array.isArray(secrets)) throw new Error("Wrangler returned an invalid secret list.");
-    return !secrets.some((secret) => secret?.name === secretName);
+    const configured = new Set(secrets.map((secret) => secret?.name).filter(Boolean));
+    return secretNames.filter((secretName) => !configured.has(secretName));
   }
   if (isWorkerNotFound(result)) {
-    return true;
+    return [...secretNames];
   }
   throw result.error ?? new Error(`wrangler secret list exited with status ${result.status}.`);
 }

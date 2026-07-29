@@ -14,6 +14,7 @@ import {
   executeSql,
   hqbaseReleaseTag,
   loadVerifiedRelease,
+  missingRequiredSecrets,
   needsInitialAuthSecret,
   normalizeConfig,
   verifyManifest,
@@ -227,7 +228,7 @@ describe("HQBase release deployment", () => {
     expect(workerNameFromConfig({ name: "hqbase-deeptake-test" })).toBe("hqbase-deeptake-test");
     expect(() => workerNameFromConfig({ name: "" })).toThrow("deployed Worker name");
   });
-  it("generates a masked auth secret only when the first Workers Build needs it", () => {
+  it("generates masked auth and Web Push secrets when the first Workers Build needs them", () => {
     let secretFile;
     deploySource("/customer/repo", {
       workersCi: true,
@@ -239,6 +240,10 @@ describe("HQBase release deployment", () => {
       }),
       randomBytes: () => Buffer.alloc(32, 7),
       randomUUID: () => "00000000-0000-4000-8000-000000000123",
+      generateVapidKeys: () => ({
+        publicKey: "generated-public-key",
+        privateKey: "generated-private-key"
+      }),
       releaseTag: `hqbase:0.1.15:${"a".repeat(64)}`,
       run: (command, args, cwd) => {
         expect(command).toBe("pnpm");
@@ -252,20 +257,26 @@ describe("HQBase release deployment", () => {
         secretFile = args.at(-1);
         expect(statSync(secretFile).mode & 0o777).toBe(0o600);
         expect(JSON.parse(readFileSync(secretFile, "utf8"))).toEqual({
-          BETTER_AUTH_SECRET: Buffer.alloc(32, 7).toString("base64url")
+          BETTER_AUTH_SECRET: Buffer.alloc(32, 7).toString("base64url"),
+          VAPID_PUBLIC_KEY: "generated-public-key",
+          VAPID_PRIVATE_KEY: "generated-private-key"
         });
       }
     });
     expect(existsSync(secretFile)).toBe(false);
   });
-  it("preserves an existing auth secret and does not mask unrelated deploy failures", () => {
+  it("preserves existing secrets and detects only missing installation secrets", () => {
     let deployCalls = 0;
     deploySource("/customer/repo", {
       workersCi: true,
       workerName: "hqbase-deeptake-test",
       attempt: () => ({
         status: 0,
-        stdout: JSON.stringify([{ name: "BETTER_AUTH_SECRET", type: "secret_text" }]),
+        stdout: JSON.stringify([
+          { name: "BETTER_AUTH_SECRET", type: "secret_text" },
+          { name: "VAPID_PUBLIC_KEY", type: "secret_text" },
+          { name: "VAPID_PRIVATE_KEY", type: "secret_text" }
+        ]),
         stderr: ""
       }),
       run: () => {
@@ -273,6 +284,16 @@ describe("HQBase release deployment", () => {
       }
     });
     expect(deployCalls).toBe(1);
+    expect(
+      missingRequiredSecrets(
+        {
+          status: 0,
+          stdout: JSON.stringify([{ name: "BETTER_AUTH_SECRET", type: "secret_text" }]),
+          stderr: ""
+        },
+        ["BETTER_AUTH_SECRET", "VAPID_PUBLIC_KEY", "VAPID_PRIVATE_KEY"]
+      )
+    ).toEqual(["VAPID_PUBLIC_KEY", "VAPID_PRIVATE_KEY"]);
     expect(
       needsInitialAuthSecret(
         {
@@ -290,6 +311,29 @@ describe("HQBase release deployment", () => {
         "BETTER_AUTH_SECRET"
       )
     ).toThrow("wrangler secret list exited");
+  });
+  it("adds a VAPID pair to an existing installation without rotating its auth identity", () => {
+    deploySource("/customer/repo", {
+      workersCi: true,
+      workerName: "hqbase-existing",
+      attempt: () => ({
+        status: 0,
+        stdout: JSON.stringify([{ name: "BETTER_AUTH_SECRET", type: "secret_text" }]),
+        stderr: ""
+      }),
+      generateVapidKeys: () => ({
+        publicKey: "upgrade-public-key",
+        privateKey: "upgrade-private-key"
+      }),
+      run: (_command, args) => {
+        expect(args.some((arg) => arg.startsWith("HQBASE_INSTALLATION_ID:"))).toBe(false);
+        const secretFile = args.at(-1);
+        expect(JSON.parse(readFileSync(secretFile, "utf8"))).toEqual({
+          VAPID_PUBLIC_KEY: "upgrade-public-key",
+          VAPID_PRIVATE_KEY: "upgrade-private-key"
+        });
+      }
+    });
   });
   it("hides successful release bookkeeping output but preserves D1 failures", () => {
     let emitted = "";
@@ -320,7 +364,9 @@ describe("HQBase release deployment", () => {
   it("keeps the generated secret out of Deploy to Cloudflare form metadata", () => {
     const packageJson = JSON.parse(readFileSync("package.json", "utf8"));
     expect(packageJson.cloudflare.bindings).not.toHaveProperty("BETTER_AUTH_SECRET");
+    expect(packageJson.cloudflare.bindings).not.toHaveProperty("VAPID_PRIVATE_KEY");
     expect(readFileSync(".env.example", "utf8")).not.toMatch(/^BETTER_AUTH_SECRET=/m);
+    expect(readFileSync(".env.example", "utf8")).not.toMatch(/^VAPID_PRIVATE_KEY=/m);
   });
   it("routes browser navigations to API endpoints before the SPA fallback", () => {
     const wranglerConfig = JSON.parse(readFileSync("wrangler.jsonc", "utf8"));

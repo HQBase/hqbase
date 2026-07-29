@@ -5,18 +5,21 @@ import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import type { CurrentUser } from "@/features/auth/types";
 import { McpConnectionDialog } from "@/features/mcp/connection-dialog";
+import type { UnreadCounts } from "@/features/notifications/types";
 import type { FolderId } from "@/lib/routes";
 import { Sidebar } from "./sidebar";
 
 type MobileNavigationProps = {
   activeFolder: FolderId;
   user: CurrentUser;
+  unread: UnreadCounts;
   onFolderChange: (folder: FolderId) => void;
   onSignedOut: () => void;
 };
 
 export function MobileNavigation({
   activeFolder,
+  unread,
   user,
   onFolderChange,
   onSignedOut
@@ -61,6 +64,7 @@ export function MobileNavigation({
           <SheetTitle className="sr-only">Navigation</SheetTitle>
           <Sidebar
             activeFolder={activeFolder}
+            unread={unread}
             drawerAction={
               <Button
                 className="h-11 w-full justify-start gap-2.5 px-2.5 text-sm font-normal text-muted-foreground"
