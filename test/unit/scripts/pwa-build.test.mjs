@@ -50,4 +50,17 @@ describe("PWA build contract", () => {
     expect(worker).toContain('event.data?.type === "SKIP_WAITING"');
     expect(worker).not.toContain("/api/");
   });
+
+  it("generates visible push notifications, unread badging, and safe message navigation", () => {
+    const worker = renderServiceWorker({
+      cacheName: "hqbase-pwa-test-1",
+      precacheUrls: ["/assets/app-abc.js", "/offline.html"]
+    });
+    expect(worker).toContain('addEventListener("push"');
+    expect(worker).toContain('showNotification("New email"');
+    expect(worker).toContain("setAppBadge(unreadCount)");
+    expect(worker).toContain('"hqbase:push-received"');
+    expect(worker).toContain('addEventListener("notificationclick"');
+    expect(worker).toContain('return "/inbox"');
+  });
 });

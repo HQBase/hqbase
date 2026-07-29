@@ -14,6 +14,7 @@ import {
 import type { CurrentUser } from "@/features/auth/types";
 import type { Mailbox } from "@/features/mailboxes/types";
 import { McpConnectionDialog } from "@/features/mcp/connection-dialog";
+import type { UnreadCounts } from "@/features/notifications/types";
 import type { FolderId } from "@/lib/routes";
 import { MobileNavigation } from "./mobile-navigation";
 
@@ -23,6 +24,7 @@ type TopBarProps = {
   mailboxes: Mailbox[];
   mailboxId: string;
   search: string;
+  unread: UnreadCounts;
   onCompose: () => void;
   onFolderChange: (folder: FolderId) => void;
   onMailboxChange: (mailboxId: string) => void;
@@ -36,6 +38,7 @@ export function TopBar({
   mailboxes,
   mailboxId,
   search,
+  unread,
   onCompose,
   onFolderChange,
   onMailboxChange,
@@ -49,6 +52,7 @@ export function TopBar({
     <header className="flex h-14 w-full shrink-0 items-center gap-2 border-b bg-background px-3 md:px-4">
       <MobileNavigation
         activeFolder={activeFolder}
+        unread={unread}
         user={user}
         onFolderChange={onFolderChange}
         onSignedOut={onSignedOut}

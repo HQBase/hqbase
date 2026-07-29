@@ -6,10 +6,10 @@ import { storeInboundEmail } from "./store-email";
 export async function handleInboundEmail(
   message: ForwardableEmailMessage,
   env: WorkerEnv
-): Promise<void> {
+): Promise<Awaited<ReturnType<typeof storeInboundEmail>>> {
   const raw = await new Response(message.raw).arrayBuffer();
   const parsed = await parseRawEmail(raw);
-  await storeInboundEmail(env.DB, env.MAIL_OBJECTS, {
+  return storeInboundEmail(env.DB, env.MAIL_OBJECTS, {
     envelopeRecipient: message.to,
     raw,
     parsed

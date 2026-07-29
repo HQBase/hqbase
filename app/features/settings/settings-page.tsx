@@ -4,6 +4,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DomainSettings } from "@/features/domains/domain-settings";
 import { MailboxSettings } from "@/features/mailboxes/mailbox-settings";
 import type { Mailbox } from "@/features/mailboxes/types";
+import { NotificationSettings } from "@/features/notifications/notification-settings";
+import type { NotificationController } from "@/features/notifications/types";
 import { DebugSettings } from "@/features/settings/debug-settings";
 import { SettingsSection } from "@/features/settings/settings-section";
 import type { SetupStatus } from "@/features/setup/types";
@@ -18,6 +20,7 @@ type SettingsPageProps = {
   activeTab: SettingsTabId;
   canManage: boolean;
   mailboxes: Mailbox[];
+  notifications: NotificationController;
   setup: SetupStatus;
   users: WorkspaceUser[];
   onRefresh: () => void;
@@ -32,6 +35,7 @@ export function SettingsPage({
   activeTab,
   canManage,
   mailboxes,
+  notifications,
   setup,
   users,
   onRefresh,
@@ -58,6 +62,7 @@ export function SettingsPage({
             <SettingsTab value="mailboxes">Mailboxes</SettingsTab>
             <SettingsTab value="users">Users</SettingsTab>
             {canManage ? <SettingsTab value="domains">Domains</SettingsTab> : null}
+            <SettingsTab value="notifications">Notifications</SettingsTab>
             {canManage ? <SettingsTab value="updates">Updates</SettingsTab> : null}
             <SettingsTab value="debug">Debug</SettingsTab>
           </TabsList>
@@ -77,6 +82,9 @@ export function SettingsPage({
               <DomainSettings portalHostname={setup.portalHostname} onChanged={onRefresh} />
             </TabsContent>
           ) : null}
+          <TabsContent className="mt-5" value="notifications">
+            <NotificationSettings notifications={notifications} />
+          </TabsContent>
           {canManage ? (
             <TabsContent className="mt-5" value="updates">
               <UpdateSettings

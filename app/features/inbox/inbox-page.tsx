@@ -18,6 +18,7 @@ type InboxPageProps = {
   mailboxes: Mailbox[];
   selectedId: string | null;
   onRefresh: () => void;
+  onUnreadChange: () => void;
   onMessageRouteChange: (folder: MailFolderId, messageId: string | null) => void;
   onSelect: (messageId: string) => void;
 };
@@ -28,6 +29,7 @@ export function InboxPage({
   mailboxes,
   selectedId,
   onRefresh,
+  onUnreadChange,
   onMessageRouteChange,
   onSelect
 }: InboxPageProps): React.ReactElement {
@@ -76,6 +78,7 @@ export function InboxPage({
                 );
               }
               onRefreshRef.current();
+              onUnreadChange();
             })
             .catch(() => undefined);
         }
@@ -91,7 +94,7 @@ export function InboxPage({
     return () => {
       cancelled = true;
     };
-  }, [activeFolder, selectedId]);
+  }, [activeFolder, onUnreadChange, selectedId]);
 
   const selectedThreadId =
     thread[0]?.threadId ??
@@ -117,6 +120,7 @@ export function InboxPage({
     if (!selectedId) return;
     await runConversationAction(selectedId, action, activeFolder);
     onRefresh();
+    onUnreadChange();
     if (
       action === "archive" ||
       action === "trash" ||

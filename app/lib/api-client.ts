@@ -34,8 +34,13 @@ export async function apiPut<T>(path: string, body: unknown): Promise<T> {
   });
 }
 
-export async function apiDelete(path: string): Promise<void> {
-  await apiRequest<null>(path, { method: "DELETE" });
+export async function apiDelete(path: string, body?: unknown): Promise<void> {
+  await apiRequest<null>(path, {
+    ...(body === undefined
+      ? {}
+      : { body: JSON.stringify(body), headers: { "content-type": "application/json" } }),
+    method: "DELETE"
+  });
 }
 
 async function apiRequest<T>(path: string, init: RequestInit): Promise<T> {

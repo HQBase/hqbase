@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.23
+
+- Add explicit per-device Web Push notifications for installed iOS, Android, and desktop PWAs.
+- Show exact accessible Inbox and Catch-all unread totals in navigation, the document title, and
+  supported installed-app badges.
+- Generate customer-owned VAPID secrets during installation and updates while keeping notification
+  payloads free of mail metadata.
+
 ## 0.1.22
 
 - Keep the mobile and installed PWA shell below the iPhone Dynamic Island while preserving the

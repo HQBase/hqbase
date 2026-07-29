@@ -94,6 +94,7 @@ describe("conversation reader", () => {
         onMessageRouteChange={() => undefined}
         onRefresh={() => undefined}
         onSelect={() => undefined}
+        onUnreadChange={() => undefined}
       />
     );
     const conversationHtml = renderToStaticMarkup(
@@ -105,6 +106,7 @@ describe("conversation reader", () => {
         onMessageRouteChange={() => undefined}
         onRefresh={() => undefined}
         onSelect={() => undefined}
+        onUnreadChange={() => undefined}
       />
     );
 

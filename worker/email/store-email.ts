@@ -15,11 +15,16 @@ export type StoreInboundInput = {
   parsed: ParsedEmail;
 };
 
+export type StoreInboundResult = {
+  inserted: boolean;
+  message: MessageDetail | MessageSummary;
+};
+
 export async function storeInboundEmail(
   db: D1Database,
   bucket: R2Bucket,
   input: StoreInboundInput
-): Promise<MessageDetail | MessageSummary> {
+): Promise<StoreInboundResult> {
   const recipient = input.envelopeRecipient.toLowerCase();
   const initialPlan = planInboundStorage({
     envelopeRecipient: recipient,
@@ -29,7 +34,7 @@ export async function storeInboundEmail(
   const dedupeKey = initialPlan.dedupeKey;
   const duplicate = dedupeKey ? await findDuplicate(db, dedupeKey) : null;
   if (duplicate) {
-    return duplicate;
+    return { inserted: false, message: duplicate };
   }
 
   const timestamp = input.parsed.date ?? nowIso();
@@ -100,7 +105,10 @@ export async function storeInboundEmail(
     });
   }
 
-  return (await getMessageDetail(db, message.id)) ?? message;
+  return {
+    inserted: true,
+    message: (await getMessageDetail(db, message.id)) ?? message
+  };
 }
 
 async function findDuplicate(db: D1Database, dedupeKey: string): Promise<MessageSummary | null> {

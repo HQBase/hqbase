@@ -9,7 +9,14 @@ export const mailFolders = [
 
 export const folders = [...mailFolders, { id: "settings", label: "Settings" }] as const;
 
-export const settingsTabs = ["mailboxes", "users", "domains", "updates", "debug"] as const;
+export const settingsTabs = [
+  "mailboxes",
+  "users",
+  "domains",
+  "notifications",
+  "updates",
+  "debug"
+] as const;
 
 export type MailFolderId = (typeof mailFolders)[number]["id"];
 export type FolderId = (typeof folders)[number]["id"];

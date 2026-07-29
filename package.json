@@ -1,6 +1,6 @@
 {
   "name": "hqbase",
-  "version": "0.1.22",
+  "version": "0.1.23",
   "private": true,
   "type": "module",
   "packageManager": "pnpm@11.7.0",
@@ -90,6 +90,7 @@
     "sanitize-html": "^2.17.6",
     "sonner": "^2.0.6",
     "tailwind-merge": "^3.3.1",
+    "web-push": "^3.6.7",
     "zod": "^4.0.5"
   },
   "devDependencies": {
@@ -100,6 +101,7 @@
     "@types/react": "^19.1.8",
     "@types/react-dom": "^19.1.6",
     "@types/sanitize-html": "^2.16.1",
+    "@types/web-push": "^3.6.4",
     "@vitejs/plugin-react": "^4.6.0",
     "@vitest/coverage-v8": "4.1.10",
     "autoprefixer": "^10.4.21",
