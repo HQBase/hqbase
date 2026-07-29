@@ -26,6 +26,25 @@ export async function countUnreadMessages(
   return { catchall, inbox, total: inbox + catchall };
 }
 
+export async function latestInboundMessageId(
+  db: D1Database,
+  mailboxIds: string[]
+): Promise<string | null> {
+  if (mailboxIds.length === 0) return null;
+  const row = await db
+    .prepare(
+      `SELECT id
+       FROM messages
+       WHERE direction = 'inbound'
+         AND mailbox_id IN (${mailboxIds.map(() => "?").join(", ")})
+       ORDER BY created_at DESC, id DESC
+       LIMIT 1`
+    )
+    .bind(...mailboxIds)
+    .first<{ id: string }>();
+  return row?.id ?? null;
+}
+
 export async function savePushSubscription(
   db: D1Database,
   userId: string,

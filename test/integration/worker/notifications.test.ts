@@ -58,7 +58,7 @@ describe("notification persistence", () => {
     await insertMessage("msg_inbox", "mbx_one", "inbox", null);
     await insertMessage("msg_catchall", "mbx_one", "catchall", null);
     await insertMessage("msg_read", "mbx_one", "inbox", now);
-    await insertMessage("msg_other", "mbx_two", "inbox", null);
+    await insertMessage("msg_z_other", "mbx_two", "inbox", null);
 
     for (const [userId, endpoint] of [
       ["usr_owner", "https://push.example/owner"],
@@ -143,6 +143,7 @@ describe("notification persistence", () => {
     });
     expect(status.status, await status.clone().text()).toBe(200);
     expect(await status.json()).toEqual({
+      latestInboundMessageId: "msg_read",
       unread: { catchall: 1, inbox: 1, total: 2 },
       vapidPublicKey: "integration-vapid-public-key"
     });

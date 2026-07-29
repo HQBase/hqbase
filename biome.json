@@ -81,6 +81,11 @@
   },
   "overrides": [
     {
+      "includes": ["test/unit/app/render-hook.tsx"],
+      "linter": { "enabled": false },
+      "assist": { "enabled": false }
+    },
+    {
       "includes": ["app/features/setup/use-setup-flow.ts"],
       "linter": { "enabled": false },
       "assist": { "enabled": false }

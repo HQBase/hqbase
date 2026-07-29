@@ -21,70 +21,44 @@ import type {
 } from "./types";
 
 const emptyUnread: UnreadCounts = { catchall: 0, inbox: 0, total: 0 };
-const refreshIntervalMs = 10_000;
+const emptyStatus: NotificationStatus = {
+  latestInboundMessageId: null,
+  unread: emptyUnread,
+  vapidPublicKey: null
+};
 
-export function useNotifications(
-  userId: string | null,
-  onForegroundPush: () => void
-): NotificationController {
-  const [status, setStatus] = React.useState<NotificationStatus>({
-    unread: emptyUnread,
-    vapidPublicKey: null
-  });
+export function useNotifications(userId: string | null): NotificationController {
+  const [status, setStatus] = React.useState<NotificationStatus>(emptyStatus);
   const [deviceState, setDeviceState] = React.useState<NotificationDeviceState>("checking");
   const [isBusy, setIsBusy] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const reconciledEndpoint = React.useRef<string | null>(null);
-  const onForegroundPushRef = React.useRef(onForegroundPush);
-  React.useEffect(() => {
-    onForegroundPushRef.current = onForegroundPush;
-  }, [onForegroundPush]);
+  const activeUserId = React.useRef(userId);
+  activeUserId.current = userId;
 
   const refresh = React.useCallback(async () => {
     if (!userId) {
-      setStatus({ unread: emptyUnread, vapidPublicKey: null });
+      setStatus(emptyStatus);
       setDeviceState("checking");
       await applyUnreadIndicators(emptyUnread);
-      return;
+      return emptyStatus;
     }
     const nextStatus = await getNotificationStatus();
+    if (activeUserId.current !== userId) return emptyStatus;
     setStatus(nextStatus);
     await applyUnreadIndicators(nextStatus.unread);
     await reconcileDevice(nextStatus, reconciledEndpoint, setDeviceState);
+    return nextStatus;
   }, [userId]);
 
   React.useEffect(() => {
-    if (!userId) {
-      void applyUnreadIndicators(emptyUnread);
-      return;
-    }
-    let active = true;
-    const runRefresh = async () => {
-      try {
-        await refresh();
-        if (active) setError(null);
-      } catch {
-        // A later focus, foreground push, or interval retries without interrupting mail.
-      }
-    };
-    const handleFocus = () => void runRefresh();
-    const handleServiceWorkerMessage = (event: MessageEvent) => {
-      if (event.data?.type !== "hqbase:push-received") return;
-      onForegroundPushRef.current();
-      void runRefresh();
-    };
-
-    void runRefresh();
-    window.addEventListener("focus", handleFocus);
-    navigator.serviceWorker?.addEventListener("message", handleServiceWorkerMessage);
-    const interval = window.setInterval(runRefresh, refreshIntervalMs);
-    return () => {
-      active = false;
-      window.clearInterval(interval);
-      window.removeEventListener("focus", handleFocus);
-      navigator.serviceWorker?.removeEventListener("message", handleServiceWorkerMessage);
-    };
-  }, [refresh, userId]);
+    if (userId) return;
+    reconciledEndpoint.current = null;
+    setStatus(emptyStatus);
+    setDeviceState("checking");
+    setError(null);
+    void applyUnreadIndicators(emptyUnread);
+  }, [userId]);
 
   const enable = React.useCallback(async () => {
     setIsBusy(true);

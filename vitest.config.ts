@@ -16,7 +16,6 @@ export default defineConfig({
       include: ["app/**/*.{ts,tsx}", "worker/**/*.ts"],
       exclude: [
         "app/components/ui/**",
-        "app/**/*.tsx",
         "app/main.tsx",
         "worker/index.ts",
         "worker/features/domains/queries.ts",
@@ -26,10 +25,34 @@ export default defineConfig({
         "worker/features/setup/cloudflare.ts"
       ],
       thresholds: {
-        branches: 20,
-        functions: 15,
-        lines: 20,
-        statements: 20
+        branches: 30,
+        functions: 30,
+        lines: 35,
+        statements: 34,
+        "app/features/compose/use-draft-autosave.ts": {
+          branches: 65,
+          functions: 85,
+          lines: 80,
+          statements: 80
+        },
+        "app/features/messages/use-mail-sync.ts": {
+          branches: 50,
+          functions: 80,
+          lines: 80,
+          statements: 80
+        },
+        "app/features/notifications/use-notifications.ts": {
+          branches: 35,
+          functions: 70,
+          lines: 50,
+          statements: 48
+        },
+        "app/features/updates/use-update-monitor.ts": {
+          branches: 60,
+          functions: 75,
+          lines: 85,
+          statements: 85
+        }
       }
     }
   }

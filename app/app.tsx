@@ -1,5 +1,4 @@
 import * as React from "react";
-import { toast } from "sonner";
 
 import { AppShell } from "@/components/layout/app-shell";
 import { Toaster } from "@/components/ui/sonner";
@@ -9,10 +8,7 @@ import type { CurrentUser } from "@/features/auth/types";
 import { InboxPage } from "@/features/inbox/inbox-page";
 import { listMailboxes } from "@/features/mailboxes/api";
 import type { Mailbox } from "@/features/mailboxes/types";
-import { listConversations, listMessages } from "@/features/messages/api";
-import { mergeIncomingMessageIds } from "@/features/messages/incoming-sound";
-import type { ConversationSummary } from "@/features/messages/types";
-import { useNotifications } from "@/features/notifications/use-notifications";
+import { useMailSync } from "@/features/messages/use-mail-sync";
 import { SettingsPage } from "@/features/settings/settings-page";
 import { getSetupStatus } from "@/features/setup/api";
 import { SetupPage } from "@/features/setup/setup-page";
@@ -20,7 +16,6 @@ import type { SetupStatus } from "@/features/setup/types";
 import { useUpdateMonitor } from "@/features/updates/use-update-monitor";
 import { listUsers } from "@/features/users/api";
 import type { WorkspaceUser } from "@/features/users/types";
-import { playNotificationSound } from "@/lib/notification-sounds";
 import type { FolderId, MailFolderId, SettingsTabId } from "@/lib/routes";
 import { useAppRoute } from "@/lib/use-app-route";
 
@@ -33,12 +28,10 @@ export function App(): React.ReactElement {
   const [user, setUser] = React.useState<CurrentUser | null>(null);
   const [mailboxes, setMailboxes] = React.useState<Mailbox[]>([]);
   const [users, setUsers] = React.useState<WorkspaceUser[]>([]);
-  const [conversations, setConversations] = React.useState<ConversationSummary[]>([]);
   const [mailboxId, setMailboxId] = React.useState("all");
   const [search, setSearch] = React.useState("");
   const [composeOpen, setComposeOpen] = React.useState(false);
   const [isLoading, setIsLoading] = React.useState(true);
-  const knownIncomingMessageIds = React.useRef<Set<string> | null>(null);
   const { navigate, route } = useAppRoute(setup?.isComplete);
   const activeFolder: FolderId = route.kind === "settings" ? "settings" : route.folder;
   const selectedId = route.kind === "mail" ? route.messageId : null;
@@ -50,6 +43,12 @@ export function App(): React.ReactElement {
   );
   const canManageUpdates = user?.role === "owner" || user?.role === "admin";
   const updateMonitor = useUpdateMonitor(canManageUpdates);
+  const mailSync = useMailSync({
+    activeFolder,
+    mailboxId,
+    search,
+    userId: currentUserId
+  });
 
   const loadWorkspace = React.useCallback(async (currentUser: CurrentUser) => {
     const [nextSetup, nextMailboxes] = await Promise.all([getSetupStatus(), listMailboxes()]);
@@ -83,72 +82,9 @@ export function App(): React.ReactElement {
     }
   }, [loadWorkspace]);
 
-  const reloadConversations = React.useCallback(async () => {
-    if (!user || activeFolder === "settings") return;
-    const nextConversations = await listConversations({
-      folder: activeFolder,
-      mailboxId: mailboxId === "all" ? undefined : mailboxId,
-      search: search || undefined
-    });
-    setConversations(nextConversations);
-  }, [activeFolder, mailboxId, search, user]);
-  const notifications = useNotifications(currentUserId, () => {
-    void reloadConversations();
-  });
-
   React.useEffect(() => {
     void reload();
   }, [reload]);
-
-  React.useEffect(() => {
-    void reloadConversations().catch((error) => {
-      toast.error(error instanceof Error ? error.message : "Conversations failed to load.");
-    });
-  }, [reloadConversations]);
-
-  React.useEffect(() => {
-    knownIncomingMessageIds.current = null;
-    if (!currentUserId) return;
-    let active = true;
-    let checking = false;
-    const checkIncomingMail = async () => {
-      if (checking) return;
-      checking = true;
-      try {
-        const latestMessages = await listMessages({});
-        if (!active) return;
-        const snapshot = mergeIncomingMessageIds(knownIncomingMessageIds.current, latestMessages);
-        knownIncomingMessageIds.current = snapshot.knownIds;
-        if (snapshot.hasNewMessages) playNotificationSound("incoming-email");
-      } catch {
-        // Incoming-mail discovery never interrupts the current workspace.
-      } finally {
-        checking = false;
-      }
-    };
-
-    void checkIncomingMail();
-    const interval = window.setInterval(() => {
-      if (active) void checkIncomingMail();
-    }, 10_000);
-
-    return () => {
-      active = false;
-      window.clearInterval(interval);
-    };
-  }, [currentUserId]);
-
-  React.useEffect(() => {
-    if (!user || activeFolder === "settings") return;
-
-    const interval = window.setInterval(() => {
-      void reloadConversations().catch(() => {
-        // Keep background refresh failures quiet; the next interval will retry.
-      });
-    }, 10_000);
-
-    return () => window.clearInterval(interval);
-  }, [activeFolder, reloadConversations, user]);
 
   React.useEffect(() => {
     if (!user || isLoading || route.kind !== "settings") return;
@@ -188,7 +124,7 @@ export function App(): React.ReactElement {
         immersiveOnCompact={activeFolder !== "settings" && selectedId !== null}
         mailboxId={mailboxId}
         mailboxes={contentMailboxes}
-        unread={notifications.unread}
+        unread={mailSync.notifications.unread}
         search={search}
         user={user}
         updateInProgress={updateMonitor.progress !== null}
@@ -210,7 +146,6 @@ export function App(): React.ReactElement {
         onSearchChange={setSearch}
         onSignedOut={() => {
           setUser(null);
-          setConversations([]);
         }}
       >
         <div className="flex h-full flex-col">
@@ -220,7 +155,7 @@ export function App(): React.ReactElement {
                 activeTab={settingsTab}
                 canManage={user.role === "owner" || user.role === "admin"}
                 mailboxes={mailboxes}
-                notifications={notifications}
+                notifications={mailSync.notifications}
                 setup={setup}
                 users={users}
                 onRefresh={() => void reload()}
@@ -233,11 +168,10 @@ export function App(): React.ReactElement {
             ) : (
               <InboxPage
                 activeFolder={activeFolder as MailFolderId}
-                conversations={conversations}
+                conversations={mailSync.conversations}
                 mailboxes={contentMailboxes}
                 selectedId={selectedId}
-                onRefresh={() => void reloadConversations()}
-                onUnreadChange={notifications.refresh}
+                onRefresh={() => void mailSync.refresh().catch(() => undefined)}
                 onMessageRouteChange={(folder, messageId) =>
                   navigate({ kind: "mail", folder, messageId })
                 }
@@ -256,7 +190,7 @@ export function App(): React.ReactElement {
             mode="new"
             open={composeOpen}
             onOpenChange={setComposeOpen}
-            onSent={() => void reloadConversations()}
+            onSent={() => void mailSync.refresh().catch(() => undefined)}
           />
         </React.Suspense>
       ) : null}

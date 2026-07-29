@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.24
+
+- Consolidate conversation, unread-count, and incoming-mail refreshes into one coordinated path.
+- Replace broad incoming-message polling with an access-scoped latest-message status query.
+- Split signed deployment responsibilities and strengthen architecture and lifecycle coverage gates.
+
 ## 0.1.23
 
 - Add explicit per-device Web Push notifications for installed iOS, Android, and desktop PWAs.
