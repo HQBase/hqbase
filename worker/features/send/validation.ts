@@ -52,5 +52,30 @@ export const replyMessageSchema = z
     }
   });
 
+export const forwardMessageSchema = z
+  .object({
+    messageId: z.string().min(1).max(100),
+    from: emailAddressSchema,
+    to: recipientListSchema,
+    cc: optionalRecipientListSchema,
+    bcc: optionalRecipientListSchema,
+    subject: z.string().trim().min(1).max(200).optional(),
+    text: z.string().trim().max(100_000).default(""),
+    html: z.string().trim().max(200_000).optional(),
+    attachmentIds: z.array(z.string().min(1).max(100)).max(20).default([]),
+    includeOriginalAttachments: z.boolean().default(true)
+  })
+  .superRefine((message, context) => {
+    const recipientCount = message.to.length + message.cc.length + message.bcc.length;
+    if (recipientCount > maxTotalRecipients) {
+      context.addIssue({
+        code: "custom",
+        message: "Cloudflare Email Sending allows up to 50 total recipients.",
+        path: ["to"]
+      });
+    }
+  });
+
 export type SendMessageInput = z.infer<typeof sendMessageSchema>;
 export type ReplyMessageInput = z.infer<typeof replyMessageSchema>;
+export type ForwardMessageInput = z.infer<typeof forwardMessageSchema>;

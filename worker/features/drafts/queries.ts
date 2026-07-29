@@ -251,3 +251,23 @@ export async function draftAttachmentObjects(
     })
   );
 }
+
+export async function draftIdsForAttachmentIds(
+  db: D1Database,
+  userId: string,
+  ids: string[]
+): Promise<string[]> {
+  if (ids.length === 0) return [];
+  const rows = await db
+    .prepare(
+      `SELECT a.id, a.draft_id FROM draft_attachments a
+       JOIN drafts d ON d.id = a.draft_id
+       WHERE d.user_id = ? AND a.id IN (${ids.map(() => "?").join(",")})`
+    )
+    .bind(userId, ...ids)
+    .all<{ id: string; draft_id: string }>();
+  if (rows.results.length !== new Set(ids).size) {
+    throw new AppError("ATTACHMENT_NOT_FOUND", "One or more attachments are unavailable.", 404);
+  }
+  return [...new Set(rows.results.map((row) => row.draft_id))];
+}
