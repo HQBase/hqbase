@@ -20,13 +20,11 @@ function baseStyles(theme: AppTheme): string {
   const palette =
     theme === "dark"
       ? {
-          background: "#101010",
           foreground: "#f2f2f2",
           link: "#93c5fd",
           quoteBorder: "#404040"
         }
       : {
-          background: "#ffffff",
           foreground: "#171717",
           link: "#1d4ed8",
           quoteBorder: "#d4d4d4"
@@ -36,10 +34,8 @@ function baseStyles(theme: AppTheme): string {
   @font-face { font-family: "Geist Sans"; src: url("/fonts/Geist-Regular.woff2") format("woff2"); font-style: normal; font-weight: 400; font-display: swap; }
   :root { color-scheme: ${theme}; }
   * { box-sizing: border-box; }
-  html, body { margin: 0; min-height: 100%; background: ${palette.background}; color: ${palette.foreground}; }
-  body { padding: 20px; font-family: "Geist Sans", ui-sans-serif, system-ui, sans-serif; font-size: 14px; line-height: 1.55; overflow-wrap: anywhere; }
-  img { max-width: 100%; height: auto; }
-  table { max-width: 100%; }
+  html { overflow-x: auto; overflow-y: hidden; -webkit-overflow-scrolling: touch; background: transparent; }
+  body { margin: 0; padding: 0; background: transparent; color: ${palette.foreground}; font-family: "Geist Sans", ui-sans-serif, system-ui, sans-serif; font-size: 14px; line-height: 1.55; }
   a { color: ${palette.link}; }
   blockquote { margin-left: 0; padding-left: 16px; border-left: 3px solid ${palette.quoteBorder}; }
 `;
