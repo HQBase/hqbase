@@ -100,7 +100,7 @@ describe("Cloudflare setup API", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     await expect(verifyCloudflareToken({ apiToken: "token-123" })).rejects.toThrow(
-      "Cloudflare rejected the temporary authorization. Authorize Cloudflare again."
+      "Cloudflare rejected the temporary authorization. Authorize again, or configure customer-managed OAuth from the deployment guide."
     );
   });
 

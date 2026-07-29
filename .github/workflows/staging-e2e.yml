@@ -30,6 +30,7 @@ jobs:
       HQBASE_STAGING_EMAIL_DOMAIN: ${{ secrets.HQBASE_E2E_EMAIL_DOMAIN }}
       HQBASE_STAGING_OWNER_EMAIL: owner@${{ secrets.HQBASE_E2E_EMAIL_DOMAIN }}
       HQBASE_STAGING_OWNER_PASSWORD: ${{ secrets.HQBASE_E2E_OWNER_PASSWORD }}
+      HQBASE_STAGING_OAUTH_CLIENT_ID: ${{ vars.HQBASE_E2E_OAUTH_CLIENT_ID }}
       HQBASE_STAGING_SENDER: hello@${{ secrets.HQBASE_E2E_EMAIL_DOMAIN }}
       HQBASE_STAGING_URL: https://${{ secrets.HQBASE_E2E_APP_HOSTNAME }}
       DEPLOYMENT_NAME: e2e-${{ github.run_id }}
@@ -60,6 +61,9 @@ jobs:
           --domain "$HQBASE_STAGING_EMAIL_DOMAIN"
           --no-email
           --app-domain "${HQBASE_STAGING_URL#https://}"
+          --auth-url "$HQBASE_STAGING_URL"
+          --oauth-mode customer
+          --oauth-client-id "$HQBASE_STAGING_OAUTH_CLIENT_ID"
           --skip-build
           --skip-deploy
       - name: Deploy reviewed source candidate

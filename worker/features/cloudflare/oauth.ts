@@ -2,7 +2,13 @@ import { z } from "zod";
 
 import type { WorkerEnv } from "../../lib/env";
 import { AppError } from "../../lib/errors";
-import { hqbaseProductConfig } from "../../lib/product-config";
+import {
+  cloudflareAuthorizationUrl,
+  isInvalidOAuthConfig,
+  type OAuthConfigEnv,
+  oauthClientId,
+  resolveOAuthConfig
+} from "./oauth-config";
 
 const VERIFIER_COOKIE = "hqb_cf_oauth_verifier";
 const STATE_COOKIE = "hqb_cf_oauth_state";
@@ -12,10 +18,6 @@ const GRANT_COOKIE_TTL_SECONDS = 15 * 60;
 const TOKEN_ENDPOINT = "https://dash.cloudflare.com/oauth2/token";
 const REVOKE_ENDPOINT = "https://dash.cloudflare.com/oauth2/revoke";
 
-type OAuthConfigEnv = Pick<
-  WorkerEnv,
-  "CLOUDFLARE_OAUTH_CLIENT_ID" | "CLOUDFLARE_OAUTH_REDIRECT_URI" | "CLOUDFLARE_OAUTH_RELAY_URL"
->;
 type OAuthCookieEnv = Pick<WorkerEnv, "BETTER_AUTH_SECRET">;
 
 export type RuntimeCloudflareOAuthFlow =
@@ -37,16 +39,19 @@ export async function startRuntimeCloudflareOAuth(
   env: OAuthConfigEnv,
   flow: RuntimeCloudflareOAuthFlow
 ): Promise<Response> {
-  const config = oauthConfig(env);
+  let config: ReturnType<typeof resolveOAuthConfig>;
+  try {
+    config = resolveOAuthConfig(request, env, flow);
+  } catch (error) {
+    if (isInvalidOAuthConfig(error)) return oauthResultRedirect(request, "config", flow);
+    throw error;
+  }
   const verifier = randomBase64Url(64);
   const state = randomBase64Url(32);
-  const relay = new URL("/oauth/authorize", config.relayUrl);
-  relay.searchParams.set("callback", `${new URL(request.url).origin}${flow.callbackPath}`);
-  relay.searchParams.set("operation", flow.operation);
-  relay.searchParams.set("state", state);
-  relay.searchParams.set("code_challenge", await sha256Base64Url(verifier));
+  const codeChallenge = await sha256Base64Url(verifier);
+  const target = cloudflareAuthorizationUrl(request, config, flow, state, codeChallenge);
 
-  const headers = new Headers({ "cache-control": "no-store", location: relay.toString() });
+  const headers = new Headers({ "cache-control": "no-store", location: target.toString() });
   headers.append("set-cookie", secureCookie(VERIFIER_COOKIE, verifier, OAUTH_COOKIE_TTL_SECONDS));
   headers.append("set-cookie", secureCookie(STATE_COOKIE, state, OAUTH_COOKIE_TTL_SECONDS));
   headers.append("set-cookie", clearRuntimeCloudflareGrantCookie());
@@ -73,7 +78,13 @@ export async function finishRuntimeCloudflareOAuth(
 
   const code = url.searchParams.get("code") ?? "";
   if (!code) return oauthResultRedirect(request, "invalid", flow);
-  const config = oauthConfig(env);
+  let config: ReturnType<typeof resolveOAuthConfig>;
+  try {
+    config = resolveOAuthConfig(request, env, flow);
+  } catch (error) {
+    if (isInvalidOAuthConfig(error)) return oauthResultRedirect(request, "config", flow);
+    throw error;
+  }
   const tokenResponse = await fetcher(TOKEN_ENDPOINT, {
     body: new URLSearchParams({
       client_id: config.clientId,
@@ -114,7 +125,7 @@ export async function resolveRuntimeCloudflareGrant(
   if (!grant) {
     throw new AppError(
       "CLOUDFLARE_ACCESS_REQUIRED",
-      "Authorize Cloudflare again. If your organization blocks HQBase, ask a Cloudflare administrator to allow the OAuth application.",
+      "Authorize Cloudflare again. If your organization blocks the public HQBase OAuth application, configure customer-managed OAuth and retry.",
       401
     );
   }
@@ -123,11 +134,10 @@ export async function resolveRuntimeCloudflareGrant(
 
 export async function revokeRuntimeCloudflareGrant(
   accessToken: string,
-  env: Pick<OAuthConfigEnv, "CLOUDFLARE_OAUTH_CLIENT_ID">,
+  env: Pick<OAuthConfigEnv, "CLOUDFLARE_OAUTH_CLIENT_ID" | "CLOUDFLARE_OAUTH_MODE">,
   fetcher: typeof fetch = fetch
 ): Promise<void> {
-  const clientId =
-    env.CLOUDFLARE_OAUTH_CLIENT_ID?.trim() || hqbaseProductConfig.cloudflareOAuthClientId;
+  const clientId = oauthClientId(env);
   const response = await fetcher(REVOKE_ENDPOINT, {
     body: new URLSearchParams({ client_id: clientId, token: accessToken }),
     headers: { "content-type": "application/x-www-form-urlencoded" },
@@ -164,19 +174,6 @@ async function readGrant(request: Request, env: OAuthCookieEnv): Promise<string 
   } catch {
     return null;
   }
-}
-
-function oauthConfig(env: OAuthConfigEnv): {
-  clientId: string;
-  redirectUri: string;
-  relayUrl: string;
-} {
-  return {
-    clientId: env.CLOUDFLARE_OAUTH_CLIENT_ID?.trim() || hqbaseProductConfig.cloudflareOAuthClientId,
-    redirectUri:
-      env.CLOUDFLARE_OAUTH_REDIRECT_URI?.trim() || hqbaseProductConfig.cloudflareOAuthRedirectUri,
-    relayUrl: env.CLOUDFLARE_OAUTH_RELAY_URL?.trim() || hqbaseProductConfig.cloudflareOAuthRelayUrl
-  };
 }
 
 function oauthResultRedirect(

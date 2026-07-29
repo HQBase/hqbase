@@ -108,7 +108,7 @@ function cloudflareErrorMessage(path: string, message?: string): string {
     ].join(" ");
   }
   if (message.toLowerCase().includes("invalid api token")) {
-    return "Cloudflare rejected the temporary authorization. Authorize Cloudflare again. If your organization blocks HQBase, ask a Cloudflare administrator to allow the OAuth application.";
+    return "Cloudflare rejected the temporary authorization. Authorize again, or configure customer-managed OAuth from the deployment guide.";
   }
   return message;
 }

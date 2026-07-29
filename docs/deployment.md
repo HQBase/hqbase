@@ -23,6 +23,9 @@ already exist. Operators may supply it explicitly for controlled automation.
 
 Cloudflare OAuth client configuration is compiled public product configuration. Temporary OAuth
 grants used for setup or updates are encrypted, scoped to the operation, and revoked after use.
+Organizations that block public OAuth applications can use a private customer-managed client
+without providing an API token or client secret. See
+[customer-managed-oauth.md](customer-managed-oauth.md).
 
 ## Default resources
 

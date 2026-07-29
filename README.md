@@ -39,6 +39,7 @@ Run `pnpm cf:typegen` after changing `wrangler.jsonc`.
 ## Operations
 
 - `docs/access-control.md`: roles, mailbox grants, and enforcement.
+- `docs/customer-managed-oauth.md`: private Cloudflare OAuth clients for restricted organizations.
 - `docs/mcp.md`: MCP discovery, OAuth, scopes, and mailbox authorization.
 - `docs/operations.md`: doctor, backup, restore, queues, retention, and incident order.
 - `docs/updates.md`: public signed releases, update checks, verification, and recovery.

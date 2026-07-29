@@ -109,9 +109,9 @@ export function destroy(flags) {
 }
 
 function assertDestroyManifest(manifest, targets) {
-  if (manifest?.version !== 1) {
+  if (manifest?.version !== 1 && manifest?.version !== 2) {
     throw new Error(
-      `Refusing to destroy: manifest field "version" must be the supported value 1. Migrate or repair the manifest from verified deployment records before retrying.`
+      `Refusing to destroy: manifest field "version" must be a supported value. Migrate or repair the manifest from verified deployment records before retrying.`
     );
   }
 

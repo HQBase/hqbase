@@ -19,6 +19,8 @@ export function install(flags) {
   const manifest = createManifest(name, {
     appDomain: optionalString(flags, "app-domain"),
     authUrl: optionalString(flags, "auth-url"),
+    oauthClientId: optionalString(flags, "oauth-client-id"),
+    oauthMode: optionalString(flags, "oauth-mode"),
     domain,
     workerName: optionalString(flags, "worker-name"),
     d1Name: optionalString(flags, "d1-name"),
@@ -91,9 +93,14 @@ export function createManifest(name, input) {
   const queueName = input.queueName ?? `hqbase-${name}-jobs`;
 
   validateBucketName(r2Bucket);
+  const cloudflareOAuth = cloudflareOAuthConfig({
+    authUrl: input.authUrl,
+    clientId: input.oauthClientId,
+    mode: input.oauthMode
+  });
 
   return {
-    version: 1,
+    version: 2,
     name,
     createdAt: new Date().toISOString(),
     worker: { name: workerName, deployed: false },
@@ -111,6 +118,7 @@ export function createManifest(name, input) {
     queue: { name: queueName, deadLetterName: `${queueName}-dlq`, created: false },
     appDomain: input.appDomain,
     authUrl: input.authUrl,
+    cloudflareOAuth,
     email: input.domain
       ? {
           domain: input.domain,
@@ -121,6 +129,46 @@ export function createManifest(name, input) {
         }
       : null
   };
+}
+
+export function cloudflareOAuthConfig({ authUrl, clientId, mode }) {
+  const resolvedMode = mode ?? "official";
+  if (resolvedMode !== "official" && resolvedMode !== "customer") {
+    throw new Error('--oauth-mode must be "official" or "customer".');
+  }
+  if (resolvedMode === "official") {
+    if (clientId) {
+      throw new Error("--oauth-client-id requires --oauth-mode customer.");
+    }
+    return { mode: "official" };
+  }
+  if (!clientId || clientId.length > 256) {
+    throw new Error("Customer-managed OAuth requires --oauth-client-id.");
+  }
+  validateCanonicalHttpsOrigin(authUrl);
+  return { clientId, mode: "customer" };
+}
+
+function validateCanonicalHttpsOrigin(value) {
+  if (!value) {
+    throw new Error("Customer-managed OAuth requires --auth-url.");
+  }
+  let url;
+  try {
+    url = new URL(value);
+  } catch {
+    throw new Error("--auth-url must be a valid canonical HTTPS origin.");
+  }
+  if (
+    url.protocol !== "https:" ||
+    url.username ||
+    url.password ||
+    url.pathname !== "/" ||
+    url.search ||
+    url.hash
+  ) {
+    throw new Error("--auth-url must be a canonical HTTPS origin without a path.");
+  }
 }
 
 function configureEmail(manifest, options) {

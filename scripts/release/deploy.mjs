@@ -264,6 +264,15 @@ export function normalizeConfig(config, version, artifactSha256) {
       ...config.assets,
       directory: "./dist"
     },
+    observability: {
+      ...config.observability,
+      enabled: true,
+      logs: {
+        ...config.observability?.logs,
+        enabled: true,
+        invocation_logs: false
+      }
+    },
     vars: {
       ...config.vars,
       HQBASE_APP_VERSION: version,
