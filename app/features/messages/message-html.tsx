@@ -4,6 +4,7 @@ import * as React from "react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
+import { useTheme } from "@/features/theme/theme-provider";
 
 import { getMessageHtml, trustRemoteMediaSender } from "./api";
 import { buildEmailHtmlDocument } from "./html-document";
@@ -14,6 +15,7 @@ type MessageHtmlProps = {
 };
 
 export function MessageHtml({ message }: MessageHtmlProps): React.ReactElement {
+  const { theme } = useTheme();
   const [html, setHtml] = React.useState<Awaited<ReturnType<typeof getMessageHtml>> | null>(null);
   const [loadRemoteImages, setLoadRemoteImages] = React.useState(false);
   const [loadingImages, setLoadingImages] = React.useState(false);
@@ -50,9 +52,10 @@ export function MessageHtml({ message }: MessageHtmlProps): React.ReactElement {
         : buildEmailHtmlDocument({
             allowRemoteImages: loadRemoteImages,
             html: html.html,
-            origin: window.location.origin
+            origin: window.location.origin,
+            theme
           }),
-    [html, loadRemoteImages]
+    [html, loadRemoteImages, theme]
   );
   const renderedQuote = React.useMemo(
     () =>
@@ -60,10 +63,11 @@ export function MessageHtml({ message }: MessageHtmlProps): React.ReactElement {
         ? buildEmailHtmlDocument({
             allowRemoteImages: loadRemoteImages,
             html: html.quotedHtml,
-            origin: window.location.origin
+            origin: window.location.origin,
+            theme
           })
         : null,
-    [html, loadRemoteImages]
+    [html, loadRemoteImages, theme]
   );
 
   async function loadImages(): Promise<void> {
@@ -117,7 +121,7 @@ export function MessageHtml({ message }: MessageHtmlProps): React.ReactElement {
       )}
       {error && <p className="text-xs text-destructive">{error}</p>}
       <iframe
-        className="w-full rounded-md border bg-white"
+        className="w-full rounded-md border bg-background"
         height={frameHeight}
         onLoad={(event) => {
           const height = event.currentTarget.contentDocument?.documentElement.scrollHeight;
@@ -135,7 +139,7 @@ export function MessageHtml({ message }: MessageHtmlProps): React.ReactElement {
           />
           {quoteExpanded ? (
             <iframe
-              className="w-full rounded-md border bg-white"
+              className="w-full rounded-md border bg-background"
               height={quoteFrameHeight}
               onLoad={(event) => {
                 const height = event.currentTarget.contentDocument?.documentElement.scrollHeight;

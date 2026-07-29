@@ -13,20 +13,40 @@ describe("message HTML view", () => {
     const blocked = buildEmailHtmlDocument({
       allowRemoteImages: false,
       html: "<strong>Hello</strong>",
-      origin: "https://mail.example.com"
+      origin: "https://mail.example.com",
+      theme: "dark"
     });
     const loaded = buildEmailHtmlDocument({
       allowRemoteImages: true,
       html: "<strong>Hello</strong>",
-      origin: "https://mail.example.com"
+      origin: "https://mail.example.com",
+      theme: "dark"
     });
 
     expect(blocked).toContain("img-src https://mail.example.com;");
     expect(blocked).toContain("font-src https://mail.example.com;");
     expect(blocked).toContain('font-family: "Geist Sans"');
     expect(blocked).toContain('url("/fonts/Geist-Regular.woff2")');
+    expect(blocked).toContain('data-theme="dark"');
+    expect(blocked).toContain("background: #101010");
+    expect(blocked).toContain("color: #f2f2f2");
     expect(blocked).not.toContain("https: http:");
     expect(loaded).toContain("img-src https://mail.example.com https: http:");
+  });
+
+  it("uses a light message canvas without rewriting sender HTML", () => {
+    const source = '<div style="background-color:#fff">Hello</div>';
+    const html = buildEmailHtmlDocument({
+      allowRemoteImages: false,
+      html: source,
+      origin: "https://mail.example.com",
+      theme: "light"
+    });
+
+    expect(html).toContain('data-theme="light"');
+    expect(html).toContain("background: #ffffff");
+    expect(html).toContain("color: #171717");
+    expect(html).toContain(source);
   });
 
   it("shows both one-time and persistent sender actions for inbound mail", () => {

@@ -141,7 +141,7 @@ describe("conversation reader", () => {
     expect(readHtml).not.toContain('aria-label="Unread"');
   });
 
-  it("collapses messages between the first and final two behind a counted divider", () => {
+  it("collapses messages between the first and final message behind a counted divider", () => {
     const messages = Array.from({ length: 6 }, (_, index) => ({
       ...firstMessage,
       id: `msg_${index + 1}`,
@@ -154,9 +154,9 @@ describe("conversation reader", () => {
     expect(html).not.toContain("Message body 2");
     expect(html).not.toContain("Message body 3");
     expect(html).not.toContain("Message body 4");
-    expect(html).toContain("Message body 5");
+    expect(html).not.toContain("Message body 5");
     expect(html).toContain("Message body 6");
-    expect(html).toContain("3 earlier messages");
+    expect(html).toContain("4 earlier messages");
     expect(html).toContain('aria-expanded="false"');
   });
 });

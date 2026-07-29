@@ -62,6 +62,10 @@ describe("mail shell", () => {
     expect(html).toContain("Open profile menu");
     expect(html).toContain("OB");
     expect(html.indexOf("Settings")).toBeLessThan(html.indexOf("Open profile menu"));
+    expect(html).toContain("Dark mode");
+    expect(html).toContain('aria-label="Switch to light mode"');
+    expect(html.indexOf("Settings")).toBeLessThan(html.indexOf("Dark mode"));
+    expect(html.indexOf("Dark mode")).toBeLessThan(html.indexOf("Open profile menu"));
     expect(html.match(/border-t pt-2/g)).toHaveLength(2);
     expect(html).toContain('stroke-width="1.5"');
     expect(html).not.toContain(">HQ<");

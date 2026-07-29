@@ -2,6 +2,7 @@ import * as React from "react";
 import type { ToasterProps } from "sonner";
 import { Toaster as Sonner, useSonner } from "sonner";
 
+import { useTheme } from "@/features/theme/theme-provider";
 import {
   initializeNotificationSounds,
   notificationSoundForToast,
@@ -13,10 +14,11 @@ const playedToastSounds = new Set<string>();
 const MAX_PLAYED_TOAST_SOUNDS = 100;
 
 export function Toaster(props: ToasterProps) {
+  const { theme } = useTheme();
   return (
     <>
       <ToastSounds />
-      <Sonner closeButton richColors theme="light" {...props} />
+      <Sonner closeButton richColors theme={theme} {...props} />
     </>
   );
 }

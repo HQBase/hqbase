@@ -52,6 +52,30 @@
 
 @layer base {
   :root {
+    color-scheme: light;
+    --background: 0 0% 100%;
+    --foreground: 0 0% 9%;
+    --card: 0 0% 99%;
+    --card-foreground: 0 0% 9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 9%;
+    --primary: 0 0% 9%;
+    --primary-foreground: 0 0% 98%;
+    --secondary: 0 0% 95%;
+    --secondary-foreground: 0 0% 15%;
+    --muted: 0 0% 96%;
+    --muted-foreground: 0 0% 42%;
+    --accent: 0 0% 93%;
+    --accent-foreground: 0 0% 9%;
+    --destructive: 0 62% 52%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 0 0% 88%;
+    --input: 0 0% 82%;
+    --ring: 0 0% 35%;
+    --radius: 0.5rem;
+  }
+
+  .dark {
     color-scheme: dark;
     --background: 0 0% 3%;
     --foreground: 0 0% 96%;
@@ -72,7 +96,6 @@
     --border: 0 0% 15%;
     --input: 0 0% 18%;
     --ring: 0 0% 55%;
-    --radius: 0.5rem;
   }
 
   html {
