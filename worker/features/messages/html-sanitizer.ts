@@ -1,6 +1,7 @@
 import sanitizeHtml from "sanitize-html";
 
 import { isSafeInlineImage } from "./inline-media";
+import { splitQuotedHtml } from "./quote-classifier";
 import type { StoredAttachment } from "./types";
 
 const allowedTags = [
@@ -142,8 +143,9 @@ export function sanitizeMessageHtml(input: {
   html: string;
   messageId: string;
   origin: string;
+  subject: string;
 }): SanitizedMessageHtml {
-  const parts = splitQuotedHtml(input.html);
+  const parts = splitQuotedHtml(input.html, input.subject);
   const body = sanitizeDisplayHtml({ ...input, html: parts.body });
   const quote = parts.quote ? sanitizeDisplayHtml({ ...input, html: parts.quote }) : null;
   return {
@@ -281,19 +283,6 @@ function sanitizerOptions(): sanitizeHtml.IOptions {
     enforceHtmlBoundary: false,
     nestingLimit: 80,
     nonTextTags: ["script", "style", "textarea", "option", "noscript"]
-  };
-}
-
-function splitQuotedHtml(html: string): { body: string; quote: string | null } {
-  const match =
-    /<div\b[^>]*\bclass\s*=\s*(?:"[^"]*\bgmail_quote(?:_container)?\b[^"]*"|'[^']*\bgmail_quote(?:_container)?\b[^']*')[^>]*>/i.exec(
-      html
-    );
-  if (!match) return { body: html, quote: null };
-  if (match.index === 0) return { body: "", quote: html };
-  return {
-    body: html.slice(0, match.index).trimEnd(),
-    quote: html.slice(match.index)
   };
 }
 
