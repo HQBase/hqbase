@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.22
+
+- Keep the mobile and installed PWA shell below the iPhone Dynamic Island while preserving the
+  shell background through the top safe area.
+
 ## 0.1.21
 
 - Use the official HQBase logo for the signed-out screen, favicon, and installed PWA icons.
