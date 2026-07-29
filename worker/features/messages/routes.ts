@@ -94,7 +94,8 @@ messageRoutes.get("/:id/html", async (c) => {
     attachments: message.attachments,
     html: await object.text(),
     messageId: message.id,
-    origin: new URL(c.req.url).origin
+    origin: new URL(c.req.url).origin,
+    subject: message.subject
   });
   return c.json({ ...rendered, remoteMediaTrusted: trusted });
 });

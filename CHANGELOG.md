@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.25
+
+- Keep manually forwarded Gmail messages visible in the reader while continuing to collapse genuine
+  quoted reply history.
+
 ## 0.1.24
 
 - Consolidate conversation, unread-count, and incoming-mail refreshes into one coordinated path.

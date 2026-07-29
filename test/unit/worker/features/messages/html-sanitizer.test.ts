@@ -24,7 +24,8 @@ describe("email HTML sanitizer", () => {
       html: `<table style="width: 100%; color: #222; position: fixed">
         <tr><td><strong>Hello</strong></td></tr>
       </table><img src="cid:signature-logo%40example.com" onerror="alert(1)">`,
-      messageId: "msg-1"
+      messageId: "msg-1",
+      subject: "Hello"
     });
 
     expect(result.hasRemoteImages).toBe(false);
@@ -48,7 +49,8 @@ describe("email HTML sanitizer", () => {
         <a href="javascript:alert(1)" onclick="alert(1)">unsafe</a>
         <a href="https://example.com/path">safe</a>
         <p style="background-image:url(https://evil.example/pixel); color: red">Text</p>`,
-      messageId: "msg-1"
+      messageId: "msg-1",
+      subject: "Hello"
     });
 
     expect(result.hasRemoteImages).toBe(true);
@@ -67,14 +69,16 @@ describe("email HTML sanitizer", () => {
       attachments: [],
       origin: "https://mail.example.com",
       html: '<img src="https://images.example.com/open.gif" srcset="https://images.example.com/2x.png 2x">',
-      messageId: "msg-1"
+      messageId: "msg-1",
+      subject: "Hello"
     });
     const loaded = sanitizeMessageHtml({
       allowRemoteImages: true,
       attachments: [],
       origin: "https://mail.example.com",
       html: '<img src="//images.example.com/open.gif">',
-      messageId: "msg-1"
+      messageId: "msg-1",
+      subject: "Hello"
     });
 
     expect(blocked.hasRemoteImages).toBe(true);
@@ -90,7 +94,8 @@ describe("email HTML sanitizer", () => {
       attachments: [],
       origin: "https://mail.example.com",
       html: '<img srcset="https://images.example.com/open.gif 1x">',
-      messageId: "msg-1"
+      messageId: "msg-1",
+      subject: "Hello"
     });
 
     expect(result.hasRemoteImages).toBe(true);
@@ -103,12 +108,46 @@ describe("email HTML sanitizer", () => {
       attachments: [],
       origin: "https://mail.example.com",
       html: `<p>New reply</p><div class="gmail_quote gmail_quote_container"><div class="gmail_attr">On Tuesday, Pat wrote:</div><blockquote class="gmail_quote"><strong>Earlier reply</strong></blockquote></div>`,
-      messageId: "msg-1"
+      messageId: "msg-1",
+      subject: "Re: Hello"
     });
 
     expect(result.html).toBe("<p>New reply</p>");
     expect(result.quotedHtml).toContain("<strong>Earlier reply</strong>");
     expect(result.quotedHtml).not.toContain("gmail_quote");
+  });
+
+  it.each([
+    ["without an authored introduction", ""],
+    ["after an authored introduction", "<p>For your information</p>"]
+  ])("keeps a Gmail forward visible %s", (_description, introduction) => {
+    const result = sanitizeMessageHtml({
+      allowRemoteImages: false,
+      attachments: [],
+      origin: "https://mail.example.com",
+      html: `${introduction}<div class="gmail_quote gmail_quote_container"><div class="gmail_attr">---------- Forwarded message ---------<br>From: The Google Workspace Team &lt;workspace-noreply@google.com&gt;<br>Subject: Promotional access</div><table><tbody><tr><td><strong>Forwarded promotion</strong></td></tr></tbody></table></div>`,
+      messageId: "msg-1",
+      subject: "Fwd: Promotional access"
+    });
+
+    expect(result.html).toContain("---------- Forwarded message ---------");
+    expect(result.html).toContain("<strong>Forwarded promotion</strong>");
+    if (introduction) expect(result.html).toContain("For your information");
+    expect(result.quotedHtml).toBeNull();
+  });
+
+  it("still collapses forwarded content when it is quoted by a reply", () => {
+    const result = sanitizeMessageHtml({
+      allowRemoteImages: false,
+      attachments: [],
+      origin: "https://mail.example.com",
+      html: `<p>New reply</p><div class="gmail_quote"><div class="gmail_attr">---------- Forwarded message ---------</div><strong>Earlier forward</strong></div>`,
+      messageId: "msg-1",
+      subject: "Re: Promotional access"
+    });
+
+    expect(result.html).toBe("<p>New reply</p>");
+    expect(result.quotedHtml).toContain("Earlier forward");
   });
 
   it("preserves safe rich HTML, remote images, and referenced CID images for outbound quotes", () => {
