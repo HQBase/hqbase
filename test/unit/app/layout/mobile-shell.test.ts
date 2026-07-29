@@ -18,6 +18,7 @@ const styles = readFileSync(new URL("../../../../app/styles.css", import.meta.ur
 describe("mobile application shell", () => {
   it("uses dynamic viewport and sidebar-colored safe areas", () => {
     expect(appShell).toContain("h-[100dvh]");
+    expect(appShell).toContain("pt-[env(safe-area-inset-top)]");
     expect(mobileNavigation).toContain("safe-area-inset-top");
     expect(mobileNavigation).toContain("safe-area-inset-bottom");
     expect(sidebar).toContain("safe-area-inset-top");
