@@ -1,23 +1,46 @@
 #!/usr/bin/env node
-import { execFileSync, spawnSync } from "node:child_process";
-import { createHash, createPublicKey, randomBytes, verify } from "node:crypto";
+import { randomUUID } from "node:crypto";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
-import webpush from "web-push";
-import { inspectActiveRelease, isWorkerNotFound } from "./active-version.mjs";
+
+import { inspectActiveRelease } from "./active-version.mjs";
+import { capture, run } from "./command.mjs";
+import {
+  compareVersions,
+  hqbaseReleaseTag,
+  loadVerifiedRelease,
+  normalizeConfig,
+  verifyManifest
+} from "./manifest.mjs";
+import {
+  deploySource,
+  executeSql,
+  missingRequiredSecrets,
+  needsInitialAuthSecret,
+  workerNameFromConfig
+} from "./worker-deploy.mjs";
 
 const root = resolve(import.meta.dirname, "../..");
-const packageVersion = JSON.parse(readFileSync(resolve(root, "package.json"), "utf8")).version;
-const publicKey = "MCowBQYDK2VwAyEAsVwKniCvpHDwbbnjTPP0SuIIG97cRL+iFBQvay9OrU4=";
-const stableManifestUrl = "https://github.com/HQBase/hqbase/releases/latest/download/stable.json";
+
+export {
+  compareVersions,
+  deploySource,
+  executeSql,
+  hqbaseReleaseTag,
+  loadVerifiedRelease,
+  missingRequiredSecrets,
+  needsInitialAuthSecret,
+  normalizeConfig,
+  verifyManifest,
+  workerNameFromConfig
+};
 
 export async function deploy(options = {}) {
   const configFile = resolve(options.configFile ?? resolve(root, "wrangler.jsonc"));
   if (process.env.HQBASE_FORCE_SOURCE_DEPLOY === "1") return sourceDeploy(root);
   const { bytes, manifest } = await loadVerifiedRelease({
     artifactFile: options.artifactFile ?? process.env.HQBASE_RELEASE_ARTIFACT_FILE,
-    checkedOutVersion: packageVersion,
     expectedVersion: options.expectedVersion ?? process.env.HQBASE_EXPECTED_RELEASE_VERSION,
     fetcher: options.fetcher,
     manifestFile: options.manifestFile ?? process.env.HQBASE_RELEASE_MANIFEST_FILE,
@@ -43,21 +66,7 @@ export async function deploy(options = {}) {
     const activeRelease = inspectActiveRelease(source, config.name);
     const releaseTag = hqbaseReleaseTag(manifest.version, manifest.artifact.sha256);
     if (!activeRelease) {
-      run(
-        "pnpm",
-        [
-          "exec",
-          "wrangler",
-          "d1",
-          "migrations",
-          "apply",
-          "DB",
-          "--remote",
-          "--config",
-          "wrangler.jsonc"
-        ],
-        source
-      );
+      applyMigrations(source);
       deploySource(source, { releaseTag });
       executeSql(
         source,
@@ -79,6 +88,7 @@ export async function deploy(options = {}) {
       console.log(`HQBase ${manifest.version} is already the active signed release.`);
       return;
     }
+
     const bookmark = findString(
       JSON.parse(
         capture(
@@ -100,25 +110,12 @@ export async function deploy(options = {}) {
       "bookmark"
     );
     const workerVersion = activeRelease.versionId;
-    if (!bookmark || !workerVersion)
+    if (!bookmark || !workerVersion) {
       throw new Error("Could not establish the update recovery checkpoint.");
+    }
     recovery = { bookmark, workerVersion, name: config.name };
-    run(
-      "pnpm",
-      [
-        "exec",
-        "wrangler",
-        "d1",
-        "migrations",
-        "apply",
-        "DB",
-        "--remote",
-        "--config",
-        "wrangler.jsonc"
-      ],
-      source
-    );
-    const updateId = crypto.randomUUID();
+    applyMigrations(source);
+    const updateId = randomUUID();
     executeSql(
       source,
       `INSERT INTO update_history (id, from_version, to_version, checkpoint_bookmark, worker_version, state, started_at) VALUES (${quote(updateId)}, ${quote(activeRelease.version)}, ${quote(manifest.version)}, ${quote(bookmark)}, ${quote(workerVersion)}, 'started', datetime('now'))`
@@ -160,284 +157,47 @@ export async function deploy(options = {}) {
     );
     console.log(`HQBase updated to ${manifest.version}.`);
   } catch (error) {
-    if (recovery) {
-      console.error(
-        `D1 recovery: pnpm exec wrangler d1 time-travel restore DB --bookmark ${recovery.bookmark} --config wrangler.jsonc`
-      );
-      console.error(
-        `Worker recovery: pnpm exec wrangler versions deploy ${recovery.workerVersion}@100% --name ${recovery.name} --config wrangler.jsonc`
-      );
-    }
+    if (recovery) reportRecovery(recovery);
     throw error;
   } finally {
     rmSync(workspace, { recursive: true, force: true });
   }
 }
 
-export async function loadVerifiedRelease(options = {}) {
-  const fetcher = options.fetcher ?? fetch;
-  let envelope;
-  if (options.manifestFile) {
-    envelope = JSON.parse(readFileSync(resolve(options.manifestFile), "utf8"));
-  } else {
-    const response = await fetcher(options.manifestUrl ?? stableManifestUrl);
-    if (!response.ok) throw new Error(`Release check failed (${response.status}).`);
-    envelope = await response.json();
-  }
-  const manifest = verifyManifest(envelope, options.publicKeyBase64);
-  if (options.expectedVersion) {
-    if (manifest.version !== options.expectedVersion) {
-      throw new Error(
-        `Expected signed HQBase ${options.expectedVersion}, received ${manifest.version}.`
-      );
-    }
-  } else if (compareVersions(manifest.version, options.checkedOutVersion ?? packageVersion) < 0) {
-    throw new Error(
-      `HQBase ${options.checkedOutVersion ?? packageVersion} has not been published as a signed stable release yet.`
-    );
-  }
-
-  let bytes;
-  if (options.artifactFile) {
-    bytes = readFileSync(resolve(options.artifactFile));
-  } else {
-    const artifactResponse = await fetcher(manifest.artifact.url);
-    if (!artifactResponse.ok)
-      throw new Error(`Release download failed (${artifactResponse.status}).`);
-    bytes = Buffer.from(await artifactResponse.arrayBuffer());
-  }
-  if (
-    bytes.length !== manifest.artifact.size ||
-    createHash("sha256").update(bytes).digest("hex") !== manifest.artifact.sha256
-  ) {
-    throw new Error("Release artifact integrity check failed.");
-  }
-  return { bytes, manifest };
-}
-
-export function verifyManifest(envelope, publicKeyBase64 = publicKey) {
-  const key = createPublicKey({
-    key: Buffer.from(publicKeyBase64, "base64"),
-    format: "der",
-    type: "spki"
-  });
-  if (
-    !verify(
-      null,
-      Buffer.from(envelope.payload, "base64url"),
-      key,
-      Buffer.from(envelope.signature, "base64url")
-    )
-  )
-    throw new Error("Release manifest signature is invalid.");
-  const manifest = JSON.parse(Buffer.from(envelope.payload, "base64url").toString("utf8"));
-  if (
-    manifest.format !== "hqbase-release-v1" ||
-    manifest.product !== "hqbase" ||
-    manifest.channel !== "stable" ||
-    !/^\d+\.\d+\.\d+/.test(manifest.version) ||
-    !/^\d+\.\d+\.\d+/.test(manifest.minVersion) ||
-    !/^[a-f0-9]{64}$/.test(manifest.artifact?.sha256) ||
-    !Number.isInteger(manifest.artifact?.size) ||
-    manifest.artifact.size <= 0
-  )
-    throw new Error("Release manifest is incompatible.");
-  return manifest;
-}
-export function compareVersions(left, right) {
-  const a = left.split("-")[0].split(".").map(Number);
-  const b = right.split("-")[0].split(".").map(Number);
-  for (let i = 0; i < 3; i += 1) {
-    const difference = (a[i] ?? 0) - (b[i] ?? 0);
-    if (difference) return difference;
-  }
-  return 0;
-}
-export function normalizeConfig(config, version, artifactSha256) {
-  return {
-    ...config,
-    $schema: "./node_modules/wrangler/config-schema.json",
-    main: "worker/index.ts",
-    compatibility_flags: [
-      ...new Set([...(config.compatibility_flags ?? []), "global_fetch_strictly_public"])
-    ],
-    assets: {
-      ...config.assets,
-      directory: "./dist"
-    },
-    vars: {
-      ...config.vars,
-      HQBASE_APP_VERSION: version,
-      ...(artifactSha256 ? { HQBASE_RELEASE_ARTIFACT_SHA256: artifactSha256 } : {}),
-      HQBASE_WORKER_NAME: workerNameFromConfig(config)
-    },
-    d1_databases: config.d1_databases?.map((binding) => ({
-      ...binding,
-      migrations_dir: "migrations"
-    }))
-  };
-}
-export function hqbaseReleaseTag(version, artifactSha256) {
-  if (!/^\d+\.\d+\.\d+/.test(version) || !/^[a-f0-9]{64}$/.test(artifactSha256))
-    throw new Error("HQBase release identity is invalid.");
-  return `hqbase:${version}:${artifactSha256}`;
-}
 function sourceDeploy(cwd) {
   run("pnpm", ["build"], cwd);
   run("pnpm", ["db:migrate:remote"], cwd);
   deploySource(cwd);
   run("pnpm", ["hqbase", "postdeploy"], cwd);
 }
-export function deploySource(cwd, options = {}) {
-  const execute = options.run ?? run;
-  const attempt = options.attempt ?? attemptRun;
-  const workersCi = options.workersCi ?? process.env.WORKERS_CI === "1";
-  const workerName = options.workerName ?? workerNameFromConfigFile(resolve(cwd, "wrangler.jsonc"));
-  const deployArgs = [
-    "exec",
-    "wrangler",
-    "deploy",
-    "--keep-vars",
-    "--var",
-    `HQBASE_WORKER_NAME:${workerName}`
-  ];
-  if (options.releaseTag) deployArgs.push("--tag", options.releaseTag);
 
-  if (!workersCi) {
-    execute("pnpm", deployArgs, cwd);
-    return;
-  }
-
-  const inspection = attempt(
-    "pnpm",
-    ["exec", "wrangler", "secret", "list", "--format", "json"],
-    cwd
-  );
-  let missingSecrets;
-  try {
-    missingSecrets = missingRequiredSecrets(inspection, [
-      "BETTER_AUTH_SECRET",
-      "VAPID_PUBLIC_KEY",
-      "VAPID_PRIVATE_KEY"
-    ]);
-  } catch (error) {
-    emitCommandOutput(inspection);
-    throw error;
-  }
-  if (missingSecrets.length === 0) {
-    execute("pnpm", deployArgs, cwd);
-    return;
-  }
-
-  if (missingSecrets.includes("BETTER_AUTH_SECRET")) {
-    deployArgs.push(
-      "--var",
-      `HQBASE_INSTALLATION_ID:${options.randomUUID?.() ?? crypto.randomUUID()}`
-    );
-  }
-
-  const workspace = mkdtempSync(resolve(tmpdir(), "hqbase-secrets-"));
-  const secretsFile = resolve(workspace, "secrets.json");
-  try {
-    const secrets = {};
-    if (missingSecrets.includes("BETTER_AUTH_SECRET")) {
-      const configuredSecret = process.env.HQBASE_AUTH_SECRET;
-      const bytes = configuredSecret ? null : (options.randomBytes ?? randomBytes)(32);
-      secrets.BETTER_AUTH_SECRET = configuredSecret ?? bytes?.toString("base64url");
-    }
-    if (
-      missingSecrets.includes("VAPID_PUBLIC_KEY") ||
-      missingSecrets.includes("VAPID_PRIVATE_KEY")
-    ) {
-      const configuredPublicKey = process.env.HQBASE_VAPID_PUBLIC_KEY;
-      const configuredPrivateKey = process.env.HQBASE_VAPID_PRIVATE_KEY;
-      const generated =
-        configuredPublicKey && configuredPrivateKey
-          ? { publicKey: configuredPublicKey, privateKey: configuredPrivateKey }
-          : (options.generateVapidKeys ?? webpush.generateVAPIDKeys)();
-      secrets.VAPID_PUBLIC_KEY = generated.publicKey;
-      secrets.VAPID_PRIVATE_KEY = generated.privateKey;
-    }
-    writeFileSync(secretsFile, `${JSON.stringify(secrets)}\n`, { mode: 0o600 });
-    execute("pnpm", [...deployArgs, "--secrets-file", secretsFile], cwd);
-  } finally {
-    rmSync(workspace, { recursive: true, force: true });
-  }
-}
-export function workerNameFromConfig(config) {
-  if (typeof config?.name !== "string" || !config.name.trim()) {
-    throw new Error("wrangler.jsonc must define the deployed Worker name.");
-  }
-  return config.name.trim();
-}
-function workerNameFromConfigFile(configFile) {
-  return workerNameFromConfig(JSON.parse(readFileSync(configFile, "utf8")));
-}
-export function needsInitialAuthSecret(result, secretName) {
-  return missingRequiredSecrets(result, [secretName]).length > 0;
-}
-export function missingRequiredSecrets(result, secretNames) {
-  if (result.status === 0) {
-    const secrets = JSON.parse(result.stdout || "[]");
-    if (!Array.isArray(secrets)) throw new Error("Wrangler returned an invalid secret list.");
-    const configured = new Set(secrets.map((secret) => secret?.name).filter(Boolean));
-    return secretNames.filter((secretName) => !configured.has(secretName));
-  }
-  if (isWorkerNotFound(result)) {
-    return [...secretNames];
-  }
-  throw result.error ?? new Error(`wrangler secret list exited with status ${result.status}.`);
-}
-export function executeSql(cwd, command, options = {}) {
-  const execute = options.attempt ?? attemptRun;
-  const result = execute(
+function applyMigrations(cwd) {
+  run(
     "pnpm",
     [
       "exec",
       "wrangler",
       "d1",
-      "execute",
+      "migrations",
+      "apply",
       "DB",
       "--remote",
-      "--command",
-      command,
       "--config",
       "wrangler.jsonc"
     ],
     cwd
   );
-  if (result.status === 0) return;
-  (options.emit ?? emitCommandOutput)(result);
-  throw (
-    result.error ??
-    new Error(`wrangler d1 execute exited with status ${result.status ?? "signal"}.`)
+}
+
+function reportRecovery(recovery) {
+  console.error(
+    `D1 recovery: pnpm exec wrangler d1 time-travel restore DB --bookmark ${recovery.bookmark} --config wrangler.jsonc`
+  );
+  console.error(
+    `Worker recovery: pnpm exec wrangler versions deploy ${recovery.workerVersion}@100% --name ${recovery.name} --config wrangler.jsonc`
   );
 }
-function run(command, args, cwd) {
-  execFileSync(command, args, {
-    cwd,
-    env: { ...process.env, CI: process.env.CI ?? "true" },
-    stdio: "inherit"
-  });
-}
-function capture(command, args, cwd) {
-  return execFileSync(command, args, {
-    cwd,
-    env: { ...process.env, CI: process.env.CI ?? "true" },
-    encoding: "utf8"
-  });
-}
-function attemptRun(command, args, cwd) {
-  return spawnSync(command, args, {
-    cwd,
-    env: { ...process.env, CI: process.env.CI ?? "true" },
-    encoding: "utf8"
-  });
-}
-function emitCommandOutput(result) {
-  if (result.stdout) process.stdout.write(result.stdout);
-  if (result.stderr) process.stderr.write(result.stderr);
-}
+
 function findString(value, ...keys) {
   if (!value || typeof value !== "object") return null;
   for (const [key, child] of Object.entries(value)) {
@@ -447,6 +207,7 @@ function findString(value, ...keys) {
   }
   return null;
 }
+
 function quote(value) {
   return `'${String(value).replaceAll("'", "''")}'`;
 }

@@ -5,6 +5,7 @@ export type UnreadCounts = {
 };
 
 export type NotificationStatus = {
+  latestInboundMessageId: string | null;
   unread: UnreadCounts;
   vapidPublicKey: string | null;
 };
@@ -23,6 +24,6 @@ export type NotificationController = {
   enable: () => Promise<void>;
   error: string | null;
   isBusy: boolean;
-  refresh: () => Promise<void>;
+  refresh: () => Promise<NotificationStatus>;
   unread: UnreadCounts;
 };

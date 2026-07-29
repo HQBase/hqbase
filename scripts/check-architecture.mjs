@@ -1,7 +1,7 @@
 import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
 
-const roots = ["app", "worker"];
+const roots = ["app", "worker", "scripts"];
 const hardLimit = 400;
 const reviewLimit = 300;
 const failures = [];
@@ -46,7 +46,7 @@ async function sourceFiles(root) {
   for (const entry of entries) {
     const location = path.join(root, entry.name);
     if (entry.isDirectory()) files.push(...(await sourceFiles(location)));
-    else if (/\.(?:ts|tsx)$/.test(entry.name)) files.push(location);
+    else if (/\.(?:mjs|ts|tsx)$/.test(entry.name)) files.push(location);
   }
   return files;
 }

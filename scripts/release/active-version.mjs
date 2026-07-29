@@ -1,4 +1,4 @@
-import { execFileSync, spawnSync } from "node:child_process";
+import { attemptRun, capture as captureRun, emitCommandOutput } from "./command.mjs";
 
 export function inspectActiveRelease(cwd, workerName, options = {}) {
   const attempt = options.attempt ?? attemptRun;
@@ -103,25 +103,4 @@ function activeVersionId(deployment) {
     throw new Error("The HQBase Worker does not have one active 100-percent version.");
   }
   return activeVersions[0].version_id;
-}
-
-function captureRun(command, args, cwd) {
-  return execFileSync(command, args, {
-    cwd,
-    env: { ...process.env, CI: process.env.CI ?? "true" },
-    encoding: "utf8"
-  });
-}
-
-function attemptRun(command, args, cwd) {
-  return spawnSync(command, args, {
-    cwd,
-    env: { ...process.env, CI: process.env.CI ?? "true" },
-    encoding: "utf8"
-  });
-}
-
-function emitCommandOutput(result) {
-  if (result.stdout) process.stdout.write(result.stdout);
-  if (result.stderr) process.stderr.write(result.stderr);
 }

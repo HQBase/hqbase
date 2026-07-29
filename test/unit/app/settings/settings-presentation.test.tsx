@@ -68,7 +68,11 @@ const notifications = {
   enable: async () => undefined,
   error: null,
   isBusy: false,
-  refresh: async () => undefined,
+  refresh: async () => ({
+    latestInboundMessageId: null,
+    unread: { catchall: 1, inbox: 2, total: 3 },
+    vapidPublicKey: "public-key"
+  }),
   unread: { catchall: 1, inbox: 2, total: 3 }
 };
 

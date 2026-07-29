@@ -6,7 +6,12 @@ import { requireAuthContext } from "../../auth/session";
 import type { HonoApp } from "../../lib/env";
 import { AppError } from "../../lib/errors";
 import { parseWith } from "../../lib/validation";
-import { countUnreadMessages, removePushSubscription, savePushSubscription } from "./queries";
+import {
+  countUnreadMessages,
+  latestInboundMessageId,
+  removePushSubscription,
+  savePushSubscription
+} from "./queries";
 
 export const notificationRoutes = new Hono<HonoApp>();
 
@@ -35,8 +40,13 @@ const unsubscribeSchema = z.object({ endpoint: endpointSchema });
 notificationRoutes.get("/status", async (c) => {
   const auth = await requireAuthContext(c.env, c.req.raw);
   const mailboxIds = await accessibleMailboxIds(c.env.DB, auth.user.id, auth.user.role, "read");
+  const [unread, latestMessageId] = await Promise.all([
+    countUnreadMessages(c.env.DB, mailboxIds),
+    latestInboundMessageId(c.env.DB, mailboxIds)
+  ]);
   return c.json({
-    unread: await countUnreadMessages(c.env.DB, mailboxIds),
+    latestInboundMessageId: latestMessageId,
+    unread,
     vapidPublicKey: configuredPublicKey(c.env)
   });
 });
