@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.1.26
+
+- Expand the OAuth-protected MCP server with conversation, thread, and attachment retrieval plus
+  message and conversation state updates.
+- Add complete MCP draft management, staged attachments, rich-text sending and replies, and
+  forwarding with original attachments.
+- Grant new MCP clients the complete mail scope set by default while preserving explicit
+  least-privilege connections and requiring existing clients to reconnect for broader consent.
+
 ## 0.1.25
 
 - Keep manually forwarded Gmail messages visible in the reader while continuing to collapse genuine

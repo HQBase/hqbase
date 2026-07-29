@@ -11,9 +11,11 @@ type OAuthClient = {
 };
 
 const scopeDescriptions: Record<string, string> = {
-  "mail:read": "Read mailboxes and message text allowed by your mailbox grants",
-  "mail:write": "Change message state where you have agent access",
-  "mail:send": "Send email and replies where you have agent access",
+  "mail:read":
+    "Read allowed mailboxes, conversations, message text, threads, and bounded attachments",
+  "mail:write": "Change message and conversation state where you have agent access",
+  "mail:send":
+    "Manage drafts and attachments, then send, reply, or forward where you have agent access",
   offline_access: "Stay connected until you revoke access"
 };
 

@@ -39,8 +39,8 @@ export function createAuth(env: WorkerEnv, request: Request) {
       oauthProvider({
         allowDynamicClientRegistration: true,
         allowUnauthenticatedClientRegistration: true,
-        clientRegistrationAllowedScopes: ["mail:write", "mail:send", "offline_access"],
-        clientRegistrationDefaultScopes: ["mail:read"],
+        clientRegistrationAllowedScopes: ["offline_access"],
+        clientRegistrationDefaultScopes: ["mail:read", "mail:write", "mail:send"],
         consentPage: "/mcp/consent",
         disableJwtPlugin: true,
         grantTypes: ["authorization_code", "refresh_token"],
