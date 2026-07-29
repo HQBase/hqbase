@@ -16,7 +16,7 @@ export function ConversationMessages({
   compact?: boolean;
   messages: MessageDetail[];
 }): React.ReactElement {
-  const hiddenCount = Math.max(0, messages.length - 3);
+  const hiddenCount = Math.max(0, messages.length - 2);
   const threadFingerprint = messages.map((message) => message.id).join(":");
   const [expandedThread, setExpandedThread] = React.useState<string | null>(null);
   const showMiddle = expandedThread === threadFingerprint;
@@ -26,8 +26,8 @@ export function ConversationMessages({
   }
 
   const first = messages[0];
-  const middle = messages.slice(1, -2);
-  const final = messages.slice(-2);
+  const middle = messages.slice(1, -1);
+  const final = messages.at(-1);
   return (
     <div className="divide-y divide-border">
       {first ? renderMessage(first) : null}
@@ -39,7 +39,7 @@ export function ConversationMessages({
         }
       />
       {showMiddle ? middle.map(renderMessage) : null}
-      {final.map(renderMessage)}
+      {final ? renderMessage(final) : null}
     </div>
   );
 

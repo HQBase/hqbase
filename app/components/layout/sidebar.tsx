@@ -4,6 +4,7 @@ import type * as React from "react";
 
 import { Button } from "@/components/ui/button";
 import type { CurrentUser } from "@/features/auth/types";
+import { ThemeSwitcher } from "@/features/theme/theme-switcher";
 import { cn } from "@/lib/cn";
 import type { FolderId } from "@/lib/routes";
 import { appRoutePath, mailFolders } from "@/lib/routes";
@@ -106,6 +107,7 @@ export function Sidebar({
                 Settings
               </a>
             </Button>
+            <ThemeSwitcher drawer={isDrawer} />
           </div>
           <div className="mt-2 border-t pt-2">
             <AccountMenu drawer={isDrawer} user={user} onSignedOut={onSignedOut} />
