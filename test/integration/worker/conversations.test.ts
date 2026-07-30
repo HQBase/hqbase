@@ -7,6 +7,7 @@ import oauthResourcesMigration from "../../../migrations/0003_oauth_resources.sq
 import conversationMigration from "../../../migrations/0004_conversations.sql?raw";
 import threadRebuildMigration from "../../../migrations/0005_rebuild_threads.sql?raw";
 import {
+  listConversationPage,
   listConversations,
   updateConversationAction
 } from "../../../worker/features/messages/conversation-queries";
@@ -134,6 +135,39 @@ describe("conversation persistence", () => {
         messageId: "msg_root_a"
       })
     ).resolves.toMatchObject({ affected: 1 });
+  });
+
+  it("pages conversations with a stable opaque cursor", async () => {
+    const filters = {
+      limit: 1,
+      mailboxIds: ["mbx_conversations"]
+    };
+    const firstPage = await listConversationPage(env.DB, filters);
+
+    expect(firstPage.conversations).toHaveLength(1);
+    expect(firstPage.conversations[0]?.id).toBe("msg_root_b");
+    expect(firstPage.nextCursor).toEqual(expect.any(String));
+
+    const secondPage = await listConversationPage(env.DB, {
+      ...filters,
+      cursor: firstPage.nextCursor ?? undefined
+    });
+    expect(secondPage.conversations).toHaveLength(1);
+    expect(secondPage.conversations[0]?.id).toBe("msg_reply_a");
+    expect(secondPage.nextCursor).toBeNull();
+  });
+
+  it("rejects malformed conversation cursors", async () => {
+    await expect(
+      listConversationPage(env.DB, {
+        cursor: "not-a-cursor",
+        folder: "inbox",
+        mailboxIds: ["mbx_conversations"]
+      })
+    ).rejects.toMatchObject({
+      code: "INVALID_CONVERSATION_CURSOR",
+      status: 400
+    });
   });
 });
 

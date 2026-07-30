@@ -217,8 +217,13 @@ describe("mail shell", () => {
         activeFolder="inbox"
         conversations={[]}
         defaultFromMailboxId={user.defaultFromMailboxId}
+        hasMore={false}
+        isLoadingMore={false}
+        loadMoreError={null}
         mailboxes={[]}
         selectedId={null}
+        onConversationAction={() => undefined}
+        onLoadMore={() => undefined}
         onMessageRouteChange={() => undefined}
         onRefresh={() => undefined}
         onSelect={() => undefined}

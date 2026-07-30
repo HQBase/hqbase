@@ -202,9 +202,14 @@ export function App(): React.ReactElement {
                 activeFolder={activeFolder as MailFolderId}
                 conversations={mailSync.conversations}
                 defaultFromMailboxId={user.defaultFromMailboxId}
+                hasMore={mailSync.hasMore}
+                isLoadingMore={mailSync.isLoadingMore}
+                loadMoreError={mailSync.loadMoreError}
                 mailboxes={contentMailboxes}
                 selectedId={selectedId}
                 onDraftsChange={() => void draftState.refresh().catch(() => undefined)}
+                onConversationAction={mailSync.applyConversationAction}
+                onLoadMore={() => void mailSync.loadMore()}
                 onRefresh={() => void mailSync.refresh().catch(() => undefined)}
                 onMessageRouteChange={(folder, messageId) =>
                   navigate({ kind: "mail", folder, messageId })
