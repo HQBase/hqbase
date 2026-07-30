@@ -64,7 +64,7 @@ const conversation: ConversationSummary = {
 };
 
 describe("conversation reader", () => {
-  it("renders the complete thread and keeps Reply and Forward at the bottom", () => {
+  it("renders Reply and Forward for every message and keeps the large final actions", () => {
     const html = renderToStaticMarkup(
       <MessageDetail
         mailboxes={[]}
@@ -78,9 +78,11 @@ describe("conversation reader", () => {
 
     expect(html.indexOf("I cannot sign in.")).toBeLessThan(html.indexOf("We can help."));
     expect(html.indexOf("We can help.")).toBeLessThan(html.lastIndexOf(">Reply<"));
-    expect(html).toContain(">Forward<");
+    expect(html.match(/>Reply</g)).toHaveLength(3);
+    expect(html.match(/>Forward</g)).toHaveLength(3);
+    expect(html).toContain('data-compose-message-id="msg_1"');
+    expect(html).toContain('data-compose-message-id="msg_2"');
     expect(html).toContain('aria-label="Back to messages"');
-    expect(html).not.toContain('aria-label="Reply"');
     expect(html).toContain('aria-label="Archive conversation"');
   });
 
@@ -156,7 +158,10 @@ describe("conversation reader", () => {
     expect(html).not.toContain("Message body 4");
     expect(html).not.toContain("Message body 5");
     expect(html).toContain("Message body 6");
-    expect(html).toContain("4 earlier messages");
+    expect(html).toContain('aria-label="Expand 4 earlier messages"');
     expect(html).toContain('aria-expanded="false"');
+    expect(html).toContain('data-thread-disclosure-state="collapsed"');
+    expect(html).toContain('data-thread-arrow="top-outward"');
+    expect(html).toContain('data-thread-arrow="bottom-outward"');
   });
 });

@@ -31,6 +31,19 @@ export async function renderHook<Props, Result>(
   };
 }
 
+export async function renderComponent(content: ReactNode): Promise<{
+  container: HTMLDivElement;
+  unmount: () => Promise<void>;
+}> {
+  const container = document.createElement("div");
+  const root = ReactDOM.createRoot(container);
+  await render(root, content);
+  return {
+    container,
+    unmount: () => render(root, null)
+  };
+}
+
 async function render(root: Root, content: ReactNode): Promise<void> {
   await act(async () => {
     root.render(content);
