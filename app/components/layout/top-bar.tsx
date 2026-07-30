@@ -1,4 +1,4 @@
-import { Cable, MailPlus, Search } from "lucide-react";
+import { Cable, MailPlus, PanelLeftClose, PanelLeftOpen, Search } from "lucide-react";
 import * as React from "react";
 
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,7 @@ import {
   SelectTrigger,
   SelectValue
 } from "@/components/ui/select";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import type { CurrentUser } from "@/features/auth/types";
 import type { Mailbox } from "@/features/mailboxes/types";
 import { McpConnectionDialog } from "@/features/mcp/connection-dialog";
@@ -31,6 +32,8 @@ type TopBarProps = {
   onMailboxChange: (mailboxId: string) => void;
   onSearchChange: (search: string) => void;
   onSignedOut: () => void;
+  onToggleSidebar?: () => void;
+  sidebarCollapsed?: boolean;
 };
 
 export function TopBar({
@@ -45,13 +48,37 @@ export function TopBar({
   onFolderChange,
   onMailboxChange,
   onSearchChange,
-  onSignedOut
+  onSignedOut,
+  onToggleSidebar,
+  sidebarCollapsed = false
 }: TopBarProps): React.ReactElement {
   const [mcpOpen, setMcpOpen] = React.useState(false);
   const mcpTriggerRef = React.useRef<HTMLButtonElement>(null);
 
   return (
-    <header className="flex h-14 w-full shrink-0 items-center gap-2 border-b bg-background px-3 md:px-4">
+    <header className="flex h-14 w-full shrink-0 touch-none items-center gap-2 border-b bg-background px-3 md:px-4">
+      {onToggleSidebar ? (
+        <TooltipProvider delayDuration={250}>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                aria-label={sidebarCollapsed ? "Show sidebar" : "Hide sidebar"}
+                className="size-8 shrink-0"
+                onClick={onToggleSidebar}
+                size="icon"
+                title={sidebarCollapsed ? "Show sidebar" : "Hide sidebar"}
+                type="button"
+                variant="ghost"
+              >
+                {sidebarCollapsed ? <PanelLeftOpen /> : <PanelLeftClose />}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">
+              {sidebarCollapsed ? "Show sidebar" : "Hide sidebar"}
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      ) : null}
       <MobileNavigation
         activeFolder={activeFolder}
         draftCount={draftCount}

@@ -28,6 +28,7 @@ type SidebarProps = {
   unread: UnreadCounts;
   onFolderChange: (folder: FolderId) => void;
   onSignedOut: () => void;
+  resizable?: boolean;
   variant?: "desktop" | "drawer";
 };
 
@@ -50,6 +51,7 @@ export function Sidebar({
   user,
   onFolderChange,
   onSignedOut,
+  resizable = false,
   variant = "desktop"
 }: SidebarProps): React.ReactElement {
   const isDrawer = variant === "drawer";
@@ -64,10 +66,12 @@ export function Sidebar({
   return (
     <aside
       className={cn(
-        "w-56 shrink-0 flex-col bg-background px-3 py-3",
+        "flex-col bg-background px-3 py-3",
         isDrawer
           ? "flex h-full w-full pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-[max(0.75rem,env(safe-area-inset-top))]"
-          : "hidden border-r md:flex"
+          : resizable
+            ? "hidden h-full w-full md:flex"
+            : "hidden w-56 shrink-0 border-r md:flex"
       )}
     >
       <div className="mb-7 flex h-9 items-center gap-2.5 px-2">

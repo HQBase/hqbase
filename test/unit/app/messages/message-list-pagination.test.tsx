@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { MessageList } from "@/features/messages/message-list";
 import type { ConversationSummary } from "@/features/messages/types";
-import { renderComponent } from "../render-hook";
+import { flushHookEffects, renderComponent } from "../render-hook";
 
 const conversation: ConversationSummary = {
   createdAt: "2026-07-30T12:00:00.000Z",
@@ -56,6 +56,7 @@ describe("conversation list pagination", () => {
         loadMoreError={null}
         selectedThreadId={null}
         onLoadMore={onLoadMore}
+        onRefresh={() => undefined}
         onSelect={() => undefined}
       />
     );
@@ -66,4 +67,41 @@ describe("conversation list pagination", () => {
     await rendered.unmount();
     vi.unstubAllGlobals();
   });
+
+  it("refreshes only after a downward pull crosses the release threshold", async () => {
+    const onRefresh = vi.fn().mockResolvedValue(undefined);
+    const rendered = await renderComponent(
+      <MessageList
+        activeFolder="inbox"
+        conversations={[conversation]}
+        hasMore={false}
+        isLoadingMore={false}
+        loadMoreError={null}
+        selectedThreadId={null}
+        onLoadMore={() => undefined}
+        onRefresh={onRefresh}
+        onSelect={() => undefined}
+      />
+    );
+    const scrollContainer = rendered.container.querySelector<HTMLDivElement>(".overscroll-contain");
+    expect(scrollContainer).not.toBeNull();
+
+    await flushHookEffects(() => {
+      scrollContainer?.dispatchEvent(touchEvent("touchstart", 20, 100));
+      scrollContainer?.dispatchEvent(touchEvent("touchmove", 20, 260));
+      scrollContainer?.dispatchEvent(touchEvent("touchend"));
+    });
+
+    expect(onRefresh).toHaveBeenCalledOnce();
+    expect(rendered.container.textContent).toContain("Updated");
+    await rendered.unmount();
+  });
 });
+
+function touchEvent(type: string, clientX = 0, clientY = 0): Event {
+  const event = new Event(type, { bubbles: true, cancelable: true });
+  Object.defineProperty(event, "touches", {
+    value: type === "touchend" ? [] : [{ clientX, clientY }]
+  });
+  return event;
+}

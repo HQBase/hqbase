@@ -87,6 +87,7 @@
     "postal-mime": "^2.5.2",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
+    "react-resizable-panels": "^4.12.2",
     "sanitize-html": "^2.17.6",
     "sonner": "^2.0.6",
     "tailwind-merge": "^3.3.1",

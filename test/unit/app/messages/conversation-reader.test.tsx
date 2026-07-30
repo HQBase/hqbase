@@ -73,6 +73,7 @@ describe("conversation reader", () => {
         selectedId={secondMessage.id}
         onAction={() => undefined}
         onBack={() => undefined}
+        onRefresh={() => undefined}
         onSent={() => undefined}
       />
     );
@@ -127,9 +128,10 @@ describe("conversation reader", () => {
 
     expect(listHtml).toContain('data-mobile-view="message-list"');
     expect(listHtml).toContain('data-mobile-view="conversation"');
-    expect(listHtml).toContain("lg:block hidden");
-    expect(conversationHtml).toContain("lg:flex lg:border-r hidden");
-    expect(conversationHtml).toContain("lg:block block");
+    expect(listHtml).toContain("h-full min-h-0 bg-background hidden");
+    expect(conversationHtml).toContain("h-full min-h-0 flex-col bg-card/35 hidden");
+    expect(conversationHtml).toContain("h-full min-h-0 bg-background block");
+    expect(listHtml).toContain("Pull to refresh");
   });
 
   it("shows the exact right-aligned conversation total and a manual paging fallback", () => {
