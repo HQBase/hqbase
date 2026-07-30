@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  defaultSendingIdentity,
   findDraftForComposer,
   forwardedMessage,
   normalizeDraftHtml,
@@ -158,10 +159,64 @@ describe("composer state", () => {
       [
         { mailboxId: "mbx_1", address: "support@example.com" },
         { mailboxId: "mbx_1", address: "alias@example.com" }
-      ]
+      ],
+      { mailboxId: "mbx_2", address: "privacy@example.com" }
     );
 
     expect(identity).toEqual({ mailboxId: "mbx_1", address: "alias@example.com" });
+  });
+
+  it("uses the preferred mailbox primary address for new messages", () => {
+    const mailboxes = [
+      {
+        id: "mbx_1",
+        address: "support@example.com",
+        displayName: "Support",
+        isActive: true,
+        accessLevel: "manager" as const,
+        createdAt: "now",
+        updatedAt: "now",
+        addresses: [
+          {
+            id: "addr_1",
+            mailboxId: "mbx_1",
+            mailDomainId: "dom_1",
+            address: "support@example.com",
+            displayName: "Support",
+            receiveEnabled: true,
+            sendEnabled: true,
+            isPrimary: true
+          }
+        ]
+      },
+      {
+        id: "mbx_2",
+        address: "privacy@example.com",
+        displayName: "Privacy",
+        isActive: true,
+        accessLevel: "agent" as const,
+        createdAt: "now",
+        updatedAt: "now",
+        addresses: [
+          {
+            id: "addr_2",
+            mailboxId: "mbx_2",
+            mailDomainId: "dom_1",
+            address: "privacy@example.com",
+            displayName: "Privacy",
+            receiveEnabled: true,
+            sendEnabled: true,
+            isPrimary: true
+          }
+        ]
+      }
+    ];
+    const identities = sendingIdentities(mailboxes);
+
+    expect(defaultSendingIdentity("mbx_2", mailboxes, identities)).toEqual({
+      mailboxId: "mbx_2",
+      address: "privacy@example.com"
+    });
   });
 
   it("treats empty editor markup as the canonical empty draft", () => {

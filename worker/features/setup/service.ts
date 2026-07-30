@@ -4,6 +4,7 @@ import { AppError } from "../../lib/errors";
 import { upsertMailDomain } from "../domains/queries";
 import { createMailbox } from "../mailboxes/service";
 import type { Mailbox } from "../mailboxes/types";
+import { setDefaultFromMailboxId } from "../preferences/queries";
 
 import {
   getSetupStatus,
@@ -28,6 +29,7 @@ type BootstrapInput = {
       }>
     | undefined;
   checklistAcknowledged: boolean;
+  defaultFromMailboxAddress: string;
   mailboxes: Array<{
     address: string;
     displayName: string;
@@ -82,6 +84,17 @@ export async function bootstrapSetup(
   for (const mailbox of input.mailboxes) {
     mailboxes.push(await createMailbox(env.DB, mailbox));
   }
+  const defaultFromMailbox = mailboxes.find(
+    (mailbox) => mailbox.address === input.defaultFromMailboxAddress
+  );
+  if (!defaultFromMailbox) {
+    throw new AppError(
+      "DEFAULT_FROM_MAILBOX_REQUIRED",
+      "Choose one of the setup mailboxes as the default From mailbox.",
+      400
+    );
+  }
+  await setDefaultFromMailboxId(env.DB, owner.id, defaultFromMailbox.id);
 
   await completeSetupIfReady(env.DB);
 

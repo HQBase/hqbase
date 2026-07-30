@@ -12,6 +12,7 @@ const ComposeDialog = React.lazy(() =>
 );
 
 type MessageDetailProps = {
+  defaultFromMailboxId: string | null;
   error?: string | null;
   isLoading?: boolean;
   mailboxes: Mailbox[];
@@ -31,6 +32,7 @@ type ThreadComposeState = {
 };
 
 export function MessageDetail({
+  defaultFromMailboxId,
   error = null,
   isLoading = false,
   mailboxes,
@@ -118,6 +120,7 @@ export function MessageDetail({
               }
             >
               <ComposeDialog
+                defaultFromMailboxId={defaultFromMailboxId}
                 key={`${composeState.mode}:${composeState.message.id}`}
                 mailboxes={mailboxes}
                 message={composeState.message}

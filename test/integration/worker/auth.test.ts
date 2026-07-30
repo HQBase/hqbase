@@ -6,6 +6,7 @@ import workspaceMigration from "../../../migrations/0002_workspace.sql?raw";
 import oauthResourcesMigration from "../../../migrations/0003_oauth_resources.sql?raw";
 import conversationMigration from "../../../migrations/0004_conversations.sql?raw";
 import threadRebuildMigration from "../../../migrations/0005_rebuild_threads.sql?raw";
+import userMailPreferencesMigration from "../../../migrations/0007_user_mail_preferences.sql?raw";
 import { createAuth } from "../../../worker/auth/auth";
 
 const origin = "https://hqbase.test";
@@ -32,6 +33,7 @@ describe("Better Auth schema", () => {
     await applyMigration(oauthResourcesMigration);
     await applyMigration(conversationMigration);
     await applyMigration(threadRebuildMigration);
+    await applyMigration(userMailPreferencesMigration);
   });
 
   it("backfills the Better Auth 1.7 account identity without losing credential rows", async () => {
@@ -59,6 +61,97 @@ describe("Better Auth schema", () => {
   it("applies the conversation draft migration on an existing schema", async () => {
     const columns = await env.DB.prepare("PRAGMA table_info(drafts)").all<{ name: string }>();
     expect(columns.results.map((column) => column.name)).toContain("forward_of_message_id");
+  });
+
+  it("adds per-user default From preferences without changing existing users", async () => {
+    const columns = await env.DB.prepare("PRAGMA table_info(user_mail_preferences)").all<{
+      name: string;
+    }>();
+    expect(columns.results.map((column) => column.name)).toEqual([
+      "user_id",
+      "default_from_mailbox_id",
+      "created_at",
+      "updated_at"
+    ]);
+    await expect(
+      env.DB.prepare(
+        `SELECT default_from_mailbox_id
+           FROM user_mail_preferences
+           WHERE user_id = 'usr_legacy'`
+      ).first()
+    ).resolves.toBeNull();
+  });
+
+  it("stores and returns the signed-in user's default From mailbox", async () => {
+    const email = "preference-owner@example.com";
+    const password = "correct-horse-battery-staple";
+    const signUp = await createAuth(env, new Request(`${origin}/api/auth/sign-up/email`)).handler(
+      new Request(`${origin}/api/auth/sign-up/email`, {
+        body: JSON.stringify({
+          email,
+          name: "Preference Owner",
+          password,
+          rememberMe: false
+        }),
+        headers: {
+          "content-type": "application/json",
+          origin
+        },
+        method: "POST"
+      })
+    );
+    expect(signUp.status, await signUp.text()).toBe(200);
+    const cookie = extractSessionCookie(signUp);
+    const user = await env.DB.prepare('SELECT id FROM "user" WHERE email = ?')
+      .bind(email)
+      .first<{ id: string }>();
+    expect(user).not.toBeNull();
+    const timestamp = new Date().toISOString();
+    await env.DB.batch([
+      env.DB.prepare(
+        `INSERT INTO mail_domains (id, name, created_at, updated_at)
+         VALUES ('domain_preferences', 'preferences.example', ?, ?)`
+      ).bind(timestamp, timestamp),
+      env.DB.prepare(
+        `INSERT INTO mailboxes
+         (id, address, display_name, is_active, created_at, updated_at)
+         VALUES ('mailbox_preferences', 'support@preferences.example', 'Support', 1, ?, ?)`
+      ).bind(timestamp, timestamp),
+      env.DB.prepare(
+        `INSERT INTO mailbox_addresses
+         (id, mailbox_id, mail_domain_id, local_part, address, display_name,
+          receive_enabled, send_enabled, is_primary, created_at, updated_at)
+         VALUES
+         ('address_preferences', 'mailbox_preferences', 'domain_preferences', 'support',
+          'support@preferences.example', 'Support', 1, 1, 1, ?, ?)`
+      ).bind(timestamp, timestamp),
+      env.DB.prepare(
+        `INSERT INTO mailbox_grants
+         (mailbox_id, user_id, access_level, created_by, created_at, updated_at)
+         VALUES ('mailbox_preferences', ?, 'agent', ?, ?, ?)`
+      ).bind(user?.id, user?.id, timestamp, timestamp)
+    ]);
+
+    const updated = await SELF.fetch(`${origin}/api/me`, {
+      body: JSON.stringify({ defaultFromMailboxId: "mailbox_preferences" }),
+      headers: {
+        "content-type": "application/json",
+        cookie
+      },
+      method: "PATCH"
+    });
+    expect(updated.status, await updated.clone().text()).toBe(200);
+    await expect(updated.json()).resolves.toMatchObject({
+      email,
+      defaultFromMailboxId: "mailbox_preferences"
+    });
+
+    const current = await SELF.fetch(`${origin}/api/me`, { headers: { cookie } });
+    expect(current.status, await current.clone().text()).toBe(200);
+    await expect(current.json()).resolves.toMatchObject({
+      email,
+      defaultFromMailboxId: "mailbox_preferences"
+    });
   });
 
   it("creates and signs in a fresh email/password account after migration", async () => {

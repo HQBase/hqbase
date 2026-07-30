@@ -19,10 +19,12 @@ import { appRoutePath, isSettingsTabId, type SettingsTabId } from "@/lib/routes"
 type SettingsPageProps = {
   activeTab: SettingsTabId;
   canManage: boolean;
+  defaultFromMailboxId: string | null;
   mailboxes: Mailbox[];
   notifications: NotificationController;
   setup: SetupStatus;
   users: WorkspaceUser[];
+  onDefaultFromMailboxChange: (mailboxId: string) => void;
   onRefresh: () => void;
   onTabChange: (tab: SettingsTabId) => void;
   onUpdateStarted: (buildId: string) => void;
@@ -34,10 +36,12 @@ type SettingsPageProps = {
 export function SettingsPage({
   activeTab,
   canManage,
+  defaultFromMailboxId,
   mailboxes,
   notifications,
   setup,
   users,
+  onDefaultFromMailboxChange,
   onRefresh,
   onTabChange,
   onUpdateStarted,
@@ -69,8 +73,10 @@ export function SettingsPage({
           <TabsContent className="mt-5" value="mailboxes">
             <MailboxSettings
               canManage={canManage}
+              defaultFromMailboxId={defaultFromMailboxId}
               mailboxes={mailboxes}
               users={users}
+              onDefaultFromMailboxChange={onDefaultFromMailboxChange}
               onChanged={onRefresh}
             />
           </TabsContent>

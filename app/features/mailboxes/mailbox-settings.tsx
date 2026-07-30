@@ -28,22 +28,28 @@ import { MailboxAccessPolicyDialog } from "@/features/mailbox-access/mailbox-acc
 import { SettingsSection } from "@/features/settings/settings-section";
 import type { WorkspaceUser } from "@/features/users/types";
 import { addMailboxAddress, createMailbox, removeMailboxAddress, updateMailbox } from "./api";
+import { DefaultFromMailboxControl } from "./default-from-mailbox-control";
 import { MailboxAliasDialog } from "./mailbox-alias-dialog";
 import { MailboxDetailsSheet } from "./mailbox-details-sheet";
+import { mailboxDomains, mailboxMatchesDomain } from "./mailbox-filtering";
 import { MailboxSelectionBar, MailboxTable } from "./mailbox-table";
 import type { Mailbox } from "./types";
 
 type MailboxSettingsProps = {
   canManage: boolean;
+  defaultFromMailboxId: string | null;
   mailboxes: Mailbox[];
   users: WorkspaceUser[];
+  onDefaultFromMailboxChange: (mailboxId: string) => void;
   onChanged: () => void;
 };
 
 export function MailboxSettings({
   canManage,
+  defaultFromMailboxId,
   mailboxes,
   users,
+  onDefaultFromMailboxChange,
   onChanged
 }: MailboxSettingsProps): React.ReactElement {
   const [address, setAddress] = React.useState("");
@@ -174,6 +180,12 @@ export function MailboxSettings({
       description="Shared addresses across your connected domains"
       title="Mailboxes"
     >
+      <DefaultFromMailboxControl
+        defaultFromMailboxId={defaultFromMailboxId}
+        mailboxes={mailboxes}
+        onChanged={onDefaultFromMailboxChange}
+      />
+
       {canManage && mailboxes.length > 0 && domains.length > 1 ? (
         <div>
           <Select
@@ -265,25 +277,5 @@ export function MailboxSettings({
         onOpenChange={setBulkAccessOpen}
       />
     </SettingsSection>
-  );
-}
-
-function mailboxDomains(mailboxes: Mailbox[]): string[] {
-  return Array.from(
-    new Set(
-      mailboxes.flatMap((mailbox) =>
-        (mailbox.addresses.length ? mailbox.addresses : [{ address: mailbox.address }]).map(
-          (identity) => identity.address.split("@")[1] ?? ""
-        )
-      )
-    )
-  )
-    .filter(Boolean)
-    .sort();
-}
-
-function mailboxMatchesDomain(mailbox: Mailbox, domain: string): boolean {
-  return (mailbox.addresses.length ? mailbox.addresses : [{ address: mailbox.address }]).some(
-    (identity) => identity.address.endsWith(`@${domain}`)
   );
 }

@@ -16,6 +16,7 @@ export type BootstrapSetupInput = {
   portalHostname: string;
   emailDomains: Array<{ name: string; zoneId: string; accountId: string | null }>;
   checklistAcknowledged: boolean;
+  defaultFromMailboxAddress: string;
   mailboxes: Array<{
     address: string;
     displayName: string;

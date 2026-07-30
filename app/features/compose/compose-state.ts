@@ -9,6 +9,7 @@ export type ComposeMode = "new" | "reply" | "forward";
 export type DraftSaveState = "saved" | "saving" | "error";
 
 export type ComposeDialogProps = {
+  defaultFromMailboxId?: string | null;
   draftId?: Draft["id"] | null;
   mailboxes: Mailbox[];
   message?: MessageDetail | null;
@@ -46,7 +47,8 @@ export const splitRecipients = (value: string) =>
 
 export function replySendingIdentity(
   message: MessageDetail,
-  identities: SendingIdentity[]
+  identities: SendingIdentity[],
+  defaultIdentity: SendingIdentity | null = null
 ): SendingIdentity | null {
   const addresses = [message.deliveredToAddress, ...message.to].filter(
     (address): address is string => Boolean(address)
@@ -58,7 +60,29 @@ export function replySendingIdentity(
     if (identity) return identity;
   }
   return (
-    identities.find((identity) => identity.mailboxId === message.mailboxId) ?? identities[0] ?? null
+    identities.find((identity) => identity.mailboxId === message.mailboxId) ??
+    defaultIdentity ??
+    identities[0] ??
+    null
+  );
+}
+
+export function defaultSendingIdentity(
+  defaultFromMailboxId: string | null,
+  mailboxes: Mailbox[],
+  identities: SendingIdentity[]
+): SendingIdentity | null {
+  const mailbox = mailboxes.find((candidate) => candidate.id === defaultFromMailboxId);
+  const primaryAddress =
+    mailbox?.addresses.find((address) => address.isPrimary && address.sendEnabled)?.address ??
+    (mailbox?.addresses.length === 0 ? mailbox.address : null);
+  return (
+    identities.find(
+      (identity) =>
+        identity.mailboxId === defaultFromMailboxId && identity.address === primaryAddress
+    ) ??
+    identities[0] ??
+    null
   );
 }
 

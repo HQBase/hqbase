@@ -79,7 +79,14 @@ const notifications = {
 describe("settings presentation", () => {
   it("renders mailbox content at the top level and opens creation from a dialog trigger", () => {
     const html = renderToStaticMarkup(
-      <MailboxSettings canManage mailboxes={[]} users={[]} onChanged={() => undefined} />
+      <MailboxSettings
+        canManage
+        defaultFromMailboxId={null}
+        mailboxes={[]}
+        users={[]}
+        onChanged={() => undefined}
+        onDefaultFromMailboxChange={() => undefined}
+      />
     );
 
     expect(html).toContain("<section");
@@ -114,14 +121,18 @@ describe("settings presentation", () => {
     const html = renderToStaticMarkup(
       <MailboxSettings
         canManage
+        defaultFromMailboxId={mailbox.id}
         mailboxes={[mailbox]}
         users={[member]}
         onChanged={() => undefined}
+        onDefaultFromMailboxChange={() => undefined}
       />
     );
 
     expect(html).toContain('class="relative w-full overflow-auto rounded-lg border"');
     expect(html).toContain('aria-label="Select all visible mailboxes"');
+    expect(html).toContain("Default From mailbox");
+    expect(html).toContain("Replies use the mailbox that received");
     expect(html).toContain('aria-label="Select support@example.com"');
     expect(html).not.toContain('aria-label="Filter mailboxes by domain"');
     expect(html).toContain(">Access<");
@@ -151,9 +162,11 @@ describe("settings presentation", () => {
     const html = renderToStaticMarkup(
       <MailboxSettings
         canManage
+        defaultFromMailboxId={mailbox.id}
         mailboxes={[mailbox, secondDomainMailbox]}
         users={[member]}
         onChanged={() => undefined}
+        onDefaultFromMailboxChange={() => undefined}
       />
     );
 
@@ -211,11 +224,13 @@ describe("settings presentation", () => {
       <SettingsPage
         activeTab="mailboxes"
         canManage
+        defaultFromMailboxId={null}
         mailboxes={[]}
         notifications={notifications}
         setup={setup}
         updateStatus={null}
         users={[]}
+        onDefaultFromMailboxChange={() => undefined}
         onRefresh={() => undefined}
         onTabChange={() => undefined}
         onUpdateStarted={() => undefined}

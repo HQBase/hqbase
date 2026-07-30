@@ -50,6 +50,7 @@ test("HQBase web lifecycle remains healthy", async ({ page, request }) => {
     const bootstrap = await request.post("/api/setup/bootstrap", {
       data: {
         checklistAcknowledged: true,
+        defaultFromMailboxAddress: sender,
         mailboxes: [{ address: sender, displayName: "HQBase E2E" }],
         ownerEmail: email,
         ownerName: "HQBase E2E Owner",

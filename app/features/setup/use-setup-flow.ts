@@ -17,6 +17,7 @@ export function useSetupFlow(onComplete: () => void) {
   const [ownerPassword, setOwnerPassword] = React.useState("");
   const [ownerAttempted, setOwnerAttempted] = React.useState(false);
   const [mailboxes, setMailboxes] = React.useState<MailboxDraft[]>([]);
+  const [selectedDefaultFromAddress, setSelectedDefaultFromAddress] = React.useState("");
   const [mailboxAttempted, setMailboxAttempted] = React.useState(false);
   const [submitError, setSubmitError] = React.useState<string | null>(null);
   const [isPending, setIsPending] = React.useState(false);
@@ -28,14 +29,35 @@ export function useSetupFlow(onComplete: () => void) {
     setOwnerName(saved.ownerName);
     setOwnerEmail(saved.ownerEmail);
     setMailboxes(saved.mailboxes);
+    setSelectedDefaultFromAddress(saved.defaultFromMailboxAddress);
   }, []);
+
+  const defaultFromMailboxAddress = mailboxes.some(
+    (mailbox) => mailbox.address === selectedDefaultFromAddress
+  )
+    ? selectedDefaultFromAddress
+    : (mailboxes[0]?.address ?? "");
+
+  React.useEffect(() => {
+    setSelectedDefaultFromAddress((current) =>
+      mailboxes.some((mailbox) => mailbox.address === current)
+        ? current
+        : (mailboxes[0]?.address ?? "")
+    );
+  }, [mailboxes]);
 
   React.useEffect(() => {
     localStorage.setItem(
       "hqb_setup_draft_v1",
-      JSON.stringify({ activeStep, mailboxes, ownerEmail, ownerName })
+      JSON.stringify({
+        activeStep,
+        defaultFromMailboxAddress,
+        mailboxes,
+        ownerEmail,
+        ownerName
+      })
     );
-  }, [activeStep, mailboxes, ownerEmail, ownerName]);
+  }, [activeStep, defaultFromMailboxAddress, mailboxes, ownerEmail, ownerName]);
 
   const cloudflare = useSetupCloudflare({
     onConnectionInvalidated: () => setActiveStep((current) => Math.min(current, DOMAIN_STEP)),
@@ -106,6 +128,7 @@ export function useSetupFlow(onComplete: () => void) {
 
     const input: BootstrapSetupInput = {
       checklistAcknowledged: true,
+      defaultFromMailboxAddress,
       mailboxes,
       ownerEmail,
       ownerName,
@@ -140,11 +163,20 @@ export function useSetupFlow(onComplete: () => void) {
   }
 
   function removeMailbox(index: number) {
-    setMailboxes((current) => current.filter((_, itemIndex) => itemIndex !== index));
+    const removedAddress = mailboxes[index]?.address;
+    const nextMailboxes = mailboxes.filter((_, itemIndex) => itemIndex !== index);
+    setMailboxes(nextMailboxes);
+    if (removedAddress === defaultFromMailboxAddress) {
+      setSelectedDefaultFromAddress(nextMailboxes[0]?.address ?? "");
+    }
     setSubmitError(null);
   }
 
   function updateMailbox(index: number, patch: Partial<MailboxDraft>) {
+    const previousAddress = mailboxes[index]?.address;
+    if (patch.address !== undefined && previousAddress === defaultFromMailboxAddress) {
+      setSelectedDefaultFromAddress(patch.address);
+    }
     setMailboxes((current) =>
       current.map((mailbox, itemIndex) =>
         itemIndex === index ? { ...mailbox, ...patch } : mailbox
@@ -158,6 +190,7 @@ export function useSetupFlow(onComplete: () => void) {
     activeStep,
     domain: { ...cloudflare.domain, onBack: () => setActiveStep(ACCESS_STEP) },
     mailboxes: {
+      defaultFromMailboxAddress,
       errors: mailboxErrors,
       isPending,
       mailboxes,
@@ -166,6 +199,7 @@ export function useSetupFlow(onComplete: () => void) {
       onBack: () => setActiveStep(OWNER_STEP),
       onComplete: () => void handleComplete(),
       onRemove: removeMailbox,
+      onSetDefaultFromMailboxAddress: setSelectedDefaultFromAddress,
       onUpdate: updateMailbox
     },
     owner: {
@@ -185,6 +219,7 @@ export function useSetupFlow(onComplete: () => void) {
 
 function readSetupDraft(): {
   activeStep: number;
+  defaultFromMailboxAddress: string;
   mailboxes: MailboxDraft[];
   ownerEmail: string;
   ownerName: string;
@@ -197,6 +232,10 @@ function readSetupDraft(): {
     if (!value || !Array.isArray(value.mailboxes)) return null;
     return {
       activeStep: Math.min(MAILBOX_STEP, Math.max(ACCESS_STEP, Number(value.activeStep) || 0)),
+      defaultFromMailboxAddress:
+        typeof value.defaultFromMailboxAddress === "string"
+          ? value.defaultFromMailboxAddress.slice(0, 254)
+          : "",
       mailboxes: value.mailboxes
         .filter((item): item is MailboxDraft =>
           Boolean(item && typeof item === "object" && "address" in item && "displayName" in item)

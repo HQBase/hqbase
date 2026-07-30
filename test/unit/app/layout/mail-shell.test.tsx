@@ -10,6 +10,7 @@ import { InboxPage } from "@/features/inbox/inbox-page";
 import { McpConnectionDetails } from "@/features/mcp/connection-dialog";
 
 const user = {
+  defaultFromMailboxId: "mailbox-1",
   id: "user-1",
   email: "olivia@example.com",
   name: "Olivia Berman",
@@ -215,6 +216,7 @@ describe("mail shell", () => {
       <InboxPage
         activeFolder="inbox"
         conversations={[]}
+        defaultFromMailboxId={user.defaultFromMailboxId}
         mailboxes={[]}
         selectedId={null}
         onMessageRouteChange={() => undefined}

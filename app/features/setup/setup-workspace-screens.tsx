@@ -12,6 +12,14 @@ import {
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from "@/components/ui/select";
+import {
   Table,
   TableBody,
   TableCell,
@@ -131,6 +139,7 @@ export function OwnerStep({
 }
 
 export function MailboxStep({
+  defaultFromMailboxAddress,
   errors,
   isPending,
   mailboxes,
@@ -138,9 +147,11 @@ export function MailboxStep({
   onBack,
   onComplete,
   onRemove,
+  onSetDefaultFromMailboxAddress,
   onUpdate,
   submitError
 }: {
+  defaultFromMailboxAddress: string;
   errors: MailboxErrors;
   isPending: boolean;
   mailboxes: MailboxDraft[];
@@ -148,6 +159,7 @@ export function MailboxStep({
   onBack: () => void;
   onComplete: () => void;
   onRemove: (index: number) => void;
+  onSetDefaultFromMailboxAddress: (address: string) => void;
   onUpdate: (index: number, patch: Partial<MailboxDraft>) => void;
   submitError: string | null;
 }): React.ReactElement {
@@ -236,6 +248,30 @@ export function MailboxStep({
         <Plus data-icon="inline-start" />
         Add mailbox
       </Button>
+
+      <Field className="max-w-md">
+        <FieldLabel htmlFor="setup-default-from-mailbox">Default From mailbox</FieldLabel>
+        <Select value={defaultFromMailboxAddress} onValueChange={onSetDefaultFromMailboxAddress}>
+          <SelectTrigger id="setup-default-from-mailbox" className="w-full shadow-none">
+            <SelectValue placeholder="Choose a mailbox" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectGroup>
+              {mailboxes
+                .filter((mailbox) => mailbox.address)
+                .map((mailbox, index) => (
+                  <SelectItem key={`${index}:${mailbox.address}`} value={mailbox.address}>
+                    {mailbox.displayName || "Mailbox"} — {mailbox.address}
+                  </SelectItem>
+                ))}
+            </SelectGroup>
+          </SelectContent>
+        </Select>
+        <FieldDescription>
+          New messages and forwards start from this mailbox. Replies use the mailbox that received
+          the original message.
+        </FieldDescription>
+      </Field>
 
       {errors.form ? <FieldError>{errors.form}</FieldError> : null}
       {submitError ? (

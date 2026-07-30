@@ -172,10 +172,14 @@ export function App(): React.ReactElement {
               <SettingsPage
                 activeTab={settingsTab}
                 canManage={user.role === "owner" || user.role === "admin"}
+                defaultFromMailboxId={user.defaultFromMailboxId}
                 mailboxes={mailboxes}
                 notifications={mailSync.notifications}
                 setup={setup}
                 users={users}
+                onDefaultFromMailboxChange={(defaultFromMailboxId) => {
+                  setUser((current) => (current ? { ...current, defaultFromMailboxId } : current));
+                }}
                 onRefresh={() => void reload()}
                 onTabChange={(tab) => navigate({ kind: "settings", tab })}
                 onUpdateStarted={updateMonitor.start}
@@ -197,6 +201,7 @@ export function App(): React.ReactElement {
               <InboxPage
                 activeFolder={activeFolder as MailFolderId}
                 conversations={mailSync.conversations}
+                defaultFromMailboxId={user.defaultFromMailboxId}
                 mailboxes={contentMailboxes}
                 selectedId={selectedId}
                 onDraftsChange={() => void draftState.refresh().catch(() => undefined)}
@@ -215,6 +220,7 @@ export function App(): React.ReactElement {
       {composeOpen ? (
         <React.Suspense fallback={null}>
           <ComposeDialog
+            defaultFromMailboxId={user.defaultFromMailboxId}
             mailboxes={contentMailboxes}
             mode="new"
             open={composeOpen}

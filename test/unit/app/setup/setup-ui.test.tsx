@@ -96,6 +96,7 @@ describe("setup UI", () => {
     ];
     const html = renderToStaticMarkup(
       <MailboxStep
+        defaultFromMailboxAddress="privacy@northstar.example"
         errors={{ rows: mailboxes.map(() => ({})) }}
         isPending={false}
         mailboxes={mailboxes}
@@ -103,6 +104,7 @@ describe("setup UI", () => {
         onBack={() => undefined}
         onComplete={() => undefined}
         onRemove={() => undefined}
+        onSetDefaultFromMailboxAddress={() => undefined}
         onUpdate={() => undefined}
         submitError={null}
       />
@@ -113,6 +115,8 @@ describe("setup UI", () => {
     expect(html).toContain("support@northstar.example");
     expect(html).toContain("privacy@fieldnotes.example");
     expect(html).toContain("Add mailbox");
+    expect(html).toContain("Default From mailbox");
+    expect(html).toContain("Replies use the mailbox that received");
     expect(html).not.toContain("Add shared addresses");
     expect(html).not.toContain(">Review<");
     expect(html).not.toContain(">Mailbox 1<");

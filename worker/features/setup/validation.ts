@@ -30,6 +30,7 @@ export const bootstrapSetupSchema = z
       .max(50)
       .optional(),
     checklistAcknowledged: z.literal(true),
+    defaultFromMailboxAddress: emailAddressSchema,
     mailboxes: z.array(createMailboxSchema).min(1).max(20)
   })
   .superRefine((input, context) => {
@@ -62,6 +63,13 @@ export const bootstrapSetupSchema = z
         });
       }
       seen.add(mailbox.address);
+    }
+    if (!input.mailboxes.some((mailbox) => mailbox.address === input.defaultFromMailboxAddress)) {
+      context.addIssue({
+        code: "custom",
+        message: "Choose one of the setup mailboxes as the default From mailbox.",
+        path: ["defaultFromMailboxAddress"]
+      });
     }
   });
 

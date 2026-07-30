@@ -67,6 +67,7 @@ describe("conversation reader", () => {
   it("renders Reply and Forward for every message and keeps the large final actions", () => {
     const html = renderToStaticMarkup(
       <MessageDetail
+        defaultFromMailboxId="mbx_1"
         mailboxes={[]}
         messages={[firstMessage, secondMessage]}
         selectedId={secondMessage.id}
@@ -91,6 +92,7 @@ describe("conversation reader", () => {
       <InboxPage
         activeFolder="inbox"
         conversations={[conversation]}
+        defaultFromMailboxId="mbx_1"
         mailboxes={[]}
         selectedId={null}
         onMessageRouteChange={() => undefined}
@@ -102,6 +104,7 @@ describe("conversation reader", () => {
       <InboxPage
         activeFolder="inbox"
         conversations={[conversation]}
+        defaultFromMailboxId="mbx_1"
         mailboxes={[]}
         selectedId={conversation.id}
         onMessageRouteChange={() => undefined}
