@@ -54,7 +54,7 @@ export function ComposeWindow({
       aria-labelledby={titleId}
       aria-modal="false"
       className={cn(
-        "fixed inset-0 z-50 flex h-[100dvh] w-full flex-col overflow-hidden bg-card shadow-2xl outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring md:inset-auto md:bottom-0 md:right-4 md:z-40 md:h-[min(42rem,calc(100vh-5rem))] md:w-[min(42rem,calc(100vw-2rem))] md:rounded-t-lg md:border",
+        "fixed inset-0 z-50 flex h-[100dvh] w-full flex-col overflow-hidden bg-card pt-[env(safe-area-inset-top)] shadow-2xl outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring md:inset-auto md:bottom-0 md:right-4 md:z-40 md:h-[min(42rem,calc(100vh-5rem))] md:w-[min(42rem,calc(100vw-2rem))] md:rounded-t-lg md:border md:pt-0",
         expanded &&
           "md:bottom-6 md:right-1/2 md:h-[min(48rem,calc(100vh-3rem))] md:w-[min(64rem,calc(100vw-3rem))] md:translate-x-1/2 md:rounded-lg",
         minimized &&

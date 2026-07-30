@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.30
+
+- Keep compact right-side sheet headers and close controls below the top device safe area.
+- Place full-screen new-message, reply, and forward composer headers below the notch or Dynamic
+  Island.
+- Add device-aware bottom spacing around new-message actions so they clear the home indicator.
+
 ## 0.1.29
 
 - Replace the available-update banner with an animated progress status after an update starts, then

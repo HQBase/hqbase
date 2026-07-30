@@ -32,14 +32,19 @@ export const SheetContent = React.forwardRef<
         "fixed inset-y-0 z-50 w-[min(92vw,480px)] bg-background p-5 shadow-lg motion-reduce:animate-none",
         side === "left"
           ? "left-0 border-r data-[state=closed]:animate-sheet-out-left data-[state=open]:animate-sheet-in-left"
-          : "right-0 border-l data-[state=closed]:animate-sheet-out-right data-[state=open]:animate-sheet-in-right",
+          : "right-0 border-l max-md:pb-[max(1.25rem,env(safe-area-inset-bottom))] max-md:pt-[max(1.25rem,env(safe-area-inset-top))] data-[state=closed]:animate-sheet-out-right data-[state=open]:animate-sheet-in-right",
         className
       )}
       ref={ref}
       {...props}
     >
       {children}
-      <DialogPrimitive.Close className="absolute right-3 top-3 inline-flex size-9 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+      <DialogPrimitive.Close
+        className={cn(
+          "absolute right-3 top-3 inline-flex size-9 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+          side === "right" && "max-md:top-[max(0.75rem,env(safe-area-inset-top))]"
+        )}
+      >
         <X />
         <span className="sr-only">Close</span>
       </DialogPrimitive.Close>
