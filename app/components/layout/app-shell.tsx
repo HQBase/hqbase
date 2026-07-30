@@ -1,9 +1,11 @@
-import { AppWindow } from "lucide-react";
+import { AppWindow, Cable } from "lucide-react";
 import * as React from "react";
 import { usePanelRef } from "react-resizable-panels";
+import { Button } from "@/components/ui/button";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import type { CurrentUser } from "@/features/auth/types";
 import type { Mailbox } from "@/features/mailboxes/types";
+import { McpConnectionDialog } from "@/features/mcp/connection-dialog";
 import type { UnreadCounts } from "@/features/notifications/types";
 import type { UpdateStatus } from "@/features/updates/types";
 import { UpdateBanner } from "@/features/updates/update-banner";
@@ -48,6 +50,8 @@ type AppShellProps = {
 export function AppShell(props: AppShellProps): React.ReactElement {
   const desktopShell = useDesktopShell();
   const sidebarPanelRef = usePanelRef();
+  const [mcpOpen, setMcpOpen] = React.useState(false);
+  const mcpTriggerRef = React.useRef<HTMLButtonElement>(null);
   const [sidebarCollapsed, setSidebarCollapsed] = React.useState(() =>
     readStoredBoolean(sidebarCollapsedStorageKey, false)
   );
@@ -78,6 +82,18 @@ export function AppShell(props: AppShellProps): React.ReactElement {
       sidebarCollapsed={sidebarCollapsed}
       {...(desktopShell ? { onToggleSidebar: toggleSidebar } : {})}
     />
+  );
+  const mcpAction = (
+    <Button
+      className="h-8 w-full justify-start gap-2.5 px-2.5 text-[13px] font-normal text-muted-foreground"
+      onClick={() => setMcpOpen(true)}
+      ref={mcpTriggerRef}
+      type="button"
+      variant="ghost"
+    >
+      <Cable data-icon="inline-start" />
+      Connect MCP
+    </Button>
   );
 
   return (
@@ -112,6 +128,7 @@ export function AppShell(props: AppShellProps): React.ReactElement {
               resizable
               unread={props.unread}
               user={props.user}
+              utilityAction={mcpAction}
               onFolderChange={props.onFolderChange}
               onSignedOut={props.onSignedOut}
             />
@@ -133,6 +150,7 @@ export function AppShell(props: AppShellProps): React.ReactElement {
             draftCount={props.draftCount}
             unread={props.unread}
             user={props.user}
+            utilityAction={mcpAction}
             onFolderChange={props.onFolderChange}
             onSignedOut={props.onSignedOut}
           />
@@ -147,6 +165,12 @@ export function AppShell(props: AppShellProps): React.ReactElement {
         onClick={scrollActiveMobileMailSurfaceToTop}
       />
       <DesktopWindowGuard />
+      <McpConnectionDialog
+        open={mcpOpen}
+        restoreFocusRef={mcpTriggerRef}
+        user={props.user}
+        onOpenChange={setMcpOpen}
+      />
     </div>
   );
 }

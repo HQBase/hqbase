@@ -1,5 +1,5 @@
-import { Cable, MailPlus, PanelLeftClose, PanelLeftOpen, Search } from "lucide-react";
-import * as React from "react";
+import { MailPlus, PanelLeftClose, PanelLeftOpen, Search } from "lucide-react";
+import type * as React from "react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,7 +14,6 @@ import {
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import type { CurrentUser } from "@/features/auth/types";
 import type { Mailbox } from "@/features/mailboxes/types";
-import { McpConnectionDialog } from "@/features/mcp/connection-dialog";
 import type { UnreadCounts } from "@/features/notifications/types";
 import type { FolderId } from "@/lib/routes";
 import { MobileNavigation } from "./mobile-navigation";
@@ -52,9 +51,6 @@ export function TopBar({
   onToggleSidebar,
   sidebarCollapsed = false
 }: TopBarProps): React.ReactElement {
-  const [mcpOpen, setMcpOpen] = React.useState(false);
-  const mcpTriggerRef = React.useRef<HTMLButtonElement>(null);
-
   return (
     <header className="flex h-14 w-full shrink-0 touch-none items-center gap-2 border-b bg-background px-3 md:px-4">
       {onToggleSidebar ? (
@@ -116,23 +112,6 @@ export function TopBar({
           <MailPlus />
           <span className="hidden sm:inline">Compose</span>
         </Button>
-        <div aria-hidden="true" className="hidden h-5 w-px bg-border md:block" />
-        <Button
-          className="hidden h-8 px-3 md:inline-flex"
-          onClick={() => setMcpOpen(true)}
-          ref={mcpTriggerRef}
-          type="button"
-          variant="outline"
-        >
-          <Cable />
-          Connect MCP
-        </Button>
-        <McpConnectionDialog
-          open={mcpOpen}
-          restoreFocusRef={mcpTriggerRef}
-          user={user}
-          onOpenChange={setMcpOpen}
-        />
       </div>
     </header>
   );

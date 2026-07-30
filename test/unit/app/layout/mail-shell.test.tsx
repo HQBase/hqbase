@@ -19,7 +19,7 @@ const user = {
 const unread = { catchall: 2, inbox: 7, total: 9 };
 
 describe("mail shell", () => {
-  it("uses the full header width and keeps mail actions in a right-aligned group", () => {
+  it("uses the full header width and keeps primary mail actions in a right-aligned group", () => {
     const html = renderToStaticMarkup(
       <TopBar
         activeFolder="inbox"
@@ -43,7 +43,7 @@ describe("mail shell", () => {
     expect(html).toContain("Search mail");
     expect(html).toContain("Compose");
     expect(html).toContain('aria-label="New email"');
-    expect(html).toContain("Connect MCP");
+    expect(html).not.toContain("Connect MCP");
     expect(html).toContain("Open navigation");
     expect(html.indexOf("Open navigation")).toBeLessThan(html.indexOf("Search mail"));
     expect(html).not.toContain("Open profile menu");
@@ -98,6 +98,7 @@ describe("mail shell", () => {
         activeFolder="inbox"
         unread={unread}
         user={user}
+        utilityAction={<button type="button">Connect MCP</button>}
         onFolderChange={() => undefined}
         onSignedOut={() => undefined}
       />
@@ -111,6 +112,7 @@ describe("mail shell", () => {
     expect(html).toContain("2 unread");
     expect(html).toContain("Open profile menu");
     expect(html).toContain("OB");
+    expect(html.indexOf("Connect MCP")).toBeLessThan(html.indexOf("Settings"));
     expect(html.indexOf("Settings")).toBeLessThan(html.indexOf("Open profile menu"));
     expect(html).toContain("Dark mode");
     expect(html).toContain('aria-label="Switch to light mode"');
@@ -153,7 +155,7 @@ describe("mail shell", () => {
     const html = renderToStaticMarkup(
       <Sidebar
         activeFolder="inbox"
-        drawerAction={<button type="button">Connect MCP</button>}
+        utilityAction={<button type="button">Connect MCP</button>}
         unread={unread}
         user={user}
         onFolderChange={() => undefined}
@@ -166,6 +168,7 @@ describe("mail shell", () => {
     expect(html).toContain("h-11 text-sm");
     expect(html).toContain('aria-current="page"');
     expect(html).toContain("Connect MCP");
+    expect(html.indexOf("Connect MCP")).toBeLessThan(html.indexOf("Settings"));
     expect(html.indexOf("Settings")).toBeLessThan(html.indexOf("Open profile menu"));
     expect(html.match(/border-t pt-2/g)).toHaveLength(2);
   });
@@ -278,7 +281,7 @@ describe("mail shell", () => {
     expect(html).not.toContain("Navigation");
   });
 
-  it("explains both MCP connection profiles and inherited user permissions", () => {
+  it("defaults to the read-only MCP profile and exposes the server switcher", () => {
     const html = renderToStaticMarkup(
       <McpConnectionDetails
         fullEndpoint="https://mail.example.com/mcp/full"
@@ -290,12 +293,13 @@ describe("mail shell", () => {
     );
 
     expect(html).toContain("https://mail.example.com/mcp");
-    expect(html).toContain("https://mail.example.com/mcp/full");
+    expect(html).not.toContain("https://mail.example.com/mcp/full");
     expect(html).toContain("Read only");
-    expect(html).toContain("Read, manage &amp; send");
-    expect(html).toContain("Archive and trash actions");
+    expect(html).toContain("Mail actions");
+    expect(html).toContain('role="tablist"');
+    expect(html).toContain('data-state="active"');
+    expect(html).toContain('data-state="inactive"');
     expect(html).toContain("Copy Read only endpoint");
-    expect(html).toContain("Copy Read, manage &amp; send endpoint");
     expect(html).toContain("OAuth 2.1");
     expect(html).toContain("registers dynamically with PKCE");
     expect(html).toContain("current workspace role");

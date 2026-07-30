@@ -4,14 +4,13 @@ import * as React from "react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
-  DialogClose,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { CurrentUser } from "@/features/auth/types";
 
 type McpConnectionDialogProps = {
@@ -40,7 +39,7 @@ export function McpConnectionDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        className="w-[min(92vw,560px)]"
+        className="top-[calc(env(safe-area-inset-top)+(100dvh-env(safe-area-inset-top)-env(safe-area-inset-bottom))/2)] max-h-[calc(100dvh-env(safe-area-inset-top)-env(safe-area-inset-bottom)-1rem)] w-[min(92vw,560px)] gap-3 overflow-y-auto overscroll-contain p-4 sm:top-1/2 sm:max-h-[calc(100dvh-2rem)] sm:gap-4 sm:p-5"
         onCloseAutoFocus={(event) => {
           event.preventDefault();
           restoreFocusRef.current?.focus();
@@ -54,7 +53,7 @@ export function McpConnectionDialog({
             <DialogTitle>Connect MCP</DialogTitle>
           </div>
           <DialogDescription>
-            Connect this workspace to a remote MCP client without creating another HQBase identity.
+            Choose a permission profile, then copy its Streamable HTTP endpoint.
           </DialogDescription>
         </DialogHeader>
 
@@ -65,14 +64,6 @@ export function McpConnectionDialog({
           readOnlyEndpointId={readOnlyEndpointId}
           user={user}
         />
-
-        <DialogFooter>
-          <DialogClose asChild>
-            <Button type="button" variant="outline">
-              Close
-            </Button>
-          </DialogClose>
-        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
@@ -92,54 +83,64 @@ export function McpConnectionDetails({
   user: CurrentUser;
 }): React.ReactElement {
   return (
-    <div className="space-y-4 text-sm">
-      <section className="rounded-lg border bg-muted/30 p-3">
-        <p className="text-xs font-medium text-muted-foreground">Signed-in user</p>
-        <p className="mt-1 font-medium">{user.name}</p>
-        <p className="text-xs text-muted-foreground">
-          {user.email} · {user.role}
-        </p>
-        <p className="mt-2 text-muted-foreground">
-          The MCP client connects as this user after sign-in and consent.
+    <div className="flex flex-col gap-3 text-sm">
+      <section className="rounded-lg border bg-muted/30 px-3 py-2.5">
+        <p className="text-xs font-medium text-muted-foreground">Connecting as</p>
+        <div className="flex flex-wrap items-baseline gap-x-2">
+          <p className="font-medium">{user.name}</p>
+          <p className="text-xs text-muted-foreground">
+            {user.email} · {user.role}
+          </p>
+        </div>
+        <p className="mt-1 text-xs leading-4 text-muted-foreground">
+          After consent, HQBase rechecks this user&apos;s current workspace role and live mailbox
+          grants.
         </p>
       </section>
 
-      <div className="space-y-3">
-        <div>
-          <p className="text-xs font-medium text-muted-foreground">Connection profile</p>
-          <p className="mt-1 text-muted-foreground">
-            Choose the permission level supported by your MCP client.
-          </p>
+      <Tabs defaultValue="read-only">
+        <div className="flex flex-col gap-1.5">
+          <p className="text-xs font-medium text-muted-foreground">Server profile</p>
+          <TabsList
+            aria-label="Server profile"
+            className="grid h-9 w-full grid-cols-2 rounded-full"
+          >
+            <TabsTrigger className="rounded-full px-2 text-xs" value="read-only">
+              Read only
+            </TabsTrigger>
+            <TabsTrigger className="rounded-full px-2 text-xs" value="mail-actions">
+              Mail actions
+            </TabsTrigger>
+          </TabsList>
         </div>
 
-        <McpEndpointOption
-          description="Search and read allowed mail without changing it."
-          endpoint={readOnlyEndpoint}
-          endpointId={readOnlyEndpointId}
-          icon={<ShieldCheck aria-hidden="true" className="size-4" />}
-          permissions="Mailboxes, conversations, messages, threads, and attachments"
-          title="Read only"
-        />
-        <McpEndpointOption
-          description="Read mail, manage its state, work with drafts, and send."
-          endpoint={fullEndpoint}
-          endpointId={fullEndpointId}
-          icon={<Send aria-hidden="true" className="size-4" />}
-          permissions="Archive and trash actions, drafts, send, reply, and forward"
-          title="Read, manage & send"
-        />
-      </div>
+        <TabsContent className="mt-2" value="read-only">
+          <McpEndpointOption
+            description="Search and read allowed mail without changing it."
+            endpoint={readOnlyEndpoint}
+            endpointId={readOnlyEndpointId}
+            icon={<ShieldCheck aria-hidden="true" className="size-4" />}
+            permissions="Mailboxes, conversations, messages, threads, and attachments"
+            title="Read only"
+          />
+        </TabsContent>
+        <TabsContent className="mt-2" value="mail-actions">
+          <McpEndpointOption
+            description="Read mail, manage its state, work with drafts, and send."
+            endpoint={fullEndpoint}
+            endpointId={fullEndpointId}
+            icon={<Send aria-hidden="true" className="size-4" />}
+            permissions="Archive and trash actions, drafts, send, reply, and forward"
+            title="Read, manage & send"
+          />
+        </TabsContent>
+      </Tabs>
 
-      <section className="space-y-2 rounded-lg border p-3 text-muted-foreground">
+      <section className="flex flex-col gap-1 rounded-lg border px-3 py-2.5 text-xs leading-4 text-muted-foreground">
         <p className="font-medium text-foreground">What happens next</p>
         <p>
-          The chosen endpoint tells the client which scopes to request. The client discovers HQBase
-          OAuth 2.1, registers dynamically with PKCE, and opens HQBase for sign-in and explicit
-          consent.
-        </p>
-        <p>
-          No API token or Cloudflare credential is required. OAuth scopes never widen access; HQBase
-          continues to apply this user&apos;s current workspace role and live mailbox grants.
+          The client discovers HQBase OAuth 2.1, registers dynamically with PKCE, then opens sign-in
+          and consent. No API token or Cloudflare credential is required.
         </p>
       </section>
     </div>
@@ -173,7 +174,7 @@ function McpEndpointOption({
   }
 
   return (
-    <section className="space-y-3 rounded-lg border bg-muted/20 p-3">
+    <section className="flex flex-col gap-3 rounded-lg border bg-muted/20 p-3">
       <div className="flex items-start gap-3">
         <span className="mt-0.5 inline-flex size-8 shrink-0 items-center justify-center rounded-md border bg-background text-muted-foreground">
           {icon}
@@ -184,14 +185,16 @@ function McpEndpointOption({
         </div>
       </div>
 
-      <p className="border-l-2 border-border pl-2 text-xs text-muted-foreground">{permissions}</p>
+      <p className="text-xs text-muted-foreground">
+        <span className="font-medium text-foreground">Includes:</span> {permissions}
+      </p>
 
       <div className="flex items-center gap-2">
         <label className="sr-only" htmlFor={endpointId}>
           {title} Streamable HTTP endpoint
         </label>
         <Input
-          className="min-w-0 font-mono text-xs"
+          className="min-w-0 font-mono text-base sm:text-xs"
           id={endpointId}
           readOnly
           value={endpoint}
@@ -204,7 +207,11 @@ function McpEndpointOption({
           type="button"
           variant="outline"
         >
-          {copied ? <Check aria-hidden="true" /> : <Copy aria-hidden="true" />}
+          {copied ? (
+            <Check aria-hidden="true" data-icon="inline-start" />
+          ) : (
+            <Copy aria-hidden="true" data-icon="inline-start" />
+          )}
           {copied ? "Copied" : "Copy"}
         </Button>
       </div>

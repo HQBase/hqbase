@@ -37,6 +37,10 @@ const composeForm = readFileSync(
   new URL("../../../../app/features/compose/compose-form.tsx", import.meta.url),
   "utf8"
 );
+const mcpConnectionDialog = readFileSync(
+  new URL("../../../../app/features/mcp/connection-dialog.tsx", import.meta.url),
+  "utf8"
+);
 const threadComposeSurface = readFileSync(
   new URL("../../../../app/features/compose/thread-compose-surface.tsx", import.meta.url),
   "utf8"
@@ -61,6 +65,23 @@ describe("mobile application shell", () => {
     expect(composeWindow).toContain("pt-[env(safe-area-inset-top)]");
     expect(threadComposeSurface).toContain("pt-[env(safe-area-inset-top)]");
     expect(composeForm).toContain("pb-[max(1rem,env(safe-area-inset-bottom))]");
+  });
+
+  it("keeps the MCP dialog inside the dynamic viewport and device safe areas", () => {
+    expect(mcpConnectionDialog).toContain("100dvh");
+    expect(mcpConnectionDialog).toContain("safe-area-inset-top");
+    expect(mcpConnectionDialog).toContain("safe-area-inset-bottom");
+    expect(mcpConnectionDialog).toContain("overflow-y-auto");
+    expect(mcpConnectionDialog).toContain("text-base sm:text-xs");
+    expect(mcpConnectionDialog).toContain('value="read-only"');
+    expect(mcpConnectionDialog).toContain('value="mail-actions"');
+    expect(mcpConnectionDialog).toContain("/mcp/full");
+  });
+
+  it("keeps Connect MCP in the desktop sidebar and compact drawer instead of the header", () => {
+    expect(appShell).toContain("Connect MCP");
+    expect(mobileNavigation).toContain("Connect MCP");
+    expect(topBar).not.toContain("Connect MCP");
   });
 
   it("keeps editable field text large enough to avoid iOS focus zoom", () => {
