@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.32
+
+- Replace the application, favicon, and installed PWA branding with the new official square HQBase
+  logo.
+
 ## 0.1.31
 
 - Let each user choose a default From mailbox during onboarding and in Settings.
