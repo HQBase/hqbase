@@ -227,6 +227,7 @@ describe("mail shell", () => {
         onMessageRouteChange={() => undefined}
         onRefresh={() => undefined}
         onSelect={() => undefined}
+        totalCount={0}
       />
     );
 

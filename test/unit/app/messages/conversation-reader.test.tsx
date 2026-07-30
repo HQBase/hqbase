@@ -103,6 +103,7 @@ describe("conversation reader", () => {
         onMessageRouteChange={() => undefined}
         onRefresh={() => undefined}
         onSelect={() => undefined}
+        totalCount={1}
       />
     );
     const conversationHtml = renderToStaticMarkup(
@@ -120,6 +121,7 @@ describe("conversation reader", () => {
         onMessageRouteChange={() => undefined}
         onRefresh={() => undefined}
         onSelect={() => undefined}
+        totalCount={1}
       />
     );
 
@@ -130,7 +132,7 @@ describe("conversation reader", () => {
     expect(conversationHtml).toContain("lg:block block");
   });
 
-  it("shows loaded-count overflow and a manual paging fallback", () => {
+  it("shows the exact right-aligned conversation total and a manual paging fallback", () => {
     const html = renderToStaticMarkup(
       <InboxPage
         activeFolder="inbox"
@@ -146,11 +148,13 @@ describe("conversation reader", () => {
         onMessageRouteChange={() => undefined}
         onRefresh={() => undefined}
         onSelect={() => undefined}
+        totalCount={237}
       />
     );
 
-    expect(html).toContain("1 conversation loaded; more available");
-    expect(html).toContain(">1+<");
+    expect(html).toContain('class="ml-auto font-mono text-[11px] text-muted-foreground"');
+    expect(html).toContain(">237 conversations<");
+    expect(html).not.toContain(">1+<");
     expect(html).toContain("Load more conversations");
   });
 

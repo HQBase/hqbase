@@ -75,7 +75,11 @@ describe("useMailSync", () => {
       configurable: true,
       value: "visible"
     });
-    mocks.listConversations.mockResolvedValue({ conversations: [], nextCursor: null });
+    mocks.listConversations.mockResolvedValue({
+      conversations: [],
+      nextCursor: null,
+      totalCount: 0
+    });
     mocks.refreshNotifications
       .mockResolvedValueOnce(status("message-1"))
       .mockResolvedValueOnce(status("message-2"));
@@ -96,6 +100,7 @@ describe("useMailSync", () => {
     expect(mocks.refreshNotifications).toHaveBeenCalledTimes(2);
     expect(mocks.playNotificationSound).toHaveBeenCalledWith("incoming-email");
     expect(hook.result.conversations).toEqual([]);
+    expect(hook.result.totalCount).toBe(0);
     await hook.unmount();
   });
 
@@ -125,9 +130,21 @@ describe("useMailSync", () => {
     const second = conversation("message-2", "2026-07-30T11:00:00.000Z");
     const newest = conversation("message-0", "2026-07-30T13:00:00.000Z");
     mocks.listConversations
-      .mockResolvedValueOnce({ conversations: [first], nextCursor: "cursor-1" })
-      .mockResolvedValueOnce({ conversations: [second], nextCursor: null })
-      .mockResolvedValueOnce({ conversations: [newest, first], nextCursor: "cursor-2" });
+      .mockResolvedValueOnce({
+        conversations: [first],
+        nextCursor: "cursor-1",
+        totalCount: 2
+      })
+      .mockResolvedValueOnce({
+        conversations: [second],
+        nextCursor: null,
+        totalCount: null
+      })
+      .mockResolvedValueOnce({
+        conversations: [newest, first],
+        nextCursor: "cursor-2",
+        totalCount: 3
+      });
     mocks.refreshNotifications
       .mockResolvedValueOnce(status("message-1"))
       .mockResolvedValueOnce(status("message-1"));
@@ -141,6 +158,7 @@ describe("useMailSync", () => {
     await flushHookEffects();
 
     expect(hook.result.hasMore).toBe(true);
+    expect(hook.result.totalCount).toBe(2);
     await flushHookEffects(() => hook.result.loadMore());
     expect(mocks.listConversations).toHaveBeenNthCalledWith(
       2,
@@ -148,6 +166,7 @@ describe("useMailSync", () => {
     );
     expect(hook.result.conversations.map((item) => item.id)).toEqual(["message-1", "message-2"]);
     expect(hook.result.hasMore).toBe(false);
+    expect(hook.result.totalCount).toBe(2);
 
     await flushHookEffects(() => window.dispatchEvent(new Event("focus")));
     expect(hook.result.conversations.map((item) => item.id)).toEqual([
@@ -156,13 +175,18 @@ describe("useMailSync", () => {
       "message-2"
     ]);
     expect(hook.result.hasMore).toBe(false);
+    expect(hook.result.totalCount).toBe(3);
     await hook.unmount();
   });
 
   it("keeps the cursor available when loading an older page fails", async () => {
     const first = conversation("message-1", "2026-07-30T12:00:00.000Z");
     mocks.listConversations
-      .mockResolvedValueOnce({ conversations: [first], nextCursor: "cursor-1" })
+      .mockResolvedValueOnce({
+        conversations: [first],
+        nextCursor: "cursor-1",
+        totalCount: 1
+      })
       .mockRejectedValueOnce(new Error("Older conversations are unavailable."));
     mocks.refreshNotifications.mockResolvedValueOnce(status("message-1"));
 
@@ -185,7 +209,11 @@ describe("useMailSync", () => {
     const conversations = ["read", "unread", "star", "unstar", "archive", "trash"].map(
       (action, index) => conversation(`message-${action}`, `2026-07-30T1${index}:00:00.000Z`)
     );
-    mocks.listConversations.mockResolvedValueOnce({ conversations, nextCursor: null });
+    mocks.listConversations.mockResolvedValueOnce({
+      conversations,
+      nextCursor: null,
+      totalCount: conversations.length
+    });
     mocks.refreshNotifications.mockResolvedValueOnce(status("message-read"));
 
     const hook = await renderHook(useMailSync, {
@@ -223,6 +251,7 @@ describe("useMailSync", () => {
     expect(hook.result.conversations.find((item) => item.id === "message-unstar")?.isStarred).toBe(
       false
     );
+    expect(hook.result.totalCount).toBe(4);
     await hook.unmount();
   });
 });

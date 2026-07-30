@@ -26,9 +26,11 @@ export function useMailSync({ activeFolder, mailboxId, search, userId }: MailSyn
   loadMoreError: string | null;
   notifications: ReturnType<typeof useNotifications>;
   refresh: () => Promise<void>;
+  totalCount: number | null;
 } {
   const [conversations, setConversations] = React.useState<ConversationSummary[]>([]);
   const [nextCursor, setNextCursor] = React.useState<string | null>(null);
+  const [totalCount, setTotalCount] = React.useState<number | null>(null);
   const [isLoadingMore, setIsLoadingMore] = React.useState(false);
   const [loadMoreError, setLoadMoreError] = React.useState<string | null>(null);
   const notifications = useNotifications(userId);
@@ -57,6 +59,7 @@ export function useMailSync({ activeFolder, mailboxId, search, userId }: MailSyn
       if (!userId) {
         setConversations([]);
         setNextCursor(null);
+        setTotalCount(null);
         await refreshNotifications();
         return;
       }
@@ -75,6 +78,7 @@ export function useMailSync({ activeFolder, mailboxId, search, userId }: MailSyn
 
       if (conversationResult.status === "fulfilled" && conversationResult.value !== null) {
         const page = conversationResult.value;
+        if (page.totalCount !== null) setTotalCount(page.totalCount);
         if (loadedAdditionalPages.current) {
           setConversations((current) => reconcileNewestPage(page.conversations, current));
         } else {
@@ -112,6 +116,7 @@ export function useMailSync({ activeFolder, mailboxId, search, userId }: MailSyn
     loadMoreInFlight.current = null;
     setConversations([]);
     setNextCursor(null);
+    setTotalCount(null);
     setIsLoadingMore(false);
     setLoadMoreError(null);
   }, [syncKey]);
@@ -205,14 +210,17 @@ export function useMailSync({ activeFolder, mailboxId, search, userId }: MailSyn
   const applyConversationAction = React.useCallback(
     (threadId: string, action: ConversationAction, affected: number): void => {
       if (affected === 0) return;
+      const removesConversation =
+        action === "archive" ||
+        action === "trash" ||
+        (activeFolder === "starred" && action === "unstar");
+      if (removesConversation) {
+        setTotalCount((current) => (current === null ? null : Math.max(0, current - 1)));
+      }
       setConversations((current) =>
         current.flatMap((conversation) => {
           if (conversation.threadId !== threadId) return [conversation];
-          if (
-            action === "archive" ||
-            action === "trash" ||
-            (activeFolder === "starred" && action === "unstar")
-          ) {
+          if (removesConversation) {
             return [];
           }
           if (action === "read") return [{ ...conversation, unreadCount: 0 }];
@@ -240,7 +248,8 @@ export function useMailSync({ activeFolder, mailboxId, search, userId }: MailSyn
     loadMore,
     loadMoreError,
     notifications,
-    refresh
+    refresh,
+    totalCount
   };
 }
 

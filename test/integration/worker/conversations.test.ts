@@ -77,9 +77,11 @@ describe("conversation persistence", () => {
   it("lists one latest-message row per conversation and applies scoped actions", async () => {
     const filters = { folder: "inbox" as const, mailboxIds: ["mbx_conversations"] };
     const initial = await listConversations(env.DB, filters);
+    const initialPage = await listConversationPage(env.DB, { ...filters, limit: 1 });
     const alice = initial.find((conversation) => conversation.messageCount === 2);
 
     expect(initial).toHaveLength(2);
+    expect(initialPage.totalCount).toBe(2);
     expect(alice).toMatchObject({
       direction: "outbound",
       id: "msg_reply_a",
@@ -147,6 +149,7 @@ describe("conversation persistence", () => {
     expect(firstPage.conversations).toHaveLength(1);
     expect(firstPage.conversations[0]?.id).toBe("msg_root_b");
     expect(firstPage.nextCursor).toEqual(expect.any(String));
+    expect(firstPage.totalCount).toBe(2);
 
     const secondPage = await listConversationPage(env.DB, {
       ...filters,
@@ -155,6 +158,7 @@ describe("conversation persistence", () => {
     expect(secondPage.conversations).toHaveLength(1);
     expect(secondPage.conversations[0]?.id).toBe("msg_reply_a");
     expect(secondPage.nextCursor).toBeNull();
+    expect(secondPage.totalCount).toBeNull();
   });
 
   it("rejects malformed conversation cursors", async () => {
