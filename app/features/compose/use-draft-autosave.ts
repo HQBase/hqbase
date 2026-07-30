@@ -1,6 +1,7 @@
 import * as React from "react";
 import { toast } from "sonner";
-import { type Draft, updateDraft } from "./api";
+import { updateDraft } from "@/features/drafts/api";
+import type { Draft } from "@/features/drafts/types";
 import type { SendingIdentity } from "./compose-fields";
 import {
   type DraftSaveState,

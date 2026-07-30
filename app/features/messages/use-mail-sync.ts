@@ -46,7 +46,7 @@ export function useMailSync({ activeFolder, mailboxId, search, userId }: MailSyn
 
       const [notificationResult, conversationResult] = await Promise.allSettled([
         refreshNotifications(),
-        activeFolder === "settings"
+        activeFolder === "settings" || activeFolder === "drafts"
           ? Promise.resolve<ConversationSummary[] | null>(null)
           : listConversations({
               folder: activeFolder,

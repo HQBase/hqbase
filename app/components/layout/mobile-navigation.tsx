@@ -11,6 +11,7 @@ import { Sidebar } from "./sidebar";
 
 type MobileNavigationProps = {
   activeFolder: FolderId;
+  draftCount: number;
   user: CurrentUser;
   unread: UnreadCounts;
   onFolderChange: (folder: FolderId) => void;
@@ -19,6 +20,7 @@ type MobileNavigationProps = {
 
 export function MobileNavigation({
   activeFolder,
+  draftCount,
   unread,
   user,
   onFolderChange,
@@ -64,6 +66,7 @@ export function MobileNavigation({
           <SheetTitle className="sr-only">Navigation</SheetTitle>
           <Sidebar
             activeFolder={activeFolder}
+            draftCount={draftCount}
             unread={unread}
             drawerAction={
               <Button

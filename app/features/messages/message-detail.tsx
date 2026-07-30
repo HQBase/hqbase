@@ -19,6 +19,7 @@ type MessageDetailProps = {
   selectedId: string | null;
   onAction: (action: "read" | "unread" | "star" | "unstar" | "archive" | "trash") => void;
   onBack: () => void;
+  onDraftsChange?: () => void;
   onSent: () => void;
 };
 
@@ -30,6 +31,7 @@ export function MessageDetail({
   selectedId,
   onAction,
   onBack,
+  onDraftsChange,
   onSent
 }: MessageDetailProps): React.ReactElement {
   const [composeMode, setComposeMode] = React.useState<Extract<
@@ -116,6 +118,7 @@ export function MessageDetail({
                 open
                 presentation="thread"
                 threadContext={<ConversationMessages compact messages={messages} />}
+                {...(onDraftsChange ? { onDraftsChange } : {})}
                 onOpenChange={(nextOpen) => {
                   if (!nextOpen) setComposeMode(null);
                 }}

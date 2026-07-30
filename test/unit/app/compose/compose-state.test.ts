@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  findDraftForComposer,
   forwardedMessage,
   normalizeDraftHtml,
   readDraftRecovery,
@@ -8,6 +9,7 @@ import {
   serializeDraft,
   splitRecipients
 } from "@/features/compose/compose-state";
+import type { Draft } from "@/features/drafts/types";
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -100,6 +102,29 @@ describe("composer state", () => {
       subject: "Recovered"
     });
     expect(readDraftRecovery("key", new Date(300).toISOString())).toBeNull();
+  });
+
+  it("reopens the exact selected draft when several new-message drafts exist", () => {
+    const draft = (id: string): Draft => ({
+      id,
+      mailboxId: "mbx_1",
+      replyToMessageId: null,
+      forwardOfMessageId: null,
+      from: "support@example.com",
+      to: [],
+      cc: [],
+      bcc: [],
+      subject: id,
+      text: "",
+      html: "",
+      version: 1,
+      updatedAt: "2026-07-29T14:00:00.000Z",
+      attachments: []
+    });
+    const drafts = [draft("draft-one"), draft("draft-two")];
+
+    expect(findDraftForComposer(drafts, "draft-two", null, null)?.id).toBe("draft-two");
+    expect(findDraftForComposer(drafts, "missing", null, null)).toBeNull();
   });
 
   it("uses the exact address that received the message as the reply identity", () => {

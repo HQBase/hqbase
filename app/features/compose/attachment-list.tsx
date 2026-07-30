@@ -1,6 +1,6 @@
 import { Paperclip, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import type { DraftAttachment } from "./api";
+import type { DraftAttachment } from "@/features/drafts/types";
 export function AttachmentList({
   attachments,
   onRemove

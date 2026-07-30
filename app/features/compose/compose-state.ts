@@ -1,4 +1,5 @@
 import type * as React from "react";
+import type { Draft } from "@/features/drafts/types";
 import type { Mailbox } from "@/features/mailboxes/types";
 import type { MessageDetail } from "@/features/messages/types";
 import { formatDateTime } from "@/lib/format";
@@ -8,15 +9,34 @@ export type ComposeMode = "new" | "reply" | "forward";
 export type DraftSaveState = "saved" | "saving" | "error";
 
 export type ComposeDialogProps = {
+  draftId?: Draft["id"] | null;
   mailboxes: Mailbox[];
   message?: MessageDetail | null;
   mode?: ComposeMode;
   open: boolean;
   presentation?: "window" | "thread";
   threadContext?: React.ReactNode;
+  onDraftsChange?: () => void;
   onOpenChange: (open: boolean) => void;
   onSent: () => void;
 };
+
+export function findDraftForComposer(
+  drafts: Draft[],
+  draftId: string | null,
+  replyToMessageId: string | null,
+  forwardOfMessageId: string | null
+): Draft | null {
+  return (
+    (draftId
+      ? drafts.find((draft) => draft.id === draftId)
+      : drafts.find(
+          (draft) =>
+            draft.replyToMessageId === replyToMessageId &&
+            draft.forwardOfMessageId === forwardOfMessageId
+        )) ?? null
+  );
+}
 
 export const splitRecipients = (value: string) =>
   value

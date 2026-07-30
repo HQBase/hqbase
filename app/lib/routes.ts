@@ -7,7 +7,13 @@ export const mailFolders = [
   { id: "catchall", label: "Catch-all", path: "catch-all" }
 ] as const;
 
-export const folders = [...mailFolders, { id: "settings", label: "Settings" }] as const;
+export const draftFolder = { id: "drafts", label: "Drafts", path: "drafts" } as const;
+
+export const folders = [
+  ...mailFolders,
+  draftFolder,
+  { id: "settings", label: "Settings" }
+] as const;
 
 export const settingsTabs = [
   "mailboxes",
@@ -24,6 +30,7 @@ export type SettingsTabId = (typeof settingsTabs)[number];
 
 export type AppRoute =
   | { kind: "mail"; folder: MailFolderId; messageId: string | null }
+  | { kind: "drafts"; draftId: string | null }
   | { kind: "settings"; tab: SettingsTabId };
 
 const legacySettingsTabs: Record<string, SettingsTabId> = {
@@ -48,6 +55,13 @@ export function readAppRoute(input: string | URL): AppRoute {
     return { kind: "settings", tab: tab ?? "mailboxes" };
   }
 
+  if (segments[0] === draftFolder.path) {
+    return {
+      kind: "drafts",
+      draftId: segments[1] ? decodePathSegment(segments[1]) : null
+    };
+  }
+
   const folder = readMailFolder(segments[0]);
   if (!folder) return { kind: "mail", folder: "inbox", messageId: null };
 
@@ -60,6 +74,10 @@ export function readAppRoute(input: string | URL): AppRoute {
 
 export function appRoutePath(route: AppRoute): string {
   if (route.kind === "settings") return `/settings/${route.tab}`;
+  if (route.kind === "drafts") {
+    const base = `/${draftFolder.path}`;
+    return route.draftId ? `${base}/${encodeURIComponent(route.draftId)}` : base;
+  }
   const folder = mailFolders.find((item) => item.id === route.folder);
   const base = `/${folder?.path ?? "inbox"}`;
   return route.messageId ? `${base}/${encodeURIComponent(route.messageId)}` : base;

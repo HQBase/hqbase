@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.27
+
+- Show a private Drafts destination in desktop and mobile navigation only when the signed-in user
+  has saved drafts.
+- List saved drafts with mailbox and search filtering, and reopen the exact new-message, reply, or
+  forward draft with its attachments and conversation context.
+- Keep the Drafts count synchronized when a composer creates, sends, or discards a draft.
+
 ## 0.1.26
 
 - Expand the OAuth-protected MCP server with conversation, thread, and attachment retrieval plus

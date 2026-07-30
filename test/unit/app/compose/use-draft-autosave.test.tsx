@@ -1,8 +1,7 @@
 // @vitest-environment happy-dom
 import { describe, expect, it, vi } from "vitest";
-
-import type { Draft } from "@/features/compose/api";
 import { useDraftAutosave } from "@/features/compose/use-draft-autosave";
+import type { Draft } from "@/features/drafts/types";
 import { flushHookEffects, renderHook } from "../render-hook";
 
 const mocks = vi.hoisted(() => ({
@@ -10,8 +9,8 @@ const mocks = vi.hoisted(() => ({
   updateDraft: vi.fn()
 }));
 
-vi.mock("@/features/compose/api", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@/features/compose/api")>()),
+vi.mock("@/features/drafts/api", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/features/drafts/api")>()),
   updateDraft: mocks.updateDraft
 }));
 vi.mock("sonner", () => ({
