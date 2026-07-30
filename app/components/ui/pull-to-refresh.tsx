@@ -7,6 +7,7 @@ import { cn } from "@/lib/cn";
 const refreshThreshold = 64;
 const refreshOffset = 44;
 const maximumPull = 96;
+const completionResetDelay = 2000;
 
 type PullStatus = "idle" | "pulling" | "refreshing" | "complete" | "failed";
 
@@ -28,10 +29,12 @@ export function PullToRefresh({
   const gestureRef = React.useRef({ startX: 0, startY: 0, tracking: false });
   const distanceRef = React.useRef(0);
   const mountedRef = React.useRef(true);
+  const onRefreshRef = React.useRef(onRefresh);
   const statusRef = React.useRef<PullStatus>("idle");
   const resetTimerRef = React.useRef<number | null>(null);
   const [distance, setDistance] = React.useState(0);
   const [status, setStatus] = React.useState<PullStatus>("idle");
+  onRefreshRef.current = onRefresh;
 
   const updateStatus = React.useCallback((nextStatus: PullStatus): void => {
     statusRef.current = nextStatus;
@@ -43,35 +46,49 @@ export function PullToRefresh({
     setDistance(nextDistance);
   }, []);
 
+  const cancelReset = React.useCallback((): void => {
+    if (resetTimerRef.current === null) return;
+    window.clearTimeout(resetTimerRef.current);
+    resetTimerRef.current = null;
+  }, []);
+
   const reset = React.useCallback(
     (delay = 0): void => {
-      if (resetTimerRef.current !== null) window.clearTimeout(resetTimerRef.current);
+      cancelReset();
       resetTimerRef.current = window.setTimeout(() => {
         if (!mountedRef.current) return;
+        resetTimerRef.current = null;
         updateDistance(0);
         updateStatus("idle");
       }, delay);
     },
-    [updateDistance, updateStatus]
+    [cancelReset, updateDistance, updateStatus]
   );
 
   const runRefresh = React.useCallback(async (): Promise<void> => {
     updateStatus("refreshing");
     updateDistance(refreshOffset);
     try {
-      await onRefresh();
+      await onRefreshRef.current();
       if (!mountedRef.current) return;
       updateStatus("complete");
-      reset(450);
+      reset(completionResetDelay);
     } catch {
       if (!mountedRef.current) return;
       updateStatus("failed");
       reset(900);
     }
-  }, [onRefresh, reset, updateDistance, updateStatus]);
+  }, [reset, updateDistance, updateStatus]);
+
+  React.useEffect(
+    () => () => {
+      mountedRef.current = false;
+      cancelReset();
+    },
+    [cancelReset]
+  );
 
   React.useEffect(() => {
-    mountedRef.current = true;
     const scrollContainer = activeScrollRef.current;
     if (!scrollContainer) return;
 
@@ -80,6 +97,7 @@ export function PullToRefresh({
       if (scrollContainer.scrollTop > 0) return;
       const touch = event.touches[0];
       if (!touch) return;
+      cancelReset();
       gestureRef.current = {
         startX: touch.clientX,
         startY: touch.clientY,
@@ -128,14 +146,12 @@ export function PullToRefresh({
     scrollContainer.addEventListener("touchend", finishGesture, { passive: true });
     scrollContainer.addEventListener("touchcancel", finishGesture, { passive: true });
     return () => {
-      mountedRef.current = false;
       scrollContainer.removeEventListener("touchstart", handleTouchStart);
       scrollContainer.removeEventListener("touchmove", handleTouchMove);
       scrollContainer.removeEventListener("touchend", finishGesture);
       scrollContainer.removeEventListener("touchcancel", finishGesture);
-      if (resetTimerRef.current !== null) window.clearTimeout(resetTimerRef.current);
     };
-  }, [activeScrollRef, reset, runRefresh, updateDistance, updateStatus]);
+  }, [activeScrollRef, cancelReset, reset, runRefresh, updateDistance, updateStatus]);
 
   const armed = distance >= refreshThreshold;
   const visible =
@@ -181,6 +197,7 @@ export function PullToRefresh({
           "h-full overflow-auto overscroll-contain will-change-transform",
           status !== "pulling" && "transition-transform duration-200 motion-reduce:transition-none"
         )}
+        data-pull-to-refresh-scroll=""
         ref={activeScrollRef}
         style={{ transform: `translateY(${distance}px)` }}
       >

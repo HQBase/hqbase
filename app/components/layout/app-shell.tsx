@@ -21,6 +21,7 @@ import {
   sidebarWidthStorageKey,
   storeLayoutValue
 } from "./desktop-layout";
+import { scrollActiveMobileMailSurfaceToTop } from "./mobile-scroll";
 import { Sidebar } from "./sidebar";
 import { TopBar } from "./top-bar";
 
@@ -138,9 +139,12 @@ export function AppShell(props: AppShellProps): React.ReactElement {
           {content}
         </>
       )}
-      <div
-        aria-hidden="true"
-        className="absolute inset-x-0 top-0 z-40 h-[env(safe-area-inset-top)] touch-none"
+      <button
+        aria-label="Scroll current view to top"
+        className="absolute inset-x-0 top-0 z-40 h-[env(safe-area-inset-top)] touch-none cursor-default appearance-none border-0 bg-transparent p-0"
+        tabIndex={-1}
+        type="button"
+        onClick={scrollActiveMobileMailSurfaceToTop}
       />
       <DesktopWindowGuard />
     </div>

@@ -1,4 +1,5 @@
 // @vitest-environment happy-dom
+import * as React from "react";
 import { describe, expect, it, vi } from "vitest";
 
 import { MessageList } from "@/features/messages/message-list";
@@ -95,6 +96,50 @@ describe("conversation list pagination", () => {
     expect(onRefresh).toHaveBeenCalledOnce();
     expect(rendered.container.textContent).toContain("Updated");
     await rendered.unmount();
+  });
+
+  it("clears the successful refresh state after two seconds when refreshed data rerenders", async () => {
+    vi.useFakeTimers();
+
+    function RefreshingList(): React.ReactElement {
+      const [refreshCount, setRefreshCount] = React.useState(0);
+      return (
+        <div data-refresh-count={refreshCount}>
+          <MessageList
+            activeFolder="inbox"
+            conversations={[conversation]}
+            hasMore={false}
+            isLoadingMore={false}
+            loadMoreError={null}
+            selectedThreadId={null}
+            onLoadMore={() => undefined}
+            onRefresh={() => setRefreshCount((count) => count + 1)}
+            onSelect={() => undefined}
+          />
+        </div>
+      );
+    }
+
+    const rendered = await renderComponent(<RefreshingList />);
+    const scrollContainer = rendered.container.querySelector<HTMLDivElement>(".overscroll-contain");
+
+    await flushHookEffects(() => {
+      scrollContainer?.dispatchEvent(touchEvent("touchstart", 20, 100));
+      scrollContainer?.dispatchEvent(touchEvent("touchmove", 20, 260));
+      scrollContainer?.dispatchEvent(touchEvent("touchend"));
+    });
+
+    expect(rendered.container.firstElementChild?.getAttribute("data-refresh-count")).toBe("1");
+    expect(rendered.container.textContent).toContain("Updated");
+
+    await flushHookEffects(() => vi.advanceTimersByTime(1999));
+    expect(rendered.container.textContent).toContain("Updated");
+
+    await flushHookEffects(() => vi.advanceTimersByTime(1));
+    expect(rendered.container.textContent).not.toContain("Updated");
+
+    await rendered.unmount();
+    vi.useRealTimers();
   });
 });
 
