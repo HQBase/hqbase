@@ -179,6 +179,7 @@ export function InboxPage({
         "h-full min-h-0 flex-col bg-card/35",
         desktopShell || !selectedId ? "flex" : "hidden"
       )}
+      data-mobile-scroll-active={!desktopShell && !selectedId ? "true" : undefined}
       data-mobile-view="message-list"
     >
       <div className="flex h-12 shrink-0 items-center justify-between border-b px-4">
@@ -211,6 +212,7 @@ export function InboxPage({
         "h-full min-h-0 bg-background",
         desktopShell || selectedId ? "block" : "hidden"
       )}
+      data-mobile-scroll-active={!desktopShell && selectedId ? "true" : undefined}
       data-mobile-view="conversation"
     >
       <MessageDetail

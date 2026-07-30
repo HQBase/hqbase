@@ -5,6 +5,10 @@ const appShell = readFileSync(
   new URL("../../../../app/components/layout/app-shell.tsx", import.meta.url),
   "utf8"
 );
+const inboxPage = readFileSync(
+  new URL("../../../../app/features/inbox/inbox-page.tsx", import.meta.url),
+  "utf8"
+);
 const mobileNavigation = readFileSync(
   new URL("../../../../app/components/layout/mobile-navigation.tsx", import.meta.url),
   "utf8"
@@ -80,7 +84,16 @@ describe("mobile application shell", () => {
     expect(pullToRefresh).toContain("event.preventDefault()");
     expect(pullToRefresh).toContain("overscroll-contain");
     expect(pullToRefresh).toContain("Release to refresh");
+    expect(pullToRefresh).toContain("completionResetDelay = 2000");
     expect(indexHtml).not.toContain("user-scalable=no");
     expect(indexHtml).not.toContain("maximum-scale=1");
+  });
+
+  it("uses the compact top safe-area strip to scroll the active mail surface to the top", () => {
+    expect(appShell).toContain('aria-label="Scroll current view to top"');
+    expect(appShell).toContain("onClick={scrollActiveMobileMailSurfaceToTop}");
+    expect(inboxPage).toContain('data-mobile-scroll-active={!desktopShell && !selectedId ? "true"');
+    expect(inboxPage).toContain('data-mobile-scroll-active={!desktopShell && selectedId ? "true"');
+    expect(pullToRefresh).toContain('data-pull-to-refresh-scroll=""');
   });
 });
