@@ -60,7 +60,9 @@ describe("update settings", () => {
         onUpdateStarted={() => undefined}
       />
     );
-    expect(html).toContain("Update started");
+    expect(html).toContain("Update in progress");
+    expect(html).toContain("animate-spin");
+    expect(html).toContain("HQBase 0.2.0 is being deployed");
     expect(html).toContain("build-123");
     expect(html).not.toContain("Install update");
   });

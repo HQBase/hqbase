@@ -1,11 +1,12 @@
 import * as React from "react";
-
 import { readUpdateProgress } from "@/features/updates/update-progress";
+import { playNotificationSound } from "@/lib/notification-sounds";
 import { type PwaUpdate, registerPwa } from "./register";
 
 export function PwaLifecycle(): React.ReactElement | null {
   const [online, setOnline] = React.useState(() => navigator.onLine);
   const [update, setUpdate] = React.useState<PwaUpdate | null>(null);
+  const updateAnnouncedRef = React.useRef(false);
 
   React.useEffect(() => {
     const handleOnline = (): void => setOnline(true);
@@ -15,7 +16,12 @@ export function PwaLifecycle(): React.ReactElement | null {
 
     const unregisterLifecycle = import.meta.env.PROD
       ? registerPwa({
-          onUpdateReady: setUpdate,
+          onUpdateReady: (nextUpdate) => {
+            if (updateAnnouncedRef.current) return;
+            updateAnnouncedRef.current = true;
+            setUpdate(nextUpdate);
+            playNotificationSound("update-ready");
+          },
           watchForUpdate: readUpdateProgress() !== null
         })
       : () => undefined;

@@ -51,8 +51,10 @@ describe("notification sounds", () => {
     expect(audio.src).toBe("/sounds/toast-error.wav");
     playNotificationSound("toast-information");
     expect(audio.src).toBe("/sounds/toast-information.wav");
+    playNotificationSound("update-ready");
+    expect(audio.src).toBe("/sounds/update-ready.wav");
 
-    expect(audio.play).toHaveBeenCalledTimes(7);
+    expect(audio.play).toHaveBeenCalledTimes(8);
     expect(audio.volume).toBe(0.55);
   });
 });

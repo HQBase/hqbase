@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import { describe, expect, it, vi } from "vitest";
 
+import { announcePwaUpdateReady } from "@/features/pwa/update-ready";
 import type { UpdateStatus } from "@/features/updates/types";
 import { useUpdateMonitor } from "@/features/updates/use-update-monitor";
 import { flushHookEffects, renderHook } from "../render-hook";
@@ -46,6 +47,9 @@ describe("useUpdateMonitor", () => {
 
     expect(mocks.getUpdateStatus).toHaveBeenCalledOnce();
     expect(hook.result.status).toEqual(status);
+    expect(hook.result.ready).toBe(false);
+    await flushHookEffects(announcePwaUpdateReady);
+    expect(hook.result.ready).toBe(true);
     await flushHookEffects(() => window.dispatchEvent(new Event("focus")));
     expect(mocks.getUpdateStatus).toHaveBeenCalledTimes(2);
 
@@ -54,5 +58,6 @@ describe("useUpdateMonitor", () => {
     await flushHookEffects(() => window.dispatchEvent(new Event("focus")));
     expect(mocks.getUpdateStatus).toHaveBeenCalledTimes(2);
     await hook.unmount();
+    document.documentElement.removeAttribute("data-hqbase-update-ready");
   });
 });

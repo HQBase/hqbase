@@ -18,6 +18,7 @@ type AppShellProps = {
   search: string;
   user: CurrentUser;
   updateInProgress: boolean;
+  updateReady: boolean;
   updateStatus: UpdateStatus | null;
   unread: UnreadCounts;
   draftCount: number;
@@ -58,6 +59,7 @@ export function AppShell(props: AppShellProps): React.ReactElement {
           />
           <UpdateBanner
             inProgress={props.updateInProgress}
+            ready={props.updateReady}
             status={props.updateStatus}
             onOpen={props.onOpenUpdates}
           />

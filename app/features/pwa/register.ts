@@ -1,4 +1,5 @@
 import { UPDATE_STARTED_EVENT } from "@/features/updates/update-progress";
+import { announcePwaUpdateReady } from "./update-ready";
 
 export type PwaUpdate = {
   activate: () => void;
@@ -34,6 +35,7 @@ export function registerPwa({
   const announceWaitingWorker = (): void => {
     if (registration?.waiting && navigator.serviceWorker.controller) {
       stopActiveUpdateWatch();
+      announcePwaUpdateReady();
       onUpdateReady({ activate });
     }
   };
