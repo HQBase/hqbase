@@ -68,7 +68,7 @@ export function MobileNavigation({
             activeFolder={activeFolder}
             draftCount={draftCount}
             unread={unread}
-            drawerAction={
+            utilityAction={
               <Button
                 className="h-11 w-full justify-start gap-2.5 px-2.5 text-sm font-normal text-muted-foreground"
                 onClick={() => {
@@ -78,7 +78,7 @@ export function MobileNavigation({
                 type="button"
                 variant="ghost"
               >
-                <Cable />
+                <Cable data-icon="inline-start" />
                 Connect MCP
               </Button>
             }

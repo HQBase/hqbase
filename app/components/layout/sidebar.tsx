@@ -23,7 +23,7 @@ import { AccountMenu } from "./account-menu";
 type SidebarProps = {
   activeFolder: FolderId;
   draftCount?: number;
-  drawerAction?: React.ReactNode;
+  utilityAction?: React.ReactNode;
   user: CurrentUser;
   unread: UnreadCounts;
   onFolderChange: (folder: FolderId) => void;
@@ -46,7 +46,7 @@ const icons: Record<FolderId, LucideIcon> = {
 export function Sidebar({
   activeFolder,
   draftCount = 0,
-  drawerAction,
+  utilityAction,
   unread,
   user,
   onFolderChange,
@@ -125,7 +125,7 @@ export function Sidebar({
         })}
         <div className="mt-auto">
           <div className="flex flex-col gap-0.5 border-t pt-2">
-            {isDrawer && drawerAction ? drawerAction : null}
+            {utilityAction}
             <Button
               asChild
               className={cn(
