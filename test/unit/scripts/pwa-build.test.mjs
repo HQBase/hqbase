@@ -17,16 +17,21 @@ describe("PWA build contract", () => {
   });
 
   it("keeps lifecycle metadata revalidated and hashed assets immutable", async () => {
-    const [html, headers, iconGenerator] = await Promise.all([
+    const [html, headers, iconGenerator, logo] = await Promise.all([
       readFile("index.html", "utf8"),
       readFile("public/_headers", "utf8"),
-      readFile("scripts/generate-pwa-icons.mjs", "utf8")
+      readFile("scripts/generate-pwa-icons.mjs", "utf8"),
+      readFile("public/logo.svg", "utf8")
     ]);
     expect(html).toContain('rel="manifest" href="/manifest.webmanifest"');
     expect(html).toContain('rel="icon" href="/logo.svg" type="image/svg+xml"');
     expect(html).toContain('rel="apple-touch-icon"');
     expect(html).toContain("viewport-fit=cover");
     expect(iconGenerator).toContain('readFile(path.join(root, "public/logo.svg"), "utf8")');
+    expect(logo).toContain('width="251" height="251" viewBox="0 0 251 251"');
+    expect(logo).toContain("<title>HQBase</title>");
+    expect(logo).toContain('<rect width="251" height="251" fill="black"/>');
+    expect(logo).toContain('id="paint0_linear_68_26"');
     expect(headers).toMatch(/\/service-worker\.js[\s\S]*no-cache, no-store, must-revalidate/);
     expect(headers).toMatch(/\/assets\/\*[\s\S]*max-age=31536000, immutable/);
   });
