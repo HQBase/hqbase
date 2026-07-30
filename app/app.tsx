@@ -5,6 +5,8 @@ import { Toaster } from "@/components/ui/sonner";
 import { getCurrentUser } from "@/features/auth/api";
 import { LoginPage } from "@/features/auth/login-page";
 import type { CurrentUser } from "@/features/auth/types";
+import { DraftsPage } from "@/features/drafts/drafts-page";
+import { useDrafts } from "@/features/drafts/use-drafts";
 import { InboxPage } from "@/features/inbox/inbox-page";
 import { listMailboxes } from "@/features/mailboxes/api";
 import type { Mailbox } from "@/features/mailboxes/types";
@@ -22,6 +24,11 @@ import { useAppRoute } from "@/lib/use-app-route";
 const ComposeDialog = React.lazy(() =>
   import("@/features/compose/compose-dialog").then((module) => ({ default: module.ComposeDialog }))
 );
+const DraftComposeDialog = React.lazy(() =>
+  import("@/features/drafts/draft-compose-dialog").then((module) => ({
+    default: module.DraftComposeDialog
+  }))
+);
 
 export function App(): React.ReactElement {
   const [setup, setSetup] = React.useState<SetupStatus | null>(null);
@@ -33,10 +40,17 @@ export function App(): React.ReactElement {
   const [composeOpen, setComposeOpen] = React.useState(false);
   const [isLoading, setIsLoading] = React.useState(true);
   const { navigate, route } = useAppRoute(setup?.isComplete);
-  const activeFolder: FolderId = route.kind === "settings" ? "settings" : route.folder;
+  const activeFolder: FolderId =
+    route.kind === "settings" ? "settings" : route.kind === "drafts" ? "drafts" : route.folder;
   const selectedId = route.kind === "mail" ? route.messageId : null;
+  const selectedDraftId = route.kind === "drafts" ? route.draftId : null;
   const settingsTab: SettingsTabId = route.kind === "settings" ? route.tab : "mailboxes";
   const currentUserId = user?.id ?? null;
+  const draftState = useDrafts(currentUserId);
+  const selectedDraft =
+    selectedDraftId === null
+      ? null
+      : (draftState.drafts.find((draft) => draft.id === selectedDraftId) ?? null);
   const contentMailboxes = React.useMemo(
     () => mailboxes.filter((mailbox) => mailbox.accessLevel !== null),
     [mailboxes]
@@ -121,7 +135,8 @@ export function App(): React.ReactElement {
     <>
       <AppShell
         activeFolder={activeFolder}
-        immersiveOnCompact={activeFolder !== "settings" && selectedId !== null}
+        draftCount={draftState.drafts.length}
+        immersiveOnCompact={route.kind === "mail" && selectedId !== null}
         mailboxId={mailboxId}
         mailboxes={contentMailboxes}
         unread={mailSync.notifications.unread}
@@ -139,7 +154,9 @@ export function App(): React.ReactElement {
           navigate(
             folder === "settings"
               ? { kind: "settings", tab: "mailboxes" }
-              : { kind: "mail", folder, messageId: null }
+              : folder === "drafts"
+                ? { kind: "drafts", draftId: null }
+                : { kind: "mail", folder, messageId: null }
           );
         }}
         onMailboxChange={setMailboxId}
@@ -165,12 +182,23 @@ export function App(): React.ReactElement {
                 updateProgress={updateMonitor.progress}
                 updateStatus={updateMonitor.status}
               />
+            ) : activeFolder === "drafts" ? (
+              <DraftsPage
+                drafts={draftState.drafts}
+                isLoading={draftState.isLoading}
+                mailboxId={mailboxId}
+                search={search}
+                selectedId={selectedDraftId}
+                onBack={() => navigate({ kind: "drafts", draftId: null })}
+                onSelect={(draftId) => navigate({ kind: "drafts", draftId })}
+              />
             ) : (
               <InboxPage
                 activeFolder={activeFolder as MailFolderId}
                 conversations={mailSync.conversations}
                 mailboxes={contentMailboxes}
                 selectedId={selectedId}
+                onDraftsChange={() => void draftState.refresh().catch(() => undefined)}
                 onRefresh={() => void mailSync.refresh().catch(() => undefined)}
                 onMessageRouteChange={(folder, messageId) =>
                   navigate({ kind: "mail", folder, messageId })
@@ -190,6 +218,20 @@ export function App(): React.ReactElement {
             mode="new"
             open={composeOpen}
             onOpenChange={setComposeOpen}
+            onDraftsChange={() => void draftState.refresh().catch(() => undefined)}
+            onSent={() => void mailSync.refresh().catch(() => undefined)}
+          />
+        </React.Suspense>
+      ) : null}
+      {selectedDraft ? (
+        <React.Suspense fallback={null}>
+          <DraftComposeDialog
+            draft={selectedDraft}
+            mailboxes={contentMailboxes}
+            onDraftsChange={() => void draftState.refresh().catch(() => undefined)}
+            onOpenChange={(open) => {
+              if (!open) navigate({ kind: "drafts", draftId: null });
+            }}
             onSent={() => void mailSync.refresh().catch(() => undefined)}
           />
         </React.Suspense>

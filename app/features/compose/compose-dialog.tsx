@@ -1,25 +1,24 @@
 import * as React from "react";
 import { toast } from "sonner";
 
-import { playNotificationSound } from "@/lib/notification-sounds";
-
 import {
   createDraft,
-  type Draft,
-  type DraftAttachment,
   deleteDraft,
   deleteDraftAttachment,
   listDrafts,
-  replyToMessage,
-  sendMessage,
   uploadDraftAttachment
-} from "./api";
+} from "@/features/drafts/api";
+import type { Draft, DraftAttachment } from "@/features/drafts/types";
+import { playNotificationSound } from "@/lib/notification-sounds";
+
+import { replyToMessage, sendMessage } from "./api";
 import { ComposeForm } from "./compose-form";
 import {
   type ComposeDialogProps,
   composeTitle,
   type DraftSaveState,
   draftStatus,
+  findDraftForComposer,
   forwardedMessage,
   normalizeDraftHtml,
   readDraftRecovery,
@@ -31,12 +30,14 @@ import { ComposeSurface } from "./compose-surface";
 import { useDraftAutosave } from "./use-draft-autosave";
 
 export function ComposeDialog({
+  draftId = null,
   mailboxes,
   message = null,
   mode = "new",
   open,
   presentation = "window",
   threadContext,
+  onDraftsChange,
   onOpenChange,
   onSent
 }: ComposeDialogProps): React.ReactElement | null {
@@ -54,10 +55,14 @@ export function ComposeDialog({
   const [isUploading, setIsUploading] = React.useState(false);
   const [saveState, setSaveState] = React.useState<DraftSaveState>("saved");
   const initialized = React.useRef(false);
+  const onDraftsChangeRef = React.useRef(onDraftsChange);
+  const onOpenChangeRef = React.useRef(onOpenChange);
+  onDraftsChangeRef.current = onDraftsChange;
+  onOpenChangeRef.current = onOpenChange;
   const formId = React.useId();
   const replyToMessageId = mode === "reply" ? (message?.id ?? null) : null;
   const forwardOfMessageId = mode === "forward" ? (message?.id ?? null) : null;
-  const recoveryKey = `hqbase:compose:${mode}:${message?.id ?? "new"}`;
+  const recoveryKey = `hqbase:compose:${mode}:${draftId ?? message?.id ?? "new"}`;
   const { initializeAutosave, resetAutosave } = useDraftAutosave({
     open,
     initialized,
@@ -83,12 +88,15 @@ export function ComposeDialog({
     void (async () => {
       try {
         const drafts = await listDrafts();
-        const existing =
-          drafts.find(
-            (item) =>
-              item.replyToMessageId === replyToMessageId &&
-              item.forwardOfMessageId === forwardOfMessageId
-          ) ?? null;
+        const existing = findDraftForComposer(
+          drafts,
+          draftId,
+          replyToMessageId,
+          forwardOfMessageId
+        );
+        if (draftId && !existing) {
+          throw new Error("Draft not found.");
+        }
         const forwarded = mode === "forward" && message ? forwardedMessage(message) : null;
         const preferredIdentity =
           mode === "reply" && message
@@ -113,6 +121,7 @@ export function ComposeDialog({
             text: forwarded?.text ?? "",
             html: forwarded?.html ?? "<p></p>"
           }));
+        if (!existing) onDraftsChangeRef.current?.();
         const recovered = readDraftRecovery(recoveryKey, initial.updatedAt);
         setDraft(initial);
         initializeAutosave(initial);
@@ -128,6 +137,7 @@ export function ComposeDialog({
         initialized.current = true;
       } catch (error) {
         toast.error(error instanceof Error ? error.message : "Draft could not be opened.");
+        if (draftId) onOpenChangeRef.current(false);
       }
     })();
   }, [
@@ -135,6 +145,7 @@ export function ComposeDialog({
     message,
     mode,
     identities,
+    draftId,
     recoveryKey,
     replyToMessageId,
     forwardOfMessageId,
@@ -179,6 +190,7 @@ export function ComposeDialog({
       resetAutosave();
       localStorage.removeItem(recoveryKey);
       onOpenChange(false);
+      onDraftsChange?.();
       onSent();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Sending failed.");
@@ -218,6 +230,7 @@ export function ComposeDialog({
     resetAutosave();
     localStorage.removeItem(recoveryKey);
     onOpenChange(false);
+    onDraftsChange?.();
   }
 
   if (!open) return null;

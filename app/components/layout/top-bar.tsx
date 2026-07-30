@@ -20,6 +20,7 @@ import { MobileNavigation } from "./mobile-navigation";
 
 type TopBarProps = {
   activeFolder: FolderId;
+  draftCount: number;
   user: CurrentUser;
   mailboxes: Mailbox[];
   mailboxId: string;
@@ -34,6 +35,7 @@ type TopBarProps = {
 
 export function TopBar({
   activeFolder,
+  draftCount,
   user,
   mailboxes,
   mailboxId,
@@ -52,6 +54,7 @@ export function TopBar({
     <header className="flex h-14 w-full shrink-0 items-center gap-2 border-b bg-background px-3 md:px-4">
       <MobileNavigation
         activeFolder={activeFolder}
+        draftCount={draftCount}
         unread={unread}
         user={user}
         onFolderChange={onFolderChange}

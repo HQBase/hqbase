@@ -1,58 +1,5 @@
 import type { MessageSummary } from "@/features/messages/types";
-import { apiDelete, apiGet, apiPatch, apiPost } from "@/lib/api-client";
-
-export type DraftAttachment = {
-  id: string;
-  filename: string;
-  contentType: string;
-  sizeBytes: number;
-};
-export type Draft = {
-  id: string;
-  mailboxId: string | null;
-  replyToMessageId: string | null;
-  forwardOfMessageId: string | null;
-  from: string;
-  to: string[];
-  cc: string[];
-  bcc: string[];
-  subject: string;
-  text: string;
-  html: string;
-  version: number;
-  updatedAt: string;
-  attachments: DraftAttachment[];
-};
-export type DraftInput = Omit<Draft, "id" | "version" | "updatedAt" | "attachments"> & {
-  id?: string;
-  version?: number;
-};
-
-export const listDrafts = () => apiGet<Draft[]>("/api/drafts");
-export const createDraft = (input: DraftInput) => apiPost<Draft>("/api/drafts", input);
-export const updateDraft = (id: string, input: DraftInput) =>
-  apiPatch<Draft>(`/api/drafts/${id}`, input);
-export const deleteDraft = (id: string) => apiDelete(`/api/drafts/${id}`);
-export const deleteDraftAttachment = (draftId: string, id: string) =>
-  apiDelete(`/api/drafts/${draftId}/attachments/${id}`);
-export async function uploadDraftAttachment(draftId: string, file: File): Promise<DraftAttachment> {
-  const form = new FormData();
-  form.set("file", file);
-  const response = await fetch(`/api/drafts/${draftId}/attachments`, {
-    method: "POST",
-    body: form,
-    credentials: "include"
-  });
-  const body = (await response.json().catch(() => null)) as
-    | DraftAttachment
-    | { error?: { message?: string } }
-    | null;
-  if (!response.ok)
-    throw new Error(
-      body && "error" in body ? (body.error?.message ?? "Upload failed.") : "Upload failed."
-    );
-  return body as DraftAttachment;
-}
+import { apiPost } from "@/lib/api-client";
 
 export async function sendMessage(input: {
   from: string;

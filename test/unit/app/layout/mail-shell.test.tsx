@@ -5,6 +5,7 @@ import { Sidebar } from "@/components/layout/sidebar";
 import { TopBar } from "@/components/layout/top-bar";
 import { LoginPage } from "@/features/auth/login-page";
 import { ComposeWindow } from "@/features/compose/compose-window";
+import { DraftsPage } from "@/features/drafts/drafts-page";
 import { InboxPage } from "@/features/inbox/inbox-page";
 import { McpConnectionDetails } from "@/features/mcp/connection-dialog";
 
@@ -21,6 +22,7 @@ describe("mail shell", () => {
     const html = renderToStaticMarkup(
       <TopBar
         activeFolder="inbox"
+        draftCount={0}
         mailboxId="all"
         mailboxes={[]}
         search=""
@@ -88,6 +90,7 @@ describe("mail shell", () => {
     const html = renderToStaticMarkup(
       <MobileNavigation
         activeFolder="catchall"
+        draftCount={0}
         unread={unread}
         user={user}
         onFolderChange={() => undefined}
@@ -122,6 +125,89 @@ describe("mail shell", () => {
     expect(html).toContain("Connect MCP");
     expect(html.indexOf("Settings")).toBeLessThan(html.indexOf("Open profile menu"));
     expect(html.match(/border-t pt-2/g)).toHaveLength(2);
+  });
+
+  it("shows Drafts with its private count only when drafts exist or the route is active", () => {
+    const withoutDrafts = renderToStaticMarkup(
+      <Sidebar
+        activeFolder="inbox"
+        unread={unread}
+        user={user}
+        onFolderChange={() => undefined}
+        onSignedOut={() => undefined}
+      />
+    );
+    const withDrafts = renderToStaticMarkup(
+      <Sidebar
+        activeFolder="inbox"
+        draftCount={3}
+        unread={unread}
+        user={user}
+        onFolderChange={() => undefined}
+        onSignedOut={() => undefined}
+      />
+    );
+    const activeEmptyDrafts = renderToStaticMarkup(
+      <Sidebar
+        activeFolder="drafts"
+        draftCount={0}
+        unread={unread}
+        user={user}
+        onFolderChange={() => undefined}
+        onSignedOut={() => undefined}
+      />
+    );
+
+    expect(withoutDrafts).not.toContain('href="/drafts"');
+    expect(withDrafts).toContain('href="/drafts"');
+    expect(withDrafts).toContain("3 drafts");
+    expect(activeEmptyDrafts).toContain('href="/drafts"');
+    expect(activeEmptyDrafts).toContain('aria-current="page"');
+  });
+
+  it("lists private drafts as reopenable rows with filtering and attachment state", () => {
+    const html = renderToStaticMarkup(
+      <DraftsPage
+        drafts={[
+          {
+            id: "draft/one",
+            mailboxId: "mailbox-1",
+            replyToMessageId: null,
+            forwardOfMessageId: null,
+            from: "olivia@example.com",
+            to: ["support@example.com"],
+            cc: [],
+            bcc: [],
+            subject: "Quarterly follow-up",
+            text: "Here is the requested summary.",
+            html: "<p>Here is the requested summary.</p>",
+            version: 2,
+            updatedAt: "2026-07-29T14:00:00.000Z",
+            attachments: [
+              {
+                id: "attachment-1",
+                filename: "summary.pdf",
+                contentType: "application/pdf",
+                sizeBytes: 100
+              }
+            ]
+          }
+        ]}
+        isLoading={false}
+        mailboxId="all"
+        search=""
+        selectedId={null}
+        onBack={() => undefined}
+        onSelect={() => undefined}
+      />
+    );
+
+    expect(html).toContain("Drafts");
+    expect(html).toContain("support@example.com");
+    expect(html).toContain("Quarterly follow-up");
+    expect(html).toContain("Here is the requested summary.");
+    expect(html).toContain('href="/drafts/draft%2Fone"');
+    expect(html).toContain("1 attachment");
   });
 
   it("combines the compact folder label and conversation count in one list header", () => {

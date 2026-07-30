@@ -19,6 +19,13 @@ describe("application routing", () => {
     }
   });
 
+  it("round-trips the Drafts folder and a selected private draft", () => {
+    expect(readAppRoute("/drafts")).toEqual({ kind: "drafts", draftId: null });
+    const route: AppRoute = { kind: "drafts", draftId: "draft/one" };
+    expect(appRoutePath(route)).toBe("/drafts/draft%2Fone");
+    expect(readAppRoute(appRoutePath(route))).toEqual(route);
+  });
+
   it("gives every Settings page a canonical route", () => {
     for (const tab of settingsTabs) {
       const path = `/settings/${tab}`;

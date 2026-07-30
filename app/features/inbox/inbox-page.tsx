@@ -17,6 +17,7 @@ type InboxPageProps = {
   conversations: ConversationSummary[];
   mailboxes: Mailbox[];
   selectedId: string | null;
+  onDraftsChange?: () => void;
   onRefresh: () => void;
   onMessageRouteChange: (folder: MailFolderId, messageId: string | null) => void;
   onSelect: (messageId: string) => void;
@@ -27,6 +28,7 @@ export function InboxPage({
   conversations,
   mailboxes,
   selectedId,
+  onDraftsChange,
   onRefresh,
   onMessageRouteChange,
   onSelect
@@ -166,6 +168,7 @@ export function InboxPage({
           selectedId={readerSelectedId}
           onAction={(action) => void handleAction(action)}
           onBack={() => onMessageRouteChange(activeFolder, null)}
+          {...(onDraftsChange ? { onDraftsChange } : {})}
           onSent={() => {
             onRefresh();
             if (selectedId) void loadThread(selectedId);

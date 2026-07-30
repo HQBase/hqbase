@@ -20,6 +20,7 @@ type AppShellProps = {
   updateInProgress: boolean;
   updateStatus: UpdateStatus | null;
   unread: UnreadCounts;
+  draftCount: number;
   onCompose: () => void;
   onFolderChange: (folder: FolderId) => void;
   onMailboxChange: (mailboxId: string) => void;
@@ -33,6 +34,7 @@ export function AppShell(props: AppShellProps): React.ReactElement {
     <div className="flex h-screen h-[100dvh] overflow-hidden bg-background pt-[env(safe-area-inset-top)] text-foreground">
       <Sidebar
         activeFolder={props.activeFolder}
+        draftCount={props.draftCount}
         unread={props.unread}
         user={props.user}
         onFolderChange={props.onFolderChange}
@@ -42,6 +44,7 @@ export function AppShell(props: AppShellProps): React.ReactElement {
         <div className={cn(props.immersiveOnCompact && "hidden lg:contents")}>
           <TopBar
             activeFolder={props.activeFolder}
+            draftCount={props.draftCount}
             unread={props.unread}
             mailboxId={props.mailboxId}
             mailboxes={props.mailboxes}

@@ -2,8 +2,8 @@ import { Paperclip, Trash2 } from "lucide-react";
 import type * as React from "react";
 
 import { Button } from "@/components/ui/button";
+import type { DraftAttachment } from "@/features/drafts/types";
 import { cn } from "@/lib/cn";
-import type { DraftAttachment } from "./api";
 import { AttachmentList } from "./attachment-list";
 import { ComposeFields, type SendingIdentity } from "./compose-fields";
 import { submitComposeOnShortcut } from "./compose-shortcuts";
