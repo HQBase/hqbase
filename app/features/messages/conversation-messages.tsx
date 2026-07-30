@@ -1,4 +1,4 @@
-import { Download, MessagesSquare } from "lucide-react";
+import { ArrowDown, ArrowUp, Download, Forward, Reply } from "lucide-react";
 import * as React from "react";
 
 import { Badge } from "@/components/ui/badge";
@@ -11,10 +11,12 @@ import type { MessageDetail } from "./types";
 
 export function ConversationMessages({
   compact = false,
-  messages
+  messages,
+  onCompose
 }: {
   compact?: boolean;
   messages: MessageDetail[];
+  onCompose?: (message: MessageDetail, mode: "reply" | "forward") => void;
 }): React.ReactElement {
   const hiddenCount = Math.max(0, messages.length - 2);
   const threadFingerprint = messages.map((message) => message.id).join(":");
@@ -95,6 +97,36 @@ export function ConversationMessages({
             </>
           ) : null}
         </div>
+        {onCompose ? (
+          <footer className="mt-5 flex flex-wrap items-center gap-2">
+            <Button
+              aria-label={`Reply to message from ${message.fromAddress}`}
+              className="h-9 min-w-24 rounded-full px-4"
+              data-compose-action="reply"
+              data-compose-message-id={message.id}
+              onClick={() => onCompose(message, "reply")}
+              size="sm"
+              type="button"
+              variant="outline"
+            >
+              <Reply />
+              Reply
+            </Button>
+            <Button
+              aria-label={`Forward message from ${message.fromAddress}`}
+              className="h-9 min-w-24 rounded-full px-4"
+              data-compose-action="forward"
+              data-compose-message-id={message.id}
+              onClick={() => onCompose(message, "forward")}
+              size="sm"
+              type="button"
+              variant="outline"
+            >
+              <Forward />
+              Forward
+            </Button>
+          </footer>
+        ) : null}
       </article>
     );
   }
@@ -110,19 +142,39 @@ function ThreadMessagesDivider({
   onToggle: () => void;
 }): React.ReactElement {
   const noun = count === 1 ? "message" : "messages";
+  const label = expanded ? `Collapse ${count} earlier ${noun}` : `Expand ${count} earlier ${noun}`;
   return (
     <div className="flex items-center gap-3 px-4 py-3 sm:px-6" data-thread-messages-control>
       <Separator className="flex-1" />
       <Button
+        aria-label={label}
         aria-expanded={expanded}
-        className="shrink-0 rounded-full"
+        className="size-11 shrink-0 rounded-full p-0 [&_svg]:size-3.5"
+        data-thread-disclosure-state={expanded ? "expanded" : "collapsed"}
         onClick={onToggle}
-        size="sm"
+        size="icon"
+        title={label}
         type="button"
         variant="outline"
       >
-        <MessagesSquare data-icon />
-        {expanded ? `Hide ${count} ${noun}` : `${count} earlier ${noun}`}
+        <span
+          aria-hidden="true"
+          className="grid grid-rows-[0.875rem_0.875rem_0.875rem] place-items-center"
+        >
+          {expanded ? (
+            <ArrowDown data-thread-arrow="top-inward" />
+          ) : (
+            <ArrowUp data-thread-arrow="top-outward" />
+          )}
+          <span className="min-w-4 text-center font-mono text-[10px] font-semibold leading-none tabular-nums">
+            {count}
+          </span>
+          {expanded ? (
+            <ArrowUp data-thread-arrow="bottom-inward" />
+          ) : (
+            <ArrowDown data-thread-arrow="bottom-outward" />
+          )}
+        </span>
       </Button>
       <Separator className="flex-1" />
     </div>

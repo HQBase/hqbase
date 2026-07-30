@@ -23,6 +23,13 @@ type MessageDetailProps = {
   onSent: () => void;
 };
 
+type ThreadComposeMode = Extract<ComposeMode, "reply" | "forward">;
+
+type ThreadComposeState = {
+  message: MessageDetailType;
+  mode: ThreadComposeMode;
+};
+
 export function MessageDetail({
   error = null,
   isLoading = false,
@@ -34,10 +41,7 @@ export function MessageDetail({
   onDraftsChange,
   onSent
 }: MessageDetailProps): React.ReactElement {
-  const [composeMode, setComposeMode] = React.useState<Extract<
-    ComposeMode,
-    "reply" | "forward"
-  > | null>(null);
+  const [composeState, setComposeState] = React.useState<ThreadComposeState | null>(null);
 
   if (isLoading) {
     return <MessageReaderStatus label="Loading conversation" />;
@@ -55,7 +59,6 @@ export function MessageDetail({
     selected.direction === "inbound"
       ? selected
       : ([...messages].reverse().find((message) => message.direction === "inbound") ?? selected);
-  const composeTarget = composeMode === "reply" ? replyTarget : selected;
   const isUnread = messages.some(
     (message) => message.direction === "inbound" && message.readAt === null
   );
@@ -101,9 +104,12 @@ export function MessageDetail({
         </div>
       </div>
       <div className="min-h-0 flex-1 overflow-auto">
-        <ConversationMessages messages={messages} />
+        <ConversationMessages
+          messages={messages}
+          onCompose={(message, mode) => setComposeState({ message, mode })}
+        />
         <div className="px-4 pb-8 pt-2 sm:px-6">
-          {composeMode ? (
+          {composeState ? (
             <React.Suspense
               fallback={
                 <div className="grid min-h-60 place-items-center text-sm text-muted-foreground">
@@ -112,15 +118,16 @@ export function MessageDetail({
               }
             >
               <ComposeDialog
+                key={`${composeState.mode}:${composeState.message.id}`}
                 mailboxes={mailboxes}
-                message={composeTarget}
-                mode={composeMode}
+                message={composeState.message}
+                mode={composeState.mode}
                 open
                 presentation="thread"
                 threadContext={<ConversationMessages compact messages={messages} />}
                 {...(onDraftsChange ? { onDraftsChange } : {})}
                 onOpenChange={(nextOpen) => {
-                  if (!nextOpen) setComposeMode(null);
+                  if (!nextOpen) setComposeState(null);
                 }}
                 onSent={onSent}
               />
@@ -132,7 +139,7 @@ export function MessageDetail({
                 size="lg"
                 type="button"
                 variant="outline"
-                onClick={() => setComposeMode("reply")}
+                onClick={() => setComposeState({ message: replyTarget, mode: "reply" })}
               >
                 <Reply />
                 Reply
@@ -142,7 +149,7 @@ export function MessageDetail({
                 size="lg"
                 type="button"
                 variant="outline"
-                onClick={() => setComposeMode("forward")}
+                onClick={() => setComposeState({ message: selected, mode: "forward" })}
               >
                 <Forward />
                 Forward

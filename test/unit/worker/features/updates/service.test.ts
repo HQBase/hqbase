@@ -43,9 +43,10 @@ describe("HQBase updates", () => {
     expect(compareVersions("0.2.0", "0.1.9")).toBeGreaterThan(0);
   });
   it("rejects a tampered manifest", async () => {
+    const replacement = envelope.signature.startsWith("A") ? "B" : "A";
     await expect(
       getUpdateStatus({ HQBASE_RELEASE_PUBLIC_KEY: publicKeyBase64 } as WorkerEnv, async () =>
-        Response.json({ ...envelope, signature: `A${envelope.signature.slice(1)}` })
+        Response.json({ ...envelope, signature: `${replacement}${envelope.signature.slice(1)}` })
       )
     ).rejects.toThrow("signature");
   });

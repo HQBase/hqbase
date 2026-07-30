@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.28
+
+- Reply to or forward any expanded message in a conversation while preserving the existing
+  conversation-level actions after the final message.
+- Replace the hidden-message divider label with a counted two-arrow control that points outward to
+  expand and inward to collapse.
+
 ## 0.1.27
 
 - Show a private Drafts destination in desktop and mobile navigation only when the signed-in user
