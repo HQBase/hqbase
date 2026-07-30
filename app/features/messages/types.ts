@@ -27,6 +27,7 @@ export type ConversationSummary = MessageSummary & {
 export type ConversationPage = {
   conversations: ConversationSummary[];
   nextCursor: string | null;
+  totalCount: number | null;
 };
 
 export type ConversationAction = "read" | "unread" | "star" | "unstar" | "archive" | "trash";

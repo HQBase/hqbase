@@ -34,7 +34,11 @@ export async function listConversationPage(
   filters: ListConversationFilters
 ): Promise<ConversationPage> {
   if (filters.mailboxIds.length === 0) {
-    return { conversations: [], nextCursor: null };
+    return {
+      conversations: [],
+      nextCursor: null,
+      totalCount: filters.cursor ? null : 0
+    };
   }
 
   const accessibleWhere = `messages.mailbox_id IN (${filters.mailboxIds.map(() => "?").join(", ")})`;
@@ -102,7 +106,8 @@ export async function listConversationPage(
          GROUP BY accessible.thread_id
        )
        SELECT ranked.*, aggregates.message_count, aggregates.unread_count,
-         aggregates.is_starred, aggregates.has_thread_attachments
+         aggregates.is_starred, aggregates.has_thread_attachments,
+         ${cursor ? "NULL" : "COUNT(*) OVER ()"} AS total_count
        FROM ranked
        JOIN aggregates ON aggregates.thread_id = ranked.thread_id
        WHERE ranked.thread_position = 1
@@ -127,7 +132,8 @@ export async function listConversationPage(
     nextCursor:
       result.results.length > limit && finalRow
         ? encodeConversationCursor({ activityAt: finalRow.activity_at, id: finalRow.id })
-        : null
+        : null,
+    totalCount: cursor ? null : (pageRows[0]?.total_count ?? 0)
   };
 }
 

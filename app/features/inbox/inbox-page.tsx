@@ -28,6 +28,7 @@ type InboxPageProps = {
   onRefresh: () => void;
   onMessageRouteChange: (folder: MailFolderId, messageId: string | null) => void;
   onSelect: (messageId: string) => void;
+  totalCount: number | null;
 };
 
 export function InboxPage({
@@ -44,12 +45,14 @@ export function InboxPage({
   onLoadMore,
   onRefresh,
   onMessageRouteChange,
-  onSelect
+  onSelect,
+  totalCount
 }: InboxPageProps): React.ReactElement {
   const activeLabel = mailFolders.find((folder) => folder.id === activeFolder)?.label ?? "Messages";
-  const conversationCountLabel = `${conversations.length} ${
-    conversations.length === 1 ? "conversation" : "conversations"
-  }`;
+  const conversationCountLabel =
+    totalCount === null
+      ? null
+      : `${totalCount.toLocaleString()} ${totalCount === 1 ? "conversation" : "conversations"}`;
   const [thread, setThread] = React.useState<MessageDetailType[]>([]);
   const [detailError, setDetailError] = React.useState<string | null>(null);
   const [detailLoading, setDetailLoading] = React.useState(false);
@@ -162,17 +165,11 @@ export function InboxPage({
             <span className="md:hidden">{activeLabel}</span>
             <span className="hidden md:inline">Conversations</span>
           </h1>
-          <span className="font-mono text-[11px] text-muted-foreground">
-            <span aria-hidden="true">
-              {conversations.length}
-              {hasMore ? "+" : ""}
+          {conversationCountLabel ? (
+            <span className="ml-auto font-mono text-[11px] text-muted-foreground">
+              {conversationCountLabel}
             </span>
-            <span className="sr-only">
-              {hasMore
-                ? `${conversationCountLabel} loaded; more available`
-                : conversationCountLabel}
-            </span>
-          </span>
+          ) : null}
         </div>
         <MessageList
           activeFolder={activeFolder}

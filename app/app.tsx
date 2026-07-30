@@ -217,6 +217,7 @@ export function App(): React.ReactElement {
                 onSelect={(messageId) =>
                   navigate({ kind: "mail", folder: activeFolder as MailFolderId, messageId })
                 }
+                totalCount={mailSync.totalCount}
               />
             )}
           </div>

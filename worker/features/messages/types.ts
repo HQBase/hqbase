@@ -63,6 +63,7 @@ export type ConversationSummary = MessageSummary & {
 export type ConversationPage = {
   conversations: ConversationSummary[];
   nextCursor: string | null;
+  totalCount: number | null;
 };
 
 export type MessageRow = {
@@ -101,6 +102,7 @@ export type ConversationRow = Omit<MessageRow, "delivered_to_address"> & {
   has_thread_attachments: number;
   is_starred: number;
   message_count: number;
+  total_count: number | null;
   unread_count: number;
 };
 
