@@ -12,8 +12,17 @@ const origin = "https://hqbase.test";
 const userId = "usr_mcp_member";
 const sessionId = "ses_mcp_member";
 const readToken = "hqb_access_mcp-hqbase-read-token";
+const readProfileFullToken = "hqb_access_mcp-hqbase-read-profile-full-token";
 const fullToken = "hqb_access_mcp-hqbase-full-token";
 const fullScopes = ["mail:read", "mail:write", "mail:send"];
+const readToolNames = [
+  "list_mailboxes",
+  "search_messages",
+  "list_conversations",
+  "get_message",
+  "get_thread",
+  "get_attachment"
+];
 
 describe("HQBase MCP server", () => {
   beforeAll(async () => {
@@ -28,6 +37,7 @@ describe("HQBase MCP server", () => {
     }
     const now = new Date();
     const storedReadToken = await hashOAuthToken("mcp-hqbase-read-token");
+    const storedReadProfileFullToken = await hashOAuthToken("mcp-hqbase-read-profile-full-token");
     const storedFullToken = await hashOAuthToken("mcp-hqbase-full-token");
     await env.DB.batch([
       env.DB.prepare(
@@ -85,20 +95,40 @@ describe("HQBase MCP server", () => {
       ),
       env.DB.prepare(
         `INSERT INTO oauthConsent
-         (id, clientId, userId, scopes, createdAt, updatedAt)
-         VALUES ('consent_mcp_hqbase', 'client_mcp_hqbase', ?, ?, ?, ?)`
-      ).bind(userId, JSON.stringify(["mail:read"]), now.toISOString(), now.toISOString()),
+         (id, clientId, userId, scopes, resources, createdAt, updatedAt)
+         VALUES ('consent_mcp_hqbase', 'client_mcp_hqbase', ?, ?, ?, ?, ?)`
+      ).bind(
+        userId,
+        JSON.stringify(fullScopes),
+        JSON.stringify([`${origin}/mcp`]),
+        now.toISOString(),
+        now.toISOString()
+      ),
       env.DB.prepare(
         `INSERT INTO oauthAccessToken
-         (id, token, clientId, sessionId, userId, expiresAt, createdAt, scopes)
-         VALUES ('access_mcp_hqbase', ?, 'client_mcp_hqbase', ?, ?, ?, ?, ?)`
+         (id, token, clientId, sessionId, userId, expiresAt, createdAt, scopes, resources)
+         VALUES ('access_mcp_hqbase', ?, 'client_mcp_hqbase', ?, ?, ?, ?, ?, ?)`
       ).bind(
         storedReadToken,
         sessionId,
         userId,
         new Date(now.getTime() + 60 * 60 * 1000).toISOString(),
         now.toISOString(),
-        JSON.stringify(["mail:read"])
+        JSON.stringify(["mail:read"]),
+        JSON.stringify([`${origin}/mcp`])
+      ),
+      env.DB.prepare(
+        `INSERT INTO oauthAccessToken
+         (id, token, clientId, sessionId, userId, expiresAt, createdAt, scopes, resources)
+         VALUES ('access_mcp_hqbase_read_profile_full', ?, 'client_mcp_hqbase', ?, ?, ?, ?, ?, ?)`
+      ).bind(
+        storedReadProfileFullToken,
+        sessionId,
+        userId,
+        new Date(now.getTime() + 60 * 60 * 1000).toISOString(),
+        now.toISOString(),
+        JSON.stringify(fullScopes),
+        JSON.stringify([`${origin}/mcp`])
       ),
       env.DB.prepare(
         `INSERT INTO oauthClient
@@ -111,20 +141,27 @@ describe("HQBase MCP server", () => {
       ),
       env.DB.prepare(
         `INSERT INTO oauthConsent
-         (id, clientId, userId, scopes, createdAt, updatedAt)
-         VALUES ('consent_mcp_hqbase_full', 'client_mcp_hqbase_full', ?, ?, ?, ?)`
-      ).bind(userId, JSON.stringify(fullScopes), now.toISOString(), now.toISOString()),
+         (id, clientId, userId, scopes, resources, createdAt, updatedAt)
+         VALUES ('consent_mcp_hqbase_full', 'client_mcp_hqbase_full', ?, ?, ?, ?, ?)`
+      ).bind(
+        userId,
+        JSON.stringify(fullScopes),
+        JSON.stringify([`${origin}/mcp/full`]),
+        now.toISOString(),
+        now.toISOString()
+      ),
       env.DB.prepare(
         `INSERT INTO oauthAccessToken
-         (id, token, clientId, sessionId, userId, expiresAt, createdAt, scopes)
-         VALUES ('access_mcp_hqbase_full', ?, 'client_mcp_hqbase_full', ?, ?, ?, ?, ?)`
+         (id, token, clientId, sessionId, userId, expiresAt, createdAt, scopes, resources)
+         VALUES ('access_mcp_hqbase_full', ?, 'client_mcp_hqbase_full', ?, ?, ?, ?, ?, ?)`
       ).bind(
         storedFullToken,
         sessionId,
         userId,
         new Date(now.getTime() + 60 * 60 * 1000).toISOString(),
         now.toISOString(),
-        JSON.stringify(fullScopes)
+        JSON.stringify(fullScopes),
+        JSON.stringify([`${origin}/mcp/full`])
       ),
       env.DB.prepare(
         `INSERT INTO threads (id, subject_normalized, last_message_at, created_at, updated_at)
@@ -161,7 +198,7 @@ describe("HQBase MCP server", () => {
     });
   });
 
-  it("defaults dynamically registered clients to the complete mail scope", async () => {
+  it("defaults dynamic registration to read and permits explicit mail-action scopes", async () => {
     const metadataResponse = await SELF.fetch(
       `${origin}/.well-known/oauth-authorization-server/api/auth`
     );
@@ -180,18 +217,42 @@ describe("HQBase MCP server", () => {
     });
     expect(registration.status).toBe(201);
     const registered = (await registration.json()) as { scope?: string };
-    expect(registered.scope?.split(" ").sort()).toEqual([...fullScopes].sort());
+    expect(registered.scope?.split(" ")).toEqual(["mail:read"]);
+
+    const fullRegistration = await SELF.fetch(metadata.registration_endpoint ?? "", {
+      body: JSON.stringify({
+        client_name: "HQBase MCP full scope test",
+        redirect_uris: ["https://client.example/full-default-callback"],
+        scope: fullScopes.join(" "),
+        token_endpoint_auth_method: "none"
+      }),
+      headers: { "content-type": "application/json" },
+      method: "POST"
+    });
+    expect(fullRegistration.status).toBe(201);
+    const fullRegistered = (await fullRegistration.json()) as { scope?: string };
+    expect(fullRegistered.scope?.split(" ").sort()).toEqual([...fullScopes].sort());
   });
 
-  it("publishes OAuth discovery and challenges unauthenticated clients", async () => {
-    const metadata = await SELF.fetch(`${origin}/.well-known/oauth-protected-resource/mcp`);
-    expect(metadata.status).toBe(200);
-    await expect(metadata.json()).resolves.toMatchObject({
+  it("publishes distinct OAuth resource metadata and scope challenges", async () => {
+    const readMetadata = await SELF.fetch(`${origin}/.well-known/oauth-protected-resource/mcp`);
+    expect(readMetadata.status).toBe(200);
+    await expect(readMetadata.json()).resolves.toMatchObject({
       resource: `${origin}/mcp`,
-      authorization_servers: [`${origin}/api/auth`]
+      authorization_servers: [`${origin}/api/auth`],
+      scopes_supported: ["mail:read"]
+    });
+    const fullMetadata = await SELF.fetch(
+      `${origin}/.well-known/oauth-protected-resource/mcp/full`
+    );
+    expect(fullMetadata.status).toBe(200);
+    await expect(fullMetadata.json()).resolves.toMatchObject({
+      resource: `${origin}/mcp/full`,
+      authorization_servers: [`${origin}/api/auth`],
+      scopes_supported: fullScopes
     });
 
-    const challenge = await mcpRequest({
+    const readChallenge = await mcpRequest({
       jsonrpc: "2.0",
       id: 1,
       method: "initialize",
@@ -201,20 +262,39 @@ describe("HQBase MCP server", () => {
         clientInfo: { name: "HQBase test", version: "1.0.0" }
       }
     });
-    expect(challenge.status).toBe(401);
-    expect(challenge.headers.get("www-authenticate")).toContain("oauth-protected-resource/mcp");
+    expect(readChallenge.status).toBe(401);
+    expect(readChallenge.headers.get("www-authenticate")).toContain(
+      'resource_metadata="https://hqbase.test/.well-known/oauth-protected-resource/mcp"'
+    );
+    expect(readChallenge.headers.get("www-authenticate")).toContain('scope="mail:read"');
+
+    const fullChallenge = await mcpRequest(
+      {
+        jsonrpc: "2.0",
+        id: 2,
+        method: "initialize",
+        params: {
+          protocolVersion: "2025-11-25",
+          capabilities: {},
+          clientInfo: { name: "HQBase test", version: "1.0.0" }
+        }
+      },
+      undefined,
+      "/mcp/full"
+    );
+    expect(fullChallenge.status).toBe(401);
+    expect(fullChallenge.headers.get("www-authenticate")).toContain(
+      'resource_metadata="https://hqbase.test/.well-known/oauth-protected-resource/mcp/full"'
+    );
+    expect(fullChallenge.headers.get("www-authenticate")).toContain(
+      'scope="mail:read mail:write mail:send"'
+    );
   });
 
-  it("registers only tools granted by OAuth scopes", async () => {
-    expect(await listToolNames(readToken)).toEqual([
-      "list_mailboxes",
-      "search_messages",
-      "list_conversations",
-      "get_message",
-      "get_thread",
-      "get_attachment"
-    ]);
-    expect(await listToolNames(fullToken)).toEqual([
+  it("enforces profile resources and caps the read-only profile", async () => {
+    expect(await listToolNames(readToken)).toEqual(readToolNames);
+    expect(await listToolNames(readProfileFullToken)).toEqual(readToolNames);
+    expect(await listToolNames(fullToken, "/mcp/full")).toEqual([
       "list_mailboxes",
       "search_messages",
       "list_conversations",
@@ -234,6 +314,12 @@ describe("HQBase MCP server", () => {
       "reply_to_message",
       "forward_message"
     ]);
+    await expect(
+      mcpRequest({ jsonrpc: "2.0", id: 3, method: "tools/list" }, fullToken)
+    ).resolves.toMatchObject({ status: 401 });
+    await expect(
+      mcpRequest({ jsonrpc: "2.0", id: 4, method: "tools/list" }, readToken, "/mcp/full")
+    ).resolves.toMatchObject({ status: 401 });
   });
 
   it("filters mailbox results through live mailbox grants", async () => {
@@ -282,7 +368,8 @@ describe("HQBase MCP server", () => {
         subject: "Draft from MCP",
         text: "Review me"
       },
-      fullToken
+      fullToken,
+      "/mcp/full"
     )) as { id: string; version: number };
     expect(created).toMatchObject({ version: 1 });
 
@@ -294,7 +381,8 @@ describe("HQBase MCP server", () => {
         contentType: "text/plain",
         contentBase64: "ZHJhZnQ="
       },
-      fullToken
+      fullToken,
+      "/mcp/full"
     )) as { id: string; filename: string };
     expect(attachment.filename).toBe("draft.txt");
 
@@ -305,7 +393,8 @@ describe("HQBase MCP server", () => {
         version: created.version,
         text: "Updated review"
       },
-      fullToken
+      fullToken,
+      "/mcp/full"
     )) as { attachments: Array<{ id: string }>; text: string; version: number };
     expect(updated).toMatchObject({ text: "Updated review", version: 2 });
     expect(updated.attachments.map((item) => item.id)).toEqual([attachment.id]);
@@ -313,9 +402,9 @@ describe("HQBase MCP server", () => {
     await env.DB.prepare(
       "UPDATE mail_domains SET sending_status = 'disabled' WHERE id = 'dom_example'"
     ).run();
-    await expect(callTool("get_draft", { draftId: created.id }, fullToken)).resolves.toMatchObject({
-      id: created.id
-    });
+    await expect(
+      callTool("get_draft", { draftId: created.id }, fullToken, "/mcp/full")
+    ).resolves.toMatchObject({ id: created.id });
     await env.DB.prepare(
       "UPDATE mail_domains SET sending_status = 'ready' WHERE id = 'dom_example'"
     ).run();
@@ -330,23 +419,30 @@ describe("HQBase MCP server", () => {
           activeFolder: "inbox",
           messageId: "msg_mcp_allowed"
         },
-        fullToken
+        fullToken,
+        "/mcp/full"
       )
     ).resolves.toMatchObject({ affected: 1, threadId: "thr_mcp_allowed" });
   });
 });
 
-async function listToolNames(accessToken: string): Promise<string[]> {
+async function listToolNames(accessToken: string, endpoint = "/mcp"): Promise<string[]> {
   const response = await mcpRequest(
     { jsonrpc: "2.0", id: 2, method: "tools/list", params: {} },
-    accessToken
+    accessToken,
+    endpoint
   );
   expect(response.status).toBe(200);
   const payload = (await response.json()) as { result?: { tools?: Array<{ name: string }> } };
   return payload.result?.tools?.map((tool) => tool.name) ?? [];
 }
 
-async function callTool(name: string, args: unknown, accessToken: string): Promise<unknown> {
+async function callTool(
+  name: string,
+  args: unknown,
+  accessToken: string,
+  endpoint = "/mcp"
+): Promise<unknown> {
   const response = await mcpRequest(
     {
       jsonrpc: "2.0",
@@ -354,7 +450,8 @@ async function callTool(name: string, args: unknown, accessToken: string): Promi
       method: "tools/call",
       params: { name, arguments: args }
     },
-    accessToken
+    accessToken,
+    endpoint
   );
   expect(response.status).toBe(200);
   const payload = (await response.json()) as {
@@ -366,14 +463,14 @@ async function callTool(name: string, args: unknown, accessToken: string): Promi
   return JSON.parse(payload.result?.content?.[0]?.text ?? "null") as unknown;
 }
 
-function mcpRequest(body: unknown, accessToken?: string): Promise<Response> {
+function mcpRequest(body: unknown, accessToken?: string, endpoint = "/mcp"): Promise<Response> {
   const headers = new Headers({
     accept: "application/json, text/event-stream",
     "content-type": "application/json",
     "mcp-protocol-version": "2025-11-25"
   });
   if (accessToken) headers.set("authorization", `Bearer ${accessToken}`);
-  return SELF.fetch(`${origin}/mcp`, {
+  return SELF.fetch(`${origin}${endpoint}`, {
     body: JSON.stringify(body),
     headers,
     method: "POST"

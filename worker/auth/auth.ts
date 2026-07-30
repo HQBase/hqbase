@@ -39,8 +39,8 @@ export function createAuth(env: WorkerEnv, request: Request) {
       oauthProvider({
         allowDynamicClientRegistration: true,
         allowUnauthenticatedClientRegistration: true,
-        clientRegistrationAllowedScopes: ["offline_access"],
-        clientRegistrationDefaultScopes: ["mail:read", "mail:write", "mail:send"],
+        clientRegistrationAllowedScopes: ["mail:write", "mail:send", "offline_access"],
+        clientRegistrationDefaultScopes: ["mail:read"],
         consentPage: "/mcp/consent",
         disableJwtPlugin: true,
         grantTypes: ["authorization_code", "refresh_token"],
@@ -52,7 +52,7 @@ export function createAuth(env: WorkerEnv, request: Request) {
         },
         scopes: ["mail:read", "mail:write", "mail:send", "offline_access"],
         storeTokens: { hash: hashOAuthToken },
-        resources: [mcpResource(env, request)],
+        resources: [mcpResource(env, request), mcpFullResource(env, request)],
         enforcePerClientResources: false
       })
     ]
@@ -69,4 +69,8 @@ export function authIssuer(env: WorkerEnv, request: Request): string {
 
 export function mcpResource(env: WorkerEnv, request: Request): string {
   return `${authOrigin(env, request)}/mcp`;
+}
+
+export function mcpFullResource(env: WorkerEnv, request: Request): string {
+  return `${authOrigin(env, request)}/mcp/full`;
 }

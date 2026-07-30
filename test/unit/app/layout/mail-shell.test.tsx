@@ -230,17 +230,24 @@ describe("mail shell", () => {
     expect(html).not.toContain("Navigation");
   });
 
-  it("explains the existing MCP endpoint and inherited user permissions", () => {
+  it("explains both MCP connection profiles and inherited user permissions", () => {
     const html = renderToStaticMarkup(
       <McpConnectionDetails
-        endpoint="https://mail.example.com/mcp"
-        endpointId="mcp-endpoint"
+        fullEndpoint="https://mail.example.com/mcp/full"
+        fullEndpointId="mcp-full-endpoint"
+        readOnlyEndpoint="https://mail.example.com/mcp"
+        readOnlyEndpointId="mcp-read-endpoint"
         user={user}
       />
     );
 
     expect(html).toContain("https://mail.example.com/mcp");
-    expect(html).toContain("remote Streamable HTTP MCP");
+    expect(html).toContain("https://mail.example.com/mcp/full");
+    expect(html).toContain("Read only");
+    expect(html).toContain("Read, manage &amp; send");
+    expect(html).toContain("Archive and trash actions");
+    expect(html).toContain("Copy Read only endpoint");
+    expect(html).toContain("Copy Read, manage &amp; send endpoint");
     expect(html).toContain("OAuth 2.1");
     expect(html).toContain("registers dynamically with PKCE");
     expect(html).toContain("current workspace role");
