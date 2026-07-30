@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.33
+
+- Remove the baked black canvas and padding from the official logo on application, authentication,
+  offline, and marketing surfaces.
+- Give favicons, Apple touch icons, installable PWA icons, maskable icons, and notification badges
+  their own purpose-built framing, with a larger mark on installed app icons.
+
 ## 0.1.32
 
 - Replace the application, favicon, and installed PWA branding with the new official square HQBase
