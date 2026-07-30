@@ -9,6 +9,14 @@ const mobileNavigation = readFileSync(
   new URL("../../../../app/components/layout/mobile-navigation.tsx", import.meta.url),
   "utf8"
 );
+const topBar = readFileSync(
+  new URL("../../../../app/components/layout/top-bar.tsx", import.meta.url),
+  "utf8"
+);
+const pullToRefresh = readFileSync(
+  new URL("../../../../app/components/ui/pull-to-refresh.tsx", import.meta.url),
+  "utf8"
+);
 const sidebar = readFileSync(
   new URL("../../../../app/components/layout/sidebar.tsx", import.meta.url),
   "utf8"
@@ -30,6 +38,7 @@ const threadComposeSurface = readFileSync(
   "utf8"
 );
 const styles = readFileSync(new URL("../../../../app/styles.css", import.meta.url), "utf8");
+const indexHtml = readFileSync(new URL("../../../../index.html", import.meta.url), "utf8");
 
 describe("mobile application shell", () => {
   it("uses dynamic viewport and sidebar-colored safe areas", () => {
@@ -54,5 +63,24 @@ describe("mobile application shell", () => {
     expect(styles).toContain("@media (max-width: 767px)");
     expect(styles).toContain('[contenteditable="true"][class]');
     expect(styles).toContain("font-size: 16px");
+  });
+
+  it("keeps persistent mail chrome fixed and ignores pans that begin in the header", () => {
+    expect(appShell).not.toContain("immersiveOnCompact");
+    expect(appShell).toContain("touch-manipulation");
+    expect(appShell).toContain("h-[env(safe-area-inset-top)] touch-none");
+    expect(topBar).toContain("shrink-0 touch-none");
+    expect(styles).toContain("overscroll-behavior: none");
+  });
+
+  it("refreshes inside mail scroll surfaces without disabling deliberate pinch zoom", () => {
+    expect(pullToRefresh).toContain(
+      'addEventListener("touchmove", handleTouchMove, { passive: false })'
+    );
+    expect(pullToRefresh).toContain("event.preventDefault()");
+    expect(pullToRefresh).toContain("overscroll-contain");
+    expect(pullToRefresh).toContain("Release to refresh");
+    expect(indexHtml).not.toContain("user-scalable=no");
+    expect(indexHtml).not.toContain("maximum-scale=1");
   });
 });

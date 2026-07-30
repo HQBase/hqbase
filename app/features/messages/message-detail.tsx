@@ -2,6 +2,7 @@ import { Archive, ArrowLeft, Forward, MailOpen, Reply, Star, Trash2 } from "luci
 import * as React from "react";
 
 import { Button } from "@/components/ui/button";
+import { PullToRefresh } from "@/components/ui/pull-to-refresh";
 import type { ComposeMode } from "@/features/compose/compose-state";
 import type { Mailbox } from "@/features/mailboxes/types";
 import { ConversationMessages } from "./conversation-messages";
@@ -18,9 +19,11 @@ type MessageDetailProps = {
   mailboxes: Mailbox[];
   messages: MessageDetailType[];
   selectedId: string | null;
+  showBack?: boolean;
   onAction: (action: "read" | "unread" | "star" | "unstar" | "archive" | "trash") => void;
   onBack: () => void;
   onDraftsChange?: () => void;
+  onRefresh: () => Promise<void> | void;
   onSent: () => void;
 };
 
@@ -38,9 +41,11 @@ export function MessageDetail({
   mailboxes,
   messages,
   selectedId,
+  showBack = true,
   onAction,
   onBack,
   onDraftsChange,
+  onRefresh,
   onSent
 }: MessageDetailProps): React.ReactElement {
   const [composeState, setComposeState] = React.useState<ThreadComposeState | null>(null);
@@ -70,16 +75,18 @@ export function MessageDetail({
     <article className="flex h-full flex-col bg-background">
       <div className="shrink-0 border-b bg-background px-3 py-3 sm:px-5">
         <div className="flex items-start gap-2">
-          <Button
-            aria-label="Back to messages"
-            className="size-10 shrink-0 lg:hidden"
-            size="icon"
-            type="button"
-            variant="ghost"
-            onClick={onBack}
-          >
-            <ArrowLeft />
-          </Button>
+          {showBack ? (
+            <Button
+              aria-label="Back to messages"
+              className="size-10 shrink-0"
+              size="icon"
+              type="button"
+              variant="ghost"
+              onClick={onBack}
+            >
+              <ArrowLeft />
+            </Button>
+          ) : null}
           <h1 className="min-w-0 flex-1 break-words pt-2 text-lg font-medium tracking-tight sm:text-xl lg:pt-1">
             {selected.subject}
           </h1>
@@ -105,7 +112,7 @@ export function MessageDetail({
           </div>
         </div>
       </div>
-      <div className="min-h-0 flex-1 overflow-auto">
+      <PullToRefresh className="min-h-0 flex-1" onRefresh={onRefresh}>
         <ConversationMessages
           messages={messages}
           onCompose={(message, mode) => setComposeState({ message, mode })}
@@ -160,7 +167,7 @@ export function MessageDetail({
             </div>
           )}
         </div>
-      </div>
+      </PullToRefresh>
     </article>
   );
 }

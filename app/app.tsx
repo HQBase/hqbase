@@ -136,7 +136,6 @@ export function App(): React.ReactElement {
       <AppShell
         activeFolder={activeFolder}
         draftCount={draftState.drafts.length}
-        immersiveOnCompact={route.kind === "mail" && selectedId !== null}
         mailboxId={mailboxId}
         mailboxes={contentMailboxes}
         unread={mailSync.notifications.unread}
@@ -210,7 +209,7 @@ export function App(): React.ReactElement {
                 onDraftsChange={() => void draftState.refresh().catch(() => undefined)}
                 onConversationAction={mailSync.applyConversationAction}
                 onLoadMore={() => void mailSync.loadMore()}
-                onRefresh={() => void mailSync.refresh().catch(() => undefined)}
+                onRefresh={() => mailSync.refresh()}
                 onMessageRouteChange={(folder, messageId) =>
                   navigate({ kind: "mail", folder, messageId })
                 }

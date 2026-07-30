@@ -1,5 +1,16 @@
 import * as React from "react";
+import { usePanelRef } from "react-resizable-panels";
 
+import {
+  conversationListWidthStorageKey,
+  defaultConversationListWidth,
+  maximumConversationListWidth,
+  minimumConversationListWidth,
+  minimumConversationReaderWidth,
+  readStoredWidth,
+  storeLayoutValue
+} from "@/components/layout/desktop-layout";
+import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import type { Mailbox } from "@/features/mailboxes/types";
 import { getMessageThread, runConversationAction } from "@/features/messages/api";
 import { MessageDetail } from "@/features/messages/message-detail";
@@ -9,6 +20,7 @@ import type {
   ConversationSummary,
   MessageDetail as MessageDetailType
 } from "@/features/messages/types";
+import { useDesktopShell } from "@/hooks/use-desktop-shell";
 import { cn } from "@/lib/cn";
 import type { MailFolderId } from "@/lib/routes";
 import { mailFolders } from "@/lib/routes";
@@ -25,7 +37,7 @@ type InboxPageProps = {
   onDraftsChange?: () => void;
   onConversationAction: (threadId: string, action: ConversationAction, affected: number) => void;
   onLoadMore: () => void;
-  onRefresh: () => void;
+  onRefresh: () => Promise<void> | void;
   onMessageRouteChange: (folder: MailFolderId, messageId: string | null) => void;
   onSelect: (messageId: string) => void;
   totalCount: number | null;
@@ -48,6 +60,16 @@ export function InboxPage({
   onSelect,
   totalCount
 }: InboxPageProps): React.ReactElement {
+  const desktopShell = useDesktopShell();
+  const conversationListPanelRef = usePanelRef();
+  const [initialConversationListWidth] = React.useState(() =>
+    readStoredWidth(
+      conversationListWidthStorageKey,
+      defaultConversationListWidth,
+      minimumConversationListWidth,
+      maximumConversationListWidth
+    )
+  );
   const activeLabel = mailFolders.find((folder) => folder.id === activeFolder)?.label ?? "Messages";
   const conversationCountLabel =
     totalCount === null
@@ -139,7 +161,7 @@ export function InboxPage({
     if (!selectedId) return;
     const updated = await runConversationAction(selectedId, action, activeFolder);
     onConversationAction(updated.threadId, action, updated.affected);
-    onRefresh();
+    void Promise.resolve(onRefresh()).catch(() => undefined);
     if (
       action === "archive" ||
       action === "trash" ||
@@ -151,58 +173,104 @@ export function InboxPage({
     await loadThread(selectedId);
   }
 
+  const listSection = (
+    <section
+      className={cn(
+        "h-full min-h-0 flex-col bg-card/35",
+        desktopShell || !selectedId ? "flex" : "hidden"
+      )}
+      data-mobile-view="message-list"
+    >
+      <div className="flex h-12 shrink-0 items-center justify-between border-b px-4">
+        <h1 className="text-sm font-medium">
+          <span className="md:hidden">{activeLabel}</span>
+          <span className="hidden md:inline">Conversations</span>
+        </h1>
+        {conversationCountLabel ? (
+          <span className="ml-auto font-mono text-[11px] text-muted-foreground">
+            {conversationCountLabel}
+          </span>
+        ) : null}
+      </div>
+      <MessageList
+        activeFolder={activeFolder}
+        conversations={conversations}
+        hasMore={hasMore}
+        isLoadingMore={isLoadingMore}
+        loadMoreError={loadMoreError}
+        selectedThreadId={selectedThreadId}
+        onLoadMore={onLoadMore}
+        onRefresh={onRefresh}
+        onSelect={(conversation) => onSelect(conversation.id)}
+      />
+    </section>
+  );
+  const readerSection = (
+    <section
+      className={cn(
+        "h-full min-h-0 bg-background",
+        desktopShell || selectedId ? "block" : "hidden"
+      )}
+      data-mobile-view="conversation"
+    >
+      <MessageDetail
+        defaultFromMailboxId={defaultFromMailboxId}
+        error={detailError}
+        isLoading={detailLoading}
+        key={selectedId ?? "empty"}
+        mailboxes={mailboxes}
+        messages={thread}
+        selectedId={readerSelectedId}
+        showBack={!desktopShell}
+        onAction={(action) => void handleAction(action)}
+        onBack={() => onMessageRouteChange(activeFolder, null)}
+        {...(onDraftsChange ? { onDraftsChange } : {})}
+        onRefresh={async () => {
+          await onRefresh();
+          if (selectedId) await loadThread(selectedId);
+        }}
+        onSent={() => {
+          void Promise.resolve(onRefresh()).catch(() => undefined);
+          if (selectedId) void loadThread(selectedId);
+        }}
+      />
+    </section>
+  );
+
+  if (!desktopShell) {
+    return (
+      <div className="h-full overflow-hidden">
+        {listSection}
+        {readerSection}
+      </div>
+    );
+  }
+
   return (
-    <div className="h-full overflow-hidden lg:grid lg:grid-cols-[360px_minmax(0,1fr)]">
-      <section
-        className={cn(
-          "h-full min-h-0 flex-col bg-card/35 lg:flex lg:border-r",
-          selectedId ? "hidden" : "flex"
-        )}
-        data-mobile-view="message-list"
+    <ResizablePanelGroup
+      id="hqbase-conversation-workspace"
+      onLayoutChanged={() => {
+        const size = conversationListPanelRef.current?.getSize();
+        if (size) {
+          storeLayoutValue(conversationListWidthStorageKey, Math.round(size.inPixels));
+        }
+      }}
+      orientation="horizontal"
+    >
+      <ResizablePanel
+        defaultSize={initialConversationListWidth}
+        groupResizeBehavior="preserve-pixel-size"
+        id="conversation-list"
+        maxSize={maximumConversationListWidth}
+        minSize={minimumConversationListWidth}
+        panelRef={conversationListPanelRef}
       >
-        <div className="flex h-12 shrink-0 items-center justify-between border-b px-4">
-          <h1 className="text-sm font-medium">
-            <span className="md:hidden">{activeLabel}</span>
-            <span className="hidden md:inline">Conversations</span>
-          </h1>
-          {conversationCountLabel ? (
-            <span className="ml-auto font-mono text-[11px] text-muted-foreground">
-              {conversationCountLabel}
-            </span>
-          ) : null}
-        </div>
-        <MessageList
-          activeFolder={activeFolder}
-          conversations={conversations}
-          hasMore={hasMore}
-          isLoadingMore={isLoadingMore}
-          loadMoreError={loadMoreError}
-          selectedThreadId={selectedThreadId}
-          onLoadMore={onLoadMore}
-          onSelect={(conversation) => onSelect(conversation.id)}
-        />
-      </section>
-      <section
-        className={cn("h-full min-h-0 bg-background lg:block", selectedId ? "block" : "hidden")}
-        data-mobile-view="conversation"
-      >
-        <MessageDetail
-          defaultFromMailboxId={defaultFromMailboxId}
-          error={detailError}
-          isLoading={detailLoading}
-          key={selectedId ?? "empty"}
-          mailboxes={mailboxes}
-          messages={thread}
-          selectedId={readerSelectedId}
-          onAction={(action) => void handleAction(action)}
-          onBack={() => onMessageRouteChange(activeFolder, null)}
-          {...(onDraftsChange ? { onDraftsChange } : {})}
-          onSent={() => {
-            onRefresh();
-            if (selectedId) void loadThread(selectedId);
-          }}
-        />
-      </section>
-    </div>
+        {listSection}
+      </ResizablePanel>
+      <ResizableHandle aria-label="Resize conversation list" id="conversation-list-divider" />
+      <ResizablePanel id="conversation-reader" minSize={minimumConversationReaderWidth}>
+        {readerSection}
+      </ResizablePanel>
+    </ResizablePanelGroup>
   );
 }

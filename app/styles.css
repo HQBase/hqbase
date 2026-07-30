@@ -100,6 +100,7 @@
 
   html {
     background-color: hsl(var(--background));
+    overscroll-behavior: none;
   }
 
   * {
@@ -118,6 +119,13 @@
 
   #root {
     min-height: 100dvh;
+  }
+}
+
+@media (hover: hover) and (pointer: fine) and (max-width: 1023px),
+  (hover: hover) and (pointer: fine) and (max-height: 599px) {
+  .desktop-window-guard {
+    display: flex;
   }
 }
 

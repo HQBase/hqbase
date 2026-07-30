@@ -50,6 +50,48 @@ describe("mail shell", () => {
     expect(html).not.toContain("OB");
   });
 
+  it("exposes the desktop sidebar state from the leading header control", () => {
+    const visibleHtml = renderToStaticMarkup(
+      <TopBar
+        activeFolder="inbox"
+        draftCount={0}
+        mailboxId="all"
+        mailboxes={[]}
+        search=""
+        sidebarCollapsed={false}
+        unread={unread}
+        user={user}
+        onCompose={() => undefined}
+        onFolderChange={() => undefined}
+        onMailboxChange={() => undefined}
+        onSearchChange={() => undefined}
+        onSignedOut={() => undefined}
+        onToggleSidebar={() => undefined}
+      />
+    );
+    const collapsedHtml = renderToStaticMarkup(
+      <TopBar
+        activeFolder="inbox"
+        draftCount={0}
+        mailboxId="all"
+        mailboxes={[]}
+        search=""
+        sidebarCollapsed
+        unread={unread}
+        user={user}
+        onCompose={() => undefined}
+        onFolderChange={() => undefined}
+        onMailboxChange={() => undefined}
+        onSearchChange={() => undefined}
+        onSignedOut={() => undefined}
+        onToggleSidebar={() => undefined}
+      />
+    );
+
+    expect(visibleHtml).toContain('aria-label="Hide sidebar"');
+    expect(collapsedHtml).toContain('aria-label="Show sidebar"');
+  });
+
   it("renders the canonical logo instead of the HQ placeholder", () => {
     const html = renderToStaticMarkup(
       <Sidebar
