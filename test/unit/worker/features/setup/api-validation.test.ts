@@ -14,6 +14,7 @@ describe("setup API validation", () => {
         ownerPassword: "password123",
         primaryDomain: "example.com",
         checklistAcknowledged: false,
+        defaultFromMailboxAddress: "hello@example.com",
         mailboxes: [{ address: "hello@example.com", displayName: "Hello" }]
       })
     ).toThrow();
@@ -27,6 +28,7 @@ describe("setup API validation", () => {
         ownerPassword: "password123",
         primaryDomain: "bad domain",
         checklistAcknowledged: true,
+        defaultFromMailboxAddress: "hello@example.com",
         mailboxes: [{ address: "hello@example.com", displayName: "Hello" }]
       })
     ).toThrow();
@@ -40,6 +42,7 @@ describe("setup API validation", () => {
         ownerPassword: "password123",
         primaryDomain: "example.com",
         checklistAcknowledged: true,
+        defaultFromMailboxAddress: "hello@example.com",
         mailboxes: [{ address: "hello@example.com", displayName: "Hello" }]
       })
     ).toMatchObject({ ownerEmail: "owner@gmail.com" });
@@ -53,12 +56,27 @@ describe("setup API validation", () => {
         ownerPassword: "password123",
         primaryDomain: "example.com",
         checklistAcknowledged: true,
+        defaultFromMailboxAddress: "hello@example.com",
         mailboxes: [
           { address: "Hello@example.com", displayName: "Hello" },
           { address: "hello@example.com", displayName: "Duplicate" }
         ]
       })
     ).toThrow("Mailbox addresses must be unique.");
+  });
+
+  it("requires the default From mailbox to be one of the setup mailboxes", () => {
+    expect(() =>
+      bootstrapSetupSchema.parse({
+        ownerName: "Owner",
+        ownerEmail: "owner@example.com",
+        ownerPassword: "password123",
+        primaryDomain: "example.com",
+        checklistAcknowledged: true,
+        defaultFromMailboxAddress: "privacy@example.com",
+        mailboxes: [{ address: "hello@example.com", displayName: "Hello" }]
+      })
+    ).toThrow("Choose one of the setup mailboxes as the default From mailbox.");
   });
 
   it("rejects credentials in Cloudflare zone listing input", () => {

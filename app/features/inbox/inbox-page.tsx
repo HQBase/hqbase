@@ -15,6 +15,7 @@ import { mailFolders } from "@/lib/routes";
 type InboxPageProps = {
   activeFolder: MailFolderId;
   conversations: ConversationSummary[];
+  defaultFromMailboxId: string | null;
   mailboxes: Mailbox[];
   selectedId: string | null;
   onDraftsChange?: () => void;
@@ -26,6 +27,7 @@ type InboxPageProps = {
 export function InboxPage({
   activeFolder,
   conversations,
+  defaultFromMailboxId,
   mailboxes,
   selectedId,
   onDraftsChange,
@@ -160,6 +162,7 @@ export function InboxPage({
         data-mobile-view="conversation"
       >
         <MessageDetail
+          defaultFromMailboxId={defaultFromMailboxId}
           error={detailError}
           isLoading={detailLoading}
           key={selectedId ?? "empty"}

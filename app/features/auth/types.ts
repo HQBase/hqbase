@@ -5,4 +5,5 @@ export type CurrentUser = {
   email: string;
   name: string;
   role: WorkspaceRole;
+  defaultFromMailboxId: string | null;
 };

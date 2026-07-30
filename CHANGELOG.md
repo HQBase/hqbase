@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.31
+
+- Let each user choose a default From mailbox during onboarding and in Settings.
+- Use that mailbox for new messages and forwards while replies continue from the mailbox that
+  received the original message.
+
 ## 0.1.30
 
 - Keep compact right-side sheet headers and close controls below the top device safe area.

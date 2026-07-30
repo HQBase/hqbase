@@ -1,9 +1,13 @@
 import { disableCurrentDeviceNotificationsBeforeSignOut } from "@/features/notifications/sign-out";
-import { apiGet } from "@/lib/api-client";
+import { apiGet, apiPatch } from "@/lib/api-client";
 import type { CurrentUser } from "./types";
 
 export async function getCurrentUser(): Promise<CurrentUser> {
   return apiGet<CurrentUser>("/api/me");
+}
+
+export async function updateDefaultFromMailbox(defaultFromMailboxId: string): Promise<CurrentUser> {
+  return apiPatch<CurrentUser>("/api/me", { defaultFromMailboxId });
 }
 
 export async function signIn(email: string, password: string): Promise<string | null> {

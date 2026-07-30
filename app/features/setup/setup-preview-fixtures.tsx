@@ -160,6 +160,7 @@ export function renderPreviewFixture(input: FixtureInput): React.ReactNode {
   }
   return (
     <MailboxStep
+      defaultFromMailboxAddress={input.mailboxes[0]?.address ?? ""}
       errors={{ rows: input.mailboxes.map(() => ({})) }}
       isPending={input.state === "submitting"}
       mailboxes={input.mailboxes}
@@ -169,6 +170,7 @@ export function renderPreviewFixture(input: FixtureInput): React.ReactNode {
       onRemove={(index) =>
         input.setMailboxes((current) => current.filter((_, itemIndex) => itemIndex !== index))
       }
+      onSetDefaultFromMailboxAddress={() => undefined}
       onUpdate={(index, patch) =>
         input.setMailboxes((current) =>
           current.map((mailbox, itemIndex) =>

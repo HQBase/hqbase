@@ -17,6 +17,7 @@ import {
   type ComposeDialogProps,
   composeTitle,
   type DraftSaveState,
+  defaultSendingIdentity,
   draftStatus,
   findDraftForComposer,
   forwardedMessage,
@@ -30,6 +31,7 @@ import { ComposeSurface } from "./compose-surface";
 import { useDraftAutosave } from "./use-draft-autosave";
 
 export function ComposeDialog({
+  defaultFromMailboxId = null,
   draftId = null,
   mailboxes,
   message = null,
@@ -42,6 +44,10 @@ export function ComposeDialog({
   onSent
 }: ComposeDialogProps): React.ReactElement | null {
   const identities = React.useMemo(() => sendingIdentities(mailboxes), [mailboxes]);
+  const defaultIdentity = React.useMemo(
+    () => defaultSendingIdentity(defaultFromMailboxId, mailboxes, identities),
+    [defaultFromMailboxId, identities, mailboxes]
+  );
   const [draft, setDraft] = React.useState<Draft | null>(null);
   const [from, setFrom] = React.useState("");
   const [to, setTo] = React.useState("");
@@ -100,8 +106,8 @@ export function ComposeDialog({
         const forwarded = mode === "forward" && message ? forwardedMessage(message) : null;
         const preferredIdentity =
           mode === "reply" && message
-            ? replySendingIdentity(message, identities)
-            : (identities[0] ?? null);
+            ? replySendingIdentity(message, identities, defaultIdentity)
+            : defaultIdentity;
         const initial =
           existing ??
           (await createDraft({
@@ -145,6 +151,7 @@ export function ComposeDialog({
     message,
     mode,
     identities,
+    defaultIdentity,
     draftId,
     recoveryKey,
     replyToMessageId,
