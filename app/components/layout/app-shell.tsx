@@ -8,6 +8,7 @@ import type { UnreadCounts } from "@/features/notifications/types";
 import type { UpdateStatus } from "@/features/updates/types";
 import { UpdateBanner } from "@/features/updates/update-banner";
 import { useDesktopShell } from "@/hooks/use-desktop-shell";
+import { scrollActiveMobileMailSurfaceToTop } from "@/lib/mobile-scroll";
 import type { FolderId } from "@/lib/routes";
 import {
   defaultSidebarWidth,
@@ -21,7 +22,6 @@ import {
   sidebarWidthStorageKey,
   storeLayoutValue
 } from "./desktop-layout";
-import { scrollActiveMobileMailSurfaceToTop } from "./mobile-scroll";
 import { Sidebar } from "./sidebar";
 import { TopBar } from "./top-bar";
 
