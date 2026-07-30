@@ -1,4 +1,5 @@
 import * as React from "react";
+import { PWA_UPDATE_READY_EVENT, readPwaUpdateReady } from "@/features/pwa/update-ready";
 import { getUpdateStatus } from "./api";
 import type { UpdateStatus } from "./types";
 import {
@@ -14,11 +15,13 @@ const activeUpdateIntervalMs = 10_000;
 export function useUpdateMonitor(canManage: boolean): {
   acceptStatus: (status: UpdateStatus) => void;
   progress: UpdateProgress | null;
+  ready: boolean;
   start: (buildId: string) => void;
   status: UpdateStatus | null;
 } {
   const [status, setStatus] = React.useState<UpdateStatus | null>(null);
   const [progress, setProgress] = React.useState<UpdateProgress | null>(() => readUpdateProgress());
+  const [ready, setReady] = React.useState(readPwaUpdateReady);
 
   const acceptStatus = React.useCallback((nextStatus: UpdateStatus) => {
     setStatus(nextStatus);
@@ -26,6 +29,12 @@ export function useUpdateMonitor(canManage: boolean): {
       clearUpdateProgress();
       setProgress(null);
     }
+  }, []);
+
+  React.useEffect(() => {
+    const handleUpdateReady = (): void => setReady(true);
+    window.addEventListener(PWA_UPDATE_READY_EVENT, handleUpdateReady);
+    return () => window.removeEventListener(PWA_UPDATE_READY_EVENT, handleUpdateReady);
   }, []);
 
   React.useEffect(() => {
@@ -72,5 +81,5 @@ export function useUpdateMonitor(canManage: boolean): {
     setProgress(beginUpdateProgress(buildId));
   }, []);
 
-  return { acceptStatus, progress, start, status };
+  return { acceptStatus, progress, ready, start, status };
 }

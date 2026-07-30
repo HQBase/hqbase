@@ -27,6 +27,11 @@ const sounds = {
     { gap: 45 },
     { from: 440, to: 440, duration: 65 }
   ],
+  "update-ready": [
+    { from: 520, to: 620, duration: 90 },
+    { gap: 40 },
+    { from: 660, to: 820, duration: 150 }
+  ],
   unlock: [{ gap: 30 }]
 };
 

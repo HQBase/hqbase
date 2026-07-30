@@ -1,9 +1,12 @@
+// @vitest-environment happy-dom
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { registerPwa } from "@/features/pwa/register";
+import { PWA_UPDATE_READY_EVENT } from "@/features/pwa/update-ready";
 import { UPDATE_STARTED_EVENT } from "@/features/updates/update-progress";
 
 describe("PWA registration", () => {
   afterEach(() => {
+    document.documentElement.removeAttribute("data-hqbase-update-ready");
     vi.unstubAllGlobals();
   });
 
@@ -50,5 +53,35 @@ describe("PWA registration", () => {
     expect(update).toHaveBeenCalledTimes(2);
 
     unregister();
+  });
+
+  it("announces when the replacement worker is ready", async () => {
+    const onUpdateReady = vi.fn();
+    const readyListener = vi.fn();
+    const waiting = { postMessage: vi.fn() };
+    const registration = {
+      addEventListener: vi.fn(),
+      installing: null,
+      update: vi.fn().mockResolvedValue(undefined),
+      waiting
+    };
+    const serviceWorker = {
+      addEventListener: vi.fn(),
+      controller: {},
+      register: vi.fn().mockResolvedValue(registration),
+      removeEventListener: vi.fn()
+    };
+    vi.stubGlobal("navigator", { onLine: true, serviceWorker });
+    window.addEventListener(PWA_UPDATE_READY_EVENT, readyListener);
+
+    const unregister = registerPwa({ onUpdateReady });
+    await Promise.resolve();
+
+    expect(onUpdateReady).toHaveBeenCalledOnce();
+    expect(readyListener).toHaveBeenCalledOnce();
+    expect(document.documentElement.hasAttribute("data-hqbase-update-ready")).toBe(true);
+
+    unregister();
+    window.removeEventListener(PWA_UPDATE_READY_EVENT, readyListener);
   });
 });

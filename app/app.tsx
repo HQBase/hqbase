@@ -143,6 +143,7 @@ export function App(): React.ReactElement {
         search={search}
         user={user}
         updateInProgress={updateMonitor.progress !== null}
+        updateReady={updateMonitor.ready}
         updateStatus={updateMonitor.status}
         onOpenUpdates={() => {
           navigate({ kind: "settings", tab: "updates" });

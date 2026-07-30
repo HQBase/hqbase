@@ -1,7 +1,8 @@
+import { ArrowRight, RefreshCw } from "lucide-react";
 import * as React from "react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
+import { Spinner } from "@/components/ui/spinner";
 import { CloudflareAuthorizationDialog } from "@/features/settings/cloudflare-authorization-dialog";
 import { SettingsSection } from "@/features/settings/settings-section";
 import { applyUpdate, getUpdateStatus } from "./api";
@@ -91,33 +92,68 @@ export function UpdateSettings({
         </Alert>
       ) : null}
       {progress ? (
-        <Alert>
-          <AlertTitle>Update started</AlertTitle>
-          <AlertDescription>
-            Cloudflare build <span className="font-mono">{progress.buildId}</span> is running.
-            HQBase remains available during the build and will reconnect after deployment.
-          </AlertDescription>
-        </Alert>
+        <div
+          aria-live="polite"
+          className="rounded-xl border border-border/80 bg-muted/25 p-4 sm:p-5"
+          role="status"
+        >
+          <div className="flex items-start gap-3.5">
+            <div className="flex size-9 shrink-0 items-center justify-center rounded-full border bg-background shadow-sm">
+              <Spinner aria-hidden="true" className="size-4 text-foreground" role="presentation" />
+            </div>
+            <div className="min-w-0">
+              <h3 className="text-sm font-medium">Update in progress</h3>
+              <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                {status?.release.version
+                  ? `HQBase ${status.release.version} is being deployed. `
+                  : "The new version is being deployed. "}
+                You can keep working while Cloudflare finishes the build.
+              </p>
+              <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-muted-foreground">
+                <span>Cloudflare build</span>
+                <code className="rounded bg-background px-1.5 py-0.5 font-mono text-foreground ring-1 ring-border">
+                  {progress.buildId}
+                </code>
+              </div>
+            </div>
+          </div>
+        </div>
       ) : null}
-      <div aria-live="polite" className="flex flex-wrap items-center gap-x-6 gap-y-2 text-xs">
-        <Version label="Current" value={status?.installedVersion ?? "Unknown"} />
-        <Version label="Available" value={status?.release.version ?? "Not checked"} />
+      <div
+        aria-live="polite"
+        className="flex flex-col gap-3 border-y py-3 sm:flex-row sm:items-center sm:justify-between"
+      >
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-xs">
+          <Version label="Current" value={status?.installedVersion ?? "Unknown"} />
+          <ArrowRight aria-hidden="true" className="size-3.5 text-muted-foreground/70" />
+          <Version label="Available" value={status?.release.version ?? "Not checked"} />
+        </div>
         <Button
+          className="self-start sm:self-auto"
           disabled={isPending}
           onClick={() => void check()}
           size="sm"
           type="button"
           variant="ghost"
         >
-          {pendingAction === "check" ? "Checking…" : "Check updates"}
+          {pendingAction === "check" ? (
+            <>
+              <Spinner aria-hidden="true" role="presentation" />
+              Checking…
+            </>
+          ) : (
+            <>
+              <RefreshCw aria-hidden="true" />
+              Check updates
+            </>
+          )}
         </Button>
       </div>
       {status?.available && !progress ? (
-        <div className="flex flex-col gap-4">
-          <Separator />
+        <div className="flex flex-col gap-4 pt-1">
           <div>
             <h3 className="text-sm font-medium">Apply update</h3>
-            <p className="mt-1 text-xs text-muted-foreground">
+            <p className="mt-1 max-w-2xl text-xs leading-5 text-muted-foreground">
               HQBase verifies the artifact, records the Worker version and D1 bookmark, migrates,
               deploys, and verifies before reporting success.
             </p>

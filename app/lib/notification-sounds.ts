@@ -4,7 +4,8 @@ export type NotificationSound =
   | "toast-error"
   | "toast-information"
   | "toast-success"
-  | "toast-warning";
+  | "toast-warning"
+  | "update-ready";
 
 export type ToastSoundType =
   | "action"
@@ -25,7 +26,8 @@ const SOUND_SOURCES: Record<NotificationSound, string> = {
   "toast-error": "/sounds/toast-error.wav",
   "toast-information": "/sounds/toast-information.wav",
   "toast-success": "/sounds/toast-success.wav",
-  "toast-warning": "/sounds/toast-warning.wav"
+  "toast-warning": "/sounds/toast-warning.wav",
+  "update-ready": "/sounds/update-ready.wav"
 };
 
 let initialized = false;

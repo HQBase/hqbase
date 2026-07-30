@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.29
+
+- Replace the available-update banner with an animated progress status after an update starts, then
+  remove it when the replacement application is ready to reload.
+- Refine Settings -> Updates with clearer version hierarchy, deployment progress, and the retained
+  Cloudflare build reference.
+- Play one quiet local notification sound when the new HQBase version is ready to reload.
+
 ## 0.1.28
 
 - Reply to or forward any expanded message in a conversation while preserving the existing
