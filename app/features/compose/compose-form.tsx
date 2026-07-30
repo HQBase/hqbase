@@ -76,7 +76,13 @@ export function ComposeForm(props: ComposeFormProps): React.ReactElement {
             onChange={props.onEditorChange}
           />
           <AttachmentList attachments={props.attachments} onRemove={props.onRemoveAttachment} />
-          <footer className="flex items-center justify-between gap-2 border-t bg-background/50 px-5 py-3">
+          <footer
+            className={cn(
+              "flex items-center justify-between gap-2 border-t bg-background/50 px-5 py-3",
+              props.presentation === "window" &&
+                "pb-[max(1rem,env(safe-area-inset-bottom))] md:pb-3"
+            )}
+          >
             <div className="flex gap-2">
               <Button
                 className={cn(props.presentation === "thread" && "hidden lg:inline-flex")}

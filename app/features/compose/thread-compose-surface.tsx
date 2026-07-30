@@ -42,7 +42,7 @@ export function ThreadComposeSurface({
     <section
       aria-describedby={statusId}
       aria-labelledby={titleId}
-      className="fixed inset-0 z-50 flex h-[100dvh] flex-col overflow-hidden bg-background outline-none lg:static lg:z-auto lg:mt-6 lg:h-auto lg:rounded-lg lg:border lg:bg-card lg:shadow-sm"
+      className="fixed inset-0 z-50 flex h-[100dvh] flex-col overflow-hidden bg-background pt-[env(safe-area-inset-top)] outline-none lg:static lg:z-auto lg:mt-6 lg:h-auto lg:rounded-lg lg:border lg:bg-card lg:pt-0 lg:shadow-sm"
       ref={surfaceRef}
       tabIndex={-1}
       onKeyDown={(event) => {
