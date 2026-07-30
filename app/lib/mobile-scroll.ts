@@ -3,7 +3,11 @@ const activeMobileMailSurfaceSelector =
 
 export function scrollActiveMobileMailSurfaceToTop(): void {
   const surface = document.querySelector<HTMLElement>(activeMobileMailSurfaceSelector);
-  if (!surface || surface.scrollTop <= 0) return;
+  if (surface) scrollMailSurfaceToTop(surface);
+}
+
+export function scrollMailSurfaceToTop(surface: HTMLElement): void {
+  if (surface.scrollTop <= 0) return;
   const reduceMotion =
     typeof window.matchMedia === "function" &&
     window.matchMedia("(prefers-reduced-motion: reduce)").matches;

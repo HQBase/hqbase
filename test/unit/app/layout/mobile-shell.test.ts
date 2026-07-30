@@ -96,4 +96,12 @@ describe("mobile application shell", () => {
     expect(inboxPage).toContain('data-mobile-scroll-active={!desktopShell && selectedId ? "true"');
     expect(pullToRefresh).toContain('data-pull-to-refresh-scroll=""');
   });
+
+  it("offers a subtle mobile-only floating scroll-to-top fallback", () => {
+    expect(pullToRefresh).toContain("scrollToTopThreshold = 320");
+    expect(pullToRefresh).toContain('aria-label="Scroll to top"');
+    expect(pullToRefresh).toContain("safe-area-inset-bottom");
+    expect(pullToRefresh).toContain("rounded-full");
+    expect(pullToRefresh).toContain("md:hidden");
+  });
 });

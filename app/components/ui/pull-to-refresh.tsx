@@ -1,13 +1,16 @@
-import { ArrowDown, Check, TriangleAlert } from "lucide-react";
+import { ArrowDown, ArrowUp, Check, TriangleAlert } from "lucide-react";
 import * as React from "react";
 
+import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { cn } from "@/lib/cn";
+import { scrollMailSurfaceToTop } from "@/lib/mobile-scroll";
 
 const refreshThreshold = 64;
 const refreshOffset = 44;
 const maximumPull = 96;
 const completionResetDelay = 2000;
+const scrollToTopThreshold = 320;
 
 type PullStatus = "idle" | "pulling" | "refreshing" | "complete" | "failed";
 
@@ -33,6 +36,7 @@ export function PullToRefresh({
   const statusRef = React.useRef<PullStatus>("idle");
   const resetTimerRef = React.useRef<number | null>(null);
   const [distance, setDistance] = React.useState(0);
+  const [showScrollToTop, setShowScrollToTop] = React.useState(false);
   const [status, setStatus] = React.useState<PullStatus>("idle");
   onRefreshRef.current = onRefresh;
 
@@ -92,6 +96,10 @@ export function PullToRefresh({
     const scrollContainer = activeScrollRef.current;
     if (!scrollContainer) return;
 
+    const handleScroll = (): void => {
+      setShowScrollToTop(scrollContainer.scrollTop > scrollToTopThreshold);
+    };
+
     const handleTouchStart = (event: TouchEvent): void => {
       if (statusRef.current === "refreshing" || event.touches.length !== 1) return;
       if (scrollContainer.scrollTop > 0) return;
@@ -145,11 +153,14 @@ export function PullToRefresh({
     scrollContainer.addEventListener("touchmove", handleTouchMove, { passive: false });
     scrollContainer.addEventListener("touchend", finishGesture, { passive: true });
     scrollContainer.addEventListener("touchcancel", finishGesture, { passive: true });
+    scrollContainer.addEventListener("scroll", handleScroll, { passive: true });
+    handleScroll();
     return () => {
       scrollContainer.removeEventListener("touchstart", handleTouchStart);
       scrollContainer.removeEventListener("touchmove", handleTouchMove);
       scrollContainer.removeEventListener("touchend", finishGesture);
       scrollContainer.removeEventListener("touchcancel", finishGesture);
+      scrollContainer.removeEventListener("scroll", handleScroll);
     };
   }, [activeScrollRef, cancelReset, reset, runRefresh, updateDistance, updateStatus]);
 
@@ -203,6 +214,27 @@ export function PullToRefresh({
       >
         {children}
       </div>
+      <Button
+        aria-hidden={!showScrollToTop}
+        aria-label="Scroll to top"
+        className={cn(
+          "absolute right-3 bottom-[max(1.25rem,env(safe-area-inset-bottom))] z-20 size-10 rounded-full border-border/70 bg-background/80 text-muted-foreground shadow-sm backdrop-blur-md transition-[opacity,transform] duration-200 hover:bg-background hover:text-foreground motion-reduce:transition-none md:hidden",
+          showScrollToTop
+            ? "pointer-events-auto translate-y-0 opacity-70"
+            : "pointer-events-none translate-y-1 opacity-0"
+        )}
+        size="icon"
+        tabIndex={showScrollToTop ? 0 : -1}
+        title="Scroll to top"
+        type="button"
+        variant="outline"
+        onClick={() => {
+          const surface = activeScrollRef.current;
+          if (surface) scrollMailSurfaceToTop(surface);
+        }}
+      >
+        <ArrowUp aria-hidden="true" className="size-4" />
+      </Button>
     </div>
   );
 }

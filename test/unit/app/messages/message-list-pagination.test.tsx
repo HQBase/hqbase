@@ -141,6 +141,52 @@ describe("conversation list pagination", () => {
     await rendered.unmount();
     vi.useRealTimers();
   });
+
+  it("offers a compact floating route back to the top after meaningful scrolling", async () => {
+    vi.stubGlobal(
+      "matchMedia",
+      vi.fn(() => ({ matches: false }))
+    );
+    const rendered = await renderComponent(
+      <MessageList
+        activeFolder="inbox"
+        conversations={[conversation]}
+        hasMore={false}
+        isLoadingMore={false}
+        loadMoreError={null}
+        selectedThreadId={null}
+        onLoadMore={() => undefined}
+        onRefresh={() => undefined}
+        onSelect={() => undefined}
+      />
+    );
+    const scrollContainer = rendered.container.querySelector<HTMLDivElement>(".overscroll-contain");
+    const scrollToTop = rendered.container.querySelector<HTMLButtonElement>(
+      'button[aria-label="Scroll to top"]'
+    );
+    const scrollTo = vi.fn();
+    if (!scrollContainer || !scrollToTop) throw new Error("Expected the compact scroll controls.");
+    scrollContainer.scrollTo = scrollTo;
+
+    expect(scrollToTop.getAttribute("aria-hidden")).toBe("true");
+    expect(scrollToTop.tabIndex).toBe(-1);
+
+    scrollContainer.scrollTop = 321;
+    await flushHookEffects(() => scrollContainer.dispatchEvent(new Event("scroll")));
+
+    expect(scrollToTop.getAttribute("aria-hidden")).toBe("false");
+    expect(scrollToTop.tabIndex).toBe(0);
+
+    await flushHookEffects(() => scrollToTop.click());
+    expect(scrollTo).toHaveBeenCalledWith({ behavior: "smooth", top: 0 });
+
+    scrollContainer.scrollTop = 0;
+    await flushHookEffects(() => scrollContainer.dispatchEvent(new Event("scroll")));
+    expect(scrollToTop.getAttribute("aria-hidden")).toBe("true");
+
+    await rendered.unmount();
+    vi.unstubAllGlobals();
+  });
 });
 
 function touchEvent(type: string, clientX = 0, clientY = 0): Event {

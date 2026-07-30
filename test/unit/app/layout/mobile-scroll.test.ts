@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { scrollActiveMobileMailSurfaceToTop } from "@/components/layout/mobile-scroll";
+import { scrollActiveMobileMailSurfaceToTop } from "@/lib/mobile-scroll";
 
 describe("compact top safe-area scrolling", () => {
   afterEach(() => {
