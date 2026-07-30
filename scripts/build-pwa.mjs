@@ -7,6 +7,7 @@ const allowedPrecachePaths = [
   /^\/fonts\//,
   /^\/icons\//,
   /^\/sounds\//,
+  /^\/favicon\.svg$/,
   /^\/logo\.svg$/,
   /^\/manifest\.webmanifest$/,
   /^\/offline\.html$/
@@ -83,7 +84,7 @@ self.addEventListener("push", (event) => {
       : \`\${unreadCount} unread messages in HQBase\`;
   const tasks = [
     self.registration.showNotification("New email", {
-      badge: "/icons/icon-192.png",
+      badge: "/icons/notification-badge.png",
       body,
       data: { url: safeNotificationPath(payload.url) },
       icon: "/icons/icon-192.png",
