@@ -93,8 +93,13 @@ describe("conversation reader", () => {
         activeFolder="inbox"
         conversations={[conversation]}
         defaultFromMailboxId="mbx_1"
+        hasMore={false}
+        isLoadingMore={false}
+        loadMoreError={null}
         mailboxes={[]}
         selectedId={null}
+        onConversationAction={() => undefined}
+        onLoadMore={() => undefined}
         onMessageRouteChange={() => undefined}
         onRefresh={() => undefined}
         onSelect={() => undefined}
@@ -105,8 +110,13 @@ describe("conversation reader", () => {
         activeFolder="inbox"
         conversations={[conversation]}
         defaultFromMailboxId="mbx_1"
+        hasMore={false}
+        isLoadingMore={false}
+        loadMoreError={null}
         mailboxes={[]}
         selectedId={conversation.id}
+        onConversationAction={() => undefined}
+        onLoadMore={() => undefined}
         onMessageRouteChange={() => undefined}
         onRefresh={() => undefined}
         onSelect={() => undefined}
@@ -118,6 +128,30 @@ describe("conversation reader", () => {
     expect(listHtml).toContain("lg:block hidden");
     expect(conversationHtml).toContain("lg:flex lg:border-r hidden");
     expect(conversationHtml).toContain("lg:block block");
+  });
+
+  it("shows loaded-count overflow and a manual paging fallback", () => {
+    const html = renderToStaticMarkup(
+      <InboxPage
+        activeFolder="inbox"
+        conversations={[conversation]}
+        defaultFromMailboxId="mbx_1"
+        hasMore={true}
+        isLoadingMore={false}
+        loadMoreError={null}
+        mailboxes={[]}
+        selectedId={null}
+        onConversationAction={() => undefined}
+        onLoadMore={() => undefined}
+        onMessageRouteChange={() => undefined}
+        onRefresh={() => undefined}
+        onSelect={() => undefined}
+      />
+    );
+
+    expect(html).toContain("1 conversation loaded; more available");
+    expect(html).toContain(">1+<");
+    expect(html).toContain("Load more conversations");
   });
 
   it("labels the unread indicator and removes it once the message is read", () => {

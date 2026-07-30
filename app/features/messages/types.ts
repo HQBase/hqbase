@@ -24,6 +24,13 @@ export type ConversationSummary = MessageSummary & {
   unreadCount: number;
 };
 
+export type ConversationPage = {
+  conversations: ConversationSummary[];
+  nextCursor: string | null;
+};
+
+export type ConversationAction = "read" | "unread" | "star" | "unstar" | "archive" | "trash";
+
 export type MessageDetail = MessageSummary & {
   cc: string[];
   bcc: string[];

@@ -2,9 +2,15 @@ import { nowIso } from "../../db/client";
 import { AppError } from "../../lib/errors";
 
 import type { MessageAction } from "./actions";
-import type { ConversationFolder, ConversationRow, ConversationSummary } from "./types";
+import type {
+  ConversationFolder,
+  ConversationPage,
+  ConversationRow,
+  ConversationSummary
+} from "./types";
 
 export type ListConversationFilters = {
+  cursor?: string | undefined;
   folder?: ConversationFolder | undefined;
   limit?: number | undefined;
   mailboxId?: string | undefined;
@@ -16,8 +22,19 @@ export async function listConversations(
   db: D1Database,
   filters: ListConversationFilters
 ): Promise<ConversationSummary[]> {
+  const page = await listConversationPage(db, {
+    ...filters,
+    limit: filters.limit ?? 100
+  });
+  return page.conversations;
+}
+
+export async function listConversationPage(
+  db: D1Database,
+  filters: ListConversationFilters
+): Promise<ConversationPage> {
   if (filters.mailboxIds.length === 0) {
-    return [];
+    return { conversations: [], nextCursor: null };
   }
 
   const accessibleWhere = `messages.mailbox_id IN (${filters.mailboxIds.map(() => "?").join(", ")})`;
@@ -43,8 +60,12 @@ export async function listConversations(
     params.push(like, like, like, like, like);
   }
 
-  const limit = Math.min(Math.max(filters.limit ?? 100, 1), 100);
-  params.push(limit);
+  const cursor = filters.cursor ? decodeConversationCursor(filters.cursor) : null;
+  if (cursor) {
+    params.push(cursor.activityAt, cursor.activityAt, cursor.id);
+  }
+  const limit = Math.min(Math.max(filters.limit ?? 50, 1), 100);
+  params.push(limit + 1);
   const result = await db
     .prepare(
       `WITH accessible AS (
@@ -85,13 +106,29 @@ export async function listConversations(
        FROM ranked
        JOIN aggregates ON aggregates.thread_id = ranked.thread_id
        WHERE ranked.thread_position = 1
+       ${
+         cursor
+           ? `AND (
+             ranked.activity_at < ?
+             OR (ranked.activity_at = ? AND ranked.id < ?)
+           )`
+           : ""
+}
        ORDER BY ranked.activity_at DESC, ranked.id DESC
        LIMIT ?`
     )
     .bind(...params)
     .all<ConversationRow>();
 
-  return result.results.map(mapConversationSummary);
+  const pageRows = result.results.slice(0, limit);
+  const finalRow = pageRows.at(-1);
+  return {
+    conversations: pageRows.map(mapConversationSummary),
+    nextCursor:
+      result.results.length > limit && finalRow
+        ? encodeConversationCursor({ activityAt: finalRow.activity_at, id: finalRow.id })
+        : null
+  };
 }
 
 export async function updateConversationAction(
@@ -184,6 +221,40 @@ function mapConversationSummary(row: ConversationRow): ConversationSummary {
     messageCount: row.message_count,
     unreadCount: row.unread_count
   };
+}
+
+type ConversationCursor = {
+  activityAt: string;
+  id: string;
+};
+
+function encodeConversationCursor(cursor: ConversationCursor): string {
+  return btoa(JSON.stringify([1, cursor.activityAt, cursor.id]))
+    .replaceAll("+", "-")
+    .replaceAll("/", "_")
+    .replace(/=+$/u, "");
+}
+
+function decodeConversationCursor(value: string): ConversationCursor {
+  try {
+    const base64 = value.replaceAll("-", "+").replaceAll("_", "/");
+    const padding = "=".repeat((4 - (base64.length % 4)) % 4);
+    const decoded: unknown = JSON.parse(atob(`${base64}${padding}`));
+    if (
+      !Array.isArray(decoded) ||
+      decoded.length !== 3 ||
+      decoded[0] !== 1 ||
+      typeof decoded[1] !== "string" ||
+      decoded[1].length === 0 ||
+      typeof decoded[2] !== "string" ||
+      decoded[2].length === 0
+    ) {
+      throw new Error("Invalid cursor payload.");
+    }
+    return { activityAt: decoded[1], id: decoded[2] };
+  } catch {
+    throw new AppError("INVALID_CONVERSATION_CURSOR", "Conversation cursor is invalid.", 400);
+  }
 }
 
 function parseJsonList(value: string): string[] {

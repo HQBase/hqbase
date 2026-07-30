@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { beforeEach, describe, expect, it, vi } from "vitest";
-
+import type { ConversationSummary } from "@/features/messages/types";
 import { useMailSync } from "@/features/messages/use-mail-sync";
 import { flushHookEffects, renderHook } from "../render-hook";
 
@@ -40,9 +40,34 @@ function status(latestInboundMessageId: string) {
   };
 }
 
+function conversation(id: string, receivedAt: string): ConversationSummary {
+  return {
+    createdAt: receivedAt,
+    direction: "inbound",
+    folder: "inbox",
+    fromAddress: `${id}@example.com`,
+    hasAttachments: false,
+    id,
+    isStarred: false,
+    mailboxId: "mailbox-1",
+    messageCount: 1,
+    readAt: null,
+    receivedAt,
+    sentAt: null,
+    snippet: `Preview ${id}`,
+    starredAt: null,
+    subject: `Subject ${id}`,
+    threadId: `thread-${id}`,
+    to: ["support@example.com"],
+    unreadCount: 1
+  };
+}
+
 describe("useMailSync", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.listConversations.mockReset();
+    mocks.refreshNotifications.mockReset();
   });
 
   it("uses one refresh path for initial load, focus, unread state, and incoming sound", async () => {
@@ -50,7 +75,7 @@ describe("useMailSync", () => {
       configurable: true,
       value: "visible"
     });
-    mocks.listConversations.mockResolvedValue([]);
+    mocks.listConversations.mockResolvedValue({ conversations: [], nextCursor: null });
     mocks.refreshNotifications
       .mockResolvedValueOnce(status("message-1"))
       .mockResolvedValueOnce(status("message-2"));
@@ -88,6 +113,116 @@ describe("useMailSync", () => {
 
     expect(mocks.refreshNotifications).toHaveBeenCalledOnce();
     expect(mocks.toastError).toHaveBeenCalledWith("Conversations are unavailable.");
+    await hook.unmount();
+  });
+
+  it("loads older cursor pages and keeps them through a newest-page refresh", async () => {
+    Object.defineProperty(document, "visibilityState", {
+      configurable: true,
+      value: "visible"
+    });
+    const first = conversation("message-1", "2026-07-30T12:00:00.000Z");
+    const second = conversation("message-2", "2026-07-30T11:00:00.000Z");
+    const newest = conversation("message-0", "2026-07-30T13:00:00.000Z");
+    mocks.listConversations
+      .mockResolvedValueOnce({ conversations: [first], nextCursor: "cursor-1" })
+      .mockResolvedValueOnce({ conversations: [second], nextCursor: null })
+      .mockResolvedValueOnce({ conversations: [newest, first], nextCursor: "cursor-2" });
+    mocks.refreshNotifications
+      .mockResolvedValueOnce(status("message-1"))
+      .mockResolvedValueOnce(status("message-1"));
+
+    const hook = await renderHook(useMailSync, {
+      activeFolder: "inbox",
+      mailboxId: "all",
+      search: "",
+      userId: "user-1"
+    });
+    await flushHookEffects();
+
+    expect(hook.result.hasMore).toBe(true);
+    await flushHookEffects(() => hook.result.loadMore());
+    expect(mocks.listConversations).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ cursor: "cursor-1" })
+    );
+    expect(hook.result.conversations.map((item) => item.id)).toEqual(["message-1", "message-2"]);
+    expect(hook.result.hasMore).toBe(false);
+
+    await flushHookEffects(() => window.dispatchEvent(new Event("focus")));
+    expect(hook.result.conversations.map((item) => item.id)).toEqual([
+      "message-0",
+      "message-1",
+      "message-2"
+    ]);
+    expect(hook.result.hasMore).toBe(false);
+    await hook.unmount();
+  });
+
+  it("keeps the cursor available when loading an older page fails", async () => {
+    const first = conversation("message-1", "2026-07-30T12:00:00.000Z");
+    mocks.listConversations
+      .mockResolvedValueOnce({ conversations: [first], nextCursor: "cursor-1" })
+      .mockRejectedValueOnce(new Error("Older conversations are unavailable."));
+    mocks.refreshNotifications.mockResolvedValueOnce(status("message-1"));
+
+    const hook = await renderHook(useMailSync, {
+      activeFolder: "inbox",
+      mailboxId: "all",
+      search: "",
+      userId: "user-1"
+    });
+    await flushHookEffects();
+    await flushHookEffects(() => hook.result.loadMore());
+
+    expect(hook.result.isLoadingMore).toBe(false);
+    expect(hook.result.loadMoreError).toBe("Older conversations are unavailable.");
+    expect(hook.result.hasMore).toBe(true);
+    await hook.unmount();
+  });
+
+  it("reconciles conversation actions across every loaded page", async () => {
+    const conversations = ["read", "unread", "star", "unstar", "archive", "trash"].map(
+      (action, index) => conversation(`message-${action}`, `2026-07-30T1${index}:00:00.000Z`)
+    );
+    mocks.listConversations.mockResolvedValueOnce({ conversations, nextCursor: null });
+    mocks.refreshNotifications.mockResolvedValueOnce(status("message-read"));
+
+    const hook = await renderHook(useMailSync, {
+      activeFolder: "inbox",
+      mailboxId: "all",
+      search: "",
+      userId: "user-1"
+    });
+    await flushHookEffects();
+    await flushHookEffects(() => {
+      hook.result.applyConversationAction("thread-message-read", "read", 1);
+      hook.result.applyConversationAction("thread-message-unread", "unread", 1);
+      hook.result.applyConversationAction("thread-message-star", "star", 1);
+      hook.result.applyConversationAction("thread-message-unstar", "unstar", 1);
+      hook.result.applyConversationAction("thread-message-archive", "archive", 1);
+      hook.result.applyConversationAction("thread-message-trash", "trash", 1);
+      hook.result.applyConversationAction("thread-missing", "read", 0);
+    });
+
+    expect(hook.result.conversations.map((item) => item.id)).toEqual([
+      "message-read",
+      "message-unread",
+      "message-star",
+      "message-unstar"
+    ]);
+    expect(hook.result.conversations.find((item) => item.id === "message-read")?.unreadCount).toBe(
+      0
+    );
+    expect(
+      hook.result.conversations.find((item) => item.id === "message-unread")?.unreadCount
+    ).toBe(1);
+    expect(hook.result.conversations.find((item) => item.id === "message-star")?.isStarred).toBe(
+      true
+    );
+    expect(hook.result.conversations.find((item) => item.id === "message-unstar")?.isStarred).toBe(
+      false
+    );
     await hook.unmount();
   });
 });

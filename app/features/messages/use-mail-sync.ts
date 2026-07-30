@@ -6,7 +6,7 @@ import { playNotificationSound } from "@/lib/notification-sounds";
 import type { FolderId } from "@/lib/routes";
 
 import { listConversations } from "./api";
-import type { ConversationSummary } from "./types";
+import type { ConversationAction, ConversationSummary } from "./types";
 
 const refreshIntervalMs = 10_000;
 
@@ -18,11 +18,19 @@ type MailSyncOptions = {
 };
 
 export function useMailSync({ activeFolder, mailboxId, search, userId }: MailSyncOptions): {
+  applyConversationAction: (threadId: string, action: ConversationAction, affected: number) => void;
   conversations: ConversationSummary[];
+  hasMore: boolean;
+  isLoadingMore: boolean;
+  loadMore: () => Promise<void>;
+  loadMoreError: string | null;
   notifications: ReturnType<typeof useNotifications>;
   refresh: () => Promise<void>;
 } {
   const [conversations, setConversations] = React.useState<ConversationSummary[]>([]);
+  const [nextCursor, setNextCursor] = React.useState<string | null>(null);
+  const [isLoadingMore, setIsLoadingMore] = React.useState(false);
+  const [loadMoreError, setLoadMoreError] = React.useState<string | null>(null);
   const notifications = useNotifications(userId);
   const refreshNotifications = notifications.refresh;
   const latestInboundId = React.useRef<string | null>(null);
@@ -30,7 +38,15 @@ export function useMailSync({ activeFolder, mailboxId, search, userId }: MailSyn
   const currentUserId = React.useRef(userId);
   const syncKey = [userId, activeFolder, mailboxId, search].join("\u0000");
   const currentSyncKey = React.useRef(syncKey);
+  const paginationSyncKey = React.useRef<string | null>(null);
+  const inboundSnapshotUserId = React.useRef(userId);
   const inFlight = React.useRef<{ key: string; promise: Promise<void> } | null>(null);
+  const loadMoreInFlight = React.useRef<{
+    cursor: string;
+    key: string;
+    promise: Promise<void>;
+  } | null>(null);
+  const loadedAdditionalPages = React.useRef(false);
   currentUserId.current = userId;
   currentSyncKey.current = syncKey;
 
@@ -40,6 +56,7 @@ export function useMailSync({ activeFolder, mailboxId, search, userId }: MailSyn
     const promise = (async () => {
       if (!userId) {
         setConversations([]);
+        setNextCursor(null);
         await refreshNotifications();
         return;
       }
@@ -47,7 +64,7 @@ export function useMailSync({ activeFolder, mailboxId, search, userId }: MailSyn
       const [notificationResult, conversationResult] = await Promise.allSettled([
         refreshNotifications(),
         activeFolder === "settings" || activeFolder === "drafts"
-          ? Promise.resolve<ConversationSummary[] | null>(null)
+          ? Promise.resolve<null>(null)
           : listConversations({
               folder: activeFolder,
               mailboxId: mailboxId === "all" ? undefined : mailboxId,
@@ -57,7 +74,13 @@ export function useMailSync({ activeFolder, mailboxId, search, userId }: MailSyn
       if (currentSyncKey.current !== syncKey || currentUserId.current !== userId) return;
 
       if (conversationResult.status === "fulfilled" && conversationResult.value !== null) {
-        setConversations(conversationResult.value);
+        const page = conversationResult.value;
+        if (loadedAdditionalPages.current) {
+          setConversations((current) => reconcileNewestPage(page.conversations, current));
+        } else {
+          setConversations(page.conversations);
+          setNextCursor(page.nextCursor);
+        }
       }
       if (notificationResult.status === "fulfilled") {
         const nextInboundId = notificationResult.value.latestInboundMessageId;
@@ -83,9 +106,21 @@ export function useMailSync({ activeFolder, mailboxId, search, userId }: MailSyn
   }, [activeFolder, mailboxId, refreshNotifications, search, syncKey, userId]);
 
   React.useEffect(() => {
+    if (paginationSyncKey.current === syncKey) return;
+    paginationSyncKey.current = syncKey;
+    loadedAdditionalPages.current = false;
+    loadMoreInFlight.current = null;
+    setConversations([]);
+    setNextCursor(null);
+    setIsLoadingMore(false);
+    setLoadMoreError(null);
+  }, [syncKey]);
+
+  React.useEffect(() => {
+    if (inboundSnapshotUserId.current === userId) return;
+    inboundSnapshotUserId.current = userId;
     latestInboundId.current = null;
     hasInboundSnapshot.current = false;
-    if (!userId) setConversations([]);
   }, [userId]);
 
   React.useEffect(() => {
@@ -123,5 +158,110 @@ export function useMailSync({ activeFolder, mailboxId, search, userId }: MailSyn
     };
   }, [refresh, userId]);
 
-  return { conversations, notifications, refresh };
+  const loadMore = React.useCallback((): Promise<void> => {
+    if (!userId || !nextCursor || activeFolder === "settings" || activeFolder === "drafts") {
+      return Promise.resolve();
+    }
+    if (
+      loadMoreInFlight.current?.key === syncKey &&
+      loadMoreInFlight.current.cursor === nextCursor
+    ) {
+      return loadMoreInFlight.current.promise;
+    }
+
+    const cursor = nextCursor;
+    setIsLoadingMore(true);
+    setLoadMoreError(null);
+    const promise = (async () => {
+      try {
+        const page = await listConversations({
+          cursor,
+          folder: activeFolder,
+          mailboxId: mailboxId === "all" ? undefined : mailboxId,
+          search: search || undefined
+        });
+        if (currentSyncKey.current !== syncKey || currentUserId.current !== userId) return;
+        loadedAdditionalPages.current = true;
+        setConversations((current) => appendConversationPage(current, page.conversations));
+        setNextCursor(page.nextCursor);
+      } catch (error: unknown) {
+        if (currentSyncKey.current === syncKey) {
+          setLoadMoreError(
+            error instanceof Error ? error.message : "More conversations could not be loaded."
+          );
+        }
+      } finally {
+        if (currentSyncKey.current === syncKey) setIsLoadingMore(false);
+      }
+    })();
+    loadMoreInFlight.current = { cursor, key: syncKey, promise };
+    const clearInFlight = (): void => {
+      if (loadMoreInFlight.current?.promise === promise) loadMoreInFlight.current = null;
+    };
+    void promise.then(clearInFlight, clearInFlight);
+    return promise;
+  }, [activeFolder, mailboxId, nextCursor, search, syncKey, userId]);
+
+  const applyConversationAction = React.useCallback(
+    (threadId: string, action: ConversationAction, affected: number): void => {
+      if (affected === 0) return;
+      setConversations((current) =>
+        current.flatMap((conversation) => {
+          if (conversation.threadId !== threadId) return [conversation];
+          if (
+            action === "archive" ||
+            action === "trash" ||
+            (activeFolder === "starred" && action === "unstar")
+          ) {
+            return [];
+          }
+          if (action === "read") return [{ ...conversation, unreadCount: 0 }];
+          if (action === "unread") {
+            return [{ ...conversation, unreadCount: Math.max(1, conversation.unreadCount) }];
+          }
+          if (action === "star") {
+            return [{ ...conversation, isStarred: true, starredAt: new Date().toISOString() }];
+          }
+          if (action === "unstar") {
+            return [{ ...conversation, isStarred: false, starredAt: null }];
+          }
+          return [conversation];
+        })
+      );
+    },
+    [activeFolder]
+  );
+
+  return {
+    applyConversationAction,
+    conversations,
+    hasMore: nextCursor !== null,
+    isLoadingMore,
+    loadMore,
+    loadMoreError,
+    notifications,
+    refresh
+  };
+}
+
+function reconcileNewestPage(
+  newest: ConversationSummary[],
+  current: ConversationSummary[]
+): ConversationSummary[] {
+  const newestThreadIds = new Set(newest.map((conversation) => conversation.threadId));
+  return [
+    ...newest,
+    ...current.filter((conversation) => !newestThreadIds.has(conversation.threadId))
+  ];
+}
+
+function appendConversationPage(
+  current: ConversationSummary[],
+  next: ConversationSummary[]
+): ConversationSummary[] {
+  const currentThreadIds = new Set(current.map((conversation) => conversation.threadId));
+  return [
+    ...current,
+    ...next.filter((conversation) => !currentThreadIds.has(conversation.threadId))
+  ];
 }

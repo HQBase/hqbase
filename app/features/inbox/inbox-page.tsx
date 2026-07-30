@@ -5,6 +5,7 @@ import { getMessageThread, runConversationAction } from "@/features/messages/api
 import { MessageDetail } from "@/features/messages/message-detail";
 import { MessageList } from "@/features/messages/message-list";
 import type {
+  ConversationAction,
   ConversationSummary,
   MessageDetail as MessageDetailType
 } from "@/features/messages/types";
@@ -16,9 +17,14 @@ type InboxPageProps = {
   activeFolder: MailFolderId;
   conversations: ConversationSummary[];
   defaultFromMailboxId: string | null;
+  hasMore: boolean;
+  isLoadingMore: boolean;
+  loadMoreError: string | null;
   mailboxes: Mailbox[];
   selectedId: string | null;
   onDraftsChange?: () => void;
+  onConversationAction: (threadId: string, action: ConversationAction, affected: number) => void;
+  onLoadMore: () => void;
   onRefresh: () => void;
   onMessageRouteChange: (folder: MailFolderId, messageId: string | null) => void;
   onSelect: (messageId: string) => void;
@@ -28,14 +34,22 @@ export function InboxPage({
   activeFolder,
   conversations,
   defaultFromMailboxId,
+  hasMore,
+  isLoadingMore,
+  loadMoreError,
   mailboxes,
   selectedId,
   onDraftsChange,
+  onConversationAction,
+  onLoadMore,
   onRefresh,
   onMessageRouteChange,
   onSelect
 }: InboxPageProps): React.ReactElement {
   const activeLabel = mailFolders.find((folder) => folder.id === activeFolder)?.label ?? "Messages";
+  const conversationCountLabel = `${conversations.length} ${
+    conversations.length === 1 ? "conversation" : "conversations"
+  }`;
   const [thread, setThread] = React.useState<MessageDetailType[]>([]);
   const [detailError, setDetailError] = React.useState<string | null>(null);
   const [detailLoading, setDetailLoading] = React.useState(false);
@@ -70,6 +84,7 @@ export function InboxPage({
           void runConversationAction(selectedId, "read", activeFolder)
             .then((updated) => {
               if (cancelled) return;
+              onConversationAction(updated.threadId, "read", updated.affected);
               if (updated.affected > 0) {
                 setThread((current) =>
                   current.map((message) =>
@@ -95,7 +110,7 @@ export function InboxPage({
     return () => {
       cancelled = true;
     };
-  }, [activeFolder, selectedId]);
+  }, [activeFolder, onConversationAction, selectedId]);
 
   const selectedThreadId =
     thread[0]?.threadId ??
@@ -119,7 +134,8 @@ export function InboxPage({
 
   async function handleAction(action: Parameters<typeof runConversationAction>[1]) {
     if (!selectedId) return;
-    await runConversationAction(selectedId, action, activeFolder);
+    const updated = await runConversationAction(selectedId, action, activeFolder);
+    onConversationAction(updated.threadId, action, updated.affected);
     onRefresh();
     if (
       action === "archive" ||
@@ -147,13 +163,25 @@ export function InboxPage({
             <span className="hidden md:inline">Conversations</span>
           </h1>
           <span className="font-mono text-[11px] text-muted-foreground">
-            {conversations.length}
+            <span aria-hidden="true">
+              {conversations.length}
+              {hasMore ? "+" : ""}
+            </span>
+            <span className="sr-only">
+              {hasMore
+                ? `${conversationCountLabel} loaded; more available`
+                : conversationCountLabel}
+            </span>
           </span>
         </div>
         <MessageList
           activeFolder={activeFolder}
           conversations={conversations}
+          hasMore={hasMore}
+          isLoadingMore={isLoadingMore}
+          loadMoreError={loadMoreError}
           selectedThreadId={selectedThreadId}
+          onLoadMore={onLoadMore}
           onSelect={(conversation) => onSelect(conversation.id)}
         />
       </section>

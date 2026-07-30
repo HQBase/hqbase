@@ -1,8 +1,15 @@
 import { apiGet, apiPost } from "@/lib/api-client";
 import type { MailFolderId } from "@/lib/routes";
-import type { ConversationSummary, MessageDetail, MessageHtml, MessageSummary } from "./types";
+import type {
+  ConversationAction,
+  ConversationPage,
+  MessageDetail,
+  MessageHtml,
+  MessageSummary
+} from "./types";
 
 export type MessageListParams = {
+  cursor?: string | undefined;
   folder?: string | undefined;
   mailboxId?: string | undefined;
   search?: string | undefined;
@@ -19,11 +26,12 @@ export async function listMessages(params: MessageListParams): Promise<MessageSu
 
 export async function listConversations(
   params: MessageListParams & { folder: MailFolderId }
-): Promise<ConversationSummary[]> {
+): Promise<ConversationPage> {
   const query = new URLSearchParams({ folder: params.folder });
+  if (params.cursor) query.set("cursor", params.cursor);
   if (params.mailboxId) query.set("mailboxId", params.mailboxId);
   if (params.search) query.set("search", params.search);
-  return apiGet<ConversationSummary[]>(`/api/conversations?${query.toString()}`);
+  return apiGet<ConversationPage>(`/api/conversations?${query.toString()}`);
 }
 
 export async function getMessage(id: string): Promise<MessageDetail> {
@@ -52,7 +60,7 @@ export async function runMessageAction(
 
 export async function runConversationAction(
   id: string,
-  action: "read" | "unread" | "star" | "unstar" | "archive" | "trash",
+  action: ConversationAction,
   folder: MailFolderId
 ): Promise<{ affected: number; threadId: string }> {
   return apiPost(`/api/conversations/${id}/${action}`, { folder });

@@ -7,7 +7,7 @@ import type { HonoApp } from "../../lib/env";
 import { parseWith } from "../../lib/validation";
 
 import type { MessageAction } from "./actions";
-import { listConversations, updateConversationAction } from "./conversation-queries";
+import { listConversationPage, updateConversationAction } from "./conversation-queries";
 import { getMessageMailboxId } from "./queries";
 import { conversationFolders } from "./types";
 
@@ -15,6 +15,7 @@ export const conversationRoutes = new Hono<HonoApp>();
 
 const actions: readonly MessageAction[] = ["read", "unread", "star", "unstar", "archive", "trash"];
 const folderSchema = z.enum(conversationFolders);
+const cursorSchema = z.string().min(1).max(512).optional();
 const actionBodySchema = z.object({ folder: folderSchema });
 
 conversationRoutes.get("/", async (c) => {
@@ -22,7 +23,8 @@ conversationRoutes.get("/", async (c) => {
   const mailboxIds = await accessibleMailboxIds(c.env.DB, auth.user.id, auth.user.role, "read");
   const folder = parseWith(folderSchema.optional(), c.req.query("folder"));
   return c.json(
-    await listConversations(c.env.DB, {
+    await listConversationPage(c.env.DB, {
+      cursor: parseWith(cursorSchema, c.req.query("cursor")),
       folder,
       mailboxId: c.req.query("mailboxId"),
       search: c.req.query("search"),
