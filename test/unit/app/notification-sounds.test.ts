@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 const audioInstances: MockAudio[] = [];
+const audioPlayOutcomes: Array<"reject" | "resolve"> = [];
 
 import {
   initializeNotificationSounds,
@@ -61,13 +62,29 @@ describe("notification sounds", () => {
 
     expect(audio.play).toHaveBeenCalledTimes(10);
     expect(audio.volume).toBe(0.55);
+
+    windowTarget.dispatchEvent(new Event("pageshow"));
+    audioPlayOutcomes.push("reject");
+    documentTarget.dispatchEvent(new Event("touchend"));
+    await Promise.resolve();
+
+    const lockedAudio = audioInstances[1];
+    if (!lockedAudio) throw new Error("Expected the interaction to recreate the audio player.");
+    expect(lockedAudio.play).toHaveBeenCalledOnce();
+    expect(playNotificationSound("refresh-pull")).toBe(false);
+    await Promise.resolve();
+    expect(playNotificationSound("refresh-pull")).toBe(true);
   });
 });
 
 class MockAudio {
   currentTime = 0;
   pause = vi.fn();
-  play = vi.fn(() => Promise.resolve());
+  play = vi.fn(() =>
+    audioPlayOutcomes.shift() === "reject"
+      ? Promise.reject(new Error("Playback requires a user interaction."))
+      : Promise.resolve()
+  );
   preload = "";
   src: string;
   volume = 1;
