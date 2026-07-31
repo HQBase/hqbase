@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.36
+
+- Show unread Inbox counts for **All mailboxes** and each accessible mailbox in the desktop and
+  compact mailbox selectors.
+- Retry the mobile pull-to-refresh cue from the trusted release gesture when iPhone has not yet
+  confirmed audio playback.
+
 ## 0.1.35
 
 - Keep each user's Login email independent from connected workspace email domains so sign-in,
