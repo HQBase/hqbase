@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.1.35
+
+- Keep each user's Login email independent from connected workspace email domains so sign-in,
+  invitation, and recovery remain available when HQBase mail is unavailable.
+- Add seven-day email invitations and server-generated temporary passwords for workspace member
+  onboarding, with password setup required before workspace or MCP access.
+- Show onboarding status in Settings and let authorized administrators resend pending invitations
+  or replace a lost temporary password without exposing stored credentials.
+
 ## 0.1.34
 
 - Load conversations in cursor-paged batches with exact filtered totals while preserving already
