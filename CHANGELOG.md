@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.38
+
+- Restore the desktop and installed PWA mail layout by keeping horizontal resize separators
+  vertical, preventing the sidebar and content panels from collapsing after the panel upgrade.
+
 ## 0.1.37
 
 - Prime iPhone audio at the start of a pull-to-refresh gesture so the release cue plays without
