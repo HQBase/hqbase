@@ -1,5 +1,10 @@
 import { createCipheriv, createHash, randomBytes } from "node:crypto";
-import { expect, request as playwrightRequest, test } from "@playwright/test";
+import {
+  type APIRequestContext,
+  expect,
+  request as playwrightRequest,
+  test
+} from "@playwright/test";
 
 const email = required("HQBASE_STAGING_OWNER_EMAIL");
 const password = required("HQBASE_STAGING_OWNER_PASSWORD");
@@ -160,24 +165,12 @@ test("Track 1 enforces read-only mailbox access and exposes operator diagnostics
   if (!loginDomain) throw new Error("HQBASE_STAGING_OWNER_EMAIL must contain a domain.");
   const memberEmail = `kirill-${suffix}@${loginDomain}`;
   const memberPassword = `${password}Track1!`;
-  const createUser = await request.post("/api/users", {
-    data: {
-      email: memberEmail,
-      method: "temporary_password",
-      name: "Kirill Track 1",
-      role: "member"
-    }
+  const member = await createStagingMember(request, {
+    email: memberEmail,
+    password: memberPassword
   });
-  const member = (await createUser.json()) as {
-    error?: unknown;
-    temporaryPassword?: string;
-    user?: { id?: string };
-  };
-  expect(createUser.status(), JSON.stringify(member)).toBe(201);
-  expect(member.user?.id).toBeTruthy();
-  expect(member.temporaryPassword).toBeTruthy();
   const grant = await request.put("/api/mailbox-grants", {
-    data: { mailboxId: mailbox?.id, userId: member.user?.id, accessLevel: "read" }
+    data: { mailboxId: mailbox?.id, userId: member.id, accessLevel: "read" }
   });
   expect(grant.status()).toBe(204);
 
@@ -187,24 +180,26 @@ test("Track 1 enforces read-only mailbox access and exposes operator diagnostics
   });
   try {
     const memberLogin = await memberRequest.post("/api/auth/sign-in/email", {
-      data: { email: memberEmail, password: member.temporaryPassword, rememberMe: false },
+      data: { email: memberEmail, password: member.loginPassword, rememberMe: false },
       headers: { origin: stagingUrl }
     });
     expect(memberLogin.ok()).toBeTruthy();
-    const passwordSetup = await memberRequest.post("/api/me/password", {
-      data: {
-        confirmPassword: memberPassword,
-        currentPassword: member.temporaryPassword,
-        newPassword: memberPassword
-      },
-      headers: { origin: stagingUrl }
-    });
-    expect(passwordSetup.ok(), await passwordSetup.text()).toBeTruthy();
+    if (member.passwordSetupRequired) {
+      const passwordSetup = await memberRequest.post("/api/me/password", {
+        data: {
+          confirmPassword: memberPassword,
+          currentPassword: member.loginPassword,
+          newPassword: memberPassword
+        },
+        headers: { origin: stagingUrl }
+      });
+      expect(passwordSetup.ok(), await passwordSetup.text()).toBeTruthy();
+    }
     const visible = await memberRequest.get("/api/mailboxes");
     expect((await visible.json()) as Array<{ id: string }>).toEqual([
       expect.objectContaining({ id: mailbox?.id })
     ]);
-    const revoke = await request.delete(`/api/mailbox-grants/${mailbox?.id}/${member.user?.id}`);
+    const revoke = await request.delete(`/api/mailbox-grants/${mailbox?.id}/${member.id}`);
     expect(revoke.status()).toBe(204);
     const hidden = await memberRequest.get("/api/mailboxes");
     expect(hidden.ok()).toBeTruthy();
@@ -219,6 +214,60 @@ test("Track 1 enforces read-only mailbox access and exposes operator diagnostics
   const scan = await request.post("/api/operations/integrity-scan");
   expect(scan.status()).toBe(202);
 });
+
+async function createStagingMember(
+  request: APIRequestContext,
+  input: { email: string; password: string }
+): Promise<{ id: string; loginPassword: string; passwordSetupRequired: boolean }> {
+  const modernResponse = await request.post("/api/users", {
+    data: {
+      email: input.email,
+      method: "temporary_password",
+      name: "Kirill Track 1",
+      role: "member"
+    }
+  });
+  const modern = (await modernResponse.json()) as {
+    error?: unknown;
+    temporaryPassword?: string;
+    user?: { id?: string };
+  };
+  if (modernResponse.status() === 201) {
+    if (!modern.user?.id || !modern.temporaryPassword) {
+      throw new Error(
+        `Modern user creation returned an incomplete result: ${JSON.stringify(modern)}`
+      );
+    }
+    return {
+      id: modern.user.id,
+      loginPassword: modern.temporaryPassword,
+      passwordSetupRequired: true
+    };
+  }
+
+  const rejection = JSON.stringify(modern);
+  if (modernResponse.status() !== 400 || !rejection.includes("expected string")) {
+    throw new Error(
+      `Modern user creation failed unexpectedly (${modernResponse.status()}): ${rejection}`
+    );
+  }
+
+  const legacyResponse = await request.post("/api/users", {
+    data: {
+      email: input.email,
+      name: "Kirill Track 1",
+      password: input.password,
+      role: "member"
+    }
+  });
+  const legacy = (await legacyResponse.json()) as { error?: unknown; id?: string };
+  if (legacyResponse.status() !== 201 || !legacy.id) {
+    throw new Error(
+      `Legacy user creation failed (${legacyResponse.status()}): ${JSON.stringify(legacy)}`
+    );
+  }
+  return { id: legacy.id, loginPassword: input.password, passwordSetupRequired: false };
+}
 
 function accessHeaders(): Record<string, string> {
   const clientId = process.env.HQBASE_STAGING_ACCESS_CLIENT_ID;
