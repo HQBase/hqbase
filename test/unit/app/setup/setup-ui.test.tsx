@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 import { AccessStep } from "@/features/setup/setup-access-screen";
 import { SetupFrame } from "@/features/setup/setup-frame";
 import { WizardLayout } from "@/features/setup/setup-wizard-parts";
-import { MailboxStep } from "@/features/setup/setup-workspace-screens";
+import { MailboxStep, OwnerStep } from "@/features/setup/setup-workspace-screens";
 
 describe("setup UI", () => {
   it("shows Cloudflare verification as an inline loading state", () => {
@@ -85,6 +85,27 @@ describe("setup UI", () => {
     expect(html).toContain('aria-label="Workspace configuration steps"');
     expect(html).not.toContain('aria-label="Installation steps"');
     expect(html).not.toContain("Authorize and install");
+  });
+
+  it("labels the owner identity as Login email and explains independent access", () => {
+    const html = renderToStaticMarkup(
+      <OwnerStep
+        errors={{}}
+        ownerEmail="owner@gmail.com"
+        ownerName="Workspace Owner"
+        ownerPassword="a-secure-password"
+        onBack={() => undefined}
+        onNext={() => undefined}
+        setOwnerEmail={() => undefined}
+        setOwnerName={() => undefined}
+        setOwnerPassword={() => undefined}
+      />
+    );
+
+    expect(html).toContain("Login email");
+    expect(html).toContain("always access, even when HQBase is unavailable");
+    expect(html).toContain("cannot use a domain connected to this workspace");
+    expect(html).not.toContain("external");
   });
 
   it("shows mailboxes in one compact editable table", () => {

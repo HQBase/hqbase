@@ -46,7 +46,10 @@ const member: WorkspaceUser = {
   email: "avery@example.com",
   role: "member",
   banned: false,
-  createdAt: "2026-07-20T00:00:00.000Z"
+  createdAt: "2026-07-20T00:00:00.000Z",
+  onboardingMethod: null,
+  passwordSetupRequired: false,
+  invitationSentAt: null
 };
 
 const connectedDomain: MailDomain = {
@@ -98,13 +101,45 @@ describe("settings presentation", () => {
   });
 
   it("keeps the user creation form out of the tab content", () => {
-    const html = renderToStaticMarkup(<UserSettings users={[]} onChanged={() => undefined} />);
+    const html = renderToStaticMarkup(
+      <UserSettings managedDomains={["example.com"]} users={[]} onChanged={() => undefined} />
+    );
 
     expect(html).toContain("Add user");
     expect(html).toContain('class="relative w-full overflow-auto rounded-lg border"');
     expect(html).toContain("No users yet.");
+    expect(html).toContain("Login email");
     expect(html).toContain('aria-label="About workspace roles"');
     expect(html).not.toContain("new-user-email");
+  });
+
+  it("shows pending onboarding state and the matching recovery action", () => {
+    const html = renderToStaticMarkup(
+      <UserSettings
+        managedDomains={["example.com"]}
+        users={[
+          {
+            ...member,
+            onboardingMethod: "email_invite",
+            passwordSetupRequired: true,
+            invitationSentAt: "2026-07-30T12:00:00.000Z"
+          },
+          {
+            ...member,
+            id: "user-2",
+            email: "direct@gmail.com",
+            onboardingMethod: "temporary_password",
+            passwordSetupRequired: true
+          }
+        ]}
+        onChanged={() => undefined}
+      />
+    );
+
+    expect(html).toContain("Invite sent");
+    expect(html).toContain("Password reset required");
+    expect(html).toContain("Resend");
+    expect(html).toContain("New password");
   });
 
   it("explains workspace roles and mailbox grants", () => {

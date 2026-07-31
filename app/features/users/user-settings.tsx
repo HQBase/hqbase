@@ -1,27 +1,10 @@
-import { UserPlus } from "lucide-react";
+import { KeyRound, Mail } from "lucide-react";
 import * as React from "react";
 import { toast } from "sonner";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger
-} from "@/components/ui/dialog";
-import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectTrigger,
-  SelectValue
-} from "@/components/ui/select";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Spinner } from "@/components/ui/spinner";
 import {
   Table,
   TableBody,
@@ -31,181 +14,143 @@ import {
   TableRow
 } from "@/components/ui/table";
 import { SettingsSection } from "@/features/settings/settings-section";
-import { createUser, updateUserRole } from "./api";
+import { regenerateTemporaryPassword, resendInvitation, updateUserRole } from "./api";
 import { RoleGuidance } from "./role-guidance";
-import type { WorkspaceRole, WorkspaceUser } from "./types";
+import { RoleSelect } from "./role-select";
+import type { WorkspaceUser } from "./types";
+import { TemporaryPasswordReveal, UserOnboardingDialog } from "./user-onboarding-dialog";
 
 type UserSettingsProps = {
+  managedDomains: string[];
   users: WorkspaceUser[];
   onChanged: () => void;
 };
 
-const roles: WorkspaceRole[] = ["owner", "admin", "member"];
+type TemporaryCredential = {
+  email: string;
+  password: string;
+};
 
-export function UserSettings({ users, onChanged }: UserSettingsProps): React.ReactElement {
-  const [name, setName] = React.useState("");
-  const [email, setEmail] = React.useState("");
-  const [password, setPassword] = React.useState("");
-  const [role, setRole] = React.useState<WorkspaceRole>("member");
-  const [createOpen, setCreateOpen] = React.useState(false);
-  const [pending, setPending] = React.useState(false);
+export function UserSettings({
+  managedDomains,
+  users,
+  onChanged
+}: UserSettingsProps): React.ReactElement {
+  const [pendingAction, setPendingAction] = React.useState<string | null>(null);
+  const [credential, setCredential] = React.useState<TemporaryCredential | null>(null);
 
-  async function handleCreate(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setPending(true);
-    try {
-      await createUser({ email, name, password, role });
-      setName("");
-      setEmail("");
-      setPassword("");
-      setRole("member");
-      setCreateOpen(false);
-      toast.success("User created.");
-      onChanged();
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "User creation failed.");
-    } finally {
-      setPending(false);
-    }
-  }
-
-  async function handleRoleChange(userId: string, nextRole: WorkspaceRole) {
-    await updateUserRole(userId, nextRole);
+  async function handleRoleChange(userId: string, role: WorkspaceUser["role"]) {
+    await updateUserRole(userId, role);
     onChanged();
   }
 
-  return (
-    <SettingsSection
-      action={
-        <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-          <DialogTrigger asChild>
-            <Button type="button">
-              <UserPlus data-icon="inline-start" />
-              Add user
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="w-[min(92vw,520px)]">
-            <DialogHeader>
-              <DialogTitle>Add user</DialogTitle>
-              <DialogDescription>Create sign-in access for a workspace member.</DialogDescription>
-            </DialogHeader>
-            <form className="flex flex-col gap-5" onSubmit={(event) => void handleCreate(event)}>
-              <FieldGroup>
-                <Field>
-                  <FieldLabel htmlFor="new-user-name">Name</FieldLabel>
-                  <Input
-                    id="new-user-name"
-                    required
-                    value={name}
-                    onChange={(event) => setName(event.target.value)}
-                  />
-                </Field>
-                <Field>
-                  <FieldLabel htmlFor="new-user-email">Email</FieldLabel>
-                  <Input
-                    id="new-user-email"
-                    required
-                    type="email"
-                    value={email}
-                    onChange={(event) => setEmail(event.target.value)}
-                  />
-                </Field>
-                <Field>
-                  <FieldLabel htmlFor="new-user-password">Temporary password</FieldLabel>
-                  <Input
-                    id="new-user-password"
-                    minLength={8}
-                    required
-                    type="password"
-                    value={password}
-                    onChange={(event) => setPassword(event.target.value)}
-                  />
-                </Field>
-                <Field>
-                  <FieldLabel>Workspace role</FieldLabel>
-                  <RoleSelect ariaLabel="Workspace role" value={role} onChange={setRole} />
-                </Field>
-              </FieldGroup>
-              <DialogFooter>
-                <DialogClose asChild>
-                  <Button type="button" variant="outline">
-                    Cancel
-                  </Button>
-                </DialogClose>
-                <Button disabled={pending} type="submit">
-                  {pending ? "Adding user…" : "Add user"}
-                </Button>
-              </DialogFooter>
-            </form>
-          </DialogContent>
-        </Dialog>
+  async function handlePendingAction(user: WorkspaceUser) {
+    setPendingAction(user.id);
+    try {
+      if (user.onboardingMethod === "email_invite") {
+        await resendInvitation(user.id);
+        toast.success(`Invitation resent to ${user.email}.`);
+      } else {
+        const result = await regenerateTemporaryPassword(user.id);
+        if (!result.temporaryPassword) throw new Error("Temporary password was not returned.");
+        setCredential({ email: user.email, password: result.temporaryPassword });
       }
-      description="Workspace access"
-      title="Users"
-    >
-      <Table containerClassName="rounded-lg border">
-        <TableHeader className="bg-muted/40">
-          <TableRow className="hover:bg-transparent">
-            <TableHead className="hidden sm:table-cell">Name</TableHead>
-            <TableHead>Email</TableHead>
-            <TableHead className="w-40">
-              <span className="flex items-center gap-1">
-                Role
-                <RoleGuidance />
-              </span>
-            </TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {users.length === 0 ? (
-            <TableRow>
-              <TableCell className="h-24 text-center text-muted-foreground" colSpan={3}>
-                No users yet.
-              </TableCell>
+      onChanged();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "User onboarding action failed.");
+    } finally {
+      setPendingAction(null);
+    }
+  }
+
+  return (
+    <>
+      <SettingsSection
+        action={<UserOnboardingDialog managedDomains={managedDomains} onCreated={onChanged} />}
+        description="Workspace identities and sign-in access"
+        title="Users"
+      >
+        <Table containerClassName="rounded-lg border">
+          <TableHeader className="bg-muted/40">
+            <TableRow className="hover:bg-transparent">
+              <TableHead className="hidden sm:table-cell">Name</TableHead>
+              <TableHead>Login email</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead className="w-40">
+                <span className="flex items-center gap-1">
+                  Role
+                  <RoleGuidance />
+                </span>
+              </TableHead>
+              <TableHead className="w-32 text-right">Action</TableHead>
             </TableRow>
+          </TableHeader>
+          <TableBody>
+            {users.length === 0 ? (
+              <TableRow>
+                <TableCell className="h-24 text-center text-muted-foreground" colSpan={5}>
+                  No users yet.
+                </TableCell>
+              </TableRow>
+            ) : null}
+            {users.map((user) => (
+              <TableRow key={user.id}>
+                <TableCell className="hidden sm:table-cell">{user.name}</TableCell>
+                <TableCell className="max-w-52 truncate">{user.email}</TableCell>
+                <TableCell>
+                  <UserStatus user={user} />
+                </TableCell>
+                <TableCell>
+                  <RoleSelect
+                    ariaLabel={`Role for ${user.name}`}
+                    value={user.role}
+                    onChange={(role) => void handleRoleChange(user.id, role)}
+                  />
+                </TableCell>
+                <TableCell className="text-right">
+                  {user.passwordSetupRequired ? (
+                    <Button
+                      disabled={pendingAction === user.id}
+                      onClick={() => void handlePendingAction(user)}
+                      size="sm"
+                      type="button"
+                      variant="outline"
+                    >
+                      {pendingAction === user.id ? (
+                        <Spinner data-icon="inline-start" />
+                      ) : user.onboardingMethod === "email_invite" ? (
+                        <Mail data-icon="inline-start" />
+                      ) : (
+                        <KeyRound data-icon="inline-start" />
+                      )}
+                      {user.onboardingMethod === "email_invite" ? "Resend" : "New password"}
+                    </Button>
+                  ) : null}
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </SettingsSection>
+      <Dialog open={credential !== null} onOpenChange={(open) => !open && setCredential(null)}>
+        <DialogContent className="w-[min(92vw,520px)]">
+          {credential ? (
+            <TemporaryPasswordReveal credential={credential} onDone={() => setCredential(null)} />
           ) : null}
-          {users.map((user) => (
-            <TableRow key={user.id}>
-              <TableCell className="hidden sm:table-cell">{user.name}</TableCell>
-              <TableCell className="max-w-44 truncate">{user.email}</TableCell>
-              <TableCell>
-                <RoleSelect
-                  ariaLabel={`Role for ${user.name}`}
-                  value={user.role}
-                  onChange={(nextRole) => void handleRoleChange(user.id, nextRole)}
-                />
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-    </SettingsSection>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
 
-function RoleSelect({
-  ariaLabel,
-  value,
-  onChange
-}: {
-  ariaLabel: string;
-  value: WorkspaceRole;
-  onChange: (value: WorkspaceRole) => void;
-}): React.ReactElement {
-  return (
-    <Select value={value} onValueChange={(next) => onChange(next as WorkspaceRole)}>
-      <SelectTrigger aria-label={ariaLabel} className="w-32 shadow-none focus:ring-1">
-        <SelectValue />
-      </SelectTrigger>
-      <SelectContent>
-        <SelectGroup>
-          {roles.map((role) => (
-            <SelectItem key={role} value={role}>
-              {role}
-            </SelectItem>
-          ))}
-        </SelectGroup>
-      </SelectContent>
-    </Select>
-  );
+function UserStatus({ user }: { user: WorkspaceUser }): React.ReactElement {
+  if (!user.passwordSetupRequired) {
+    return <Badge variant="secondary">Active</Badge>;
+  }
+  if (user.onboardingMethod === "email_invite") {
+    return (
+      <Badge variant="outline">{user.invitationSentAt ? "Invite sent" : "Invite not sent"}</Badge>
+    );
+  }
+  return <Badge variant="outline">Password reset required</Badge>;
 }

@@ -7,7 +7,10 @@ import oauthResourcesMigration from "../../../migrations/0003_oauth_resources.sq
 import conversationMigration from "../../../migrations/0004_conversations.sql?raw";
 import threadRebuildMigration from "../../../migrations/0005_rebuild_threads.sql?raw";
 import userMailPreferencesMigration from "../../../migrations/0007_user_mail_preferences.sql?raw";
+import userOnboardingMigration from "../../../migrations/0008_user_onboarding.sql?raw";
+import loginEmailDomainMigration from "../../../migrations/0009_login_email_domain_isolation.sql?raw";
 import { createAuth } from "../../../worker/auth/auth";
+import { migrationStatements } from "./migration-statements";
 
 const origin = "https://hqbase.test";
 
@@ -27,6 +30,10 @@ describe("Better Auth schema", () => {
         `INSERT INTO account
          (id, accountId, providerId, userId, password, createdAt, updatedAt)
          VALUES ('acc_legacy', 'usr_legacy', 'credential', 'usr_legacy', 'legacy-hash', ?, ?)`
+      ).bind(now, now),
+      env.DB.prepare(
+        `INSERT INTO mail_domains (id, name, created_at, updated_at)
+         VALUES ('dom_legacy', 'example.com', ?, ?)`
       ).bind(now, now)
     ]);
 
@@ -34,6 +41,8 @@ describe("Better Auth schema", () => {
     await applyMigration(conversationMigration);
     await applyMigration(threadRebuildMigration);
     await applyMigration(userMailPreferencesMigration);
+    await applyMigration(userOnboardingMigration);
+    await applyMigration(loginEmailDomainMigration);
   });
 
   it("backfills the Better Auth 1.7 account identity without losing credential rows", async () => {
@@ -56,6 +65,27 @@ describe("Better Auth schema", () => {
       userId: "usr_legacy",
       password: "legacy-hash"
     });
+  });
+
+  it("preserves an existing owner on a managed domain while installing future guards", async () => {
+    const legacy = await env.DB.prepare(
+      `SELECT u.email, d.name AS domain
+       FROM "user" u
+       JOIN mail_domains d ON d.name = substr(u.email, instr(u.email, '@') + 1)
+       WHERE u.id = 'usr_legacy'`
+    ).first<{ email: string; domain: string }>();
+    expect(legacy).toEqual({ email: "legacy@example.com", domain: "example.com" });
+
+    const triggers = await env.DB.prepare(
+      `SELECT name FROM sqlite_master
+       WHERE type = 'trigger' AND name LIKE '%login_email%'`
+    ).all<{ name: string }>();
+    expect(triggers.results.map((trigger) => trigger.name).sort()).toEqual([
+      "mail_domain_login_email_insert_guard",
+      "mail_domain_login_email_update_guard",
+      "user_login_email_domain_insert_guard",
+      "user_login_email_domain_update_guard"
+    ]);
   });
 
   it("applies the conversation draft migration on an existing schema", async () => {
@@ -82,8 +112,15 @@ describe("Better Auth schema", () => {
     ).resolves.toBeNull();
   });
 
+  it("keeps existing users active when member onboarding is added", async () => {
+    const onboarding = await env.DB.prepare(
+      "SELECT status FROM user_onboarding WHERE user_id = 'usr_legacy'"
+    ).first();
+    expect(onboarding).toBeNull();
+  });
+
   it("stores and returns the signed-in user's default From mailbox", async () => {
-    const email = "preference-owner@example.com";
+    const email = "preference-owner@login.example";
     const password = "correct-horse-battery-staple";
     const signUp = await createAuth(env, new Request(`${origin}/api/auth/sign-up/email`)).handler(
       new Request(`${origin}/api/auth/sign-up/email`, {
@@ -155,7 +192,7 @@ describe("Better Auth schema", () => {
   });
 
   it("creates and signs in a fresh email/password account after migration", async () => {
-    const email = "fresh-owner@example.com";
+    const email = "fresh-owner@login.example";
     const password = "correct-horse-battery-staple";
     const auth = createAuth(env, new Request(`${origin}/api/auth/sign-up/email`));
 
@@ -263,10 +300,7 @@ function extractSessionCookie(response: Response): string {
 }
 
 async function applyMigration(source: string): Promise<void> {
-  for (const statement of source
-    .split(";")
-    .map((value) => value.trim())
-    .filter(Boolean)) {
+  for (const statement of migrationStatements(source)) {
     await env.DB.prepare(statement).run();
   }
 }

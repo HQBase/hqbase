@@ -9,14 +9,6 @@ export function buildAppHostname(subdomain: string, domain: string): string {
   return normalized ? `${normalized}.${domain}` : domain;
 }
 
-export function buildDomainAddress(localPart: string, domain: string): string {
-  const normalizedLocalPart = localPart.trim().toLowerCase();
-  const normalizedDomain = domain.trim().toLowerCase();
-  return normalizedLocalPart && normalizedDomain
-    ? `${normalizedLocalPart}@${normalizedDomain}`
-    : "";
-}
-
 export function inferWorkerName(): string {
   const hostname = window.location.hostname;
   if (hostname.endsWith(".workers.dev")) {

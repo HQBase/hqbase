@@ -6,4 +6,5 @@ export type CurrentUser = {
   name: string;
   role: WorkspaceRole;
   defaultFromMailboxId: string | null;
+  passwordSetupRequired: boolean;
 };

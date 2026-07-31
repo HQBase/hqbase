@@ -27,6 +27,7 @@ import {
   TableHeader,
   TableRow
 } from "@/components/ui/table";
+import { LOGIN_EMAIL_HINT } from "@/lib/login-email";
 import type { MailboxDraft, MailboxErrors, OwnerErrors } from "./setup-validation";
 import { WizardActions, WizardPanel } from "./setup-wizard-parts";
 
@@ -94,9 +95,7 @@ export function OwnerStep({
             value={ownerEmail}
             onChange={(event) => setOwnerEmail(event.target.value)}
           />
-          <FieldDescription>
-            This address is for authentication, not mailbox routing.
-          </FieldDescription>
+          <FieldDescription>{LOGIN_EMAIL_HINT}</FieldDescription>
         </Field>
 
         <Field data-invalid={Boolean(errors.password)}>

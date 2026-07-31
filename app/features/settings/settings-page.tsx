@@ -81,7 +81,15 @@ export function SettingsPage({
             />
           </TabsContent>
           <TabsContent className="mt-5" value="users">
-            {canManage ? <UserSettings users={users} onChanged={onRefresh} /> : <NoUserAccess />}
+            {canManage ? (
+              <UserSettings
+                managedDomains={setup.domains.map((domain) => domain.name)}
+                users={users}
+                onChanged={onRefresh}
+              />
+            ) : (
+              <NoUserAccess />
+            )}
           </TabsContent>
           {canManage ? (
             <TabsContent className="mt-5" value="domains">

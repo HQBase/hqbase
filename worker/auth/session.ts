@@ -6,6 +6,7 @@ import type { WorkspaceRole } from "../lib/validation";
 import { parseWith, workspaceRoleSchema } from "../lib/validation";
 
 import { createAuth } from "./auth";
+import { isPasswordSetupRequired } from "./password-setup";
 
 const betterSessionSchema = z.object({
   session: z.object({
@@ -60,10 +61,24 @@ export async function getAuthContext(
   };
 }
 
-export async function requireAuthContext(env: WorkerEnv, request: Request): Promise<AuthContext> {
+export async function requireAuthContext(
+  env: WorkerEnv,
+  request: Request,
+  options: { allowPasswordSetupRequired?: boolean } = {}
+): Promise<AuthContext> {
   const authContext = await getAuthContext(env, request);
   if (!authContext) {
     throw new AppError("UNAUTHENTICATED", "Sign in is required.", 401);
+  }
+  if (
+    !options.allowPasswordSetupRequired &&
+    (await isPasswordSetupRequired(env.DB, authContext.user.id))
+  ) {
+    throw new AppError(
+      "PASSWORD_SETUP_REQUIRED",
+      "Replace your temporary password before using this workspace.",
+      403
+    );
   }
   return authContext;
 }

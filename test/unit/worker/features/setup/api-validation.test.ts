@@ -48,6 +48,20 @@ describe("setup API validation", () => {
     ).toMatchObject({ ownerEmail: "owner@gmail.com" });
   });
 
+  it("rejects an owner Login email on any selected workspace domain", () => {
+    expect(() =>
+      bootstrapSetupSchema.parse({
+        ownerName: "Owner",
+        ownerEmail: "owner@example.com",
+        ownerPassword: "password123",
+        emailDomains: [{ name: "support.example" }, { name: "example.com" }],
+        checklistAcknowledged: true,
+        defaultFromMailboxAddress: "hello@example.com",
+        mailboxes: [{ address: "hello@example.com", displayName: "Hello" }]
+      })
+    ).toThrow("Use an email account you can always access, even when HQBase is unavailable.");
+  });
+
   it("rejects duplicate bootstrap mailboxes", () => {
     expect(() =>
       bootstrapSetupSchema.parse({

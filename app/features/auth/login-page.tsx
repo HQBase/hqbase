@@ -41,7 +41,7 @@ export function LoginPage({ onLogin }: LoginPageProps): React.ReactElement {
         <Card className="bg-card/70 shadow-none">
           <CardHeader className="space-y-1 pb-5">
             <CardTitle className="text-lg font-medium tracking-tight">Sign in</CardTitle>
-            <CardDescription className="text-xs">Your workspace email</CardDescription>
+            <CardDescription className="text-xs">Use your Login email</CardDescription>
           </CardHeader>
           <CardContent>
             <form className="flex flex-col gap-4" onSubmit={(event) => void handleSubmit(event)}>
@@ -49,7 +49,7 @@ export function LoginPage({ onLogin }: LoginPageProps): React.ReactElement {
                 className="flex flex-col gap-2 text-xs text-muted-foreground"
                 htmlFor="login-email"
               >
-                Email
+                Login email
                 <Input
                   autoComplete="email"
                   className="h-10 bg-background shadow-none focus-visible:ring-1"

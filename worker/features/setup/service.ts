@@ -1,6 +1,7 @@
 import { signUpOwnerUser } from "../../auth/user-actions";
 import type { WorkerEnv } from "../../lib/env";
 import { AppError } from "../../lib/errors";
+import { assertLoginEmailOutsideDomains } from "../../security/login-email";
 import { upsertMailDomain } from "../domains/queries";
 import { createMailbox } from "../mailboxes/service";
 import type { Mailbox } from "../mailboxes/types";
@@ -51,6 +52,10 @@ export async function bootstrapSetup(
 
   const domains = input.emailDomains ?? [{ name: input.primaryDomain ?? "" }];
   if (!domains[0]?.name) throw new AppError("DOMAIN_REQUIRED", "Choose an email domain.", 400);
+  assertLoginEmailOutsideDomains(
+    input.ownerEmail,
+    domains.map((domain) => domain.name)
+  );
 
   for (const domain of domains) {
     await upsertMailDomain(env.DB, {

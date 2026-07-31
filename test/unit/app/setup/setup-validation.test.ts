@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  buildDomainAddress,
   defaultMailboxesForDomains,
   syncMailboxesForDomains
 } from "@/features/setup/setup-helpers";
@@ -24,11 +23,6 @@ const activeZone: CloudflareZone = {
 };
 
 describe("setup form validation", () => {
-  it("builds the owner sign-in address from the editable local part and selected domain", () => {
-    expect(buildDomainAddress(" Oleg ", "Example.COM")).toBe("oleg@example.com");
-    expect(buildDomainAddress("", "example.com")).toBe("");
-  });
-
   it("creates the default mailbox set for every selected domain", () => {
     expect(defaultMailboxesForDomains(["Example.com", "team.example"])).toEqual([
       { address: "support@example.com", displayName: "Support" },
@@ -59,7 +53,7 @@ describe("setup form validation", () => {
 
   it("blocks invalid owner details before the mailbox step", () => {
     expect(validateOwner({ email: "not-an-email", name: "", password: "short" })).toEqual({
-      email: "Enter a valid login email.",
+      email: "Enter a valid Login email.",
       name: "Enter your name.",
       password: "Use at least 8 characters."
     });
@@ -67,22 +61,31 @@ describe("setup form validation", () => {
 
   it("allows the owner sign-in address to use a separate domain", () => {
     expect(
-      validateOwner({
-        email: "owner@gmail.com",
-        name: "Workspace Owner",
-        password: "a-secure-password"
-      })
+      validateOwner(
+        {
+          email: "owner@gmail.com",
+          name: "Workspace Owner",
+          password: "a-secure-password"
+        },
+        ["example.com"]
+      )
     ).toEqual({});
+  });
 
+  it("rejects an owner Login email on any selected workspace domain", () => {
     expect(
-      hasErrors(
-        validateOwner({
+      validateOwner(
+        {
           email: "owner@example.com",
           name: "Workspace Owner",
           password: "a-secure-password"
-        })
+        },
+        ["support.example", "EXAMPLE.COM"]
       )
-    ).toBe(false);
+    ).toEqual({
+      email:
+        "Use an email account you can always access, even when HQBase is unavailable. It cannot use a domain connected to this workspace."
+    });
   });
 
   it("validates domain selection and the required app hostname", () => {

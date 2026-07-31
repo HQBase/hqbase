@@ -1,4 +1,5 @@
 import { newId, nowIso } from "../../db/client";
+import { assertDomainUnusedByLoginEmails } from "../../security/login-email";
 import type { CatchAllPolicy, DomainStatus, MailDomain, MailDomainRow } from "./types";
 
 export function mapMailDomain(row: MailDomainRow): MailDomain {
@@ -58,6 +59,9 @@ export async function upsertMailDomain(
   }
 ): Promise<MailDomain> {
   const existing = await findMailDomainByName(db, input.name);
+  if (!existing) {
+    await assertDomainUnusedByLoginEmails(db, input.name);
+  }
   const timestamp = nowIso();
   const id = existing?.id ?? newId("dom");
   await db

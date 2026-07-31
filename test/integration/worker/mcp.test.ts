@@ -6,7 +6,10 @@ import workspaceMigration from "../../../migrations/0002_workspace.sql?raw";
 import oauthResourcesMigration from "../../../migrations/0003_oauth_resources.sql?raw";
 import conversationMigration from "../../../migrations/0004_conversations.sql?raw";
 import threadRebuildMigration from "../../../migrations/0005_rebuild_threads.sql?raw";
+import userOnboardingMigration from "../../../migrations/0008_user_onboarding.sql?raw";
+import loginEmailDomainMigration from "../../../migrations/0009_login_email_domain_isolation.sql?raw";
 import { hashOAuthToken } from "../../../worker/auth/oauth-token";
+import { migrationStatements } from "./migration-statements";
 
 const origin = "https://hqbase.test";
 const userId = "usr_mcp_member";
@@ -31,7 +34,9 @@ describe("HQBase MCP server", () => {
       workspaceMigration,
       oauthResourcesMigration,
       conversationMigration,
-      threadRebuildMigration
+      threadRebuildMigration,
+      userOnboardingMigration,
+      loginEmailDomainMigration
     ]) {
       await applyMigration(migration);
     }
@@ -44,7 +49,13 @@ describe("HQBase MCP server", () => {
         `INSERT INTO "user"
          (id, name, email, emailVerified, createdAt, updatedAt, role, banned)
          VALUES (?, ?, ?, 1, ?, ?, 'member', 0)`
-      ).bind(userId, "MCP Member", "mcp-member@example.com", now.toISOString(), now.toISOString()),
+      ).bind(
+        userId,
+        "MCP Member",
+        "mcp-member@login.example",
+        now.toISOString(),
+        now.toISOString()
+      ),
       env.DB.prepare(
         `INSERT INTO "session"
          (id, expiresAt, token, createdAt, updatedAt, userId)
@@ -322,6 +333,24 @@ describe("HQBase MCP server", () => {
     ).resolves.toMatchObject({ status: 401 });
   });
 
+  it("rejects MCP access while a user still has a temporary password", async () => {
+    const timestamp = new Date().toISOString();
+    await env.DB.prepare(
+      `INSERT INTO user_onboarding
+       (user_id, method, status, created_by, created_at, updated_at)
+       VALUES (?, 'temporary_password', 'pending', ?, ?, ?)`
+    )
+      .bind(userId, userId, timestamp, timestamp)
+      .run();
+    try {
+      await expect(
+        mcpRequest({ jsonrpc: "2.0", id: 40, method: "tools/list" }, readToken)
+      ).resolves.toMatchObject({ status: 401 });
+    } finally {
+      await env.DB.prepare("DELETE FROM user_onboarding WHERE user_id = ?").bind(userId).run();
+    }
+  });
+
   it("filters mailbox results through live mailbox grants", async () => {
     const mailboxes = (await callTool("list_mailboxes", {}, readToken)) as Array<{ id: string }>;
     expect(mailboxes.map((mailbox) => mailbox.id)).toEqual(["mbx_allowed"]);
@@ -478,10 +507,7 @@ function mcpRequest(body: unknown, accessToken?: string, endpoint = "/mcp"): Pro
 }
 
 async function applyMigration(source: string): Promise<void> {
-  for (const statement of source
-    .split(";")
-    .map((value) => value.trim())
-    .filter(Boolean)) {
+  for (const statement of migrationStatements(source)) {
     await env.DB.prepare(statement).run();
   }
 }

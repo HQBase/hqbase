@@ -156,16 +156,28 @@ test("Track 1 enforces read-only mailbox access and exposes operator diagnostics
   expect(mailbox).toBeDefined();
 
   const suffix = `${Date.now()}-${process.env.GITHUB_RUN_ID ?? "local"}`;
-  const memberEmail = `kirill-${suffix}@${domain}`;
+  const loginDomain = email.split("@")[1];
+  if (!loginDomain) throw new Error("HQBASE_STAGING_OWNER_EMAIL must contain a domain.");
+  const memberEmail = `kirill-${suffix}@${loginDomain}`;
   const memberPassword = `${password}Track1!`;
   const createUser = await request.post("/api/users", {
-    data: { email: memberEmail, name: "Kirill Track 1", password: memberPassword, role: "member" }
+    data: {
+      email: memberEmail,
+      method: "temporary_password",
+      name: "Kirill Track 1",
+      role: "member"
+    }
   });
-  const member = (await createUser.json()) as { id?: string; error?: unknown };
+  const member = (await createUser.json()) as {
+    error?: unknown;
+    temporaryPassword?: string;
+    user?: { id?: string };
+  };
   expect(createUser.status(), JSON.stringify(member)).toBe(201);
-  expect(member.id).toBeTruthy();
+  expect(member.user?.id).toBeTruthy();
+  expect(member.temporaryPassword).toBeTruthy();
   const grant = await request.put("/api/mailbox-grants", {
-    data: { mailboxId: mailbox?.id, userId: member.id, accessLevel: "read" }
+    data: { mailboxId: mailbox?.id, userId: member.user?.id, accessLevel: "read" }
   });
   expect(grant.status()).toBe(204);
 
@@ -175,15 +187,24 @@ test("Track 1 enforces read-only mailbox access and exposes operator diagnostics
   });
   try {
     const memberLogin = await memberRequest.post("/api/auth/sign-in/email", {
-      data: { email: memberEmail, password: memberPassword, rememberMe: false },
+      data: { email: memberEmail, password: member.temporaryPassword, rememberMe: false },
       headers: { origin: stagingUrl }
     });
     expect(memberLogin.ok()).toBeTruthy();
+    const passwordSetup = await memberRequest.post("/api/me/password", {
+      data: {
+        confirmPassword: memberPassword,
+        currentPassword: member.temporaryPassword,
+        newPassword: memberPassword
+      },
+      headers: { origin: stagingUrl }
+    });
+    expect(passwordSetup.ok(), await passwordSetup.text()).toBeTruthy();
     const visible = await memberRequest.get("/api/mailboxes");
     expect((await visible.json()) as Array<{ id: string }>).toEqual([
       expect.objectContaining({ id: mailbox?.id })
     ]);
-    const revoke = await request.delete(`/api/mailbox-grants/${mailbox?.id}/${member.id}`);
+    const revoke = await request.delete(`/api/mailbox-grants/${mailbox?.id}/${member.user?.id}`);
     expect(revoke.status()).toBe(204);
     const hidden = await memberRequest.get("/api/mailboxes");
     expect(hidden.ok()).toBeTruthy();

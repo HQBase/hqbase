@@ -7,6 +7,8 @@ import oauthResourcesMigration from "../../../migrations/0003_oauth_resources.sq
 import conversationMigration from "../../../migrations/0004_conversations.sql?raw";
 import threadRebuildMigration from "../../../migrations/0005_rebuild_threads.sql?raw";
 import pushMigration from "../../../migrations/0006_push_notifications.sql?raw";
+import userOnboardingMigration from "../../../migrations/0008_user_onboarding.sql?raw";
+import loginEmailDomainMigration from "../../../migrations/0009_login_email_domain_isolation.sql?raw";
 import { createAuth } from "../../../worker/auth/auth";
 import {
   countUnreadMessages,
@@ -14,6 +16,7 @@ import {
   removePushSubscription,
   savePushSubscription
 } from "../../../worker/features/notifications/queries";
+import { migrationStatements } from "./migration-statements";
 
 describe("notification persistence", () => {
   beforeAll(async () => {
@@ -23,7 +26,9 @@ describe("notification persistence", () => {
       oauthResourcesMigration,
       conversationMigration,
       threadRebuildMigration,
-      pushMigration
+      pushMigration,
+      userOnboardingMigration,
+      loginEmailDomainMigration
     ]) {
       await applyMigration(migration);
     }
@@ -33,10 +38,10 @@ describe("notification persistence", () => {
         `INSERT INTO "user"
          (id, name, email, emailVerified, createdAt, updatedAt, role, banned)
          VALUES
-           ('usr_owner', 'Owner', 'owner@example.com', 1, ?, ?, 'owner', 0),
-           ('usr_member', 'Member', 'member@example.com', 1, ?, ?, 'member', 0),
-           ('usr_other', 'Other', 'other@example.com', 1, ?, ?, 'member', 0),
-           ('usr_banned', 'Banned', 'banned@example.com', 1, ?, ?, 'owner', 1)`
+           ('usr_owner', 'Owner', 'owner@login.example', 1, ?, ?, 'owner', 0),
+           ('usr_member', 'Member', 'member@login.example', 1, ?, ?, 'member', 0),
+           ('usr_other', 'Other', 'other@login.example', 1, ?, ?, 'member', 0),
+           ('usr_banned', 'Banned', 'banned@login.example', 1, ?, ?, 'owner', 1)`
       ).bind(now, now, now, now, now, now, now, now),
       env.DB.prepare(
         `INSERT INTO mailboxes (id, address, display_name, is_active, created_at, updated_at)
@@ -108,7 +113,7 @@ describe("notification persistence", () => {
 
   it("requires an authenticated user and validates subscription endpoints at the API boundary", async () => {
     const origin = "https://hqbase.test";
-    const email = "push-user@example.com";
+    const email = "push-user@login.example";
     const auth = createAuth(env, new Request(`${origin}/api/auth/sign-up/email`));
     const signUp = await auth.handler(
       new Request(`${origin}/api/auth/sign-up/email`, {
@@ -208,10 +213,7 @@ async function insertMessage(
 }
 
 async function applyMigration(source: string): Promise<void> {
-  for (const statement of source
-    .split(";")
-    .map((value) => value.trim())
-    .filter(Boolean)) {
+  for (const statement of migrationStatements(source)) {
     await env.DB.prepare(statement).run();
   }
 }

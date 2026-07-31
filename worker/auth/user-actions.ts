@@ -5,7 +5,7 @@ import { AppError } from "../lib/errors";
 import type { WorkspaceRole } from "../lib/validation";
 import { parseWith } from "../lib/validation";
 
-import { createAuth } from "./auth";
+import { authOrigin, createAuth } from "./auth";
 
 const authUserSchema = z.object({
   user: z.object({
@@ -20,7 +20,7 @@ type AuthUserResult = z.infer<typeof authUserSchema>["user"];
 type CreateAuthUserInput = {
   name: string;
   email: string;
-  password: string;
+  password?: string;
   role: WorkspaceRole;
 };
 
@@ -46,8 +46,63 @@ export async function createManagedUser(
   request: Request,
   input: CreateAuthUserInput
 ): Promise<AuthUserResult> {
-  const data = await callAuthJson(env, request, "/api/auth/admin/create-user", input, true);
+  const body = {
+    name: input.name,
+    email: input.email,
+    role: input.role,
+    ...(input.password ? { password: input.password } : {})
+  };
+  const data = await callAuthJson(env, request, "/api/auth/admin/create-user", body, true);
   return parseWith(authUserSchema, data).user;
+}
+
+export async function requestPasswordSetupEmail(
+  env: WorkerEnv,
+  request: Request,
+  email: string
+): Promise<void> {
+  const redirectTo = `${authOrigin(env, request)}/set-password`;
+  await callAuthJson(
+    env,
+    request,
+    "/api/auth/request-password-reset",
+    { email, redirectTo },
+    false
+  );
+}
+
+export async function changeCurrentUserPassword(
+  env: WorkerEnv,
+  request: Request,
+  input: { currentPassword: string; newPassword: string }
+): Promise<string | null> {
+  const result = await callAuthResponse(
+    env,
+    request,
+    "/api/auth/change-password",
+    {
+      currentPassword: input.currentPassword,
+      newPassword: input.newPassword,
+      revokeOtherSessions: true
+    },
+    true
+  );
+  return result.response.headers.get("set-cookie");
+}
+
+export async function setManagedUserPassword(
+  env: WorkerEnv,
+  request: Request,
+  userId: string,
+  newPassword: string
+): Promise<void> {
+  await callAuthJson(
+    env,
+    request,
+    "/api/auth/admin/set-user-password",
+    { newPassword, userId },
+    true
+  );
 }
 
 async function callAuthJson(
@@ -57,6 +112,16 @@ async function callAuthJson(
   body: unknown,
   includeCookie: boolean
 ): Promise<unknown> {
+  return (await callAuthResponse(env, request, pathname, body, includeCookie)).data;
+}
+
+async function callAuthResponse(
+  env: WorkerEnv,
+  request: Request,
+  pathname: string,
+  body: unknown,
+  includeCookie: boolean
+): Promise<{ data: unknown; response: Response }> {
   const url = new URL(request.url);
   url.pathname = pathname;
   url.search = "";
@@ -84,7 +149,7 @@ async function callAuthJson(
   if (!authResponse.ok) {
     throw new AppError("AUTH_USER_CREATE_FAILED", extractAuthError(data), authResponse.status);
   }
-  return data;
+  return { data, response: authResponse };
 }
 
 async function safeJson(response: Response): Promise<unknown> {
