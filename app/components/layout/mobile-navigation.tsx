@@ -79,6 +79,7 @@ export function MobileNavigation({
           <Sidebar
             activeFolder={activeFolder}
             draftCount={draftCount}
+            mailboxId={mailboxId}
             mailboxFilter={{
               mailboxes,
               value: mailboxId,

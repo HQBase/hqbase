@@ -15,6 +15,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import type { CurrentUser } from "@/features/auth/types";
 import type { Mailbox } from "@/features/mailboxes/types";
 import type { UnreadCounts } from "@/features/notifications/types";
+import { mailboxUnreadLabel } from "@/features/notifications/unread";
 import type { FolderId } from "@/lib/routes";
 import { MobileNavigation } from "./mobile-navigation";
 
@@ -105,10 +106,12 @@ export function TopBar({
           </SelectTrigger>
           <SelectContent>
             <SelectGroup>
-              <SelectItem value="all">All mailboxes</SelectItem>
+              <SelectItem value="all">
+                {mailboxUnreadLabel("All mailboxes", "all", unread)}
+              </SelectItem>
               {mailboxes.map((mailbox) => (
                 <SelectItem key={mailbox.id} value={mailbox.id}>
-                  {mailbox.address}
+                  {mailboxUnreadLabel(mailbox.address, mailbox.id, unread)}
                 </SelectItem>
               ))}
             </SelectGroup>

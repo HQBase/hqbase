@@ -9,6 +9,7 @@ import { DraftsPage } from "@/features/drafts/drafts-page";
 import { InboxPage } from "@/features/inbox/inbox-page";
 import type { Mailbox } from "@/features/mailboxes/types";
 import { McpConnectionDetails } from "@/features/mcp/connection-dialog";
+import { mailboxUnreadLabel } from "@/features/notifications/unread";
 
 const user = {
   defaultFromMailboxId: "mailbox-1",
@@ -18,7 +19,12 @@ const user = {
   passwordSetupRequired: false,
   role: "owner" as const
 };
-const unread = { catchall: 2, inbox: 7, total: 9 };
+const unread = {
+  catchall: 2,
+  inbox: 7,
+  inboxByMailbox: { "mailbox-1": 4, "mailbox-2": 3 },
+  total: 9
+};
 const mailbox: Mailbox = {
   id: "mailbox-1",
   address: "support@example.com",
@@ -108,6 +114,7 @@ describe("mail shell", () => {
     const html = renderToStaticMarkup(
       <Sidebar
         activeFolder="inbox"
+        mailboxId="all"
         unread={unread}
         user={user}
         utilityAction={<button type="button">Connect MCP</button>}
@@ -170,6 +177,7 @@ describe("mail shell", () => {
     const html = renderToStaticMarkup(
       <Sidebar
         activeFolder="inbox"
+        mailboxId="all"
         mailboxFilter={{
           mailboxes: [mailbox],
           value: "all",
@@ -197,10 +205,36 @@ describe("mail shell", () => {
     expect(html.match(/border-t pt-2/g)).toHaveLength(2);
   });
 
+  it("shows per-mailbox unread labels and scopes the Inbox count to the selection", () => {
+    expect(mailboxUnreadLabel("All mailboxes", "all", unread)).toBe("All mailboxes (7)");
+    expect(mailboxUnreadLabel("support@example.com", "mailbox-1", unread)).toBe(
+      "support@example.com (4)"
+    );
+    expect(mailboxUnreadLabel("empty@example.com", "mailbox-empty", unread)).toBe(
+      "empty@example.com (0)"
+    );
+
+    const html = renderToStaticMarkup(
+      <Sidebar
+        activeFolder="inbox"
+        mailboxId="mailbox-1"
+        unread={unread}
+        user={user}
+        onFolderChange={() => undefined}
+        onSignedOut={() => undefined}
+      />
+    );
+
+    expect(html).toContain("4 unread");
+    expect(html).not.toContain("7 unread");
+    expect(html).toContain("2 unread");
+  });
+
   it("shows Drafts with its private count only when drafts exist or the route is active", () => {
     const withoutDrafts = renderToStaticMarkup(
       <Sidebar
         activeFolder="inbox"
+        mailboxId="all"
         unread={unread}
         user={user}
         onFolderChange={() => undefined}
@@ -211,6 +245,7 @@ describe("mail shell", () => {
       <Sidebar
         activeFolder="inbox"
         draftCount={3}
+        mailboxId="all"
         unread={unread}
         user={user}
         onFolderChange={() => undefined}
@@ -221,6 +256,7 @@ describe("mail shell", () => {
       <Sidebar
         activeFolder="drafts"
         draftCount={0}
+        mailboxId="all"
         unread={unread}
         user={user}
         onFolderChange={() => undefined}

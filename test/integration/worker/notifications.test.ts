@@ -79,11 +79,13 @@ describe("notification persistence", () => {
     await expect(countUnreadMessages(env.DB, ["mbx_one"])).resolves.toEqual({
       catchall: 1,
       inbox: 1,
+      inboxByMailbox: { mbx_one: 1 },
       total: 2
     });
     await expect(countUnreadMessages(env.DB, ["mbx_one", "mbx_two"])).resolves.toEqual({
       catchall: 1,
       inbox: 2,
+      inboxByMailbox: { mbx_one: 1, mbx_two: 1 },
       total: 3
     });
   });
@@ -149,7 +151,7 @@ describe("notification persistence", () => {
     expect(status.status, await status.clone().text()).toBe(200);
     expect(await status.json()).toEqual({
       latestInboundMessageId: "msg_read",
-      unread: { catchall: 1, inbox: 1, total: 2 },
+      unread: { catchall: 1, inbox: 1, inboxByMailbox: { mbx_one: 1 }, total: 2 },
       vapidPublicKey: "integration-vapid-public-key"
     });
 

@@ -17,10 +17,15 @@ describe("browser notifications", () => {
     vi.stubGlobal("navigator", { setAppBadge, clearAppBadge });
     vi.stubGlobal("document", { title: "" });
 
-    await applyUnreadIndicators({ catchall: 1, inbox: 2, total: 3 });
+    await applyUnreadIndicators({
+      catchall: 1,
+      inbox: 2,
+      inboxByMailbox: { "mailbox-1": 2 },
+      total: 3
+    });
     expect(document.title).toBe("(3) HQBase");
     expect(setAppBadge).toHaveBeenCalledWith(3);
-    await applyUnreadIndicators({ catchall: 0, inbox: 0, total: 0 });
+    await applyUnreadIndicators({ catchall: 0, inbox: 0, inboxByMailbox: {}, total: 0 });
     expect(document.title).toBe("HQBase");
     expect(clearAppBadge).toHaveBeenCalledOnce();
   });

@@ -20,7 +20,7 @@ import type {
   UnreadCounts
 } from "./types";
 
-const emptyUnread: UnreadCounts = { catchall: 0, inbox: 0, total: 0 };
+const emptyUnread: UnreadCounts = { catchall: 0, inbox: 0, inboxByMailbox: {}, total: 0 };
 const emptyStatus: NotificationStatus = {
   latestInboundMessageId: null,
   unread: emptyUnread,

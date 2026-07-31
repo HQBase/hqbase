@@ -73,10 +73,10 @@ const notifications = {
   isBusy: false,
   refresh: async () => ({
     latestInboundMessageId: null,
-    unread: { catchall: 1, inbox: 2, total: 3 },
+    unread: { catchall: 1, inbox: 2, inboxByMailbox: { "mailbox-1": 2 }, total: 3 },
     vapidPublicKey: "public-key"
   }),
-  unread: { catchall: 1, inbox: 2, total: 3 }
+  unread: { catchall: 1, inbox: 2, inboxByMailbox: { "mailbox-1": 2 }, total: 3 }
 };
 
 describe("settings presentation", () => {

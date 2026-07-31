@@ -34,7 +34,7 @@ describe("useNotifications", () => {
     const subscription = { endpoint: "https://push.example/device" };
     const status = {
       latestInboundMessageId: "message-2",
-      unread: { catchall: 1, inbox: 2, total: 3 },
+      unread: { catchall: 1, inbox: 2, inboxByMailbox: { "mailbox-1": 2 }, total: 3 },
       vapidPublicKey: "public-key"
     };
     mocks.currentPushSubscription.mockResolvedValue(subscription);
@@ -55,7 +55,7 @@ describe("useNotifications", () => {
     expect(mocks.applyUnreadIndicators).toHaveBeenLastCalledWith(status.unread);
 
     await hook.rerender({ userId: null });
-    expect(hook.result.unread).toEqual({ catchall: 0, inbox: 0, total: 0 });
+    expect(hook.result.unread).toEqual({ catchall: 0, inbox: 0, inboxByMailbox: {}, total: 0 });
     expect(hook.result.deviceState).toBe("checking");
     await hook.unmount();
   });

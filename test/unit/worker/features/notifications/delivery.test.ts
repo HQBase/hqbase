@@ -63,7 +63,12 @@ describe("push delivery", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(accessibleMailboxIds).mockResolvedValue(["mbx_1"]);
-    vi.mocked(countUnreadMessages).mockResolvedValue({ catchall: 1, inbox: 2, total: 3 });
+    vi.mocked(countUnreadMessages).mockResolvedValue({
+      catchall: 1,
+      inbox: 2,
+      inboxByMailbox: { mbx_1: 2 },
+      total: 3
+    });
     vi.mocked(listPushSubscriptionsForMailbox).mockResolvedValue([
       {
         id: "push_1",

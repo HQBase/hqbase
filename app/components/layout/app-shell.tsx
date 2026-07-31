@@ -125,6 +125,7 @@ export function AppShell(props: AppShellProps): React.ReactElement {
             <Sidebar
               activeFolder={props.activeFolder}
               draftCount={props.draftCount}
+              mailboxId={props.mailboxId}
               resizable
               unread={props.unread}
               user={props.user}
@@ -148,6 +149,7 @@ export function AppShell(props: AppShellProps): React.ReactElement {
           <Sidebar
             activeFolder={props.activeFolder}
             draftCount={props.draftCount}
+            mailboxId={props.mailboxId}
             unread={props.unread}
             user={props.user}
             utilityAction={mcpAction}
