@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.37
+
+- Prime iPhone audio at the start of a pull-to-refresh gesture so the release cue plays without
+  requiring a menu tap first.
+
 ## 0.1.36
 
 - Show unread Inbox counts for **All mailboxes** and each accessible mailbox in the desktop and
