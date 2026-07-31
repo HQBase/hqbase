@@ -67,11 +67,9 @@ export function useSetupFlow(onComplete: () => void) {
     onTokenVerified: () => advanceTo(DOMAIN_STEP)
   });
   const ownerDraft = { email: ownerEmail, name: ownerName, password: ownerPassword };
-  const currentOwnerErrors = validateOwner(ownerDraft);
-  const currentMailboxErrors = validateMailboxes(
-    mailboxes,
-    cloudflare.emailDomains.map((domain) => domain.name)
-  );
+  const managedDomains = cloudflare.emailDomains.map((domain) => domain.name);
+  const currentOwnerErrors = validateOwner(ownerDraft, managedDomains);
+  const currentMailboxErrors = validateMailboxes(mailboxes, managedDomains);
   const ownerErrors = ownerAttempted ? currentOwnerErrors : {};
   const mailboxErrors = mailboxAttempted
     ? currentMailboxErrors
@@ -98,7 +96,7 @@ export function useSetupFlow(onComplete: () => void) {
 
   function handleOwnerNext() {
     setOwnerAttempted(true);
-    if (hasErrors(validateOwner(ownerDraft))) return;
+    if (hasErrors(validateOwner(ownerDraft, managedDomains))) return;
     setSubmitError(null);
     advanceTo(MAILBOX_STEP);
   }
@@ -111,7 +109,7 @@ export function useSetupFlow(onComplete: () => void) {
       return;
     }
     setOwnerAttempted(true);
-    if (hasErrors(validateOwner(ownerDraft))) {
+    if (hasErrors(validateOwner(ownerDraft, managedDomains))) {
       setActiveStep(OWNER_STEP);
       return;
     }

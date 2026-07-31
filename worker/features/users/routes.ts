@@ -1,7 +1,6 @@
 import { Hono } from "hono";
 
 import { requireAuthContext, requireRole } from "../../auth/session";
-import { createManagedUser } from "../../auth/user-actions";
 import type { HonoApp } from "../../lib/env";
 import { AppError } from "../../lib/errors";
 import { readJson } from "../../lib/json";
@@ -9,6 +8,11 @@ import { parseWith } from "../../lib/validation";
 import { recordAudit } from "../audit/service";
 
 import { listUsers, setWorkspaceUserRole } from "./queries";
+import {
+  createWorkspaceUser,
+  regenerateTemporaryPassword,
+  resendWorkspaceInvitation
+} from "./service";
 import { createUserSchema, updateUserSchema } from "./validation";
 
 export const userRoutes = new Hono<HonoApp>();
@@ -27,18 +31,68 @@ userRoutes.post("/", async (c) => {
   if (input.role === "owner" && authContext.user.role !== "owner") {
     throw new AppError("OWNER_REQUIRED", "Only an owner can create another owner.", 403);
   }
-  const user = await createManagedUser(c.env, c.req.raw, input);
+  const result = await createWorkspaceUser(c.env, c.req.raw, authContext.user.id, input);
   await recordAudit(c.env.DB, {
     correlationId: c.get("correlationId"),
     actorType: "user",
     actorId: authContext.user.id,
-    action: "user.create",
+    action: input.method === "email_invite" ? "user.invite" : "user.create",
+    resourceType: "user",
+    resourceId: result.user.id,
+    outcome: "success",
+    metadata: { method: input.method, role: input.role }
+  });
+  return c.json(result, 201);
+});
+
+userRoutes.post("/:id/resend-invitation", async (c) => {
+  const authContext = await requireAuthContext(c.env, c.req.raw);
+  requireRole(authContext, ["owner", "admin"]);
+  const target = await c.env.DB.prepare('SELECT role FROM "user" WHERE id = ?')
+    .bind(c.req.param("id"))
+    .first<{ role: string | null }>();
+  if (!target) throw new AppError("USER_NOT_FOUND", "User not found.", 404);
+  if (target.role === "owner" && authContext.user.role !== "owner") {
+    throw new AppError("OWNER_REQUIRED", "Only an owner can manage another owner.", 403);
+  }
+
+  const user = await resendWorkspaceInvitation(c.env, c.req.raw, c.req.param("id"));
+  await recordAudit(c.env.DB, {
+    correlationId: c.get("correlationId"),
+    actorType: "user",
+    actorId: authContext.user.id,
+    action: "user.invite.resend",
     resourceType: "user",
     resourceId: user.id,
     outcome: "success",
-    metadata: { role: input.role }
+    metadata: {}
   });
-  return c.json(user, 201);
+  return c.json(user);
+});
+
+userRoutes.post("/:id/temporary-password", async (c) => {
+  const authContext = await requireAuthContext(c.env, c.req.raw);
+  requireRole(authContext, ["owner", "admin"]);
+  const target = await c.env.DB.prepare('SELECT role FROM "user" WHERE id = ?')
+    .bind(c.req.param("id"))
+    .first<{ role: string | null }>();
+  if (!target) throw new AppError("USER_NOT_FOUND", "User not found.", 404);
+  if (target.role === "owner" && authContext.user.role !== "owner") {
+    throw new AppError("OWNER_REQUIRED", "Only an owner can manage another owner.", 403);
+  }
+
+  const result = await regenerateTemporaryPassword(c.env, c.req.raw, c.req.param("id"));
+  await recordAudit(c.env.DB, {
+    correlationId: c.get("correlationId"),
+    actorType: "user",
+    actorId: authContext.user.id,
+    action: "user.temporary-password.regenerate",
+    resourceType: "user",
+    resourceId: result.user.id,
+    outcome: "success",
+    metadata: {}
+  });
+  return c.json(result);
 });
 
 userRoutes.patch("/:id", async (c) => {

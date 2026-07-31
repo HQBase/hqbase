@@ -1,11 +1,14 @@
 import { oauthProvider } from "@better-auth/oauth-provider";
 import { betterAuth } from "better-auth";
 import { admin } from "better-auth/plugins";
-
+import { recordAudit } from "../features/audit/service";
+import { sendPasswordSetupEmail } from "../features/users/email";
 import type { WorkerEnv } from "../lib/env";
-
 import { adminRole, memberRole, ownerRole } from "./access";
 import { hashOAuthToken } from "./oauth-token";
+import { completePasswordSetup } from "./password-setup";
+
+const passwordSetupTokenLifetimeSeconds = 7 * 24 * 60 * 60;
 
 export function createAuth(env: WorkerEnv, request: Request) {
   const baseURL = authOrigin(env, request);
@@ -20,7 +23,27 @@ export function createAuth(env: WorkerEnv, request: Request) {
     emailAndPassword: {
       enabled: true,
       minPasswordLength: 8,
-      requireEmailVerification: false
+      maxPasswordLength: 128,
+      requireEmailVerification: false,
+      resetPasswordTokenExpiresIn: passwordSetupTokenLifetimeSeconds,
+      revokeSessionsOnPasswordReset: true,
+      sendResetPassword: async ({ user, url }) => {
+        await sendPasswordSetupEmail(env, { user, url });
+      },
+      onPasswordReset: async ({ user }) => {
+        if (await completePasswordSetup(env.DB, user.id)) {
+          await recordAudit(env.DB, {
+            correlationId: crypto.randomUUID(),
+            actorType: "user",
+            actorId: user.id,
+            action: "user.password.setup",
+            resourceType: "user",
+            resourceId: user.id,
+            outcome: "success",
+            metadata: {}
+          });
+        }
+      }
     },
     plugins: [
       admin({

@@ -9,6 +9,7 @@ import type { HonoApp } from "../../lib/env";
 import { AppError } from "../../lib/errors";
 import { readJson } from "../../lib/json";
 import { parseWith } from "../../lib/validation";
+import { assertDomainUnusedByLoginEmails } from "../../security/login-email";
 import { recordAudit } from "../audit/service";
 import {
   clearRuntimeCloudflareGrantCookie,
@@ -25,7 +26,12 @@ import {
   listCloudflareZones
 } from "../setup/cloudflare";
 import { upsertWorkspaceHost } from "../setup/queries";
-import { listMailDomains, updateMailDomainSettings, upsertMailDomain } from "./queries";
+import {
+  findMailDomainByName,
+  listMailDomains,
+  updateMailDomainSettings,
+  upsertMailDomain
+} from "./queries";
 import {
   changePortalHostnameSchema,
   createMailDomainSchema,
@@ -100,6 +106,9 @@ domainRoutes.post("/provision", async (c) => {
   requireRole(auth, ["owner", "admin"]);
   requireRecentSession(auth);
   const input = parseWith(provisionMailDomainSchema, await readJson(c.req.raw));
+  if (!(await findMailDomainByName(c.env.DB, input.name))) {
+    await assertDomainUnusedByLoginEmails(c.env.DB, input.name);
+  }
   const grant = await resolveRuntimeCloudflareGrant(c.req.raw, c.env);
   const result = await configureCloudflareDomain({
     apiToken: grant,

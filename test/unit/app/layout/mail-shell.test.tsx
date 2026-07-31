@@ -15,6 +15,7 @@ const user = {
   id: "user-1",
   email: "olivia@example.com",
   name: "Olivia Berman",
+  passwordSetupRequired: false,
   role: "owner" as const
 };
 const unread = { catchall: 2, inbox: 7, total: 9 };

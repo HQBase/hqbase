@@ -1,5 +1,5 @@
 import { disableCurrentDeviceNotificationsBeforeSignOut } from "@/features/notifications/sign-out";
-import { apiGet, apiPatch } from "@/lib/api-client";
+import { apiGet, apiPatch, apiPost } from "@/lib/api-client";
 import type { CurrentUser } from "./types";
 
 export async function getCurrentUser(): Promise<CurrentUser> {
@@ -44,4 +44,27 @@ export async function signOut(): Promise<void> {
     headers: { "content-type": "application/json" },
     method: "POST"
   });
+}
+
+export async function completeTemporaryPasswordSetup(input: {
+  currentPassword: string;
+  newPassword: string;
+  confirmPassword: string;
+}): Promise<void> {
+  await apiPost("/api/me/password", input);
+}
+
+export async function resetPassword(token: string, newPassword: string): Promise<void> {
+  const response = await fetch("/api/auth/reset-password", {
+    body: JSON.stringify({ newPassword, token }),
+    headers: { "content-type": "application/json" },
+    method: "POST"
+  });
+  if (!response.ok) {
+    throw new Error(
+      response.status === 400
+        ? "This password setup link is invalid or expired."
+        : "Password setup failed."
+    );
+  }
 }

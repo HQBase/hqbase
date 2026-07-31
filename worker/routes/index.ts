@@ -95,5 +95,28 @@ apiRoutes.all("/api/auth/*", async (c) => {
     ]);
   }
 
+  if (pathname === "/api/auth/request-password-reset" && c.req.method === "POST") {
+    const body: { email?: unknown } = await c.req.raw
+      .clone()
+      .json<{ email?: unknown }>()
+      .catch(() => ({}));
+    const email = typeof body.email === "string" ? body.email : "invalid";
+    const ip = c.req.header("cf-connecting-ip") ?? "unknown";
+    await Promise.all([
+      enforceRateLimit(c.env.DB, c.env.BETTER_AUTH_SECRET, {
+        scope: "password-reset.email",
+        subject: email,
+        limit: 5,
+        windowSeconds: 60 * 60
+      }),
+      enforceRateLimit(c.env.DB, c.env.BETTER_AUTH_SECRET, {
+        scope: "password-reset.ip",
+        subject: ip,
+        limit: 20,
+        windowSeconds: 60 * 60
+      })
+    ]);
+  }
+
   return createAuth(c.env, c.req.raw).handler(c.req.raw);
 });

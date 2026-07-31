@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { LOGIN_EMAIL_HINT, loginEmailUsesManagedDomain } from "@/lib/login-email";
 import type { CloudflareZone } from "./types";
 
 export type OwnerDraft = {
@@ -57,7 +58,7 @@ export function validateDomain(input: {
   return errors;
 }
 
-export function validateOwner(owner: OwnerDraft): OwnerErrors {
+export function validateOwner(owner: OwnerDraft, managedDomains: string[] = []): OwnerErrors {
   const errors: OwnerErrors = {};
   const name = owner.name.trim();
 
@@ -65,7 +66,10 @@ export function validateOwner(owner: OwnerDraft): OwnerErrors {
   else if (name.length > 100) errors.name = "Name must be 100 characters or fewer.";
 
   const normalizedEmail = owner.email.trim().toLowerCase();
-  if (!emailSchema.safeParse(normalizedEmail).success) errors.email = "Enter a valid login email.";
+  if (!emailSchema.safeParse(normalizedEmail).success) errors.email = "Enter a valid Login email.";
+  else if (loginEmailUsesManagedDomain(normalizedEmail, managedDomains)) {
+    errors.email = LOGIN_EMAIL_HINT;
+  }
 
   if (owner.password.length < 8) {
     errors.password = "Use at least 8 characters.";

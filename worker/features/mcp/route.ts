@@ -2,6 +2,7 @@ import { oauthProviderAuthServerMetadata } from "@better-auth/oauth-provider";
 
 import { authIssuer, authOrigin, createAuth, mcpFullResource, mcpResource } from "../../auth/auth";
 import { hashOAuthToken } from "../../auth/oauth-token";
+import { isPasswordSetupRequired } from "../../auth/password-setup";
 import type { WorkerEnv } from "../../lib/env";
 import type { WorkspaceRole } from "../../lib/validation";
 import { workspaceRoleSchema } from "../../lib/validation";
@@ -133,6 +134,9 @@ async function authenticateMcp(
   }
   const parsedRole = workspaceRoleSchema.safeParse(row.role ?? "member");
   if (!parsedRole.success) throw new Error("Invalid workspace role.");
+  if (await isPasswordSetupRequired(env.DB, row.userId)) {
+    throw new Error("Password setup is required.");
+  }
 
   const expectedResource = profileResource(profile, env, request);
   const tokenResources = parseStoredList(row.resources);

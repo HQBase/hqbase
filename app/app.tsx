@@ -4,6 +4,10 @@ import { AppShell } from "@/components/layout/app-shell";
 import { Toaster } from "@/components/ui/sonner";
 import { getCurrentUser } from "@/features/auth/api";
 import { LoginPage } from "@/features/auth/login-page";
+import {
+  InvitationPasswordSetupPage,
+  TemporaryPasswordSetupPage
+} from "@/features/auth/password-setup-page";
 import type { CurrentUser } from "@/features/auth/types";
 import { DraftsPage } from "@/features/drafts/drafts-page";
 import { useDrafts } from "@/features/drafts/use-drafts";
@@ -31,6 +35,7 @@ const DraftComposeDialog = React.lazy(() =>
 );
 
 export function App(): React.ReactElement {
+  const invitationSetup = window.location.pathname === "/set-password";
   const [setup, setSetup] = React.useState<SetupStatus | null>(null);
   const [user, setUser] = React.useState<CurrentUser | null>(null);
   const [mailboxes, setMailboxes] = React.useState<Mailbox[]>([]);
@@ -45,7 +50,7 @@ export function App(): React.ReactElement {
   const selectedId = route.kind === "mail" ? route.messageId : null;
   const selectedDraftId = route.kind === "drafts" ? route.draftId : null;
   const settingsTab: SettingsTabId = route.kind === "settings" ? route.tab : "mailboxes";
-  const currentUserId = user?.id ?? null;
+  const currentUserId = user?.passwordSetupRequired ? null : (user?.id ?? null);
   const draftState = useDrafts(currentUserId);
   const selectedDraft =
     selectedDraftId === null
@@ -55,7 +60,8 @@ export function App(): React.ReactElement {
     () => mailboxes.filter((mailbox) => mailbox.accessLevel !== null),
     [mailboxes]
   );
-  const canManageUpdates = user?.role === "owner" || user?.role === "admin";
+  const canManageUpdates =
+    !user?.passwordSetupRequired && (user?.role === "owner" || user?.role === "admin");
   const updateMonitor = useUpdateMonitor(canManageUpdates);
   const mailSync = useMailSync({
     activeFolder,
@@ -88,6 +94,7 @@ export function App(): React.ReactElement {
 
       const currentUser = await getCurrentUser();
       setUser(currentUser);
+      if (currentUser.passwordSetupRequired) return;
       await loadWorkspace(currentUser);
     } catch {
       setUser(null);
@@ -97,8 +104,9 @@ export function App(): React.ReactElement {
   }, [loadWorkspace]);
 
   React.useEffect(() => {
+    if (invitationSetup) return;
     void reload();
-  }, [reload]);
+  }, [invitationSetup, reload]);
 
   React.useEffect(() => {
     if (!user || isLoading || route.kind !== "settings") return;
@@ -108,6 +116,16 @@ export function App(): React.ReactElement {
       navigate({ kind: "settings", tab: "mailboxes" }, true);
     }
   }, [isLoading, navigate, route, user]);
+
+  if (invitationSetup) {
+    const params = new URLSearchParams(window.location.search);
+    return (
+      <>
+        <InvitationPasswordSetupPage error={params.get("error")} token={params.get("token")} />
+        <Toaster />
+      </>
+    );
+  }
 
   if (isLoading && setup === null) {
     return <FullScreenStatus label="Loading HQBase" />;
@@ -126,6 +144,19 @@ export function App(): React.ReactElement {
     return (
       <>
         <LoginPage onLogin={() => void reload()} />
+        <Toaster />
+      </>
+    );
+  }
+
+  if (user.passwordSetupRequired) {
+    return (
+      <>
+        <TemporaryPasswordSetupPage
+          user={user}
+          onComplete={() => void reload()}
+          onSignedOut={() => setUser(null)}
+        />
         <Toaster />
       </>
     );

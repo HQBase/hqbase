@@ -139,7 +139,7 @@ export function renderPreviewFixture(input: FixtureInput): React.ReactNode {
     const errors =
       input.state === "validation"
         ? {
-            email: "Enter a valid login email.",
+            email: "Enter a valid Login email.",
             name: "Enter your name.",
             password: "Use at least 8 characters."
           }

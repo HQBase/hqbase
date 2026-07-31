@@ -11,6 +11,7 @@ import {
   listConversations,
   updateConversationAction
 } from "../../../worker/features/messages/conversation-queries";
+import { migrationStatements } from "./migration-statements";
 
 describe("conversation persistence", () => {
   beforeAll(async () => {
@@ -218,10 +219,7 @@ async function insertLegacyMessage(input: {
 }
 
 async function applyMigration(source: string): Promise<void> {
-  for (const statement of source
-    .split(";")
-    .map((value) => value.trim())
-    .filter(Boolean)) {
+  for (const statement of migrationStatements(source)) {
     await env.DB.prepare(statement).run();
   }
 }

@@ -28,8 +28,8 @@ Public Deploy Button installs use `/setup` after the Worker is deployed:
 4. Click `Connect domain and continue`. HQBase configures Cloudflare and advances
    to the owner account only after every required check passes.
 
-On the owner step, choose only the part before `@`. HQBase combines it with the
-selected domain and uses the complete address as the owner login.
+On the owner step, enter the owner's full Login email. Its account must remain accessible even when
+HQBase is unavailable, so it cannot use any email domain selected for this workspace.
 
 The setup wizard uses the delegated grant to enable Email Routing DNS, point the catch-all route at
 the deployed Worker, and enable Email Sending when permitted by the account. The access token is a

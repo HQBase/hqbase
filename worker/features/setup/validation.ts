@@ -1,6 +1,10 @@
 import { z } from "zod";
 
 import { emailAddressSchema } from "../../lib/validation";
+import {
+  LOGIN_EMAIL_DOMAIN_MESSAGE,
+  loginEmailUsesManagedDomain
+} from "../../security/login-email";
 import { createMailboxSchema } from "../mailboxes/validation";
 
 export const domainSchema = z
@@ -42,6 +46,13 @@ export const bootstrapSetupSchema = z
         code: "custom",
         message: "Choose at least one email domain.",
         path: ["emailDomains"]
+      });
+    }
+    if (loginEmailUsesManagedDomain(input.ownerEmail, domains)) {
+      context.addIssue({
+        code: "custom",
+        message: LOGIN_EMAIL_DOMAIN_MESSAGE,
+        path: ["ownerEmail"]
       });
     }
 
