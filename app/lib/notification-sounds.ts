@@ -1,6 +1,8 @@
 export type NotificationSound =
   | "incoming-email"
   | "outgoing-email"
+  | "refresh-complete"
+  | "refresh-pull"
   | "toast-error"
   | "toast-information"
   | "toast-success"
@@ -23,6 +25,8 @@ const UNLOCK_EVENTS = ["touchend", "click", "keydown"] as const;
 const SOUND_SOURCES: Record<NotificationSound, string> = {
   "incoming-email": "/sounds/incoming-email.wav",
   "outgoing-email": "/sounds/outgoing-email.wav",
+  "refresh-complete": "/sounds/toast-success.wav",
+  "refresh-pull": "/sounds/toast-information.wav",
   "toast-error": "/sounds/toast-error.wav",
   "toast-information": "/sounds/toast-information.wav",
   "toast-success": "/sounds/toast-success.wav",
@@ -33,6 +37,7 @@ const SOUND_SOURCES: Record<NotificationSound, string> = {
 let initialized = false;
 let unlockListenersBound = false;
 let player: HTMLAudioElement | null = null;
+let playbackGeneration = 0;
 
 export function notificationSoundForToastType(
   type: ToastSoundType | undefined
@@ -64,21 +69,21 @@ export function initializeNotificationSounds(): void {
   window.addEventListener("pageshow", resetPlayer);
 }
 
-export function playNotificationSound(sound: NotificationSound): void {
+export function playNotificationSound(sound: NotificationSound): boolean {
   try {
     initializeNotificationSounds();
-    if (!player || prefersReducedMotion()) return;
+    if (!player || prefersReducedMotion()) return false;
 
     player.pause();
     player.src = SOUND_SOURCES[sound];
     player.currentTime = 0;
     player.volume = SOUND_VOLUME;
-    void player.play().catch(() => {
-      // The next explicit interaction can unlock playback again.
-      bindUnlockListeners();
-    });
+    playbackGeneration += 1;
+    void player.play().then(unbindUnlockListeners, bindUnlockListeners);
+    return true;
   } catch {
     // Audible feedback must never interrupt the underlying action.
+    return false;
   }
 }
 
@@ -105,13 +110,16 @@ function unlockPlayer(): void {
     player.preload = "auto";
     player.src = UNLOCK_SOURCE;
     player.currentTime = 0;
+    const unlockingPlayer = player;
+    const unlockGeneration = ++playbackGeneration;
 
-    void player.play().then(
+    void unlockingPlayer.play().then(
       () => {
-        player?.pause();
-        if (player) {
-          player.currentTime = 0;
-          player.volume = SOUND_VOLUME;
+        if (player !== unlockingPlayer) return;
+        if (playbackGeneration === unlockGeneration) {
+          unlockingPlayer.pause();
+          unlockingPlayer.currentTime = 0;
+          unlockingPlayer.volume = SOUND_VOLUME;
         }
         unbindUnlockListeners();
       },
@@ -126,6 +134,7 @@ function unlockPlayer(): void {
 
 function resetPlayer(): void {
   try {
+    playbackGeneration += 1;
     player?.pause();
   } catch {
     // Resetting audio must never interrupt returning to the application.

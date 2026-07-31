@@ -6,6 +6,14 @@ import { MessageList } from "@/features/messages/message-list";
 import type { ConversationSummary } from "@/features/messages/types";
 import { flushHookEffects, renderComponent } from "../render-hook";
 
+const mocks = vi.hoisted(() => ({
+  playNotificationSound: vi.fn(() => true)
+}));
+
+vi.mock("@/lib/notification-sounds", () => ({
+  playNotificationSound: mocks.playNotificationSound
+}));
+
 const conversation: ConversationSummary = {
   createdAt: "2026-07-30T12:00:00.000Z",
   direction: "inbound",
@@ -70,6 +78,7 @@ describe("conversation list pagination", () => {
   });
 
   it("refreshes only after a downward pull crosses the release threshold", async () => {
+    mocks.playNotificationSound.mockClear();
     const onRefresh = vi.fn().mockResolvedValue(undefined);
     const rendered = await renderComponent(
       <MessageList
@@ -90,11 +99,85 @@ describe("conversation list pagination", () => {
     await flushHookEffects(() => {
       scrollContainer?.dispatchEvent(touchEvent("touchstart", 20, 100));
       scrollContainer?.dispatchEvent(touchEvent("touchmove", 20, 260));
+      scrollContainer?.dispatchEvent(touchEvent("touchmove", 20, 270));
+    });
+
+    expect(onRefresh).not.toHaveBeenCalled();
+    expect(mocks.playNotificationSound).toHaveBeenCalledOnce();
+    expect(mocks.playNotificationSound).toHaveBeenCalledWith("refresh-pull");
+
+    await flushHookEffects(() => {
       scrollContainer?.dispatchEvent(touchEvent("touchend"));
     });
 
     expect(onRefresh).toHaveBeenCalledOnce();
     expect(rendered.container.textContent).toContain("Updated");
+    expect(mocks.playNotificationSound.mock.calls).toEqual([
+      ["refresh-pull"],
+      ["refresh-complete"]
+    ]);
+    await rendered.unmount();
+  });
+
+  it("retries the pull cue on release when the first mobile gesture unlocks audio", async () => {
+    mocks.playNotificationSound.mockClear();
+    mocks.playNotificationSound.mockReturnValueOnce(false);
+    const rendered = await renderComponent(
+      <MessageList
+        activeFolder="inbox"
+        conversations={[conversation]}
+        hasMore={false}
+        isLoadingMore={false}
+        loadMoreError={null}
+        selectedThreadId={null}
+        onLoadMore={() => undefined}
+        onRefresh={() => undefined}
+        onSelect={() => undefined}
+      />
+    );
+    const scrollContainer = rendered.container.querySelector<HTMLDivElement>(".overscroll-contain");
+
+    await flushHookEffects(() => {
+      scrollContainer?.dispatchEvent(touchEvent("touchstart", 20, 100));
+      scrollContainer?.dispatchEvent(touchEvent("touchmove", 20, 260));
+    });
+    expect(mocks.playNotificationSound.mock.calls).toEqual([["refresh-pull"]]);
+
+    await flushHookEffects(() => scrollContainer?.dispatchEvent(touchEvent("touchend")));
+    expect(mocks.playNotificationSound.mock.calls).toEqual([
+      ["refresh-pull"],
+      ["refresh-pull"],
+      ["refresh-complete"]
+    ]);
+    await rendered.unmount();
+  });
+
+  it("keeps a pull below the refresh threshold silent", async () => {
+    mocks.playNotificationSound.mockClear();
+    const onRefresh = vi.fn();
+    const rendered = await renderComponent(
+      <MessageList
+        activeFolder="inbox"
+        conversations={[conversation]}
+        hasMore={false}
+        isLoadingMore={false}
+        loadMoreError={null}
+        selectedThreadId={null}
+        onLoadMore={() => undefined}
+        onRefresh={onRefresh}
+        onSelect={() => undefined}
+      />
+    );
+    const scrollContainer = rendered.container.querySelector<HTMLDivElement>(".overscroll-contain");
+
+    await flushHookEffects(() => {
+      scrollContainer?.dispatchEvent(touchEvent("touchstart", 20, 100));
+      scrollContainer?.dispatchEvent(touchEvent("touchmove", 20, 180));
+      scrollContainer?.dispatchEvent(touchEvent("touchend"));
+    });
+
+    expect(onRefresh).not.toHaveBeenCalled();
+    expect(mocks.playNotificationSound).not.toHaveBeenCalled();
     await rendered.unmount();
   });
 
