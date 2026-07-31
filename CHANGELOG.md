@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.1.34
+
+- Load conversations in cursor-paged batches with exact filtered totals while preserving already
+  loaded history and list position across background refreshes and reader navigation.
+- Add native-like mail shell controls, including persistent and resizable desktop panels,
+  surface-scoped mobile pull-to-refresh, compact top-tap handling, and a scroll-to-top fallback.
+- Keep mailbox filtering and the read-only or mail-actions MCP connection choice available in
+  compact navigation with device-safe dialog sizing.
+- Play distinct quiet cues when mobile pull-to-refresh reaches its release threshold and when the
+  refresh fetch completes, including a first-gesture iOS audio-unlock fallback.
+
 ## 0.1.33
 
 - Remove the baked black canvas and padding from the official logo on application, authentication,
