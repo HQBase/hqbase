@@ -37,6 +37,7 @@ const SOUND_SOURCES: Record<NotificationSound, string> = {
 let initialized = false;
 let unlockListenersBound = false;
 let player: HTMLAudioElement | null = null;
+let playerReady = false;
 let playbackGeneration = 0;
 
 export function notificationSoundForToastType(
@@ -74,13 +75,26 @@ export function playNotificationSound(sound: NotificationSound): boolean {
     initializeNotificationSounds();
     if (!player || prefersReducedMotion()) return false;
 
-    player.pause();
-    player.src = SOUND_SOURCES[sound];
-    player.currentTime = 0;
-    player.volume = SOUND_VOLUME;
-    playbackGeneration += 1;
-    void player.play().then(unbindUnlockListeners, bindUnlockListeners);
-    return true;
+    const playingPlayer = player;
+    const playbackWasReady = playerReady;
+    const playGeneration = ++playbackGeneration;
+    playingPlayer.pause();
+    playingPlayer.src = SOUND_SOURCES[sound];
+    playingPlayer.currentTime = 0;
+    playingPlayer.volume = SOUND_VOLUME;
+    void playingPlayer.play().then(
+      () => {
+        if (player !== playingPlayer || playbackGeneration !== playGeneration) return;
+        playerReady = true;
+        unbindUnlockListeners();
+      },
+      () => {
+        if (player !== playingPlayer || playbackGeneration !== playGeneration) return;
+        playerReady = false;
+        bindUnlockListeners();
+      }
+    );
+    return playbackWasReady;
   } catch {
     // Audible feedback must never interrupt the underlying action.
     return false;
@@ -115,15 +129,16 @@ function unlockPlayer(): void {
 
     void unlockingPlayer.play().then(
       () => {
-        if (player !== unlockingPlayer) return;
-        if (playbackGeneration === unlockGeneration) {
-          unlockingPlayer.pause();
-          unlockingPlayer.currentTime = 0;
-          unlockingPlayer.volume = SOUND_VOLUME;
-        }
+        if (player !== unlockingPlayer || playbackGeneration !== unlockGeneration) return;
+        playerReady = true;
+        unlockingPlayer.pause();
+        unlockingPlayer.currentTime = 0;
+        unlockingPlayer.volume = SOUND_VOLUME;
         unbindUnlockListeners();
       },
       () => {
+        if (player !== unlockingPlayer || playbackGeneration !== unlockGeneration) return;
+        playerReady = false;
         // Keep listeners attached so the next interaction can retry.
       }
     );
@@ -140,6 +155,7 @@ function resetPlayer(): void {
     // Resetting audio must never interrupt returning to the application.
   }
   player = null;
+  playerReady = false;
   bindUnlockListeners();
 }
 
