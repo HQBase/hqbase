@@ -29,6 +29,7 @@ describe("notification sounds", () => {
 
     initializeNotificationSounds();
     initializeNotificationSounds();
+    expect(playNotificationSound("refresh-pull")).toBe(false);
     expect(audioInstances).toHaveLength(0);
 
     documentTarget.dispatchEvent(new Event("touchend"));
@@ -39,10 +40,14 @@ describe("notification sounds", () => {
     expect(audio.src).toBe("/sounds/unlock.wav");
     expect(audio.play).toHaveBeenCalledOnce();
 
-    playNotificationSound("incoming-email");
+    expect(playNotificationSound("incoming-email")).toBe(true);
     expect(audio.src).toBe("/sounds/incoming-email.wav");
     playNotificationSound("outgoing-email");
     expect(audio.src).toBe("/sounds/outgoing-email.wav");
+    playNotificationSound("refresh-pull");
+    expect(audio.src).toBe("/sounds/toast-information.wav");
+    playNotificationSound("refresh-complete");
+    expect(audio.src).toBe("/sounds/toast-success.wav");
     playNotificationSound("toast-success");
     expect(audio.src).toBe("/sounds/toast-success.wav");
     playNotificationSound("toast-warning");
@@ -54,7 +59,7 @@ describe("notification sounds", () => {
     playNotificationSound("update-ready");
     expect(audio.src).toBe("/sounds/update-ready.wav");
 
-    expect(audio.play).toHaveBeenCalledTimes(8);
+    expect(audio.play).toHaveBeenCalledTimes(10);
     expect(audio.volume).toBe(0.55);
   });
 });

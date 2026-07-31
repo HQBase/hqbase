@@ -105,6 +105,8 @@ describe("mobile application shell", () => {
     expect(pullToRefresh).toContain("event.preventDefault()");
     expect(pullToRefresh).toContain("overscroll-contain");
     expect(pullToRefresh).toContain("Release to refresh");
+    expect(pullToRefresh).toContain('playNotificationSound("refresh-pull")');
+    expect(pullToRefresh).toContain('playNotificationSound("refresh-complete")');
     expect(pullToRefresh).toContain("completionResetDelay = 2000");
     expect(indexHtml).not.toContain("user-scalable=no");
     expect(indexHtml).not.toContain("maximum-scale=1");

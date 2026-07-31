@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { cn } from "@/lib/cn";
 import { scrollMailSurfaceToTop } from "@/lib/mobile-scroll";
+import { playNotificationSound } from "@/lib/notification-sounds";
 
 const refreshThreshold = 64;
 const refreshOffset = 44;
@@ -35,6 +36,8 @@ export function PullToRefresh({
   const onRefreshRef = React.useRef(onRefresh);
   const statusRef = React.useRef<PullStatus>("idle");
   const resetTimerRef = React.useRef<number | null>(null);
+  const thresholdSoundPendingRef = React.useRef(false);
+  const thresholdSoundPlayedRef = React.useRef(false);
   const [distance, setDistance] = React.useState(0);
   const [showScrollToTop, setShowScrollToTop] = React.useState(false);
   const [status, setStatus] = React.useState<PullStatus>("idle");
@@ -76,6 +79,7 @@ export function PullToRefresh({
       await onRefreshRef.current();
       if (!mountedRef.current) return;
       updateStatus("complete");
+      playNotificationSound("refresh-complete");
       reset(completionResetDelay);
     } catch {
       if (!mountedRef.current) return;
@@ -106,6 +110,8 @@ export function PullToRefresh({
       const touch = event.touches[0];
       if (!touch) return;
       cancelReset();
+      thresholdSoundPendingRef.current = false;
+      thresholdSoundPlayedRef.current = false;
       gestureRef.current = {
         startX: touch.clientX,
         startY: touch.clientY,
@@ -135,6 +141,14 @@ export function PullToRefresh({
 
       event.preventDefault();
       const resistedDistance = Math.min(maximumPull, deltaY * 0.46);
+      if (
+        resistedDistance >= refreshThreshold &&
+        distanceRef.current < refreshThreshold &&
+        !thresholdSoundPlayedRef.current
+      ) {
+        thresholdSoundPlayedRef.current = true;
+        thresholdSoundPendingRef.current = !playNotificationSound("refresh-pull");
+      }
       updateDistance(resistedDistance);
       updateStatus("pulling");
     };
@@ -143,9 +157,14 @@ export function PullToRefresh({
       if (!gestureRef.current.tracking) return;
       gestureRef.current.tracking = false;
       if (distanceRef.current >= refreshThreshold && statusRef.current !== "refreshing") {
+        if (thresholdSoundPendingRef.current) {
+          thresholdSoundPendingRef.current = false;
+          playNotificationSound("refresh-pull");
+        }
         void runRefresh();
         return;
       }
+      thresholdSoundPendingRef.current = false;
       reset();
     };
 
