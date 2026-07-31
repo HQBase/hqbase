@@ -1,6 +1,7 @@
 export type UnreadCounts = {
   catchall: number;
   inbox: number;
+  inboxByMailbox: Record<string, number>;
   total: number;
 };
 

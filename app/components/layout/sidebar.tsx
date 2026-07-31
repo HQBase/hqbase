@@ -24,6 +24,7 @@ import {
 import type { CurrentUser } from "@/features/auth/types";
 import type { Mailbox } from "@/features/mailboxes/types";
 import type { UnreadCounts } from "@/features/notifications/types";
+import { inboxUnreadForMailbox, mailboxUnreadLabel } from "@/features/notifications/unread";
 import { ThemeSwitcher } from "@/features/theme/theme-switcher";
 import { cn } from "@/lib/cn";
 import type { FolderId } from "@/lib/routes";
@@ -33,6 +34,7 @@ import { AccountMenu } from "./account-menu";
 type SidebarProps = {
   activeFolder: FolderId;
   draftCount?: number;
+  mailboxId: string;
   mailboxFilter?: {
     mailboxes: Mailbox[];
     value: string;
@@ -61,6 +63,7 @@ const icons: Record<FolderId, LucideIcon> = {
 export function Sidebar({
   activeFolder,
   draftCount = 0,
+  mailboxId,
   mailboxFilter,
   utilityAction,
   unread,
@@ -113,10 +116,12 @@ export function Sidebar({
               </SelectTrigger>
               <SelectContent>
                 <SelectGroup>
-                  <SelectItem value="all">All mailboxes</SelectItem>
+                  <SelectItem value="all">
+                    {mailboxUnreadLabel("All mailboxes", "all", unread)}
+                  </SelectItem>
                   {mailboxFilter.mailboxes.map((mailbox) => (
                     <SelectItem key={mailbox.id} value={mailbox.id}>
-                      {mailbox.address}
+                      {mailboxUnreadLabel(mailbox.address, mailbox.id, unread)}
                     </SelectItem>
                   ))}
                 </SelectGroup>
@@ -129,7 +134,11 @@ export function Sidebar({
         {navigationFolders.map((folder) => {
           const Icon = icons[folder.id];
           const unreadCount =
-            folder.id === "inbox" ? unread.inbox : folder.id === "catchall" ? unread.catchall : 0;
+            folder.id === "inbox"
+              ? inboxUnreadForMailbox(unread, mailboxId)
+              : folder.id === "catchall"
+                ? unread.catchall
+                : 0;
           const count = folder.id === "drafts" ? draftCount : unreadCount;
           return (
             <Button

@@ -22,7 +22,7 @@ vi.mock("@/features/notifications/use-notifications", () => ({
     error: null,
     isBusy: false,
     refresh: mocks.refreshNotifications,
-    unread: { catchall: 0, inbox: 0, total: 0 }
+    unread: { catchall: 0, inbox: 0, inboxByMailbox: {}, total: 0 }
   })
 }));
 vi.mock("@/lib/notification-sounds", () => ({
@@ -35,7 +35,7 @@ vi.mock("sonner", () => ({
 function status(latestInboundMessageId: string) {
   return {
     latestInboundMessageId,
-    unread: { catchall: 0, inbox: 1, total: 1 },
+    unread: { catchall: 0, inbox: 1, inboxByMailbox: { "mailbox-1": 1 }, total: 1 },
     vapidPublicKey: null
   };
 }

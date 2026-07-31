@@ -6,24 +6,33 @@ export async function countUnreadMessages(
   mailboxIds: string[]
 ): Promise<UnreadCounts> {
   if (mailboxIds.length === 0) {
-    return { catchall: 0, inbox: 0, total: 0 };
+    return { catchall: 0, inbox: 0, inboxByMailbox: {}, total: 0 };
   }
 
   const result = await db
     .prepare(
-      `SELECT folder, COUNT(*) AS unread_count
+      `SELECT mailbox_id, folder, COUNT(*) AS unread_count
        FROM messages
        WHERE direction = 'inbound'
          AND read_at IS NULL
          AND folder IN ('inbox', 'catchall')
          AND mailbox_id IN (${mailboxIds.map(() => "?").join(", ")})
-       GROUP BY folder`
+       GROUP BY mailbox_id, folder`
     )
     .bind(...mailboxIds)
-    .all<{ folder: "catchall" | "inbox"; unread_count: number }>();
-  const inbox = result.results.find((row) => row.folder === "inbox")?.unread_count ?? 0;
-  const catchall = result.results.find((row) => row.folder === "catchall")?.unread_count ?? 0;
-  return { catchall, inbox, total: inbox + catchall };
+    .all<{ folder: "catchall" | "inbox"; mailbox_id: string; unread_count: number }>();
+  const inboxByMailbox: Record<string, number> = {};
+  let inbox = 0;
+  let catchall = 0;
+  for (const row of result.results) {
+    if (row.folder === "inbox") {
+      inbox += row.unread_count;
+      inboxByMailbox[row.mailbox_id] = row.unread_count;
+    } else {
+      catchall += row.unread_count;
+    }
+  }
+  return { catchall, inbox, inboxByMailbox, total: inbox + catchall };
 }
 
 export async function latestInboundMessageId(
