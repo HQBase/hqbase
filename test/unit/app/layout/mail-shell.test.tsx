@@ -7,6 +7,7 @@ import { LoginPage } from "@/features/auth/login-page";
 import { ComposeWindow } from "@/features/compose/compose-window";
 import { DraftsPage } from "@/features/drafts/drafts-page";
 import { InboxPage } from "@/features/inbox/inbox-page";
+import type { Mailbox } from "@/features/mailboxes/types";
 import { McpConnectionDetails } from "@/features/mcp/connection-dialog";
 
 const user = {
@@ -17,6 +18,16 @@ const user = {
   role: "owner" as const
 };
 const unread = { catchall: 2, inbox: 7, total: 9 };
+const mailbox: Mailbox = {
+  id: "mailbox-1",
+  address: "support@example.com",
+  addresses: [],
+  displayName: "Support",
+  isActive: true,
+  accessLevel: "manager",
+  createdAt: "2026-07-30T12:00:00.000Z",
+  updatedAt: "2026-07-30T12:00:00.000Z"
+};
 
 describe("mail shell", () => {
   it("uses the full header width and keeps primary mail actions in a right-aligned group", () => {
@@ -136,9 +147,12 @@ describe("mail shell", () => {
       <MobileNavigation
         activeFolder="catchall"
         draftCount={0}
+        mailboxId="all"
+        mailboxes={[]}
         unread={unread}
         user={user}
         onFolderChange={() => undefined}
+        onMailboxChange={() => undefined}
         onSignedOut={() => undefined}
       />
     );
@@ -151,10 +165,15 @@ describe("mail shell", () => {
     expect(html).not.toContain("Catch-all");
   });
 
-  it("gives drawer destinations mobile-sized targets and marks the active page", () => {
+  it("gives the drawer a mailbox filter and mobile-sized destinations", () => {
     const html = renderToStaticMarkup(
       <Sidebar
         activeFolder="inbox"
+        mailboxFilter={{
+          mailboxes: [mailbox],
+          value: "all",
+          onChange: () => undefined
+        }}
         utilityAction={<button type="button">Connect MCP</button>}
         unread={unread}
         user={user}
@@ -166,6 +185,10 @@ describe("mail shell", () => {
 
     expect(html).toContain("flex h-full w-full");
     expect(html).toContain("h-11 text-sm");
+    expect(html).toContain('aria-label="Mailbox filter"');
+    expect(html).toContain('id="drawer-mailbox-filter"');
+    expect(html).toContain('for="drawer-mailbox-filter">Mailbox</label>');
+    expect(html.indexOf(">Mailbox</label>")).toBeLessThan(html.indexOf(">Inbox</span>"));
     expect(html).toContain('aria-current="page"');
     expect(html).toContain("Connect MCP");
     expect(html.indexOf("Connect MCP")).toBeLessThan(html.indexOf("Settings"));

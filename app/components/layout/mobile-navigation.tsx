@@ -4,6 +4,7 @@ import * as React from "react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import type { CurrentUser } from "@/features/auth/types";
+import type { Mailbox } from "@/features/mailboxes/types";
 import { McpConnectionDialog } from "@/features/mcp/connection-dialog";
 import type { UnreadCounts } from "@/features/notifications/types";
 import type { FolderId } from "@/lib/routes";
@@ -12,18 +13,24 @@ import { Sidebar } from "./sidebar";
 type MobileNavigationProps = {
   activeFolder: FolderId;
   draftCount: number;
+  mailboxId: string;
+  mailboxes: Mailbox[];
   user: CurrentUser;
   unread: UnreadCounts;
   onFolderChange: (folder: FolderId) => void;
+  onMailboxChange: (mailboxId: string) => void;
   onSignedOut: () => void;
 };
 
 export function MobileNavigation({
   activeFolder,
   draftCount,
+  mailboxId,
+  mailboxes,
   unread,
   user,
   onFolderChange,
+  onMailboxChange,
   onSignedOut
 }: MobileNavigationProps): React.ReactElement {
   const [open, setOpen] = React.useState(false);
@@ -33,6 +40,11 @@ export function MobileNavigation({
 
   function handleFolderChange(folder: FolderId): void {
     onFolderChange(folder);
+    setOpen(false);
+  }
+
+  function handleMailboxChange(nextMailboxId: string): void {
+    onMailboxChange(nextMailboxId);
     setOpen(false);
   }
 
@@ -67,6 +79,11 @@ export function MobileNavigation({
           <Sidebar
             activeFolder={activeFolder}
             draftCount={draftCount}
+            mailboxFilter={{
+              mailboxes,
+              value: mailboxId,
+              onChange: handleMailboxChange
+            }}
             unread={unread}
             utilityAction={
               <Button

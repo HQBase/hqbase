@@ -12,7 +12,17 @@ import {
 import type * as React from "react";
 
 import { Button } from "@/components/ui/button";
+import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from "@/components/ui/select";
 import type { CurrentUser } from "@/features/auth/types";
+import type { Mailbox } from "@/features/mailboxes/types";
 import type { UnreadCounts } from "@/features/notifications/types";
 import { ThemeSwitcher } from "@/features/theme/theme-switcher";
 import { cn } from "@/lib/cn";
@@ -23,6 +33,11 @@ import { AccountMenu } from "./account-menu";
 type SidebarProps = {
   activeFolder: FolderId;
   draftCount?: number;
+  mailboxFilter?: {
+    mailboxes: Mailbox[];
+    value: string;
+    onChange: (mailboxId: string) => void;
+  };
   utilityAction?: React.ReactNode;
   user: CurrentUser;
   unread: UnreadCounts;
@@ -46,6 +61,7 @@ const icons: Record<FolderId, LucideIcon> = {
 export function Sidebar({
   activeFolder,
   draftCount = 0,
+  mailboxFilter,
   utilityAction,
   unread,
   user,
@@ -78,6 +94,37 @@ export function Sidebar({
         <img alt="" className="h-7 w-auto shrink-0" src="/logo.svg" />
         <span className="text-sm font-medium tracking-tight">HQBase</span>
       </div>
+      {isDrawer && mailboxFilter ? (
+        <FieldGroup className="mb-4 gap-0 px-2">
+          <Field className="gap-1.5">
+            <FieldLabel
+              className="text-xs font-medium text-muted-foreground"
+              htmlFor="drawer-mailbox-filter"
+            >
+              Mailbox
+            </FieldLabel>
+            <Select value={mailboxFilter.value} onValueChange={mailboxFilter.onChange}>
+              <SelectTrigger
+                aria-label="Mailbox filter"
+                className="h-11 bg-muted/70 shadow-none [&>span]:truncate"
+                id="drawer-mailbox-filter"
+              >
+                <SelectValue placeholder="All mailboxes" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectGroup>
+                  <SelectItem value="all">All mailboxes</SelectItem>
+                  {mailboxFilter.mailboxes.map((mailbox) => (
+                    <SelectItem key={mailbox.id} value={mailbox.id}>
+                      {mailbox.address}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+              </SelectContent>
+            </Select>
+          </Field>
+        </FieldGroup>
+      ) : null}
       <nav className="flex flex-1 flex-col gap-0.5">
         {navigationFolders.map((folder) => {
           const Icon = icons[folder.id];

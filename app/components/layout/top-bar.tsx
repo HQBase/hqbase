@@ -78,9 +78,12 @@ export function TopBar({
       <MobileNavigation
         activeFolder={activeFolder}
         draftCount={draftCount}
+        mailboxId={mailboxId}
+        mailboxes={mailboxes}
         unread={unread}
         user={user}
         onFolderChange={onFolderChange}
+        onMailboxChange={onMailboxChange}
         onSignedOut={onSignedOut}
       />
       <div className="relative min-w-0 max-w-xl flex-1">
@@ -94,7 +97,10 @@ export function TopBar({
       </div>
       <div className="ml-auto flex shrink-0 items-center gap-2">
         <Select value={mailboxId} onValueChange={onMailboxChange}>
-          <SelectTrigger className="hidden h-8 w-52 border-transparent bg-muted/70 shadow-none lg:flex">
+          <SelectTrigger
+            aria-label="Mailbox filter"
+            className="hidden h-8 w-52 border-transparent bg-muted/70 shadow-none lg:flex"
+          >
             <SelectValue placeholder="All mailboxes" />
           </SelectTrigger>
           <SelectContent>
