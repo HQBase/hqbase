@@ -21,7 +21,9 @@ export type ToastSoundType =
 
 const SOUND_VOLUME = 0.55;
 const UNLOCK_SOURCE = "/sounds/unlock.wav";
-const UNLOCK_EVENTS = ["touchend", "click", "keydown"] as const;
+// Prime iPhone audio when a touch begins so a pull-to-refresh cue can use the
+// gesture's later touchend without racing a document-level unlock playback.
+const UNLOCK_EVENTS = ["touchstart", "click", "keydown"] as const;
 const SOUND_SOURCES: Record<NotificationSound, string> = {
   "incoming-email": "/sounds/incoming-email.wav",
   "outgoing-email": "/sounds/outgoing-email.wav",
@@ -73,12 +75,14 @@ export function initializeNotificationSounds(): void {
 export function playNotificationSound(sound: NotificationSound): boolean {
   try {
     initializeNotificationSounds();
-    if (!player || prefersReducedMotion()) return false;
+    if (prefersReducedMotion() || typeof Audio === "undefined") return false;
 
+    player ??= new Audio(SOUND_SOURCES[sound]);
     const playingPlayer = player;
     const playbackWasReady = playerReady;
     const playGeneration = ++playbackGeneration;
     playingPlayer.pause();
+    playingPlayer.preload = "auto";
     playingPlayer.src = SOUND_SOURCES[sound];
     playingPlayer.currentTime = 0;
     playingPlayer.volume = SOUND_VOLUME;

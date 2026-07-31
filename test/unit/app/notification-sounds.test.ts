@@ -30,16 +30,24 @@ describe("notification sounds", () => {
 
     initializeNotificationSounds();
     initializeNotificationSounds();
+    audioPlayOutcomes.push("reject");
     expect(playNotificationSound("refresh-pull")).toBe(false);
-    expect(audioInstances).toHaveLength(0);
-
-    documentTarget.dispatchEvent(new Event("touchend"));
     await Promise.resolve();
     expect(audioInstances).toHaveLength(1);
     const audio = audioInstances[0];
-    if (!audio) throw new Error("Expected the interaction to create an audio player.");
-    expect(audio.src).toBe("/sounds/unlock.wav");
+    if (!audio) throw new Error("Expected playback to create an audio player.");
+    expect(audio.src).toBe("/sounds/toast-information.wav");
     expect(audio.play).toHaveBeenCalledOnce();
+
+    documentTarget.dispatchEvent(new Event("touchend"));
+    await Promise.resolve();
+    expect(audio.play).toHaveBeenCalledOnce();
+
+    documentTarget.dispatchEvent(new Event("touchstart"));
+    await Promise.resolve();
+    expect(audioInstances).toHaveLength(1);
+    expect(audio.src).toBe("/sounds/unlock.wav");
+    expect(audio.play).toHaveBeenCalledTimes(2);
 
     expect(playNotificationSound("incoming-email")).toBe(true);
     expect(audio.src).toBe("/sounds/incoming-email.wav");
@@ -60,12 +68,12 @@ describe("notification sounds", () => {
     playNotificationSound("update-ready");
     expect(audio.src).toBe("/sounds/update-ready.wav");
 
-    expect(audio.play).toHaveBeenCalledTimes(10);
+    expect(audio.play).toHaveBeenCalledTimes(11);
     expect(audio.volume).toBe(0.55);
 
     windowTarget.dispatchEvent(new Event("pageshow"));
     audioPlayOutcomes.push("reject");
-    documentTarget.dispatchEvent(new Event("touchend"));
+    documentTarget.dispatchEvent(new Event("touchstart"));
     await Promise.resolve();
 
     const lockedAudio = audioInstances[1];
