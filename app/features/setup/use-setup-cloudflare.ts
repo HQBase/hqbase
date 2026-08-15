@@ -23,6 +23,9 @@ export function useSetupCloudflare(callbacks: {
   const [portalZoneId, setPortalZoneId] = React.useState("");
   const workerName = React.useMemo(() => inferWorkerName(), []);
   const [appSubdomain, setAppSubdomain] = React.useState("hqbase");
+  // Cloudflare Email Sending requires a Workers Paid plan. Operators on the free
+  // plan can still run a receive-only workspace by turning this off.
+  const [enableSending, setEnableSending] = React.useState(true);
   const [domainAttempted, setDomainAttempted] = React.useState(false);
   const [connectionError, setConnectionError] = React.useState<string | null>(null);
   const [results, setResults] = React.useState<ConfiguredDomain[]>([]);
@@ -37,7 +40,8 @@ export function useSetupCloudflare(callbacks: {
     ...selectedZoneIds.slice().sort(),
     portalZoneId,
     appHostname,
-    workerName
+    workerName,
+    String(enableSending)
   ].join(":");
   const domainConnected = Boolean(
     configuredKey === currentConnectionKey &&
@@ -96,7 +100,7 @@ export function useSetupCloudflare(callbacks: {
         const result = await configureCloudflareDomain({
           ...(isPortal ? { appHostname } : {}),
           attachCustomDomain: isPortal,
-          enableSending: true,
+          enableSending,
           workerName: workerName.trim(),
           zoneId: zone.id
         });
@@ -156,6 +160,7 @@ export function useSetupCloudflare(callbacks: {
       appHostname,
       appSubdomain,
       connectionError,
+      enableSending,
       errors: domainErrors,
       isLoading,
       portalZone,
@@ -167,6 +172,7 @@ export function useSetupCloudflare(callbacks: {
       onConnect: () => void handleDomainConnect(),
       onToggleZone: toggleZone,
       setAppSubdomain: (value: string) => update(() => setAppSubdomain(value)),
+      setEnableSending: (value: boolean) => update(() => setEnableSending(value)),
       setPortalZoneId: (value: string) => update(() => setPortalZoneId(value))
     },
     domainConnected,

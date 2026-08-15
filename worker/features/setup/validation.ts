@@ -89,6 +89,7 @@ export const verifyCloudflareAccessSchema = z.object({}).strict();
 export const listCloudflareZonesSchema = z.object({}).strict();
 
 export const inspectCloudflareDomainSchema = z.object({
+  requireSending: z.boolean().optional(),
   workerName: z.string().trim().min(1).max(63).optional(),
   zoneId: z.string().trim().min(1).max(64)
 });

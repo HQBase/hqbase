@@ -27,6 +27,7 @@ export function DomainStep(props: {
   appHostname: string;
   appSubdomain: string;
   connectionError: string | null;
+  enableSending: boolean;
   errors: DomainErrors;
   isLoading: boolean;
   onBack: () => void;
@@ -38,6 +39,7 @@ export function DomainStep(props: {
   selectedZoneIds: string[];
   selectedZones: CloudflareZone[];
   setAppSubdomain: (value: string) => void;
+  setEnableSending: (value: boolean) => void;
   setPortalZoneId: (value: string) => void;
   zones: CloudflareZone[];
 }): React.ReactElement {
@@ -118,6 +120,26 @@ export function DomainStep(props: {
         onChange={props.setAppSubdomain}
         onDomainChange={props.setPortalZoneId}
       />
+
+      <Field>
+        <label
+          className="flex cursor-pointer items-start gap-2.5 rounded-md px-1 py-1 hover:bg-muted/50"
+          htmlFor="enable-sending"
+        >
+          <Checkbox
+            checked={props.enableSending}
+            id="enable-sending"
+            onCheckedChange={(checked) => props.setEnableSending(checked === true)}
+          />
+          <span className="flex min-w-0 flex-col gap-0.5 text-sm">
+            <span className="font-medium">Enable outbound sending</span>
+            <span className="text-xs text-muted-foreground">
+              Cloudflare Email Sending requires a Workers Paid plan. Leave this off to run a
+              receive-only workspace; you can enable sending later from domain settings.
+            </span>
+          </span>
+        </label>
+      </Field>
     </WizardPanel>
   );
 }
@@ -250,7 +272,7 @@ function describeReadinessFailure(status: CloudflareConfigureResult["status"]): 
   if (!status.catchAll.enabled || !status.catchAll.configuredForWorker) {
     issues.push(status.catchAll.error ?? "Catch-all is not routing to this HQBase Worker.");
   }
-  if (!status.sending.enabled) {
+  if (status.sendingRequired && !status.sending.enabled) {
     issues.push(status.sending.error ?? "Email Sending is not enabled.");
   }
   return issues.join(" ") || "Cloudflare has not reported this domain as ready yet.";

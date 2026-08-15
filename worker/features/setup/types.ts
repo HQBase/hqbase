@@ -73,6 +73,7 @@ export type CloudflareDomainStatus = {
   routing: CloudflareRoutingStatus;
   catchAll: CloudflareCatchAllStatus;
   sending: CloudflareSendingStatus;
+  sendingRequired: boolean;
   ready: boolean;
 };
 

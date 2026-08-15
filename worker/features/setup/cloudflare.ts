@@ -18,6 +18,10 @@ type CloudflareInput = { apiToken: string };
 type CloudflareZoneInput = CloudflareInput & {
   zoneId: string;
   workerName?: string | undefined;
+  // Outbound sending needs a Workers Paid plan. A receive-only workspace is a
+  // valid configuration, so readiness must not demand sending when the operator
+  // deliberately skipped it.
+  requireSending?: boolean | undefined;
 };
 
 type CloudflareConfigureInput = CloudflareZoneInput & {
@@ -124,19 +128,21 @@ export async function inspectCloudflareDomain(
     inspectSending(input.apiToken, zone.id)
   ]);
 
+  const sendingRequired = input.requireSending ?? true;
   const ready =
     zone.status === "active" &&
     routing.enabled &&
     routing.dnsReady &&
     catchAll.enabled &&
     catchAll.configuredForWorker &&
-    sending.enabled;
+    (!sendingRequired || sending.enabled);
 
   return {
     catchAll,
     ready,
     routing,
     sending,
+    sendingRequired,
     workerName,
     zone
   };
@@ -229,7 +235,7 @@ export async function configureCloudflareDomain(
     steps.push({
       id: "sending",
       label: "Enable Email Sending",
-      message: "Skipped by setup option.",
+      message: "Skipped. This workspace receives mail but cannot send it.",
       status: "skipped"
     });
   }
@@ -237,6 +243,7 @@ export async function configureCloudflareDomain(
   return {
     status: await inspectCloudflareDomain({
       apiToken: input.apiToken,
+      requireSending: input.enableSending,
       workerName,
       zoneId: zone.id
     }),

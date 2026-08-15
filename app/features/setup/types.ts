@@ -59,6 +59,7 @@ export type CloudflareDomainStatus = {
     subdomains: string[];
     error: string | null;
   };
+  sendingRequired: boolean;
   ready: boolean;
 };
 

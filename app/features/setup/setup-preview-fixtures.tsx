@@ -115,6 +115,7 @@ export function renderPreviewFixture(input: FixtureInput): React.ReactNode {
         connectionError={
           readinessError ? "Cloudflare needs attention on one or more checks below." : null
         }
+        enableSending={true}
         errors={{}}
         isLoading={false}
         onBack={() => undefined}
@@ -130,6 +131,7 @@ export function renderPreviewFixture(input: FixtureInput): React.ReactNode {
         selectedZoneIds={input.selectedZoneIds}
         selectedZones={input.selectedZones}
         setAppSubdomain={input.setAppSubdomain}
+        setEnableSending={() => undefined}
         setPortalZoneId={input.setPortalZoneId}
         zones={zones}
       />
@@ -245,6 +247,7 @@ function readinessFailureFixture(): ConfiguredDomain[] {
             subdomains: [zone.name],
             error: null
           },
+          sendingRequired: true,
           ready: false
         }
       }
