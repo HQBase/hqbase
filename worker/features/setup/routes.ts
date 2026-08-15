@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import type { HonoApp } from "../../lib/env";
 import { readJson } from "../../lib/json";
 import { parseWith } from "../../lib/validation";
+import { enforceRateLimit } from "../../security/rate-limit";
 import {
   clearRuntimeCloudflareGrantCookie,
   finishRuntimeCloudflareOAuth,
@@ -88,6 +89,13 @@ setupRoutes.post("/cloudflare/configure", async (c) => {
 });
 
 setupRoutes.post("/bootstrap", async (c) => {
+  const ip = c.req.header("cf-connecting-ip") ?? "unknown";
+  await enforceRateLimit(c.env.DB, c.env.BETTER_AUTH_SECRET, {
+    scope: "setup.bootstrap.ip",
+    subject: ip,
+    limit: 5,
+    windowSeconds: 15 * 60
+  });
   const input = parseWith(bootstrapSetupSchema, await readJson(c.req.raw));
   const grant = await resolveRuntimeCloudflareGrant(c.req.raw, c.env);
   const result = await bootstrapSetup(c.env, c.req.raw, input);

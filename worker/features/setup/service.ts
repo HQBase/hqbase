@@ -1,4 +1,5 @@
 import { signUpOwnerUser } from "../../auth/user-actions";
+import { nowIso } from "../../db/client";
 import type { WorkerEnv } from "../../lib/env";
 import { AppError } from "../../lib/errors";
 import { assertLoginEmailOutsideDomains } from "../../security/login-email";
@@ -50,64 +51,90 @@ export async function bootstrapSetup(
     throw new AppError("SETUP_OWNER_EXISTS", "An owner user already exists.", 409);
   }
 
-  const domains = input.emailDomains ?? [{ name: input.primaryDomain ?? "" }];
-  if (!domains[0]?.name) throw new AppError("DOMAIN_REQUIRED", "Choose an email domain.", 400);
-  assertLoginEmailOutsideDomains(
-    input.ownerEmail,
-    domains.map((domain) => domain.name)
-  );
-
-  for (const domain of domains) {
-    await upsertMailDomain(env.DB, {
-      ...domain,
-      receivingStatus: "ready",
-      sendingStatus: "ready",
-      dnsStatus: "ready"
-    });
+  // The userCount check above is check-then-act and not atomic by itself: two
+  // concurrent bootstrap calls against a fresh, unauthenticated instance could
+  // both observe userCount === 0 and each create an independent owner. Claim a
+  // singleton lock row first; the PRIMARY KEY constraint makes only one caller
+  // win regardless of concurrency, so the loser is rejected before it can touch
+  // the user table.
+  const lockTimestamp = nowIso();
+  const claim = await env.DB.prepare(
+    `INSERT INTO app_settings (key, value_json, created_at, updated_at)
+     VALUES ('setup_bootstrap_lock', 'true', ?, ?)
+     ON CONFLICT(key) DO NOTHING`
+  )
+    .bind(lockTimestamp, lockTimestamp)
+    .run();
+  if (!claim.meta.changes) {
+    throw new AppError("SETUP_IN_PROGRESS", "Setup is already being completed.", 409);
   }
 
-  const owner = await signUpOwnerUser(env, request, {
-    email: input.ownerEmail,
-    name: input.ownerName,
-    password: input.ownerPassword,
-    role: "owner"
-  });
-
-  await setPrimaryDomain(env.DB, domains[0].name);
-  if (input.portalHostname) {
-    await upsertWorkspaceHost(env.DB, {
-      hostname: input.portalHostname,
-      zoneId:
-        domains.find((domain) => input.portalHostname?.endsWith(`.${domain.name}`))?.zoneId ?? null,
-      kind: "portal",
-      canonical: true
-    });
-  }
-  await setChecklistAcknowledged(env.DB, input.checklistAcknowledged);
-
-  const mailboxes: Mailbox[] = [];
-  for (const mailbox of input.mailboxes) {
-    mailboxes.push(await createMailbox(env.DB, mailbox));
-  }
-  const defaultFromMailbox = mailboxes.find(
-    (mailbox) => mailbox.address === input.defaultFromMailboxAddress
-  );
-  if (!defaultFromMailbox) {
-    throw new AppError(
-      "DEFAULT_FROM_MAILBOX_REQUIRED",
-      "Choose one of the setup mailboxes as the default From mailbox.",
-      400
+  try {
+    const domains = input.emailDomains ?? [{ name: input.primaryDomain ?? "" }];
+    if (!domains[0]?.name) throw new AppError("DOMAIN_REQUIRED", "Choose an email domain.", 400);
+    assertLoginEmailOutsideDomains(
+      input.ownerEmail,
+      domains.map((domain) => domain.name)
     );
+
+    for (const domain of domains) {
+      await upsertMailDomain(env.DB, {
+        ...domain,
+        receivingStatus: "ready",
+        sendingStatus: "ready",
+        dnsStatus: "ready"
+      });
+    }
+
+    const owner = await signUpOwnerUser(env, request, {
+      email: input.ownerEmail,
+      name: input.ownerName,
+      password: input.ownerPassword,
+      role: "owner"
+    });
+
+    await setPrimaryDomain(env.DB, domains[0].name);
+    if (input.portalHostname) {
+      await upsertWorkspaceHost(env.DB, {
+        hostname: input.portalHostname,
+        zoneId:
+          domains.find((domain) => input.portalHostname?.endsWith(`.${domain.name}`))?.zoneId ??
+          null,
+        kind: "portal",
+        canonical: true
+      });
+    }
+    await setChecklistAcknowledged(env.DB, input.checklistAcknowledged);
+
+    const mailboxes: Mailbox[] = [];
+    for (const mailbox of input.mailboxes) {
+      mailboxes.push(await createMailbox(env.DB, mailbox));
+    }
+    const defaultFromMailbox = mailboxes.find(
+      (mailbox) => mailbox.address === input.defaultFromMailboxAddress
+    );
+    if (!defaultFromMailbox) {
+      throw new AppError(
+        "DEFAULT_FROM_MAILBOX_REQUIRED",
+        "Choose one of the setup mailboxes as the default From mailbox.",
+        400
+      );
+    }
+    await setDefaultFromMailboxId(env.DB, owner.id, defaultFromMailbox.id);
+
+    await completeSetupIfReady(env.DB);
+
+    return {
+      owner,
+      mailboxes,
+      setup: await getSetupStatus(env.DB)
+    };
+  } finally {
+    // userCount > 0 guards re-entry permanently once an owner exists; the lock
+    // only needs to live for the duration of one bootstrap attempt so a failed
+    // attempt (validation error, etc.) can be retried.
+    await env.DB.prepare(`DELETE FROM app_settings WHERE key = 'setup_bootstrap_lock'`).run();
   }
-  await setDefaultFromMailboxId(env.DB, owner.id, defaultFromMailbox.id);
-
-  await completeSetupIfReady(env.DB);
-
-  return {
-    owner,
-    mailboxes,
-    setup: await getSetupStatus(env.DB)
-  };
 }
 
 export async function completeSetupIfReady(db: D1Database): Promise<SetupStatus> {
