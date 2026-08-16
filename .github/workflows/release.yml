@@ -333,6 +333,20 @@ jobs:
               throw new Error("Published artifact does not match the signed manifest.");
             }
           '
+      - name: Post complete release notes to Discord
+        id: discord_release
+        continue-on-error: true
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_RELEASE_WEBHOOK_URL }}
+        run: |
+          notes_file="$RUNNER_TEMP/hqbase-release-notes.md"
+          gh release view "v${HQBASE_RELEASE_VERSION}" --json body --jq .body > "$notes_file"
+          node scripts/release/notify-discord.mjs "$notes_file"
+      - name: Report a Discord delivery failure
+        if: steps.discord_release.outcome == 'failure'
+        run: >-
+          echo "::warning title=Discord release notification failed::The signed release is valid,
+          but its Discord message was not delivered."
 
   cleanup-failed-draft:
     needs: [candidate, staging]
