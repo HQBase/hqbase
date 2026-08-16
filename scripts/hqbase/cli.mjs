@@ -5,6 +5,7 @@ import { backup } from "./backup.mjs";
 import { updateDeployButton } from "./button.mjs";
 import { destroy } from "./destroy.mjs";
 import { doctor } from "./doctor.mjs";
+import { configureDomain } from "./domain.mjs";
 import { install } from "./install.mjs";
 import { configureOAuth } from "./oauth.mjs";
 import { printPostDeploy } from "./postdeploy.mjs";
@@ -29,6 +30,9 @@ try {
       break;
     case "oauth":
       configureOAuth(flags);
+      break;
+    case "domain":
+      configureDomain(flags);
       break;
     case "backup":
       backup(flags);
@@ -64,6 +68,7 @@ Usage:
   pnpm hqbase button --repo-url https://github.com/OWNER/REPO
   pnpm hqbase install --name dev-01 [--domain example.com]
   pnpm hqbase oauth --name dev-01 --mode official|customer
+  pnpm hqbase domain --name dev-01 --app-domain app.example.com|--detach
   pnpm hqbase doctor --name dev-01
   pnpm hqbase backup --name dev-01 [--output backup.json]
   pnpm hqbase restore --name dev-01 --backup backup.json --yes
@@ -94,6 +99,13 @@ OAuth options:
   --client-id <id>       Customer OAuth client ID. Required for customer mode.
   --auth-url <origin>    Exact canonical HTTPS HQBase origin. Required for customer mode.
   --skip-deploy          Validate and write local deployment configuration without deploying.
+  --dry-run              Validate without writing or deploying.
+
+Domain options (moves the Worker; D1, R2, and queues are untouched):
+  --app-domain <host>    Attach this custom Worker domain instead of the current one.
+  --detach               Remove the custom domain and serve from workers.dev.
+  --auth-url <origin>    Set BETTER_AUTH_URL explicitly. Defaults to https://<app-domain> when one was set before.
+  --skip-deploy          Write local deployment configuration without deploying.
   --dry-run              Validate without writing or deploying.
 `);
 }
