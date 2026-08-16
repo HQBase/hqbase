@@ -8,13 +8,20 @@ export async function isPasswordSetupRequired(db: D1Database, userId: string): P
 
 export async function completePasswordSetup(db: D1Database, userId: string): Promise<boolean> {
   const timestamp = new Date().toISOString();
-  const result = await db
-    .prepare(
-      `UPDATE user_onboarding
+  const results = await db.batch([
+    db
+      .prepare(
+        `UPDATE user_onboarding
        SET status = 'complete', completed_at = ?, updated_at = ?
        WHERE user_id = ? AND status = 'pending'`
-    )
-    .bind(timestamp, timestamp, userId)
-    .run();
-  return (result.meta.changes ?? 0) > 0;
+      )
+      .bind(timestamp, timestamp, userId),
+    db
+      .prepare(
+        `DELETE FROM verification
+       WHERE value = ? AND identifier LIKE 'reset-password:%'`
+      )
+      .bind(userId)
+  ]);
+  return (results[0]?.meta.changes ?? 0) > 0;
 }

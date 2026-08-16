@@ -12,6 +12,7 @@ import userMailPreferencesMigration from "../../../migrations/0007_user_mail_pre
 import userOnboardingMigration from "../../../migrations/0008_user_onboarding.sql?raw";
 import loginEmailDomainMigration from "../../../migrations/0009_login_email_domain_isolation.sql?raw";
 import deviceAuthorizationMigration from "../../../migrations/0010_oauth_device_authorization.sql?raw";
+import latestPasswordResetTokenMigration from "../../../migrations/0011_latest_password_reset_token.sql?raw";
 import resetSql from "../../../scripts/hqbase/reset-d1.sql?raw";
 import { buildSeedSql } from "../../../scripts/local-seed-fixture.mjs";
 import { migrationStatements } from "./migration-statements";
@@ -27,7 +28,8 @@ const migrations = [
   userMailPreferencesMigration,
   userOnboardingMigration,
   loginEmailDomainMigration,
-  deviceAuthorizationMigration
+  deviceAuthorizationMigration,
+  latestPasswordResetTokenMigration
 ];
 
 describe("local database reset", () => {
@@ -59,6 +61,12 @@ describe("local database reset", () => {
          )`
     ).first<{ count: number }>();
     expect(oauthTables?.count).toBe(5);
+
+    const resetTokenTrigger = await env.DB.prepare(
+      `SELECT name FROM sqlite_master
+       WHERE type = 'trigger' AND name = 'verification_latest_password_reset_token'`
+    ).first<{ name: string }>();
+    expect(resetTokenTrigger?.name).toBe("verification_latest_password_reset_token");
   });
 });
 

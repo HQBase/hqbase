@@ -47,10 +47,39 @@ describe("user onboarding email", () => {
     ).rejects.toThrow("Connect an active sending mailbox");
     expect(send).not.toHaveBeenCalled();
   });
+
+  it("sends established users password-reset copy without changing onboarding state", async () => {
+    const send = vi.fn().mockResolvedValue({ messageId: "<reset@example.com>" });
+    const run = vi.fn();
+    const db = database({
+      onboarding: { method: "temporary_password", status: "complete" },
+      sender: { address: "support@example.com" },
+      run
+    });
+
+    await sendPasswordSetupEmail(environment(db, send), {
+      user: { id: "user-2", email: "person@gmail.com", name: "Avery" },
+      url: "https://mail.example.com/api/auth/reset-password/token?callbackURL=recovery"
+    });
+
+    expect(send).toHaveBeenCalledWith(
+      expect.objectContaining({
+        subject: "Reset your HQBase password",
+        to: "person@gmail.com"
+      })
+    );
+    const message = send.mock.calls[0]?.[0] as { html: string; text: string };
+    expect(message.text).toContain("A password reset was requested");
+    expect(message.text).toContain("Reset password:");
+    expect(run).not.toHaveBeenCalled();
+  });
 });
 
 function database(input: {
-  onboarding: { method: "email_invite"; status: "pending" };
+  onboarding: {
+    method: "email_invite" | "temporary_password";
+    status: "complete" | "pending";
+  };
   sender: { address: string } | null;
   run: ReturnType<typeof vi.fn>;
 }): D1Database {

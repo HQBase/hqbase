@@ -2,7 +2,9 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
 import {
+  ForgotPasswordPage,
   InvitationPasswordSetupPage,
+  PasswordResetPage,
   TemporaryPasswordSetupPage
 } from "@/features/auth/password-setup-page";
 
@@ -26,6 +28,36 @@ describe("password setup presentation", () => {
 
     expect(html).toContain("Invitation link unavailable");
     expect(html).toContain("resend the invitation");
+    expect(html).not.toContain('type="password"');
+  });
+
+  it("asks for a Login email without revealing whether an account exists", () => {
+    const html = renderToStaticMarkup(<ForgotPasswordPage returnTo="/" />);
+
+    expect(html).toContain("Forgot your password?");
+    expect(html).toContain("Login email");
+    expect(html).toContain("if the account exists");
+    expect(html).toContain("Send reset link");
+  });
+
+  it("uses recovery-specific copy for a valid reset token", () => {
+    const html = renderToStaticMarkup(
+      <PasswordResetPage error={null} returnTo="/device?user_code=ABCD-EFGH" token="reset-token" />
+    );
+
+    expect(html).toContain("Reset your password");
+    expect(html).toContain("Reset password");
+    expect(html).toContain('maxLength="128"');
+    expect(html).not.toContain("Invitation accepted");
+  });
+
+  it("offers a new request for an invalid reset link", () => {
+    const html = renderToStaticMarkup(
+      <PasswordResetPage error="INVALID_TOKEN" returnTo="/" token={null} />
+    );
+
+    expect(html).toContain("Reset link unavailable");
+    expect(html).toContain("Request a new link");
     expect(html).not.toContain('type="password"');
   });
 

@@ -33,7 +33,7 @@ export type AppRoute =
   | { kind: "drafts"; draftId: string | null }
   | { kind: "settings"; tab: SettingsTabId };
 
-const publicAuthenticationPaths = new Set(["/set-password"]);
+const publicAuthenticationPaths = new Set(["/forgot-password", "/reset-password", "/set-password"]);
 
 export function isPublicAuthenticationPath(pathname: string): boolean {
   return publicAuthenticationPaths.has(pathname);

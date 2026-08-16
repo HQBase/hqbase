@@ -147,6 +147,8 @@ describe("mail shell", () => {
     const html = renderToStaticMarkup(<LoginPage onLogin={() => undefined} />);
 
     expect(html).toContain('src="/logo.svg"');
+    expect(html).toContain('href="/forgot-password"');
+    expect(html).toContain("Forgot password?");
     expect(html).not.toContain(">HQ</span>");
   });
 

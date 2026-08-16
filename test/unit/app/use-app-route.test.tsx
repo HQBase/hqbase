@@ -9,14 +9,16 @@ describe("application route normalization", () => {
     window.history.replaceState(null, "", "/");
   });
 
-  it("preserves the invitation password route and its setup token", async () => {
-    window.history.replaceState(null, "", "/set-password?token=setup-token");
+  it.each([
+    "/forgot-password?returnTo=%2Fdevice%3Fuser_code%3DABCD-EFGH",
+    "/reset-password?token=reset-token&returnTo=%2Fdevice%3Fuser_code%3DABCD-EFGH",
+    "/set-password?token=setup-token"
+  ])("preserves the public authentication route %s", async (path) => {
+    window.history.replaceState(null, "", path);
 
     const hook = await renderHook(() => useAppRoute(undefined), undefined);
 
-    expect(`${window.location.pathname}${window.location.search}`).toBe(
-      "/set-password?token=setup-token"
-    );
+    expect(`${window.location.pathname}${window.location.search}`).toBe(path);
     await hook.unmount();
   });
 
