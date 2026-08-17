@@ -1,6 +1,6 @@
 {
   "name": "hqbase",
-  "version": "1.1.1",
+  "version": "1.1.2",
   "private": true,
   "license": "AGPL-3.0-only",
   "type": "module",
@@ -87,7 +87,7 @@
     "better-auth": "1.7.0-rc.6",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
-    "hono": "^4.8.5",
+    "hono": "^4.13.2",
     "lucide-react": "^0.525.0",
     "postal-mime": "^2.5.2",
     "react": "^19.1.0",

@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { signIn } from "./api";
+import { authenticationPath, safeAuthenticationReturnPath } from "./password-recovery";
 
 type LoginPageProps = {
   onLogin: () => void;
@@ -13,6 +14,17 @@ export function LoginPage({ onLogin }: LoginPageProps): React.ReactElement {
   const [email, setEmail] = React.useState("");
   const [password, setPassword] = React.useState("");
   const [isPending, setIsPending] = React.useState(false);
+  const currentPath =
+    typeof window === "undefined"
+      ? "/"
+      : `${window.location.pathname}${window.location.search}${window.location.hash}`;
+  const forgotPasswordPath = authenticationPath(
+    "/forgot-password",
+    safeAuthenticationReturnPath(
+      currentPath,
+      typeof window === "undefined" ? undefined : window.location.origin
+    )
+  );
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -60,11 +72,16 @@ export function LoginPage({ onLogin }: LoginPageProps): React.ReactElement {
                   value={email}
                 />
               </label>
-              <label
-                className="flex flex-col gap-2 text-xs text-muted-foreground"
-                htmlFor="login-password"
-              >
-                Password
+              <div className="flex flex-col gap-2 text-xs text-muted-foreground">
+                <div className="flex items-center justify-between gap-4">
+                  <label htmlFor="login-password">Password</label>
+                  <a
+                    className="text-foreground underline-offset-4 hover:underline"
+                    href={forgotPasswordPath}
+                  >
+                    Forgot password?
+                  </a>
+                </div>
                 <Input
                   autoComplete="current-password"
                   className="h-10 bg-background shadow-none focus-visible:ring-1"
@@ -74,7 +91,7 @@ export function LoginPage({ onLogin }: LoginPageProps): React.ReactElement {
                   type="password"
                   value={password}
                 />
-              </label>
+              </div>
               <Button className="mt-1 h-10" disabled={isPending} type="submit">
                 {isPending ? "Signing in" : "Continue"}
               </Button>

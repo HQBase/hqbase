@@ -74,6 +74,12 @@ describe("HQBase installation resources", () => {
     expect(generated).toEqual(repository);
   });
 
+  it("keeps preview_urls identical to the repository Wrangler configuration", () => {
+    const config = createWranglerConfig(createManifest("qa", {}));
+
+    expect(config.preview_urls).toBe(repositoryWranglerConfig.preview_urls);
+  });
+
   it("fails closed on incomplete customer-managed OAuth configuration", () => {
     expect(() =>
       cloudflareOAuthConfig({

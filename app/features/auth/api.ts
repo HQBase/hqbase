@@ -46,6 +46,20 @@ export async function signOut(): Promise<void> {
   });
 }
 
+export async function requestPasswordReset(email: string, redirectTo: string): Promise<void> {
+  const response = await fetch("/api/auth/request-password-reset", {
+    body: JSON.stringify({ email: email.trim(), redirectTo }),
+    headers: { "content-type": "application/json" },
+    method: "POST"
+  });
+  if (response.status === 429) {
+    throw new Error("Too many password reset requests. Wait before trying again.");
+  }
+  if (!response.ok) {
+    throw new Error("The password reset request could not be submitted.");
+  }
+}
+
 export async function completeTemporaryPasswordSetup(input: {
   currentPassword: string;
   newPassword: string;
@@ -63,8 +77,8 @@ export async function resetPassword(token: string, newPassword: string): Promise
   if (!response.ok) {
     throw new Error(
       response.status === 400
-        ? "This password setup link is invalid or expired."
-        : "Password setup failed."
+        ? "This password link is invalid or expired."
+        : "Password update failed."
     );
   }
 }

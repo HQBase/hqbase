@@ -9,8 +9,13 @@ import { hashOAuthToken } from "./oauth-token";
 import { completePasswordSetup } from "./password-setup";
 
 const passwordSetupTokenLifetimeSeconds = 7 * 24 * 60 * 60;
+type BackgroundTaskHandler = (promise: Promise<unknown>) => void;
 
-export function createAuth(env: WorkerEnv, request: Request) {
+export function createAuth(
+  env: WorkerEnv,
+  request: Request,
+  backgroundTaskHandler?: BackgroundTaskHandler
+) {
   const baseURL = authOrigin(env, request);
 
   return betterAuth({
@@ -20,6 +25,9 @@ export function createAuth(env: WorkerEnv, request: Request) {
     database: env.DB,
     disabledPaths: ["/token"],
     secret: env.BETTER_AUTH_SECRET,
+    ...(backgroundTaskHandler
+      ? { advanced: { backgroundTasks: { handler: backgroundTaskHandler } } }
+      : {}),
     account: {
       fields: {
         accountId: "providerAccountId"
@@ -36,18 +44,17 @@ export function createAuth(env: WorkerEnv, request: Request) {
         await sendPasswordSetupEmail(env, { user, url });
       },
       onPasswordReset: async ({ user }) => {
-        if (await completePasswordSetup(env.DB, user.id)) {
-          await recordAudit(env.DB, {
-            correlationId: crypto.randomUUID(),
-            actorType: "user",
-            actorId: user.id,
-            action: "user.password.setup",
-            resourceType: "user",
-            resourceId: user.id,
-            outcome: "success",
-            metadata: {}
-          });
-        }
+        const completedSetup = await completePasswordSetup(env.DB, user.id);
+        await recordAudit(env.DB, {
+          correlationId: crypto.randomUUID(),
+          actorType: "user",
+          actorId: user.id,
+          action: completedSetup ? "user.password.setup" : "user.password.reset",
+          resourceType: "user",
+          resourceId: user.id,
+          outcome: "success",
+          metadata: {}
+        });
       }
     },
     plugins: [

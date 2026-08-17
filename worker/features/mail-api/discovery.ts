@@ -111,6 +111,8 @@ External agents must use an OAuth bearer token. Do not copy or reuse an HQBase b
 
 Prefer Device Authorization for agents, command-line tools, and other clients that cannot safely receive a browser callback. A callback-capable client may instead register \`authorization_code\` and use Authorization Code with PKCE and the S256 challenge method. Both flows require the same resource, scopes, sign-in, and explicit approval.
 
+Native desktop and mobile clients that use Authorization Code with PKCE must register with \`application_type\` set to \`native\`. HQBase accepts the native redirect forms defined by RFC 8252: app-claimed HTTPS, loopback HTTP, and private-use schemes. A private-use redirect must use a reverse-domain scheme with no authority component, for example \`com.example.mail:/oauth/callback\`.
+
 Use this exact OAuth resource and token audience: \`${apiBase}\`. MCP uses separate audiences at \`${origin}/mcp\` and \`${origin}/mcp/full\`; an MCP token cannot be used with the Mail API.
 
 ## Permissions

@@ -4,8 +4,11 @@ import { AppShell } from "@/components/layout/app-shell";
 import { Toaster } from "@/components/ui/sonner";
 import { getCurrentUser } from "@/features/auth/api";
 import { LoginPage } from "@/features/auth/login-page";
+import { safeAuthenticationReturnPath } from "@/features/auth/password-recovery";
 import {
+  ForgotPasswordPage,
   InvitationPasswordSetupPage,
+  PasswordResetPage,
   TemporaryPasswordSetupPage
 } from "@/features/auth/password-setup-page";
 import type { CurrentUser } from "@/features/auth/types";
@@ -40,7 +43,7 @@ const DraftComposeDialog = React.lazy(() =>
 );
 
 export function App(): React.ReactElement {
-  const invitationSetup = isPublicAuthenticationPath(window.location.pathname);
+  const publicAuthenticationPath = isPublicAuthenticationPath(window.location.pathname);
   const [setup, setSetup] = React.useState<SetupStatus | null>(null);
   const [user, setUser] = React.useState<CurrentUser | null>(null);
   const [mailboxes, setMailboxes] = React.useState<Mailbox[]>([]);
@@ -109,9 +112,9 @@ export function App(): React.ReactElement {
   }, [loadWorkspace]);
 
   React.useEffect(() => {
-    if (invitationSetup) return;
+    if (publicAuthenticationPath) return;
     void reload();
-  }, [invitationSetup, reload]);
+  }, [publicAuthenticationPath, reload]);
 
   React.useEffect(() => {
     if (!user || isLoading || route.kind !== "settings") return;
@@ -122,11 +125,24 @@ export function App(): React.ReactElement {
     }
   }, [isLoading, navigate, route, user]);
 
-  if (invitationSetup) {
+  if (publicAuthenticationPath) {
     const params = new URLSearchParams(window.location.search);
+    const returnTo = safeAuthenticationReturnPath(params.get("returnTo"), window.location.origin);
+    const page =
+      window.location.pathname === "/forgot-password" ? (
+        <ForgotPasswordPage returnTo={returnTo} />
+      ) : window.location.pathname === "/reset-password" ? (
+        <PasswordResetPage
+          error={params.get("error")}
+          returnTo={returnTo}
+          token={params.get("token")}
+        />
+      ) : (
+        <InvitationPasswordSetupPage error={params.get("error")} token={params.get("token")} />
+      );
     return (
       <>
-        <InvitationPasswordSetupPage error={params.get("error")} token={params.get("token")} />
+        {page}
         <Toaster />
       </>
     );

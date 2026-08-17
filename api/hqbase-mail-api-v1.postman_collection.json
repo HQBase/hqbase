@@ -395,7 +395,7 @@
                 }
               ]
             },
-            "description": "Update conversation state",
+            "description": "Applies the action to the accessible part of the conversation identified by the message {id}.",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"folder\": \"inbox\"\n}",

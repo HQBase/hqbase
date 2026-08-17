@@ -237,6 +237,9 @@ describe("HQBase Mail API v1", () => {
     );
     expect(instructions).toContain("The person must open it themselves in a browser they control");
     expect(instructions).toContain("Sending and replying are not idempotent");
+    expect(instructions).toContain("`application_type` set to `native`");
+    expect(instructions).toContain("RFC 8252");
+    expect(instructions).toContain("app-claimed HTTPS, loopback HTTP, and private-use schemes");
     for (const [path, pathItem] of Object.entries(mailApiOpenApi.paths)) {
       for (const method of ["get", "post", "patch", "delete"] as const) {
         if (method in pathItem) {

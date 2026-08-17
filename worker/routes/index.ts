@@ -140,7 +140,8 @@ apiRoutes.all("/api/auth/*", async (c) => {
     ]);
   }
 
-  const handleAuthRequest = () => createAuth(c.env, c.req.raw).handler(c.req.raw);
+  const handleAuthRequest = () =>
+    createAuth(c.env, c.req.raw, (promise) => c.executionCtx.waitUntil(promise)).handler(c.req.raw);
   if (pathname === "/api/auth/oauth2/token" && c.req.method === "POST") {
     return handleDeviceTokenRequest(c.env, c.req.raw, handleAuthRequest);
   }

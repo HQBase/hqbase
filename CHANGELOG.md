@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.1.2
+
+- Add secure self-service password recovery from the sign-in page. Recovery links expire after
+  seven days, work once, invalidate older unused password links, and revoke existing sessions after
+  a successful reset.
+- Keep generated customer deployments on their configured hostname by disabling preview URLs.
+- Post complete release notes to the configured Discord webhook only after the signed release and
+  public archive pass verification. Discord delivery failures do not invalidate a release.
+- Improve the repository README so installation, documentation, community, contribution, security,
+  and local-development paths are easier to find.
+
 ## 1.1.1
 
 - Publish the deployment-local Mail API instructions as a valid Agent Skill at
