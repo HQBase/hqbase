@@ -90,6 +90,7 @@ export function TopBar({
       <div className="relative min-w-0 max-w-xl flex-1">
         <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
         <Input
+          aria-label="Search mail"
           className="h-8 border-transparent bg-muted/70 pl-8 shadow-none focus-visible:border-input focus-visible:ring-1"
           placeholder="Search mail"
           value={search}
