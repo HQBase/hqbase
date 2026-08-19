@@ -12,6 +12,7 @@ import {
 import {
   assertSourceDeployConfig,
   compareVersions,
+  deployConfiguration,
   deploySource,
   executeSql,
   hqbaseReleaseTag,
@@ -46,6 +47,31 @@ describe("HQBase release deployment", () => {
     expect(() => verifyManifest({ ...envelope, signature: invalidSignature }, encoded)).toThrow(
       "signature"
     );
+  });
+  it("verifies that a configuration deployment produced a new active version", () => {
+    const commands = [];
+    const versions = [
+      { versionId: "version-1", version: "1.2.3", tag: "hqbase:1.2.3" },
+      { versionId: "version-2", version: "1.2.3", tag: "hqbase:1.2.3" }
+    ];
+    const inspect = () => versions.shift() ?? versions[0];
+
+    expect(
+      deployConfiguration("/source", "hqbase-qa", "hqbase:1.2.3", {
+        inspect,
+        run: (command, args) => commands.push([command, ...args].join(" "))
+      })
+    ).toMatchObject({ versionId: "version-2" });
+    expect(commands[0]).toContain("wrangler deploy --keep-vars");
+    expect(commands[0]).toContain("--tag hqbase:1.2.3");
+
+    const unchanged = { versionId: "version-1", version: "1.2.3", tag: "hqbase:1.2.3" };
+    expect(() =>
+      deployConfiguration("/source", "hqbase-qa", "hqbase:1.2.3", {
+        inspect: () => unchanged,
+        run: () => {}
+      })
+    ).toThrowError(/new active version/);
   });
   it("selects only newer semantic releases", () => {
     expect(compareVersions("0.2.0", "0.1.9")).toBeGreaterThan(0);

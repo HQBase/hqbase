@@ -94,7 +94,11 @@ export function createWranglerConfig(manifest) {
       : {}),
     ...(manifest.authUrl ? { BETTER_AUTH_URL: manifest.authUrl } : {})
   };
-  const customDomains = [manifest.appDomain].filter(Boolean);
+  // Retired hostnames stay attached so automation, mail discovery, and the 308 portal redirect
+  // keep answering on them until the operator removes them explicitly.
+  const customDomains = [
+    ...new Set([manifest.appDomain, ...(manifest.retiredDomains ?? [])].filter(Boolean))
+  ];
   if (customDomains.length > 0) {
     config.routes = customDomains.map((pattern) => ({ pattern, custom_domain: true }));
   }
