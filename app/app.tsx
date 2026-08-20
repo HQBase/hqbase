@@ -233,6 +233,7 @@ export function App(): React.ReactElement {
                 defaultFromMailboxId={user.defaultFromMailboxId}
                 mailboxes={mailboxes}
                 notifications={mailSync.notifications}
+                userRole={user.role}
                 setup={setup}
                 users={users}
                 onDefaultFromMailboxChange={(defaultFromMailboxId) => {

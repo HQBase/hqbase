@@ -6,6 +6,7 @@ import type { Mailbox } from "@/features/mailboxes/types";
 import { McpSettings } from "@/features/mcp/mcp-settings";
 import { NotificationSettings } from "@/features/notifications/notification-settings";
 import type { NotificationController } from "@/features/notifications/types";
+import { PersonalAccessTokenSettings } from "@/features/personal-access-tokens/personal-access-token-settings";
 import { DebugSettings } from "@/features/settings/debug-settings";
 import { InterfaceSettings } from "@/features/settings/interface-settings";
 import { SettingsSection } from "@/features/settings/settings-section";
@@ -13,7 +14,7 @@ import type { SetupStatus } from "@/features/setup/types";
 import type { UpdateStatus } from "@/features/updates/types";
 import type { UpdateProgress } from "@/features/updates/update-progress";
 import { UpdateSettings } from "@/features/updates/update-settings";
-import type { WorkspaceUser } from "@/features/users/types";
+import type { WorkspaceRole, WorkspaceUser } from "@/features/users/types";
 import { UserSettings } from "@/features/users/user-settings";
 import type { SettingsTabId } from "@/lib/routes";
 
@@ -24,6 +25,7 @@ type SettingsPageProps = {
   defaultFromMailboxId: string | null;
   mailboxes: Mailbox[];
   notifications: NotificationController;
+  userRole: WorkspaceRole;
   setup: SetupStatus;
   users: WorkspaceUser[];
   onDefaultFromMailboxChange: (mailboxId: string) => void;
@@ -41,6 +43,7 @@ export function SettingsPage({
   defaultFromMailboxId,
   mailboxes,
   notifications,
+  userRole,
   setup,
   users,
   onDefaultFromMailboxChange,
@@ -81,6 +84,7 @@ export function SettingsPage({
           <NotificationSettings notifications={notifications} />
         ) : null}
         {activeTab === "interface" ? <InterfaceSettings /> : null}
+        {activeTab === "api" ? <PersonalAccessTokenSettings userRole={userRole} /> : null}
         {activeTab === "mcp" ? <McpSettings user={currentUser} /> : null}
         {activeTab === "updates" && canManage ? (
           <UpdateSettings
