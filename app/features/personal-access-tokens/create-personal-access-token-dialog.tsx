@@ -20,11 +20,15 @@ import { defaultPersonalAccessTokenExpiry, personalAccessTokenExpiryToIso } from
 import type { CreatePersonalAccessTokenResponse } from "./types";
 
 export function CreatePersonalAccessTokenDialog({
+  getCreateResultGeneration,
+  isCreateResultGenerationCurrent,
   open,
   onAmbiguous,
   onCreated,
   onOpenChange
 }: {
+  getCreateResultGeneration: () => number;
+  isCreateResultGenerationCurrent: (generation: number) => boolean;
   open: boolean;
   onAmbiguous: (error: AmbiguousPersonalAccessTokenCreateError) => void | Promise<void>;
   onCreated: (result: CreatePersonalAccessTokenResponse) => void | Promise<void>;
@@ -40,6 +44,8 @@ export function CreatePersonalAccessTokenDialog({
           ready={
             <CreatePersonalAccessTokenForm
               active={open}
+              getCreateResultGeneration={getCreateResultGeneration}
+              isCreateResultGenerationCurrent={isCreateResultGenerationCurrent}
               onAmbiguous={onAmbiguous}
               onCreated={onCreated}
               onOpenChange={onOpenChange}
@@ -53,11 +59,15 @@ export function CreatePersonalAccessTokenDialog({
 
 function CreatePersonalAccessTokenForm({
   active,
+  getCreateResultGeneration,
+  isCreateResultGenerationCurrent,
   onAmbiguous,
   onCreated,
   onOpenChange
 }: {
   active: boolean;
+  getCreateResultGeneration: () => number;
+  isCreateResultGenerationCurrent: (generation: number) => boolean;
   onAmbiguous: (error: AmbiguousPersonalAccessTokenCreateError) => void | Promise<void>;
   onCreated: (result: CreatePersonalAccessTokenResponse) => void | Promise<void>;
   onOpenChange: (open: boolean) => void;
@@ -89,8 +99,14 @@ function CreatePersonalAccessTokenForm({
     }
     setPending(true);
     setError(null);
+    const resultGeneration = getCreateResultGeneration();
     try {
       const result = await createPersonalAccessToken({ name: trimmedName, expiresAt: expiry });
+      if (!isCreateResultGenerationCurrent(resultGeneration)) {
+        onOpenChange(false);
+        await onAmbiguous(new AmbiguousPersonalAccessTokenCreateError());
+        return;
+      }
       onOpenChange(false);
       await onCreated(result);
     } catch (nextError) {

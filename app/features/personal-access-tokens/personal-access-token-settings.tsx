@@ -38,6 +38,8 @@ export function PersonalAccessTokenSettings({
   const [oneTimeToken, setOneTimeToken] = React.useState<string | null>(null);
   const [oneTimeOpen, setOneTimeOpen] = React.useState(false);
   const copyReference = React.useRef<string | null>(null);
+  const createResultGeneration = React.useRef(0);
+  const mounted = React.useRef(false);
 
   const refresh = React.useCallback(async () => {
     setLoading(true);
@@ -56,6 +58,13 @@ export function PersonalAccessTokenSettings({
     void refresh();
   }, [refresh]);
 
+  React.useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
+
   const clearPlaintext = React.useCallback(() => {
     copyReference.current = null;
     onCopyReferenceChange?.(false);
@@ -65,6 +74,7 @@ export function PersonalAccessTokenSettings({
 
   React.useEffect(() => {
     const clearSynchronously = () => {
+      createResultGeneration.current += 1;
       copyReference.current = null;
       onCopyReferenceChange?.(false);
       flushSync(() => {
@@ -77,6 +87,7 @@ export function PersonalAccessTokenSettings({
     return () => {
       window.removeEventListener("pagehide", clearSynchronously);
       window.removeEventListener(signOutStartedEvent, clearSynchronously);
+      createResultGeneration.current += 1;
       copyReference.current = null;
       onCopyReferenceChange?.(false);
     };
@@ -157,10 +168,15 @@ export function PersonalAccessTokenSettings({
         </DialogContent>
       </Dialog>
       <CreatePersonalAccessTokenDialog
+        getCreateResultGeneration={() => createResultGeneration.current}
+        isCreateResultGenerationCurrent={(generation) =>
+          generation === createResultGeneration.current
+        }
         open={createOpen}
         onAmbiguous={async (nextError) => {
+          if (!mounted.current) return;
           await refresh();
-          setError(nextError.message);
+          if (mounted.current) setError(nextError.message);
         }}
         onCreated={(result) => {
           copyReference.current = result.token;

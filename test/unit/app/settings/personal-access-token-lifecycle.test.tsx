@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { signOutStartedEvent } from "@/features/auth/sign-out-lifecycle";
@@ -293,6 +293,54 @@ describe("personal access token creation UI", () => {
     expect(tokenIsVisible).toBe(false);
     expect(hasCopyReference).toBe(false);
     expect(clipboardWriteOccurred).toBe(false);
+  });
+
+  it.each([
+    "pagehide",
+    "sign-out",
+    "unmount"
+  ] as const)("discards a create result that arrives after %s", async (lifecycle) => {
+    let hasCopyReference = false;
+    const createResult = deferred<{
+      personalAccessToken: typeof metadata;
+      token: string;
+    }>();
+    apiMocks.createPersonalAccessToken.mockReturnValue(createResult.promise);
+    const user = userEvent.setup();
+    const view = render(
+      <PersonalAccessTokenSettings
+        userRole="member"
+        onCopyReferenceChange={(hasValue) => {
+          hasCopyReference = hasValue;
+        }}
+      />
+    );
+    await submitCreateForm(user);
+
+    if (lifecycle === "pagehide") window.dispatchEvent(new Event("pagehide"));
+    else if (lifecycle === "sign-out") window.dispatchEvent(new Event(signOutStartedEvent));
+    else view.unmount();
+
+    await act(async () => {
+      createResult.resolve({ personalAccessToken: metadata, token: "test-only-token" });
+      await createResult.promise;
+    });
+
+    const tokenIsVisible = document.body.textContent?.includes("test-only-token") ?? false;
+    expect(tokenIsVisible).toBe(false);
+    expect(hasCopyReference).toBe(false);
+    expect(apiMocks.createPersonalAccessToken).toHaveBeenCalledOnce();
+    expect(apiMocks.createPersonalAccessToken).toHaveBeenCalledWith({
+      expiresAt: expect.any(String),
+      name: "Automation"
+    });
+    expect(screen.queryByText("Copy this token now. HQBase cannot show it again.")).toBeNull();
+    if (lifecycle === "unmount") {
+      expect(apiMocks.listPersonalAccessTokens).toHaveBeenCalledOnce();
+    } else {
+      await waitFor(() => expect(apiMocks.listPersonalAccessTokens).toHaveBeenCalledTimes(2));
+      expect(screen.getByText(ambiguousMessage)).toBeTruthy();
+    }
   });
 });
 
