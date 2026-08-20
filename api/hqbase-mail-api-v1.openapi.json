@@ -46,6 +46,9 @@
           },
           {
             "cookieSession": []
+          },
+          {
+            "personalAccessToken": []
           }
         ],
         "responses": {
@@ -73,14 +76,7 @@
             }
           },
           "401": {
-            "description": "Missing or invalid authentication",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
+            "$ref": "#/components/responses/MailApiUnauthorized"
           },
           "403": {
             "description": "Insufficient OAuth scope or mailbox access",
@@ -127,6 +123,9 @@
           },
           {
             "cookieSession": []
+          },
+          {
+            "personalAccessToken": []
           }
         ],
         "responses": {
@@ -151,14 +150,7 @@
             }
           },
           "401": {
-            "description": "Missing or invalid authentication",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
+            "$ref": "#/components/responses/MailApiUnauthorized"
           },
           "403": {
             "description": "Insufficient OAuth scope",
@@ -228,6 +220,9 @@
           },
           {
             "cookieSession": []
+          },
+          {
+            "personalAccessToken": []
           }
         ],
         "responses": {
@@ -264,14 +259,7 @@
             }
           },
           "401": {
-            "description": "Missing or invalid authentication",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
+            "$ref": "#/components/responses/MailApiUnauthorized"
           },
           "403": {
             "description": "Insufficient OAuth scope or mailbox access",
@@ -371,6 +359,9 @@
           },
           {
             "cookieSession": []
+          },
+          {
+            "personalAccessToken": []
           }
         ],
         "responses": {
@@ -395,14 +386,7 @@
             }
           },
           "401": {
-            "description": "Missing or invalid authentication",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
+            "$ref": "#/components/responses/MailApiUnauthorized"
           },
           "403": {
             "description": "Insufficient OAuth scope or mailbox access",
@@ -460,6 +444,9 @@
           },
           {
             "cookieSession": []
+          },
+          {
+            "personalAccessToken": []
           }
         ],
         "responses": {
@@ -487,14 +474,7 @@
             }
           },
           "401": {
-            "description": "Missing or invalid authentication",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
+            "$ref": "#/components/responses/MailApiUnauthorized"
           },
           "403": {
             "description": "Insufficient OAuth scope or mailbox access",
@@ -552,6 +532,9 @@
           },
           {
             "cookieSession": []
+          },
+          {
+            "personalAccessToken": []
           }
         ],
         "responses": {
@@ -576,14 +559,7 @@
             }
           },
           "401": {
-            "description": "Missing or invalid authentication",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
+            "$ref": "#/components/responses/MailApiUnauthorized"
           },
           "403": {
             "description": "Insufficient OAuth scope or mailbox access",
@@ -651,6 +627,9 @@
           },
           {
             "cookieSession": []
+          },
+          {
+            "personalAccessToken": []
           }
         ],
         "responses": {
@@ -676,14 +655,7 @@
             }
           },
           "401": {
-            "description": "Missing or invalid authentication",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
+            "$ref": "#/components/responses/MailApiUnauthorized"
           },
           "403": {
             "description": "Insufficient OAuth scope or mailbox access",
@@ -761,6 +733,9 @@
           },
           {
             "cookieSession": []
+          },
+          {
+            "personalAccessToken": []
           }
         ],
         "responses": {
@@ -786,14 +761,7 @@
             }
           },
           "401": {
-            "description": "Missing or invalid authentication",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
+            "$ref": "#/components/responses/MailApiUnauthorized"
           },
           "403": {
             "description": "Insufficient OAuth scope or mailbox access",
@@ -851,6 +819,9 @@
           },
           {
             "cookieSession": []
+          },
+          {
+            "personalAccessToken": []
           }
         ],
         "responses": {
@@ -875,14 +846,7 @@
             }
           },
           "401": {
-            "description": "Missing or invalid authentication",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
+            "$ref": "#/components/responses/MailApiUnauthorized"
           },
           "403": {
             "description": "Insufficient OAuth scope or mailbox access",
@@ -940,6 +904,9 @@
           },
           {
             "cookieSession": []
+          },
+          {
+            "personalAccessToken": []
           }
         ],
         "responses": {
@@ -964,14 +931,7 @@
             }
           },
           "401": {
-            "description": "Missing or invalid authentication",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
+            "$ref": "#/components/responses/MailApiUnauthorized"
           },
           "403": {
             "description": "Insufficient OAuth scope or mailbox access",
@@ -1047,6 +1007,9 @@
           },
           {
             "cookieSession": []
+          },
+          {
+            "personalAccessToken": []
           }
         ],
         "responses": {
@@ -1071,14 +1034,7 @@
             }
           },
           "401": {
-            "description": "Missing or invalid authentication",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
+            "$ref": "#/components/responses/MailApiUnauthorized"
           },
           "403": {
             "description": "Insufficient OAuth scope or mailbox access",
@@ -1167,6 +1123,9 @@
           },
           {
             "cookieSession": []
+          },
+          {
+            "personalAccessToken": []
           }
         ],
         "responses": {
@@ -1191,14 +1150,7 @@
             }
           },
           "401": {
-            "description": "Missing or invalid authentication",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
+            "$ref": "#/components/responses/MailApiUnauthorized"
           },
           "403": {
             "description": "Insufficient OAuth scope or mailbox access",
@@ -1288,6 +1240,9 @@
           },
           {
             "cookieSession": []
+          },
+          {
+            "personalAccessToken": []
           }
         ],
         "responses": {
@@ -1315,14 +1270,7 @@
             }
           },
           "401": {
-            "description": "Missing or invalid authentication",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
+            "$ref": "#/components/responses/MailApiUnauthorized"
           },
           "403": {
             "description": "Insufficient OAuth scope or mailbox access",
@@ -1366,6 +1314,9 @@
           },
           {
             "cookieSession": []
+          },
+          {
+            "personalAccessToken": []
           }
         ],
         "responses": {
@@ -1390,14 +1341,7 @@
             }
           },
           "401": {
-            "description": "Missing or invalid authentication",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
+            "$ref": "#/components/responses/MailApiUnauthorized"
           },
           "403": {
             "description": "Insufficient OAuth scope or mailbox access",
@@ -1465,6 +1409,9 @@
           },
           {
             "cookieSession": []
+          },
+          {
+            "personalAccessToken": []
           }
         ],
         "responses": {
@@ -1489,14 +1436,7 @@
             }
           },
           "401": {
-            "description": "Missing or invalid authentication",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
+            "$ref": "#/components/responses/MailApiUnauthorized"
           },
           "403": {
             "description": "Insufficient OAuth scope or mailbox access",
@@ -1552,6 +1492,9 @@
           },
           {
             "cookieSession": []
+          },
+          {
+            "personalAccessToken": []
           }
         ],
         "responses": {
@@ -1576,14 +1519,7 @@
             }
           },
           "401": {
-            "description": "Missing or invalid authentication",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
+            "$ref": "#/components/responses/MailApiUnauthorized"
           },
           "403": {
             "description": "Insufficient OAuth scope or mailbox access",
@@ -1672,6 +1608,9 @@
           },
           {
             "cookieSession": []
+          },
+          {
+            "personalAccessToken": []
           }
         ],
         "responses": {
@@ -1689,14 +1628,7 @@
             }
           },
           "401": {
-            "description": "Missing or invalid authentication",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
+            "$ref": "#/components/responses/MailApiUnauthorized"
           },
           "403": {
             "description": "Insufficient OAuth scope or mailbox access",
@@ -1755,6 +1687,9 @@
           },
           {
             "cookieSession": []
+          },
+          {
+            "personalAccessToken": []
           }
         ],
         "responses": {
@@ -1779,14 +1714,7 @@
             }
           },
           "401": {
-            "description": "Missing or invalid authentication",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
+            "$ref": "#/components/responses/MailApiUnauthorized"
           },
           "403": {
             "description": "Insufficient OAuth scope or mailbox access",
@@ -1877,6 +1805,9 @@
           },
           {
             "cookieSession": []
+          },
+          {
+            "personalAccessToken": []
           }
         ],
         "responses": {
@@ -1894,14 +1825,7 @@
             }
           },
           "401": {
-            "description": "Missing or invalid authentication",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
+            "$ref": "#/components/responses/MailApiUnauthorized"
           },
           "403": {
             "description": "Insufficient OAuth scope or mailbox access",
@@ -1969,6 +1893,9 @@
           },
           {
             "cookieSession": []
+          },
+          {
+            "personalAccessToken": []
           }
         ],
         "responses": {
@@ -1993,14 +1920,7 @@
             }
           },
           "401": {
-            "description": "Missing or invalid authentication",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
+            "$ref": "#/components/responses/MailApiUnauthorized"
           },
           "403": {
             "description": "Insufficient OAuth scope or mailbox access",
@@ -2066,6 +1986,9 @@
           },
           {
             "cookieSession": []
+          },
+          {
+            "personalAccessToken": []
           }
         ],
         "responses": {
@@ -2090,14 +2013,7 @@
             }
           },
           "401": {
-            "description": "Missing or invalid authentication",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
+            "$ref": "#/components/responses/MailApiUnauthorized"
           },
           "403": {
             "description": "Insufficient OAuth scope or mailbox access",
@@ -2276,6 +2192,24 @@
         "in": "cookie",
         "name": "better-auth.session_token",
         "description": "Same-origin HQBase web session. Secure deployments may prefix the cookie name."
+      },
+      "personalAccessToken": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "HQBase PAT",
+        "description": "An HQBase personal access token. PATs can call every Mail API operation, subject to the token owner's current role and mailbox grants."
+      }
+    },
+    "responses": {
+      "MailApiUnauthorized": {
+        "description": "Authentication is missing or invalid. Missing credentials return UNAUTHENTICATED with the message A session cookie or bearer token is required. Bearer values that start with hqb_pat_ use personal access token authentication; other bearer values use OAuth. An invalid Authorization header does not fall back to a session cookie. A rejected OAuth token returns INVALID_OAUTH_TOKEN, and a rejected PAT returns INVALID_PERSONAL_ACCESS_TOKEN. Both invalid bearer errors use the message Bearer token is invalid or inactive.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
       }
     },
     "schemas": {

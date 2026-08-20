@@ -275,6 +275,14 @@ describe("HQBase Mail API v1", () => {
     expect(instructions).toContain("`application_type` set to `native`");
     expect(instructions).toContain("RFC 8252");
     expect(instructions).toContain("app-claimed HTTPS, loopback HTTP, and private-use schemes");
+    expect(instructions).toContain("INVALID_PERSONAL_ACCESS_TOKEN");
+    expect(instructions).toContain("Bearer token is invalid or inactive.");
+    expect(instructions).toContain("start with `hqb_pat_`");
+    expect(instructions).toContain("does not fall back to a browser session cookie");
+    expect(instructions).toContain("trusted automation");
+    expect(instructions).toContain("valid only at the issuing origin");
+    expect(instructions).toContain("does not authenticate administration or MCP");
+    expect(instructions).toContain("Do not retry the same rejected PAT");
     for (const [path, pathItem] of Object.entries(mailApiOpenApi.paths)) {
       for (const method of ["get", "post", "patch", "delete"] as const) {
         if (method in pathItem) {
@@ -287,11 +295,35 @@ describe("HQBase Mail API v1", () => {
     expect(openApi.status).toBe(200);
     expect(openApi.headers.get("content-type")).toContain("application/json");
     const document = (await openApi.json()) as {
+      components: {
+        responses: { MailApiUnauthorized: { description: string } };
+        securitySchemes: { personalAccessToken: Record<string, unknown> };
+      };
       externalDocs: { url: string };
+      paths: Record<
+        string,
+        Record<string, { responses: Record<string, unknown>; security: unknown }>
+      >;
       servers: Array<{ url: string }>;
     };
     expect(document.servers).toEqual([{ url: origin, description: "This HQBase installation" }]);
     expect(document.externalDocs.url).toBe(`${origin}/skills/hqbase-mail/SKILL.md`);
+    expect(document.components.securitySchemes.personalAccessToken).toMatchObject({
+      type: "http",
+      scheme: "bearer",
+      bearerFormat: "HQBase PAT"
+    });
+    expect(document.paths["/api/v1/send"]?.post?.security).toEqual([
+      { oauth2: ["mail:send"] },
+      { cookieSession: [] },
+      { personalAccessToken: [] }
+    ]);
+    expect(document.paths["/api/v1/send"]?.post?.responses["401"]).toEqual({
+      $ref: "#/components/responses/MailApiUnauthorized"
+    });
+    expect(document.components.responses.MailApiUnauthorized.description).toContain(
+      "INVALID_PERSONAL_ACCESS_TOKEN"
+    );
 
     const head = await SELF.fetch(`${origin}/skills/hqbase-mail/SKILL.md`, { method: "HEAD" });
     expect(head.status).toBe(200);
