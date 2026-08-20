@@ -44,6 +44,19 @@ try {
   const { installabilityErrors } = await client.send("Page.getInstallabilityErrors");
   assert.deepEqual(installabilityErrors, []);
 
+  const apiHealthUrl = `${baseUrl}/api/health`;
+  await context.route(apiHealthUrl, (route) =>
+    route.fulfill({
+      body: JSON.stringify({ ok: true }),
+      contentType: "application/json",
+      status: 200
+    })
+  );
+  const onlineApiResponse = await page.goto(apiHealthUrl, { waitUntil: "domcontentloaded" });
+  assert.equal(onlineApiResponse?.fromServiceWorker(), false);
+  assert.deepEqual(await onlineApiResponse?.json(), { ok: true });
+  await context.unroute(apiHealthUrl);
+
   const cacheState = await page.evaluate(async () => {
     const names = await caches.keys();
     const urls = [];
@@ -58,10 +71,17 @@ try {
   assert.ok(cacheState.urls.includes("/sounds/incoming-email.wav"));
   assert.ok(cacheState.urls.includes("/sounds/unlock.wav"));
   assert.equal(
-    cacheState.urls.some((url) => url.startsWith("/api/")),
+    cacheState.urls.some((url) => url === "/api" || url.startsWith("/api/")),
     false
   );
 
+  await context.setOffline(true);
+  await assert.rejects(page.goto(apiHealthUrl, { waitUntil: "domcontentloaded" }));
+  assert.equal(await page.getByRole("heading", { name: "You're offline" }).count(), 0);
+  assert.equal(await page.locator("#root").count(), 0);
+
+  await context.setOffline(false);
+  await page.goto(baseUrl, { waitUntil: "domcontentloaded" });
   await context.setOffline(true);
   const offlineResponse = await page.reload({ waitUntil: "domcontentloaded" });
   assert.equal(offlineResponse?.fromServiceWorker(), true);
