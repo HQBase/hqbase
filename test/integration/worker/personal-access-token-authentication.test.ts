@@ -179,20 +179,66 @@ describe("Mail API personal access token authentication", () => {
     await expect(response.json()).resolves.toMatchObject({ error: { code: "VALIDATION_ERROR" } });
   });
 
+  it("attributes successful PAT send and reply audits without secrets or mail content", async () => {
+    const sendBody = JSON.stringify({
+      from: "allowed@pat.example",
+      to: ["reader@example.net"],
+      subject: "pat-send-content-marker",
+      text: "pat-send-body-marker"
+    });
+    const authorization = `Bearer ${actors.owner.bearer}`;
+    const sentResponse = await SELF.fetch(`${origin}/api/v1/send`, {
+      body: sendBody,
+      headers: { authorization, "content-type": "application/json" },
+      method: "POST"
+    });
+    expect(sentResponse.status, await sentResponse.clone().text()).toBe(201);
+    const sentBody = JSON.stringify(await sentResponse.json());
+    await assertPatAudit("message.send", [
+      actors.owner.bearer,
+      actors.owner.tokenHash,
+      authorization,
+      sendBody,
+      sentBody,
+      "pat-send-content-marker",
+      "pat-send-body-marker"
+    ]);
+
+    const replyBody = JSON.stringify({
+      from: "allowed@pat.example",
+      messageId: "msg_pat_allowed",
+      text: "pat-reply-content-marker"
+    });
+    const replyResponse = await SELF.fetch(`${origin}/api/v1/reply`, {
+      body: replyBody,
+      headers: { authorization, "content-type": "application/json" },
+      method: "POST"
+    });
+    expect(replyResponse.status, await replyResponse.clone().text()).toBe(201);
+    const responseBody = JSON.stringify(await replyResponse.json());
+    await assertPatAudit("message.reply", [
+      actors.owner.bearer,
+      actors.owner.tokenHash,
+      authorization,
+      replyBody,
+      responseBody,
+      "pat-reply-content-marker"
+    ]);
+  });
+
   it("shares send and reply limits by user across PAT, session, and OAuth", async () => {
     await env.DB.prepare(
       "DELETE FROM rate_limits WHERE scope IN ('mail.send', 'mail.reply')"
     ).run();
     for (const path of ["/api/v1/send", "/api/v1/reply"]) {
-      for (let attempt = 0; attempt < 20; attempt += 1) {
-        expect(
-          (await invalidAction(path, { authorization: `Bearer ${actors.owner.bearer}` })).status
-        ).toBe(400);
-        expect((await invalidAction(path, { cookie: actors.owner.cookie })).status).toBe(400);
-        expect((await invalidAction(path, { authorization: `Bearer ${oauthBearer}` })).status).toBe(
-          400
-        );
-      }
+      const responses = await Promise.all(
+        Array.from({ length: 20 }, () => [
+          invalidAction(path, { authorization: `Bearer ${actors.owner.bearer}` }),
+          invalidAction(path, { cookie: actors.owner.cookie }),
+          invalidAction(path, { authorization: `Bearer ${oauthBearer}` })
+        ]).flat()
+      );
+      expect(responses.map(({ status }) => status)).toEqual(Array(60).fill(400));
       const limited = await invalidAction(path, {
         authorization: `Bearer ${actors.owner.bearer}`
       });
@@ -510,4 +556,21 @@ function extractSessionCookie(response: Response): string {
   const match = serialized.match(/(?:^|,\s*)((?:__Secure-)?better-auth\.session_token=[^;,]+)/);
   if (!match?.[1]) throw new Error("Session cookie was not returned.");
   return match[1];
+}
+
+async function assertPatAudit(action: string, forbidden: readonly string[]): Promise<void> {
+  const row = await env.DB.prepare(
+    `SELECT metadata_json AS metadataJson FROM audit_events
+     WHERE action = ? ORDER BY occurred_at DESC, id DESC LIMIT 1`
+  )
+    .bind(action)
+    .first<{ metadataJson: string }>();
+  if (!row) throw new Error("Expected a PAT-backed audit row.");
+  const metadata = JSON.parse(row.metadataJson) as Record<string, unknown>;
+  expect(metadata).toEqual({
+    authenticationKind: "pat",
+    personalAccessTokenId: actors.owner.tokenId
+  });
+  expect(Object.keys(metadata)).toEqual(["authenticationKind", "personalAccessTokenId"]);
+  assertSecretSafeAbsent(row.metadataJson, forbidden);
 }

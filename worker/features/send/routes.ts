@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { requireMailApiContext } from "../../auth/mail-api";
+import { mailApiAuditMetadata, requireMailApiContext } from "../../auth/mail-api";
 import { requireMailboxAccess } from "../../auth/mailbox-access";
 import type { HonoApp } from "../../lib/env";
 import { AppError } from "../../lib/errors";
@@ -39,6 +39,7 @@ sendRoutes.post("/send", async (c) => {
   await requireDraftIdAccess(c.env, principal, input.draftId);
   await requireDraftAttachmentIdsAccess(c.env, principal, input.attachmentIds);
   const sent = await sendNewMessage(c.env, input, authContext.user.id);
+  const metadata = mailApiAuditMetadata(authContext);
   await recordAudit(c.env.DB, {
     correlationId: c.get("correlationId"),
     actorType: "user",
@@ -46,7 +47,8 @@ sendRoutes.post("/send", async (c) => {
     action: "message.send",
     resourceType: "mailbox",
     resourceId: mailbox.id,
-    outcome: "success"
+    outcome: "success",
+    ...(metadata ? { metadata } : {})
   });
   return c.json(sent, 201);
 });
@@ -80,6 +82,7 @@ sendRoutes.post("/reply", async (c) => {
   await requireDraftIdAccess(c.env, principal, input.draftId);
   await requireDraftAttachmentIdsAccess(c.env, principal, input.attachmentIds);
   const sent = await replyToMessage(c.env, input, authContext.user.id);
+  const metadata = mailApiAuditMetadata(authContext);
   await recordAudit(c.env.DB, {
     correlationId: c.get("correlationId"),
     actorType: "user",
@@ -87,7 +90,8 @@ sendRoutes.post("/reply", async (c) => {
     action: "message.reply",
     resourceType: "mailbox",
     resourceId: mailbox.id,
-    outcome: "success"
+    outcome: "success",
+    ...(metadata ? { metadata } : {})
   });
   return c.json(sent, 201);
 });

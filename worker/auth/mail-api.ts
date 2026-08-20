@@ -127,6 +127,17 @@ export function readMailApiBearerValue(request: Request): string | null {
   return authorization?.match(/^Bearer\s+(.+)$/iu)?.[1]?.trim() ?? null;
 }
 
+export function mailApiAuditMetadata(
+  context: MailApiContext
+): { authenticationKind: "pat"; personalAccessTokenId: string } | undefined {
+  return context.authentication.kind === "pat"
+    ? {
+        authenticationKind: "pat",
+        personalAccessTokenId: context.authentication.tokenId
+      }
+    : undefined;
+}
+
 export function isVersionedMailApiRequest(request: Request): boolean {
   const pathname = new URL(request.url).pathname;
   return pathname === "/api/v1" || pathname.startsWith("/api/v1/");
