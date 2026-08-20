@@ -31,7 +31,7 @@
     "api:generate": "node scripts/generate-mail-api-artifacts.mjs --write",
     "api:check": "node scripts/generate-mail-api-artifacts.mjs --check",
     "test:pwa": "node scripts/test-pwa.mjs",
-    "test:e2e:staging": "playwright test --config playwright.config.ts app-shell-smoke.spec.ts lifecycle.spec.ts",
+    "test:e2e:staging": "playwright test --config playwright.config.ts app-shell-smoke.spec.ts lifecycle.spec.ts personal-access-tokens.spec.ts",
     "test:e2e:staging:smoke": "playwright test --config playwright.config.ts app-shell-smoke.spec.ts",
     "test:e2e:staging:lifecycle": "playwright test --config playwright.config.ts lifecycle.spec.ts",
     "pwa:icons": "node scripts/generate-pwa-icons.mjs",
