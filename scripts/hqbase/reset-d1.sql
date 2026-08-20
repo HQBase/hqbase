@@ -25,6 +25,7 @@ DROP TABLE IF EXISTS deployment_state;
 DROP TABLE IF EXISTS operation_runs;
 DROP TABLE IF EXISTS retention_policies;
 DROP TABLE IF EXISTS rate_limits;
+DROP TABLE IF EXISTS personal_access_tokens;
 DROP TABLE IF EXISTS audit_events;
 DROP TABLE IF EXISTS mailbox_grants;
 DROP TABLE IF EXISTS hqbase_schema_state;
