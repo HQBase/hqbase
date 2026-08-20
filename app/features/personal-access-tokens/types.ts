@@ -11,3 +11,13 @@ export type PersonalAccessTokenMetadata = {
 export type PersonalAccessTokenList = {
   personalAccessTokens: PersonalAccessTokenMetadata[];
 };
+
+export type CreatePersonalAccessTokenInput = {
+  name: string;
+  expiresAt: string | null;
+};
+
+export type CreatePersonalAccessTokenResponse = {
+  personalAccessToken: PersonalAccessTokenMetadata;
+  token: string;
+};

@@ -51,6 +51,7 @@ describe("personal access token settings", () => {
       "Personal access tokens cannot access workspace administration or MCP."
     );
     expect(view.container.textContent).toContain("Deployment agent");
+    expect(view.container.textContent).toContain("Create token");
     expect(view.container.textContent).toContain("••••Ab_9");
     expect(view.container.textContent).not.toContain("tokenHash");
     expect(view.container.textContent).not.toContain("Revoked");
