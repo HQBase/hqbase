@@ -1,5 +1,8 @@
 import { env } from "cloudflare:test";
+import { getTableConfig } from "drizzle-orm/sqlite-core";
 import { beforeAll, describe, expect, it } from "vitest";
+
+import { personalAccessTokens } from "../../../worker/db/schema";
 
 import { applyCurrentMigrations } from "./current-migrations";
 
@@ -8,6 +11,27 @@ const stamp = "2026-08-19T18:00:00.000Z";
 describe("personal access token schema", () => {
   beforeAll(async () => {
     await applyCurrentMigrations();
+  });
+
+  it("keeps the Drizzle PAT table aligned with the SQL migration", () => {
+    const table = getTableConfig(personalAccessTokens);
+
+    expect(table.name).toBe("personal_access_tokens");
+    expect(table.columns.map(({ name }) => name)).toEqual([
+      "id",
+      "user_id",
+      "name",
+      "token_hash",
+      "token_suffix",
+      "created_at",
+      "expires_at",
+      "revoked_at"
+    ]);
+    expect(table.indexes.map(({ config }) => config.name).sort()).toEqual([
+      "personal_access_tokens_list_idx",
+      "personal_access_tokens_user_idx"
+    ]);
+    expect(table.foreignKeys).toHaveLength(1);
   });
 
   it("deletes a user's PAT rows through the foreign-key cascade", async () => {
