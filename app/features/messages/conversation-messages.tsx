@@ -25,11 +25,18 @@ export function ConversationMessages({
   onCompose?: (message: MessageDetail, mode: "reply" | "forward") => void;
 }): React.ReactElement {
   const hiddenCount = Math.max(0, messages.length - 2);
-  const threadFingerprint = messages.map((message) => message.id).join(":");
-  const [expandedThread, setExpandedThread] = React.useState<string | null>(null);
-  const showMiddle = expandedThread === threadFingerprint;
+  const threadId = messages[0]?.threadId ?? null;
+  const [expandedThreadId, setExpandedThreadId] = React.useState<string | null>(null);
+  const previousThreadId = React.useRef(threadId);
+  const showMiddle = threadId !== null && expandedThreadId === threadId;
   const replyTarget =
     [...messages].reverse().find((message) => message.direction === "inbound") ?? messages.at(-1);
+
+  React.useEffect(() => {
+    if (previousThreadId.current === threadId) return;
+    previousThreadId.current = threadId;
+    setExpandedThreadId(null);
+  }, [threadId]);
 
   if (hiddenCount === 0) {
     return (
@@ -45,13 +52,14 @@ export function ConversationMessages({
   return (
     <div className="divide-y divide-border">
       {first ? renderMessage(first, false) : null}
-      <ThreadMessagesDivider
-        count={hiddenCount}
-        expanded={showMiddle}
-        onToggle={() =>
-          setExpandedThread((current) => (current === threadFingerprint ? null : threadFingerprint))
-        }
-      />
+      {showMiddle ? null : (
+        <ThreadMessagesDivider
+          count={hiddenCount}
+          onExpand={() => {
+            if (threadId) setExpandedThreadId(threadId);
+          }}
+        />
+      )}
       {showMiddle ? middle.map((message) => renderMessage(message, false)) : null}
       {final ? renderMessage(final, true) : null}
     </div>
@@ -148,24 +156,22 @@ export function ConversationMessages({
 
 function ThreadMessagesDivider({
   count,
-  expanded,
-  onToggle
+  onExpand
 }: {
   count: number;
-  expanded: boolean;
-  onToggle: () => void;
+  onExpand: () => void;
 }): React.ReactElement {
   const noun = count === 1 ? "message" : "messages";
-  const label = expanded ? `Collapse ${count} earlier ${noun}` : `Expand ${count} earlier ${noun}`;
+  const label = `Expand ${count} earlier ${noun}`;
   return (
     <div className="flex items-center gap-3 px-4 py-3 sm:px-6" data-thread-messages-control>
       <Separator className="flex-1" />
       <Button
         aria-label={label}
-        aria-expanded={expanded}
+        aria-expanded="false"
         className="size-11 shrink-0 rounded-full p-0 [&_svg]:size-3.5"
-        data-thread-disclosure-state={expanded ? "expanded" : "collapsed"}
-        onClick={onToggle}
+        data-thread-disclosure-state="collapsed"
+        onClick={onExpand}
         size="icon"
         title={label}
         type="button"
@@ -175,19 +181,11 @@ function ThreadMessagesDivider({
           aria-hidden="true"
           className="grid grid-rows-[0.875rem_0.875rem_0.875rem] place-items-center"
         >
-          {expanded ? (
-            <PiArrowDown data-thread-arrow="top-inward" />
-          ) : (
-            <PiArrowUp data-thread-arrow="top-outward" />
-          )}
+          <PiArrowUp data-thread-arrow="top-outward" />
           <span className="min-w-4 text-center font-mono text-[10px] font-semibold leading-none tabular-nums">
             {count}
           </span>
-          {expanded ? (
-            <PiArrowUp data-thread-arrow="bottom-inward" />
-          ) : (
-            <PiArrowDown data-thread-arrow="bottom-outward" />
-          )}
+          <PiArrowDown data-thread-arrow="bottom-outward" />
         </span>
       </Button>
       <Separator className="flex-1" />

@@ -186,10 +186,11 @@ describe("HQBase Mail API v1", () => {
       env.DB.prepare(
         `INSERT INTO messages
          (id, thread_id, mailbox_id, direction, folder, from_address, to_json, cc_json, bcc_json,
-          subject, snippet, text_body, message_id, dedupe_key, in_reply_to, references_json,
+          subject, snippet, text_body, html_r2_key, message_id, dedupe_key, in_reply_to, references_json,
           received_at, sent_at, read_at, has_attachments, created_at, updated_at)
          VALUES ('msg_api', 'thr_api', 'mbx_api', 'inbound', 'inbox', 'sender@example.net', ?,
-                 '[]', '[]', 'API message', 'Body', 'Body', '<api@example.net>', 'api-dedupe',
+                 '[]', '[]', 'API message', 'Body', 'Body', 'mail/api/body.html',
+                 '<api@example.net>', 'api-dedupe',
                  NULL, '[]', ?, NULL, NULL, 1, ?, ?)`
       ).bind(
         JSON.stringify(["support@example.com"]),
@@ -224,6 +225,11 @@ describe("HQBase Mail API v1", () => {
     await env.MAIL_OBJECTS.put("mail/api/hello.txt", "hello", {
       httpMetadata: { contentType: "text/plain" }
     });
+    await env.MAIL_OBJECTS.put(
+      "mail/api/body.html",
+      '<p>Visible before</p><div class="gmail_quote"><p>Earlier reply</p></div><p>Visible after</p>',
+      { httpMetadata: { contentType: "text/html; charset=utf-8" } }
+    );
   });
 
   it("publishes protected-resource metadata and a scoped authentication challenge", async () => {
@@ -337,6 +343,23 @@ describe("HQBase Mail API v1", () => {
     const attachment = await apiFetch("/api/v1/attachments/att_api", readToken);
     expect(attachment.status).toBe(200);
     expect(await attachment.text()).toBe("hello");
+  });
+
+  it("returns visible content before and after separately classified reply history", async () => {
+    const response = await apiFetch("/api/v1/messages/msg_api/html", readToken);
+    expect(response.status, await response.clone().text()).toBe(200);
+    const payload = (await response.json()) as {
+      afterQuotedHtml: string | null;
+      html: string;
+      quotedHtml: string | null;
+      remoteMediaTrusted: boolean;
+    };
+
+    expect(payload.html).toContain("Visible before");
+    expect(payload.html).not.toContain("Earlier reply");
+    expect(payload.quotedHtml).toContain("Earlier reply");
+    expect(payload.afterQuotedHtml).toContain("Visible after");
+    expect(payload.remoteMediaTrusted).toBe(false);
   });
 
   it("unarchives and restores mail through the versioned action route", async () => {

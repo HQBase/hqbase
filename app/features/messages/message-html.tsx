@@ -8,7 +8,10 @@ import { useTheme } from "@/features/theme/theme-provider";
 
 import { getMessageHtml, trustRemoteMediaSender } from "./api";
 import { buildEmailHtmlDocument } from "./html-document";
+import { hasMessageHtmlContent, splitQuotedText } from "./message-html-content";
 import type { MessageDetail } from "./types";
+
+export { splitQuotedText } from "./message-html-content";
 
 type MessageHtmlProps = {
   message: MessageDetail;
@@ -45,7 +48,7 @@ export function MessageHtml({ message }: MessageHtmlProps): React.ReactElement {
 
   const rendered = React.useMemo(
     () =>
-      html === null
+      !html?.html
         ? null
         : buildEmailHtmlDocument({
             allowRemoteImages: loadRemoteImages,
@@ -67,6 +70,19 @@ export function MessageHtml({ message }: MessageHtmlProps): React.ReactElement {
         : null,
     [html, loadRemoteImages, theme]
   );
+  const renderedAfterQuote = React.useMemo(
+    () =>
+      html?.afterQuotedHtml
+        ? buildEmailHtmlDocument({
+            allowRemoteImages: loadRemoteImages,
+            html: html.afterQuotedHtml,
+            origin: window.location.origin,
+            theme
+          })
+        : null,
+    [html, loadRemoteImages, theme]
+  );
+  const bodyHasContent = React.useMemo(() => hasMessageHtmlContent(html?.html ?? ""), [html?.html]);
 
   async function loadImages(): Promise<void> {
     setLoadingImages(true);
@@ -96,7 +112,7 @@ export function MessageHtml({ message }: MessageHtmlProps): React.ReactElement {
     }
   }
 
-  if (!rendered) {
+  if (!rendered && !renderedQuote && !renderedAfterQuote) {
     return (
       <>
         <PlainTextMessage message={message} />
@@ -118,20 +134,58 @@ export function MessageHtml({ message }: MessageHtmlProps): React.ReactElement {
         />
       )}
       {error && <p className="text-xs text-destructive">{error}</p>}
-      <EmailFrame srcDoc={rendered} title={`Message body: ${message.subject}`} />
-      {renderedQuote ? (
+      <MessageHtmlFrames
+        afterQuote={renderedAfterQuote}
+        body={rendered}
+        bodyHasContent={bodyHasContent}
+        onToggleQuote={() => setQuoteExpanded((expanded) => !expanded)}
+        quote={renderedQuote}
+        quoteExpanded={quoteExpanded}
+        subject={message.subject}
+      />
+    </div>
+  );
+}
+
+export function MessageHtmlFrames({
+  afterQuote,
+  body,
+  bodyHasContent,
+  onToggleQuote,
+  quote,
+  quoteExpanded,
+  subject
+}: {
+  afterQuote: string | null;
+  body: string | null;
+  bodyHasContent: boolean;
+  onToggleQuote: () => void;
+  quote: string | null;
+  quoteExpanded: boolean;
+  subject: string;
+}): React.ReactElement {
+  const showQuoteControl = Boolean(bodyHasContent && quote);
+  const showQuote = quoteExpanded || !bodyHasContent;
+
+  return (
+    <div className="contents" data-message-html-frames>
+      {body ? <EmailFrame srcDoc={body} title={`Message body: ${subject}`} /> : null}
+      {quote ? (
         <>
-          <QuotedContentDivider
-            expanded={quoteExpanded}
-            onToggle={() => setQuoteExpanded((expanded) => !expanded)}
-          />
-          {quoteExpanded ? (
-            <EmailFrame
-              srcDoc={renderedQuote}
-              title={`Quoted message history: ${message.subject}`}
-            />
+          {showQuoteControl ? (
+            <QuotedContentDivider expanded={quoteExpanded} onToggle={onToggleQuote} />
           ) : null}
+          <div
+            aria-hidden={!showQuote}
+            className={showQuote ? "block" : "hidden print:block"}
+            data-quoted-content-frame
+          >
+            <EmailFrame srcDoc={quote} title={`Quoted message history: ${subject}`} />
+          </div>
         </>
+      ) : null}
+      {afterQuote ? (
+        <EmailFrame srcDoc={afterQuote} title={`Message content after quote: ${subject}`} />
       ) : null}
     </div>
   );
@@ -208,7 +262,7 @@ export function QuotedContentDivider({
   onToggle: () => void;
 }): React.ReactElement {
   return (
-    <div className="flex items-center gap-2" data-quoted-content-control>
+    <div className="flex items-center gap-2 print:hidden" data-quoted-content-control>
       <Separator className="flex-1" />
       <Button
         aria-expanded={expanded}
@@ -278,29 +332,30 @@ export function PlainTextMessage({ message }: MessageHtmlProps): React.ReactElem
   const content = splitQuotedText(message.textBody || message.snippet);
   return (
     <div className="flex flex-col gap-4">
-      <pre className="whitespace-pre-wrap break-words font-[Arial,Helvetica,sans-serif] text-[small] leading-[1.5] text-foreground/90">
-        {content.body}
-      </pre>
+      {content.body ? (
+        <pre className="whitespace-pre-wrap break-words font-[Arial,Helvetica,sans-serif] text-[small] leading-[1.5] text-foreground/90">
+          {content.body}
+        </pre>
+      ) : null}
       {content.quote ? (
         <>
           <QuotedContentDivider expanded={expanded} onToggle={() => setExpanded((open) => !open)} />
-          {expanded ? (
+          <div
+            aria-hidden={!expanded}
+            className={expanded ? "block" : "hidden print:block"}
+            data-quoted-content-frame
+          >
             <pre className="whitespace-pre-wrap break-words border-l border-border pl-[1ex] font-[Arial,Helvetica,sans-serif] text-[small] leading-[1.5] text-muted-foreground">
               {content.quote}
             </pre>
-          ) : null}
+          </div>
         </>
+      ) : null}
+      {content.afterQuote ? (
+        <pre className="whitespace-pre-wrap break-words font-[Arial,Helvetica,sans-serif] text-[small] leading-[1.5] text-foreground/90">
+          {content.afterQuote}
+        </pre>
       ) : null}
     </div>
   );
-}
-
-export function splitQuotedText(value: string): { body: string; quote: string | null } {
-  const match = /\n{1,2}On [^\n]+ wrote:\n>/i.exec(value.replace(/\r\n?/g, "\n"));
-  if (!match) return { body: value, quote: null };
-  const normalized = value.replace(/\r\n?/g, "\n");
-  return {
-    body: normalized.slice(0, match.index).trimEnd(),
-    quote: normalized.slice(match.index).trim()
-  };
 }

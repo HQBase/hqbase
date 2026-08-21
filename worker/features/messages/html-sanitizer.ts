@@ -132,9 +132,15 @@ const safeStyleValue =
 const remoteCssResource = /(?:https?:)?\/\//i;
 
 export type SanitizedMessageHtml = {
+  afterQuotedHtml: string | null;
   hasRemoteImages: boolean;
   html: string;
   quotedHtml: string | null;
+};
+
+type SanitizedDisplayHtml = {
+  hasRemoteImages: boolean;
+  html: string;
 };
 
 export function sanitizeMessageHtml(input: {
@@ -146,11 +152,18 @@ export function sanitizeMessageHtml(input: {
   origin: string;
   subject: string;
 }): SanitizedMessageHtml {
-  const parts = splitQuotedHtml(input.html, input.subject);
+  const parts = splitQuotedHtml(input.html);
   const body = sanitizeDisplayHtml({ ...input, html: parts.body });
   const quote = parts.quote ? sanitizeDisplayHtml({ ...input, html: parts.quote }) : null;
+  const afterQuote = parts.afterQuote
+    ? sanitizeDisplayHtml({ ...input, html: parts.afterQuote })
+    : null;
   return {
-    hasRemoteImages: body.hasRemoteImages || Boolean(quote?.hasRemoteImages),
+    afterQuotedHtml: afterQuote?.html || null,
+    hasRemoteImages:
+      body.hasRemoteImages ||
+      Boolean(quote?.hasRemoteImages) ||
+      Boolean(afterQuote?.hasRemoteImages),
     html: body.html,
     quotedHtml: quote?.html || null
   };
@@ -212,7 +225,7 @@ function sanitizeDisplayHtml(input: {
   inlineBasePath?: string;
   messageId: string;
   origin: string;
-}): Omit<SanitizedMessageHtml, "quotedHtml"> {
+}): SanitizedDisplayHtml {
   const origin = safeOrigin(input.origin);
   const contentIds = new Map(
     input.attachments.flatMap((attachment) =>

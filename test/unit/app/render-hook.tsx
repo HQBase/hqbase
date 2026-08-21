@@ -33,6 +33,7 @@ export async function renderHook<Props, Result>(
 
 export async function renderComponent(content: ReactNode): Promise<{
   container: HTMLDivElement;
+  rerender: (content: ReactNode) => Promise<void>;
   unmount: () => Promise<void>;
 }> {
   const container = document.createElement("div");
@@ -40,6 +41,7 @@ export async function renderComponent(content: ReactNode): Promise<{
   await render(root, content);
   return {
     container,
+    rerender: (content) => render(root, content),
     unmount: () => render(root, null)
   };
 }
