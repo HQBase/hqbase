@@ -17,6 +17,11 @@ const internalTopicsHeader = "x-hqbase-event-topics";
 const internalRequestIdHeader = "x-hqbase-event-request-id";
 
 export class MailEvents extends DurableObject<WorkerEnv> {
+  constructor(ctx: DurableObjectState, env: WorkerEnv) {
+    super(ctx, env);
+    ctx.setWebSocketAutoResponse(new WebSocketRequestResponsePair("ping", "pong"));
+  }
+
   override async fetch(request: Request): Promise<Response> {
     if (request.headers.get("upgrade")?.toLowerCase() !== "websocket") {
       return new Response("WebSocket upgrade required.", { status: 426 });

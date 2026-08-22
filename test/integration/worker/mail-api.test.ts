@@ -349,6 +349,9 @@ describe("HQBase Mail API v1", () => {
       authorization: `Bearer ${readToken}`,
       upgrade: "websocket"
     });
+    const pong = nextSocketMessage(messageSocket);
+    messageSocket.send("ping");
+    await expect(pong).resolves.toBe("pong");
     const messageFrame = nextSocketFrame(messageSocket);
     await env.MAIL_EVENTS.getByName("workspace").publish({
       topic: "messages",
@@ -982,6 +985,12 @@ function nextSocketFrame(socket: WebSocket): Promise<unknown> {
       },
       { once: true }
     );
+  });
+}
+
+function nextSocketMessage(socket: WebSocket): Promise<string> {
+  return new Promise((resolve) => {
+    socket.addEventListener("message", (event) => resolve(String(event.data)), { once: true });
   });
 }
 

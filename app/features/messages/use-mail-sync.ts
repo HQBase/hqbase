@@ -8,8 +8,6 @@ import type { FolderId } from "@/lib/routes";
 import { listConversations } from "./api";
 import type { ConversationAction, ConversationSummary } from "./types";
 
-const refreshIntervalMs = 60_000;
-
 type MailSyncOptions = {
   activeFolder: FolderId;
   mailboxId: string;
@@ -100,6 +98,13 @@ export function useMailSync({ activeFolder, mailboxId, search, userId }: MailSyn
       }
 
       if (conversationResult.status === "rejected") throw conversationResult.reason;
+      if (
+        conversationResult.status === "fulfilled" &&
+        conversationResult.value === null &&
+        notificationResult.status === "rejected"
+      ) {
+        throw notificationResult.reason;
+      }
     })();
     inFlight.current = { key: syncKey, promise };
     const clearInFlight = (): void => {
@@ -150,13 +155,11 @@ export function useMailSync({ activeFolder, mailboxId, search, userId }: MailSyn
     };
 
     runRefresh(true);
-    const interval = window.setInterval(runRefresh, refreshIntervalMs);
     window.addEventListener("focus", refreshWhenVisible);
     document.addEventListener("visibilitychange", refreshWhenVisible);
     navigator.serviceWorker?.addEventListener("message", handleServiceWorkerMessage);
     return () => {
       active = false;
-      window.clearInterval(interval);
       window.removeEventListener("focus", refreshWhenVisible);
       document.removeEventListener("visibilitychange", refreshWhenVisible);
       navigator.serviceWorker?.removeEventListener("message", handleServiceWorkerMessage);

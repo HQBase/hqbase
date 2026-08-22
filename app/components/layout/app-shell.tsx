@@ -1,5 +1,6 @@
 import * as React from "react";
 import type { CurrentUser } from "@/features/auth/types";
+import type { MailConnectionStatus } from "@/features/events/types";
 import type { Mailbox } from "@/features/mailboxes/types";
 import type { UnreadCounts } from "@/features/notifications/types";
 import type { UpdateStatus } from "@/features/updates/types";
@@ -15,6 +16,7 @@ type AppShellProps = {
   activeFolder: FolderId;
   activeSettingsTab?: import("@/lib/routes").SettingsTabId | undefined;
   canManage?: boolean | undefined;
+  connectionStatus: MailConnectionStatus;
   children: React.ReactNode;
   mailboxId: string;
   mailboxes: Mailbox[];
@@ -55,6 +57,7 @@ export function AppShell(props: AppShellProps): React.ReactElement {
               activeFolder={props.activeFolder}
               activeSettingsTab={props.activeSettingsTab}
               canManage={props.canManage}
+              connectionStatus={props.connectionStatus}
               draftCount={props.draftCount}
               mailboxId={props.mailboxId}
               sidebarCollapsed={sidebarCollapsed}
@@ -84,6 +87,7 @@ export function AppShell(props: AppShellProps): React.ReactElement {
             activeFolder={props.activeFolder}
             activeSettingsTab={props.activeSettingsTab}
             canManage={props.canManage}
+            connectionStatus={props.connectionStatus}
             draftCount={props.draftCount}
             mailboxId={props.mailboxId}
             unread={props.unread}
@@ -121,6 +125,7 @@ function ShellContent({
   activeSettingsTab,
   canManage,
   children,
+  connectionStatus,
   draftCount,
   mailboxId,
   mailboxes,
@@ -150,6 +155,7 @@ function ShellContent({
         activeFolder={activeFolder}
         activeSettingsTab={activeSettingsTab}
         canManage={canManage}
+        connectionStatus={connectionStatus}
         draftCount={draftCount}
         mailboxId={mailboxId}
         mailboxes={mailboxes}

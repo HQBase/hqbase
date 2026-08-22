@@ -25,6 +25,8 @@ class FakeWebSocket extends EventTarget {
     this.dispatchEvent(new CloseEvent("close"));
   });
 
+  send = vi.fn();
+
   open(): void {
     this.readyState = FakeWebSocket.OPEN;
     this.dispatchEvent(new Event("open"));
@@ -38,6 +40,7 @@ class FakeWebSocket extends EventTarget {
 function handlers() {
   return {
     onDrafts: vi.fn(),
+    onFallbackPoll: vi.fn(),
     onMailboxes: vi.fn(),
     onMessages: vi.fn(),
     onReconnect: vi.fn()
@@ -69,7 +72,9 @@ describe("useMailEvents", () => {
     const socket = FakeWebSocket.instances[0];
 
     expect(socket?.url).toBe("ws://localhost:3000/api/v1/events");
+    expect(hook.result).toBe("connecting");
     await flushHookEffects(() => socket?.open());
+    expect(hook.result).toBe("connected");
     expect(callbacks.onReconnect).toHaveBeenCalledOnce();
 
     await flushHookEffects(() => {
@@ -140,6 +145,63 @@ describe("useMailEvents", () => {
     expect(FakeWebSocket.instances).toHaveLength(1);
     await flushHookEffects(() => vi.advanceTimersByTime(1));
     expect(FakeWebSocket.instances).toHaveLength(2);
+    await hook.unmount();
+  });
+
+  it("uses successful fallback sync while reconnecting", async () => {
+    const callbacks = handlers();
+    callbacks.onFallbackPoll.mockResolvedValue(undefined);
+    const hook = await renderHook(() => useMailEvents("user-1", callbacks), undefined);
+    const socket = FakeWebSocket.instances[0];
+    await flushHookEffects(() => socket?.open());
+    await flushHookEffects(() => socket?.close());
+
+    expect(callbacks.onFallbackPoll).toHaveBeenCalledOnce();
+    expect(hook.result).toBe("fallback");
+    await hook.unmount();
+  });
+
+  it("reports unavailable when both live events and fallback sync fail", async () => {
+    const callbacks = handlers();
+    callbacks.onFallbackPoll.mockRejectedValue(new Error("API unavailable"));
+    const hook = await renderHook(() => useMailEvents("user-1", callbacks), undefined);
+    const socket = FakeWebSocket.instances[0];
+    await flushHookEffects(() => socket?.open());
+    await flushHookEffects(() => socket?.close());
+
+    expect(hook.result).toBe("unavailable");
+    await hook.unmount();
+  });
+
+  it("checks an open socket with an application heartbeat", async () => {
+    vi.useFakeTimers();
+    const hook = await renderHook(() => useMailEvents("user-1", handlers()), undefined);
+    const socket = FakeWebSocket.instances[0];
+    await flushHookEffects(() => socket?.open());
+
+    await flushHookEffects(() => vi.advanceTimersByTime(30_000));
+    expect(socket?.send).toHaveBeenCalledWith("ping");
+    await flushHookEffects(() => socket?.message("pong"));
+    await flushHookEffects(() => vi.advanceTimersByTime(10_000));
+
+    expect(socket?.close).not.toHaveBeenCalled();
+    expect(hook.result).toBe("connected");
+    await hook.unmount();
+  });
+
+  it("falls back and reconnects when the heartbeat expires", async () => {
+    vi.useFakeTimers();
+    const callbacks = handlers();
+    callbacks.onFallbackPoll.mockResolvedValue(undefined);
+    const hook = await renderHook(() => useMailEvents("user-1", callbacks), undefined);
+    const socket = FakeWebSocket.instances[0];
+    await flushHookEffects(() => socket?.open());
+
+    await flushHookEffects(() => vi.advanceTimersByTime(40_000));
+
+    expect(socket?.close).toHaveBeenCalledWith(4000, "Heartbeat timed out.");
+    expect(callbacks.onFallbackPoll).toHaveBeenCalledOnce();
+    expect(hook.result).toBe("fallback");
     await hook.unmount();
   });
 });

@@ -112,6 +112,35 @@ describe("mail shell", () => {
     expect(topBarHtml).not.toContain('aria-label="Hide sidebar"');
   });
 
+  it("shows an accessible mail connection status beside the sidebar title", () => {
+    const labels = {
+      connecting: "Connecting to live updates",
+      connected: "Live updates connected",
+      fallback: "Using fallback sync while live updates reconnect",
+      unavailable: "Cannot connect to HQBase"
+    } as const;
+
+    for (const [connectionStatus, label] of Object.entries(labels)) {
+      const html = renderToStaticMarkup(
+        <Sidebar
+          activeFolder="inbox"
+          connectionStatus={connectionStatus as keyof typeof labels}
+          mailboxId="all"
+          unread={unread}
+          user={user}
+          onFolderChange={() => undefined}
+          onSignedOut={() => undefined}
+        />
+      );
+
+      expect(html).toContain(`data-connection-status="${connectionStatus}"`);
+      expect(html).toContain(`aria-label="${label}"`);
+      expect(html.indexOf(">Mail</span>")).toBeLessThan(
+        html.indexOf(`data-connection-status="${connectionStatus}"`)
+      );
+    }
+  });
+
   it("renders the canonical logo instead of the HQ placeholder", () => {
     const html = renderToStaticMarkup(
       <Sidebar

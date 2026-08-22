@@ -122,11 +122,20 @@ export function App(): React.ReactElement {
     if (!currentUser.passwordSetupRequired) await loadWorkspace(currentUser);
   }, [currentUserId, loadWorkspace]);
   const refreshRealtimeState = React.useCallback(async () => {
-    await Promise.allSettled([refreshWorkspace(), mailSync.refresh(), draftState.refresh()]);
+    const results = await Promise.allSettled([
+      refreshWorkspace(),
+      mailSync.refresh(),
+      draftState.refresh()
+    ]);
+    if (results.every((result) => result.status === "rejected")) {
+      const failure = results.find((result) => result.status === "rejected");
+      throw failure?.reason;
+    }
   }, [draftState.refresh, mailSync.refresh, refreshWorkspace]);
 
-  useMailEvents(currentUserId, {
+  const connectionStatus = useMailEvents(currentUserId, {
     onDrafts: draftState.refresh,
+    onFallbackPoll: refreshRealtimeState,
     onMailboxes: refreshRealtimeState,
     onMessages: mailSync.refresh,
     onReconnect: refreshRealtimeState
@@ -210,6 +219,7 @@ export function App(): React.ReactElement {
         activeFolder={activeFolder}
         activeSettingsTab={settingsTab}
         canManage={user.role === "owner" || user.role === "admin"}
+        connectionStatus={connectionStatus}
         draftCount={draftState.drafts.length}
         mailboxId={mailboxId}
         mailboxes={contentMailboxes}

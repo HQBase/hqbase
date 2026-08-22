@@ -12,6 +12,7 @@ import {
   SelectValue
 } from "@/components/ui/select";
 import type { CurrentUser } from "@/features/auth/types";
+import type { MailConnectionStatus } from "@/features/events/types";
 import type { Mailbox } from "@/features/mailboxes/types";
 import type { UnreadCounts } from "@/features/notifications/types";
 import { mailboxUnreadLabel } from "@/features/notifications/unread";
@@ -22,6 +23,7 @@ type TopBarProps = {
   activeFolder: FolderId;
   activeSettingsTab?: SettingsTabId | undefined;
   canManage?: boolean | undefined;
+  connectionStatus?: MailConnectionStatus | undefined;
   draftCount: number;
   user: CurrentUser;
   mailboxes: Mailbox[];
@@ -42,6 +44,7 @@ export function TopBar({
   activeFolder,
   activeSettingsTab,
   canManage,
+  connectionStatus,
   draftCount,
   user,
   mailboxes,
@@ -76,6 +79,7 @@ export function TopBar({
         activeFolder={activeFolder}
         activeSettingsTab={activeSettingsTab}
         canManage={canManage}
+        connectionStatus={connectionStatus}
         draftCount={draftCount}
         mailboxId={mailboxId}
         mailboxes={mailboxes}
