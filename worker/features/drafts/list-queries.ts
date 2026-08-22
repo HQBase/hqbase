@@ -63,15 +63,21 @@ export async function getDraftsByIds(
   ids: string[]
 ): Promise<Draft[]> {
   if (ids.length === 0) return [];
-  const rows = await getRows<DraftRow>(
-    db,
-    sql`SELECT * FROM drafts
-        WHERE user_id = ${userId}
-          AND id IN (${sql.join(
-            ids.map((id) => sql`${id}`),
-            sql`, `
-          )})`
-  );
+  const rows: DraftRow[] = [];
+  for (let index = 0; index < ids.length; index += 99) {
+    const batch = ids.slice(index, index + 99);
+    rows.push(
+      ...(await getRows<DraftRow>(
+        db,
+        sql`SELECT * FROM drafts
+            WHERE user_id = ${userId}
+              AND id IN (${sql.join(
+                batch.map((id) => sql`${id}`),
+                sql`, `
+              )})`
+      ))
+    );
+  }
   return mapDraftRows(db, rows);
 }
 

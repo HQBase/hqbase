@@ -2,6 +2,10 @@ import { env, SELF } from "cloudflare:test";
 import { beforeAll, describe, expect, it } from "vitest";
 
 import { createAuth } from "../../../worker/auth/auth";
+import {
+  listAccessibleDraftPage,
+  requireDraftAccess
+} from "../../../worker/features/drafts/access";
 import { encodeDraftChangeCursor } from "../../../worker/features/drafts/change-cursor";
 import { encodeChangeCursor } from "../../../worker/features/messages/change-cursor";
 import { applyCurrentMigrations } from "./current-migrations";
@@ -234,6 +238,77 @@ describe("HQBase Mail API draft synchronization", () => {
     expect(deletion.changes).toEqual([{ type: "delete", draftId: "drf_access_revoked" }]);
   });
 
+  it("uses the same access rules for banned users and inaccessible message targets", async () => {
+    const stamp = "2026-08-22T05:00:00.000Z";
+    await env.DB.batch([
+      threadRow("thr_draft_secret_target", stamp),
+      messageRow(
+        "msg_draft_secret_target",
+        "thr_draft_secret_target",
+        "mbx_draft_sync_secret",
+        stamp
+      ),
+      draftRow("drf_secret_target", "mbx_draft_sync", stamp)
+    ]);
+    await env.DB.prepare("UPDATE drafts SET reply_to_message_id = ? WHERE id = 'drf_secret_target'")
+      .bind("msg_draft_secret_target")
+      .run();
+
+    const listed = await apiFetch("/api/v1/drafts?limit=100", sendToken);
+    expect(listed.status, await listed.clone().text()).toBe(200);
+    expect((await listed.json<Array<{ id: string }>>()).map((draft) => draft.id)).not.toContain(
+      "drf_secret_target"
+    );
+    await expect(
+      requireDraftAccess(
+        env,
+        { role: "member", userId },
+        {
+          mailboxId: "mbx_draft_sync",
+          from: "draft-sync@example.com",
+          replyToMessageId: "msg_draft_secret_target",
+          forwardOfMessageId: null
+        }
+      )
+    ).rejects.toMatchObject({ code: "MAILBOX_FORBIDDEN", status: 403 });
+
+    await env.DB.prepare(`UPDATE "user" SET banned = 1 WHERE id = ?`).bind(userId).run();
+    try {
+      const page = await listAccessibleDraftPage(env, { role: "member", userId }, { limit: 100 });
+      expect(page.drafts).toEqual([]);
+      await expect(
+        requireDraftAccess(
+          env,
+          { role: "member", userId },
+          {
+            mailboxId: null,
+            from: "",
+            replyToMessageId: null,
+            forwardOfMessageId: null
+          }
+        )
+      ).rejects.toMatchObject({ code: "MAILBOX_FORBIDDEN", status: 403 });
+    } finally {
+      await env.DB.prepare(`UPDATE "user" SET banned = 0 WHERE id = ?`).bind(userId).run();
+    }
+  });
+
+  it("loads a full 100-change page within the D1 parameter limit", async () => {
+    const cursor = await checkpoint();
+    const stamp = "2026-08-22T06:00:00.000Z";
+    await env.DB.batch(
+      Array.from({ length: 100 }, (_, index) =>
+        draftRow(`drf_full_page_${String(index).padStart(3, "0")}`, "mbx_draft_sync", stamp)
+      )
+    );
+
+    const page = await changePage(
+      await apiFetch(`/api/v1/drafts/changes?cursor=${cursor}&limit=100`, sendToken)
+    );
+    expect(page.hasMore).toBe(false);
+    expect(page.changes).toHaveLength(100);
+  });
+
   it("validates scope, filters, limits, and foreign cursors", async () => {
     const noSend = await apiFetch("/api/v1/drafts/changes", readToken);
     expect(noSend.status).toBe(403);
@@ -327,6 +402,29 @@ function grantRow(mailboxId: string, stamp: string): D1PreparedStatement {
     `INSERT INTO mailbox_grants (mailbox_id, user_id, access_level, created_by, created_at, updated_at)
      VALUES (?, ?, 'agent', ?, ?, ?)`
   ).bind(mailboxId, userId, userId, stamp, stamp);
+}
+
+function threadRow(id: string, stamp: string): D1PreparedStatement {
+  return env.DB.prepare(
+    `INSERT INTO threads (id, subject_normalized, last_message_at, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?)`
+  ).bind(id, id, stamp, stamp, stamp);
+}
+
+function messageRow(
+  id: string,
+  threadId: string,
+  mailboxId: string,
+  stamp: string
+): D1PreparedStatement {
+  return env.DB.prepare(
+    `INSERT INTO messages
+     (id, thread_id, mailbox_id, direction, folder, from_address, to_json, cc_json, bcc_json,
+      subject, snippet, text_body, message_id, dedupe_key, in_reply_to, references_json,
+      received_at, sent_at, read_at, has_attachments, created_at, updated_at)
+     VALUES (?, ?, ?, 'inbound', 'inbox', 'sender@example.net', '[]', '[]', '[]', ?, '', '',
+             NULL, ?, NULL, '[]', ?, NULL, NULL, 0, ?, ?)`
+  ).bind(id, threadId, mailboxId, id, `dedupe-${id}`, stamp, stamp, stamp);
 }
 
 function draftRow(id: string, mailboxId: string, stamp: string): D1PreparedStatement {
