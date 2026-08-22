@@ -9,6 +9,7 @@ import { AppError } from "../../lib/errors";
 import type { MessageAction } from "./actions";
 import { buildMessageActionPatch } from "./actions";
 import { decodeKeysetCursor, encodeKeysetCursor, type KeysetCursor } from "./keyset-cursor";
+import { literalSearchPattern } from "./search";
 import type {
   AttachmentRow,
   InsertAttachmentInput,
@@ -155,10 +156,11 @@ export async function listMessagePage(
     where.push(sql`mailbox_id = ${filters.mailboxId}`);
   }
   if (filters.search) {
-    const like = `%${filters.search}%`;
+    const like = literalSearchPattern(filters.search);
     where.push(
-      sql`(subject LIKE ${like} OR from_address LIKE ${like} OR to_json LIKE ${like}
-           OR snippet LIKE ${like} OR text_body LIKE ${like})`
+      sql`(subject LIKE ${like} ESCAPE '\\' OR from_address LIKE ${like} ESCAPE '\\'
+           OR to_json LIKE ${like} ESCAPE '\\' OR snippet LIKE ${like} ESCAPE '\\'
+           OR text_body LIKE ${like} ESCAPE '\\')`
     );
   }
 
