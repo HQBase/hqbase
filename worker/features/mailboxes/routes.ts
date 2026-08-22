@@ -6,6 +6,7 @@ import type { HonoApp } from "../../lib/env";
 import { readJson } from "../../lib/json";
 import { parseWith } from "../../lib/validation";
 import { recordAudit } from "../audit/service";
+import { ignoreMailEventFailure, publishMailboxMailEvent } from "../events/service";
 
 import { listMailboxesForUser } from "./queries";
 import {
@@ -42,6 +43,7 @@ mailboxRoutes.post("/", async (c) => {
     resourceId: mailbox.id,
     outcome: "success"
   });
+  scheduleMailboxEvent(c, mailbox.id);
   return c.json(mailbox, 201);
 });
 
@@ -60,6 +62,7 @@ mailboxRoutes.patch("/:id", async (c) => {
     resourceId: c.req.param("id"),
     outcome: "success"
   });
+  scheduleMailboxEvent(c, c.req.param("id"));
   return c.json(updated);
 });
 
@@ -80,6 +83,7 @@ mailboxRoutes.post("/:id/addresses", async (c) => {
     resourceId: c.req.param("id"),
     outcome: "success"
   });
+  scheduleMailboxEvent(c, c.req.param("id"));
   return c.json(address, 201);
 });
 
@@ -96,5 +100,10 @@ mailboxRoutes.delete("/:id/addresses/:addressId", async (c) => {
     resourceId: c.req.param("id"),
     outcome: "success"
   });
+  scheduleMailboxEvent(c, c.req.param("id"));
   return c.body(null, 204);
 });
+
+function scheduleMailboxEvent(c: Context<HonoApp>, mailboxId: string): void {
+  c.executionCtx.waitUntil(ignoreMailEventFailure(publishMailboxMailEvent(c.env, mailboxId)));
+}

@@ -11,7 +11,6 @@ vi.mock("@worker/features/mailboxes/queries", () => ({
 vi.mock("@worker/features/mailboxes/address-queries", () => ({
   findAddressIdentity: vi.fn().mockResolvedValue(null)
 }));
-
 vi.mock("@worker/features/messages/queries", () => ({
   getMessageDetail: vi.fn(),
   getMessageHtmlKey: vi.fn(),
@@ -76,6 +75,7 @@ describe("send service", () => {
     HQBASE_RELEASE_MANIFEST_URL:
       "https://github.com/HQBase/hqbase/releases/latest/download/stable.json",
     HQBASE_WORKER_NAME: "hqbase",
+    MAIL_EVENTS: {} as WorkerEnv["MAIL_EVENTS"],
     MAIL_OBJECTS: { get, put } as unknown as R2Bucket,
     MAIL_SENDER: { send } as unknown as SendEmail,
     HQBASE_JOBS: {} as Queue

@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   requireDraftIdAccess: vi.fn(),
   requireMailApiContext: vi.fn(),
   requireMailboxAccess: vi.fn(),
+  scheduleSentMailEvents: vi.fn(),
   sendForwardDraft: vi.fn(),
   sendNewMessage: vi.fn()
 }));
@@ -30,6 +31,9 @@ vi.mock("@worker/features/drafts/access", () => ({
   getAccessibleDraft: mocks.getAccessibleDraft,
   requireDraftAttachmentIdsAccess: mocks.requireDraftAttachmentIdsAccess,
   requireDraftIdAccess: mocks.requireDraftIdAccess
+}));
+vi.mock("@worker/features/events/service", () => ({
+  scheduleSentMailEvents: mocks.scheduleSentMailEvents
 }));
 vi.mock("@worker/features/mailboxes/queries", () => ({
   findMailboxForSending: mocks.findMailboxForSending
@@ -94,6 +98,11 @@ describe("send routes", () => {
       "agent"
     );
     expect(mocks.sendNewMessage).toHaveBeenCalledOnce();
+    expect(mocks.scheduleSentMailEvents).toHaveBeenCalledWith(
+      expect.objectContaining({ DB: db }),
+      expect.any(Function),
+      { draftId: "draft-forward", mailboxId: "mailbox-1", userId: "user-1" }
+    );
   });
 
   it("includes original attachments when sending a web forward draft", async () => {
@@ -133,5 +142,10 @@ describe("send routes", () => {
       "user-1"
     );
     expect(mocks.sendNewMessage).not.toHaveBeenCalled();
+    expect(mocks.scheduleSentMailEvents).toHaveBeenCalledWith(
+      expect.objectContaining({ DB: db }),
+      expect.any(Function),
+      { draftId: "draft-forward", mailboxId: "mailbox-1", userId: "user-1" }
+    );
   });
 });

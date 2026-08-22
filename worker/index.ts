@@ -3,12 +3,17 @@ import { sql } from "drizzle-orm";
 import { handleMailApiMetadata } from "./auth/mail-api";
 import { getRow } from "./db/drizzle";
 import { handleInboundEmail } from "./email/inbound";
+import { MailEvents } from "./features/events/durable-object";
+import { handleMailEventRoute } from "./features/events/route";
+import { ignoreMailEventFailure, publishMessageMailEvent } from "./features/events/service";
 import { handleMailApiDiscovery } from "./features/mail-api/discovery";
 import { handleMcpRoute } from "./features/mcp/route";
 import { notifyInboundMessage } from "./features/notifications/delivery";
 import { consumeJobs } from "./jobs/consumer";
 import type { WorkerEnv } from "./lib/env";
 import { apiRoutes } from "./routes";
+
+export { MailEvents };
 
 export default {
   async fetch(request: Request, env: WorkerEnv, ctx: ExecutionContext): Promise<Response> {
@@ -17,6 +22,8 @@ export default {
     if (mailApiDiscovery) return mailApiDiscovery;
     const mailApiMetadata = handleMailApiMetadata(request, env);
     if (mailApiMetadata) return mailApiMetadata;
+    const mailEventResponse = await handleMailEventRoute(request, env);
+    if (mailEventResponse) return mailEventResponse;
     const mcpResponse = await handleMcpRoute(request, env, ctx);
     if (mcpResponse) return mcpResponse;
     if (url.pathname.startsWith("/api/")) {
@@ -51,6 +58,13 @@ export default {
         notifyInboundMessage(env, stored.message, stored.isUnassigned).catch(() => {
           // Push delivery is additive and never changes accepted inbound mail.
         })
+      );
+      ctx.waitUntil(
+        ignoreMailEventFailure(
+          publishMessageMailEvent(env, [
+            { isUnassigned: stored.isUnassigned, mailboxId: stored.message.mailboxId }
+          ])
+        )
       );
     }
   },

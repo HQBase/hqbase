@@ -3,7 +3,11 @@ import { isVersionedMailApiRequest, requireMailApiContext } from "../../auth/mai
 import { accessibleMessageScope } from "../../auth/mailbox-access";
 import type { HonoApp } from "../../lib/env";
 import { AppError } from "../../lib/errors";
-
+import {
+  ignoreMailEventFailure,
+  messageEventTarget,
+  publishMessageMailEvent
+} from "../events/service";
 import { requireAttachmentAccess, requireMessageAccess } from "./access";
 import type { MessageAction } from "./actions";
 import { sanitizeMessageHtml } from "./html-sanitizer";
@@ -158,7 +162,12 @@ for (const action of actions) {
       c.req.param("id"),
       action === "read" || action === "unread" ? "read" : "agent"
     );
-    return c.json(await updateMessageAction(c.env.DB, c.req.param("id"), action));
+    const message = await updateMessageAction(c.env.DB, c.req.param("id"), action);
+    const target = await messageEventTarget(c.env.DB, message.id);
+    if (target) {
+      c.executionCtx.waitUntil(ignoreMailEventFailure(publishMessageMailEvent(c.env, [target])));
+    }
+    return c.json(message);
   });
 }
 

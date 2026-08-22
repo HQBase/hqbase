@@ -43,6 +43,15 @@
       "bucket_name": "hqbase-mail"
     }
   ],
+  "durable_objects": {
+    "bindings": [{ "name": "MAIL_EVENTS", "class_name": "MailEvents" }]
+  },
+  "migrations": [
+    {
+      "tag": "mail-events-v1",
+      "new_sqlite_classes": ["MailEvents"]
+    }
+  ],
   "queues": {
     "producers": [{ "binding": "HQBASE_JOBS", "queue": "hqbase-jobs" }],
     "consumers": [

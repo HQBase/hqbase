@@ -14,6 +14,7 @@ import {
 import type { CurrentUser } from "@/features/auth/types";
 import { DraftsPage } from "@/features/drafts/drafts-page";
 import { useDrafts } from "@/features/drafts/use-drafts";
+import { useMailEvents } from "@/features/events/use-mail-events";
 import { InboxPage } from "@/features/inbox/inbox-page";
 import { listMailboxes } from "@/features/mailboxes/api";
 import type { Mailbox } from "@/features/mailboxes/types";
@@ -114,6 +115,32 @@ export function App(): React.ReactElement {
     }
   }, [loadWorkspace]);
 
+  const refreshWorkspace = React.useCallback(async () => {
+    if (!currentUserId) return;
+    const currentUser = await getCurrentUser();
+    setUser(currentUser);
+    if (!currentUser.passwordSetupRequired) await loadWorkspace(currentUser);
+  }, [currentUserId, loadWorkspace]);
+  const refreshRealtimeState = React.useCallback(async () => {
+    const results = await Promise.allSettled([
+      refreshWorkspace(),
+      mailSync.refresh(),
+      draftState.refresh()
+    ]);
+    if (results.every((result) => result.status === "rejected")) {
+      const failure = results.find((result) => result.status === "rejected");
+      throw failure?.reason;
+    }
+  }, [draftState.refresh, mailSync.refresh, refreshWorkspace]);
+
+  const connectionStatus = useMailEvents(currentUserId, {
+    onDrafts: draftState.refresh,
+    onFallbackPoll: refreshRealtimeState,
+    onMailboxes: refreshRealtimeState,
+    onMessages: mailSync.refresh,
+    onReconnect: refreshRealtimeState
+  });
+
   React.useEffect(() => {
     if (publicAuthenticationPath) return;
     void reload();
@@ -192,6 +219,7 @@ export function App(): React.ReactElement {
         activeFolder={activeFolder}
         activeSettingsTab={settingsTab}
         canManage={user.role === "owner" || user.role === "admin"}
+        connectionStatus={connectionStatus}
         draftCount={draftState.drafts.length}
         mailboxId={mailboxId}
         mailboxes={contentMailboxes}

@@ -4,6 +4,7 @@ import { requireMailApiContext } from "../../auth/mail-api";
 import { accessibleMessageScope } from "../../auth/mailbox-access";
 import type { HonoApp } from "../../lib/env";
 import { parseWith } from "../../lib/validation";
+import { ignoreMailEventFailure, publishMessageMailEvent } from "../events/service";
 import { requireMessageAccess } from "./access";
 import type { MessageAction } from "./actions";
 import { listConversationPage, updateConversationAction } from "./conversation-queries";
@@ -58,13 +59,17 @@ for (const action of actions) {
       requiredAccess
     );
     const body = parseWith(actionBodySchema, await c.req.json<unknown>().catch(() => ({})));
-    return c.json(
-      await updateConversationAction(c.env.DB, {
-        action,
-        activeFolder: body.folder,
-        messageId: c.req.param("id"),
-        scope
-      })
-    );
+    const { eventTargets, ...result } = await updateConversationAction(c.env.DB, {
+      action,
+      activeFolder: body.folder,
+      messageId: c.req.param("id"),
+      scope
+    });
+    if (eventTargets.length > 0) {
+      c.executionCtx.waitUntil(
+        ignoreMailEventFailure(publishMessageMailEvent(c.env, eventTargets))
+      );
+    }
+    return c.json(result);
   });
 }

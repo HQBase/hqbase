@@ -54,6 +54,9 @@
       "MAIL_OBJECTS": {
         "description": "Create a new R2 bucket for this HQBase workspace."
       },
+      "MAIL_EVENTS": {
+        "description": "Hibernating Durable Object used for access-scoped mail synchronization wake-ups."
+      },
       "HQBASE_JOBS": {
         "description": "Queue used for bounded maintenance and integrity jobs with a dead-letter queue."
       },

@@ -4,6 +4,7 @@ import { PiList } from "react-icons/pi";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import type { CurrentUser } from "@/features/auth/types";
+import type { MailConnectionStatus } from "@/features/events/types";
 import type { Mailbox } from "@/features/mailboxes/types";
 import type { UnreadCounts } from "@/features/notifications/types";
 import type { FolderId, SettingsTabId } from "@/lib/routes";
@@ -13,6 +14,7 @@ type MobileNavigationProps = {
   activeFolder: FolderId;
   activeSettingsTab?: SettingsTabId | undefined;
   canManage?: boolean | undefined;
+  connectionStatus?: MailConnectionStatus | undefined;
   draftCount: number;
   mailboxId: string;
   mailboxes: Mailbox[];
@@ -29,6 +31,7 @@ export function MobileNavigation({
   activeFolder,
   activeSettingsTab,
   canManage,
+  connectionStatus,
   draftCount,
   mailboxId,
   mailboxes,
@@ -93,6 +96,7 @@ export function MobileNavigation({
           activeFolder={activeFolder}
           activeSettingsTab={activeSettingsTab}
           canManage={canManage}
+          connectionStatus={connectionStatus}
           draftCount={draftCount}
           mailboxId={mailboxId}
           mailboxFilter={{

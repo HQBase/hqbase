@@ -8,6 +8,7 @@ import { parseWith } from "../../lib/validation";
 import { enforceRateLimit } from "../../security/rate-limit";
 import { recordAudit } from "../audit/service";
 import { requireDraftAttachmentIdsAccess, requireDraftIdAccess } from "../drafts/access";
+import { type MailEventScheduler, scheduleSentMailEvents } from "../events/service";
 import { findMailboxForSending } from "../mailboxes/queries";
 import { requireMessageAccess } from "../messages/access";
 import { forwardMessage } from "../send/forward";
@@ -23,7 +24,8 @@ const attachmentIds = z.array(z.string().min(1).max(100)).max(20).default([]);
 export function registerSendTools(
   server: McpServer,
   env: WorkerEnv,
-  principal: McpPrincipal
+  principal: McpPrincipal,
+  schedule: MailEventScheduler
 ): void {
   if (!principal.scopes.has("mail:send")) return;
 
@@ -53,6 +55,11 @@ export function registerSendTools(
         await requireDraftIdAccess(env, principal, parsed.draftId);
         await requireDraftAttachmentIdsAccess(env, principal, parsed.attachmentIds);
         const message = await sendNewMessage(env, parsed, principal.userId);
+        scheduleSentMailEvents(env, schedule, {
+          draftId: parsed.draftId,
+          mailboxId,
+          userId: principal.userId
+        });
         await recordSend(env, principal, "mcp.message.send", mailboxId);
         return message;
       })
@@ -85,6 +92,11 @@ export function registerSendTools(
         await requireDraftIdAccess(env, principal, parsed.draftId);
         await requireDraftAttachmentIdsAccess(env, principal, parsed.attachmentIds);
         const message = await replyToMessage(env, parsed, principal.userId);
+        scheduleSentMailEvents(env, schedule, {
+          draftId: parsed.draftId,
+          mailboxId,
+          userId: principal.userId
+        });
         await recordSend(env, principal, "mcp.message.reply", mailboxId);
         return message;
       })
@@ -117,6 +129,7 @@ export function registerSendTools(
         const mailboxId = await requireSendingAccess(env, principal, parsed.from);
         await requireDraftAttachmentIdsAccess(env, principal, parsed.attachmentIds);
         const message = await forwardMessage(env, parsed, principal.userId);
+        scheduleSentMailEvents(env, schedule, { mailboxId, userId: principal.userId });
         await recordSend(env, principal, "mcp.message.forward", mailboxId);
         return message;
       })

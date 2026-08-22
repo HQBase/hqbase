@@ -8,6 +8,7 @@ import { AppError } from "../../lib/errors";
 import { readJson } from "../../lib/json";
 import { parseWith } from "../../lib/validation";
 import { recordAudit } from "../audit/service";
+import { ignoreMailEventFailure, publishUserMailEvent } from "../events/service";
 
 import { listUsers, setWorkspaceUserRole } from "./queries";
 import {
@@ -125,6 +126,9 @@ userRoutes.patch("/:id", async (c) => {
     outcome: "success",
     metadata: { role: input.role }
   });
+  c.executionCtx.waitUntil(
+    ignoreMailEventFailure(publishUserMailEvent(c.env, c.req.param("id"), "mailboxes"))
+  );
   return c.json({ ok: true });
 });
 

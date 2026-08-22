@@ -6,6 +6,7 @@ import { nowIso } from "../../db/client";
 import { createDatabase, getRow, getRows } from "../../db/drizzle";
 import { messages } from "../../db/schema";
 import { AppError } from "../../lib/errors";
+import type { MessageEventTarget } from "../events/service";
 
 import type { MessageAction } from "./actions";
 import { decodeKeysetCursor, encodeKeysetCursor, type KeysetCursor } from "./keyset-cursor";
@@ -154,7 +155,11 @@ export async function updateConversationAction(
     messageId: string;
     scope: MessageScope;
   }
-): Promise<{ affected: number; threadId: string }> {
+): Promise<{
+  affected: number;
+  eventTargets: MessageEventTarget[];
+  threadId: string;
+}> {
   const scope = messageScopeCondition(input.scope, "mailbox_id", "is_unassigned");
   if (!scope) {
     throw new AppError("MAILBOX_FORBIDDEN", "You do not have access to this mailbox.", 403);
@@ -232,8 +237,15 @@ export async function updateConversationAction(
     .update(messages)
     .set(set)
     .where(and(...conditions))
-    .returning({ id: messages.id });
-  return { affected: result.length, threadId: selected.thread_id };
+    .returning({ isUnassigned: messages.isUnassigned, mailboxId: messages.mailboxId });
+  return {
+    affected: result.length,
+    eventTargets: result.map((row) => ({
+      isUnassigned: row.isUnassigned,
+      mailboxId: row.mailboxId
+    })),
+    threadId: selected.thread_id
+  };
 }
 
 function mapConversationSummary(row: ConversationRow): ConversationSummary {

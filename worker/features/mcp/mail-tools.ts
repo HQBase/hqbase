@@ -5,6 +5,12 @@ import { accessibleMessageScope } from "../../auth/mailbox-access";
 import type { WorkerEnv } from "../../lib/env";
 import { AppError } from "../../lib/errors";
 import { recordAudit } from "../audit/service";
+import {
+  type MailEventScheduler,
+  messageEventTarget,
+  publishMessageMailEvent,
+  scheduleMailEvent
+} from "../events/service";
 import { listMailboxesForUser } from "../mailboxes/queries";
 import { requireAttachmentAccess, requireMessageAccess } from "../messages/access";
 import { listConversations, updateConversationAction } from "../messages/conversation-queries";
@@ -36,10 +42,11 @@ const conversationFolderSchema = z.enum(conversationFolders);
 export function registerMailTools(
   server: McpServer,
   env: WorkerEnv,
-  principal: McpPrincipal
+  principal: McpPrincipal,
+  schedule: MailEventScheduler
 ): void {
   if (principal.scopes.has("mail:read")) registerReadTools(server, env, principal);
-  if (principal.scopes.has("mail:write")) registerWriteTools(server, env, principal);
+  if (principal.scopes.has("mail:write")) registerWriteTools(server, env, principal, schedule);
 }
 
 function registerReadTools(server: McpServer, env: WorkerEnv, principal: McpPrincipal): void {
@@ -177,7 +184,12 @@ function registerReadTools(server: McpServer, env: WorkerEnv, principal: McpPrin
   );
 }
 
-function registerWriteTools(server: McpServer, env: WorkerEnv, principal: McpPrincipal): void {
+function registerWriteTools(
+  server: McpServer,
+  env: WorkerEnv,
+  principal: McpPrincipal,
+  schedule: MailEventScheduler
+): void {
   server.registerTool(
     "update_message",
     {
@@ -193,6 +205,10 @@ function registerWriteTools(server: McpServer, env: WorkerEnv, principal: McpPri
       toolResult(async () => {
         await requireMessageAccess(env.DB, principal.userId, principal.role, messageId, "agent");
         const message = await updateMessageAction(env.DB, messageId, action);
+        const target = await messageEventTarget(env.DB, message.id);
+        if (target) {
+          scheduleMailEvent(schedule, publishMessageMailEvent(env, [target]));
+        }
         await recordMutation(env, principal, `mcp.message.${action}`, "message", messageId);
         return message;
       })
@@ -219,12 +235,15 @@ function registerWriteTools(server: McpServer, env: WorkerEnv, principal: McpPri
           principal.role,
           "agent"
         );
-        const result = await updateConversationAction(env.DB, {
+        const { eventTargets, ...result } = await updateConversationAction(env.DB, {
           action,
           activeFolder,
           messageId,
           scope
         });
+        if (eventTargets.length > 0) {
+          scheduleMailEvent(schedule, publishMessageMailEvent(env, eventTargets));
+        }
         await recordMutation(
           env,
           principal,

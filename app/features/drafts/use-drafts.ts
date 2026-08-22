@@ -3,8 +3,6 @@ import * as React from "react";
 import { listDrafts } from "./api";
 import type { Draft } from "./types";
 
-const refreshIntervalMs = 10_000;
-
 export function useDrafts(userId: string | null): {
   drafts: Draft[];
   isLoading: boolean;
@@ -44,14 +42,9 @@ export function useDrafts(userId: string | null): {
     const refreshWhenVisible = (): void => {
       if (document.visibilityState === "visible") void refresh().catch(() => undefined);
     };
-    const interval = window.setInterval(
-      () => void refresh().catch(() => undefined),
-      refreshIntervalMs
-    );
     window.addEventListener("focus", refreshWhenVisible);
     document.addEventListener("visibilitychange", refreshWhenVisible);
     return () => {
-      window.clearInterval(interval);
       window.removeEventListener("focus", refreshWhenVisible);
       document.removeEventListener("visibilitychange", refreshWhenVisible);
     };
