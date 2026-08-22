@@ -19,6 +19,7 @@ jobs:
       contents: write
     outputs:
       artifact_name: ${{ steps.metadata.outputs.artifact_name }}
+      commit: ${{ steps.metadata.outputs.commit }}
       draft_created: ${{ steps.draft.outputs.created }}
       previous_tag: ${{ steps.metadata.outputs.previous_tag }}
       version: ${{ steps.metadata.outputs.version }}
@@ -79,6 +80,7 @@ jobs:
           artifact_name="hqbase-release-${release_version}-${GITHUB_SHA}"
           echo "HQBASE_RELEASE_VERSION=$release_version" >> "$GITHUB_ENV"
           echo "artifact_name=$artifact_name" >> "$GITHUB_OUTPUT"
+          echo "commit=$GITHUB_SHA" >> "$GITHUB_OUTPUT"
           echo "previous_tag=$previous_tag" >> "$GITHUB_OUTPUT"
           echo "version=$release_version" >> "$GITHUB_OUTPUT"
       - run: pnpm install --frozen-lockfile
@@ -293,11 +295,41 @@ jobs:
       contents: write
     env:
       GH_TOKEN: ${{ github.token }}
+      RELEASE_COMMIT: ${{ needs.candidate.outputs.commit }}
       HQBASE_RELEASE_VERSION: ${{ needs.candidate.outputs.version }}
     steps:
       - uses: actions/checkout@v6
+      - name: Read current Deploy Button source
+        id: deploy_source
+        run: |
+          previous_commit="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/deploy" --jq .object.sha)"
+          test -n "$previous_commit"
+          echo "previous_commit=$previous_commit" >> "$GITHUB_OUTPUT"
+      - name: Advance Deploy Button source to validated candidate
+        id: advance_deploy
+        run: >-
+          gh api --method PATCH "repos/$GITHUB_REPOSITORY/git/refs/heads/deploy"
+          -f sha="$RELEASE_COMMIT"
       - name: Publish the validated draft
+        id: publish_release
         run: gh release edit "v${HQBASE_RELEASE_VERSION}" --draft=false --latest
+      - name: Restore Deploy Button source after publication failure
+        if: ${{ failure() && steps.advance_deploy.outcome == 'success' && steps.publish_release.outcome == 'failure' }}
+        env:
+          PREVIOUS_DEPLOY_COMMIT: ${{ steps.deploy_source.outputs.previous_commit }}
+        run: |
+          if test "$(gh release view "v${HQBASE_RELEASE_VERSION}" --json isDraft --jq .isDraft)" != "true"; then
+            echo "::warning title=Deploy branch retained::The release is public, so the validated Deploy Button source was not rolled back."
+            exit 0
+          fi
+          current_commit="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/deploy" --jq .object.sha)"
+          if test "$current_commit" != "$RELEASE_COMMIT"; then
+            echo "Deploy branch moved after the candidate update; refusing to overwrite it." >&2
+            exit 1
+          fi
+          gh api --method PATCH "repos/$GITHUB_REPOSITORY/git/refs/heads/deploy" \
+            -f sha="$PREVIOUS_DEPLOY_COMMIT" \
+            -F force=true
       - name: Verify public stable asset, signature, and digest
         run: |
           stable_url="https://github.com/HQBase/hqbase/releases/latest/download/stable.json"
@@ -310,6 +342,8 @@ jobs:
             test "$attempt" -lt 30
             sleep 2
           done
+          deploy_commit="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/deploy" --jq .object.sha)"
+          test "$deploy_commit" = "$RELEASE_COMMIT"
           node --input-type=module -e '
             import { createHash, createPublicKey, verify } from "node:crypto";
             import { readFileSync, statSync } from "node:fs";
