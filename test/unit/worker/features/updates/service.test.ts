@@ -69,6 +69,51 @@ describe("HQBase updates", () => {
     ]);
     expect(fetcher.mock.calls.some(([, init]) => init?.method === "DELETE")).toBe(false);
   });
+  it("rejects an overlapping update before it can replace the shared release pin", async () => {
+    let firstPinStarted: (() => void) | undefined;
+    let releaseFirstPin: (() => void) | undefined;
+    const firstPinReady = new Promise<void>((resolve) => {
+      firstPinStarted = resolve;
+    });
+    const firstPinCanFinish = new Promise<void>((resolve) => {
+      releaseFirstPin = resolve;
+    });
+    const environment = updateEnvironment();
+    const firstFetcher = cloudflareUpdateFetcher({
+      beforeFirstPin: async () => {
+        firstPinStarted?.();
+        await firstPinCanFinish;
+      }
+    });
+    const first = triggerUpdate(
+      environment,
+      "temporary-token-that-is-long-enough",
+      "0.1.0",
+      firstFetcher as typeof fetch
+    );
+    await firstPinReady;
+    const secondFetcher = cloudflareUpdateFetcher();
+
+    try {
+      await expect(
+        triggerUpdate(
+          environment,
+          "temporary-token-that-is-long-enough",
+          "0.1.0",
+          secondFetcher as typeof fetch
+        )
+      ).rejects.toMatchObject({ code: "UPDATE_IN_PROGRESS", status: 409 });
+      expect(
+        secondFetcher.mock.calls.some(
+          ([input, init]) =>
+            String(input).endsWith("/environment_variables") && init?.method === "PATCH"
+        )
+      ).toBe(false);
+    } finally {
+      releaseFirstPin?.();
+    }
+    await expect(first).resolves.toEqual({ buildId: "build-id", status: "queued" });
+  });
   it("rejects a custom-source production trigger", async () => {
     const fetcher = cloudflareUpdateFetcher({ deployCommand: "npx wrangler deploy" });
 
@@ -239,8 +284,25 @@ describe("HQBase updates", () => {
 
 function updateEnvironment(): WorkerEnv {
   const raw = vi.fn().mockResolvedValue([[JSON.stringify("mail.example.com")]]);
+  let lockValue: string | null = null;
   const db = {
-    prepare: vi.fn(() => ({ bind: vi.fn(() => ({ raw })) }))
+    prepare: vi.fn((query: string) => ({
+      bind: vi.fn((...values: unknown[]) => ({
+        first: vi.fn(async () => {
+          if (!query.includes("INSERT INTO app_settings")) return null;
+          if (lockValue) return null;
+          lockValue = String(values[1]);
+          return { value_json: lockValue };
+        }),
+        raw,
+        run: vi.fn(async () => {
+          if (query.startsWith("DELETE FROM app_settings") && values[1] === lockValue) {
+            lockValue = null;
+          }
+          return { success: true };
+        })
+      }))
+    }))
   } as unknown as D1Database;
   return {
     DB: db,
@@ -252,6 +314,7 @@ function updateEnvironment(): WorkerEnv {
 
 function cloudflareUpdateFetcher(
   options: {
+    beforeFirstPin?: () => Promise<void>;
     branchIncludes?: string[];
     buildFails?: boolean;
     deployCommand?: string;
@@ -288,6 +351,7 @@ function cloudflareUpdateFetcher(
     }
     if (url.endsWith("/environment_variables")) {
       if (init?.method === "PATCH") pinPatches += 1;
+      if (pinPatches === 1) await options.beforeFirstPin?.();
       if (options.rollbackFails && pinPatches > 1) {
         return Response.json(
           { success: false, errors: [{ message: "Pin rollback failed." }] },

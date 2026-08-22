@@ -3,6 +3,7 @@ import { getSetting } from "../../db/client";
 import type { WorkerEnv } from "../../lib/env";
 import { AppError } from "../../lib/errors";
 import { hqbaseProductConfig } from "../../lib/product-config";
+import { withUpdateBuildLock } from "./build-lock";
 import type { ReleaseManifest, UpdateStatus } from "./types";
 
 const expectedReleaseVariable = "HQBASE_EXPECTED_RELEASE_VERSION";
@@ -46,12 +47,6 @@ export async function getUpdateStatus(
   )
     throw new AppError("UPDATE_SIGNATURE_INVALID", "Release signature verification failed.", 503);
   const release = manifestSchema.parse(JSON.parse(decodeBase64Url(envelope.payload)));
-  if (release.product !== "hqbase")
-    throw new AppError(
-      "UPDATE_PRODUCT_INVALID",
-      "Release product does not match this installation.",
-      503
-    );
   return {
     product: "hqbase",
     installedVersion,
@@ -151,49 +146,51 @@ export async function triggerUpdate(
       "Cloudflare returned an invalid production build trigger.",
       502
     );
-  const variablesUrl = `https://api.cloudflare.com/client/v4/accounts/${accountId}/builds/triggers/${triggerId}/environment_variables`;
-  const variables = await cloudflare<{
-    result: Record<string, { is_secret: boolean; value?: string | null }>;
-  }>(variablesUrl, { headers }, fetcher);
-  const sourceDeploy = variables.result[forceSourceDeployVariable];
-  if (sourceDeploy?.is_secret || sourceDeploy?.value?.trim() === "1") {
-    throw new AppError(
-      "UPDATE_TRIGGER_USES_SOURCE",
-      "Signed updates are disabled because this build trigger uses custom source. Use the custom-source deployment process instead.",
-      409
-    );
-  }
-  const previousPin = variables.result[expectedReleaseVariable];
-  if (previousPin?.is_secret) {
-    throw new AppError(
-      "UPDATE_TRIGGER_UNMANAGED",
-      "Signed updates require HQBASE_EXPECTED_RELEASE_VERSION to be a plain build variable.",
-      409
-    );
-  }
-  await setBuildVersionPin(variablesUrl, expectedVersion, headers, fetcher);
-  try {
-    const build = await cloudflare<{
-      result: { build_uuid?: string; id?: string; status?: string };
-    }>(
-      `https://api.cloudflare.com/client/v4/accounts/${accountId}/builds/triggers/${triggerId}/builds`,
-      { method: "POST", headers, body: JSON.stringify({ branch: "main" }) },
-      fetcher
-    );
-    const buildId = build.result.build_uuid ?? build.result.id;
-    if (!buildId)
+  return withUpdateBuildLock(env.DB, triggerId, async () => {
+    const variablesUrl = `https://api.cloudflare.com/client/v4/accounts/${accountId}/builds/triggers/${triggerId}/environment_variables`;
+    const variables = await cloudflare<{
+      result: Record<string, { is_secret: boolean; value?: string | null }>;
+    }>(variablesUrl, { headers }, fetcher);
+    const sourceDeploy = variables.result[forceSourceDeployVariable];
+    if (sourceDeploy?.is_secret || sourceDeploy?.value?.trim() === "1") {
       throw new AppError(
-        "UPDATE_TRIGGER_FAILED",
-        "Cloudflare did not return a build identifier.",
-        502
+        "UPDATE_TRIGGER_USES_SOURCE",
+        "Signed updates are disabled because this build trigger uses custom source. Use the custom-source deployment process instead.",
+        409
       );
-    return { buildId, status: build.result.status ?? "queued" };
-  } catch (error) {
-    await restoreBuildVersionPin(variablesUrl, previousPin, headers, fetcher).catch(
-      () => undefined
-    );
-    throw error;
-  }
+    }
+    const previousPin = variables.result[expectedReleaseVariable];
+    if (previousPin?.is_secret) {
+      throw new AppError(
+        "UPDATE_TRIGGER_UNMANAGED",
+        "Signed updates require HQBASE_EXPECTED_RELEASE_VERSION to be a plain build variable.",
+        409
+      );
+    }
+    await setBuildVersionPin(variablesUrl, expectedVersion, headers, fetcher);
+    try {
+      const build = await cloudflare<{
+        result: { build_uuid?: string; id?: string; status?: string };
+      }>(
+        `https://api.cloudflare.com/client/v4/accounts/${accountId}/builds/triggers/${triggerId}/builds`,
+        { method: "POST", headers, body: JSON.stringify({ branch: "main" }) },
+        fetcher
+      );
+      const buildId = build.result.build_uuid ?? build.result.id;
+      if (!buildId)
+        throw new AppError(
+          "UPDATE_TRIGGER_FAILED",
+          "Cloudflare did not return a build identifier.",
+          502
+        );
+      return { buildId, status: build.result.status ?? "queued" };
+    } catch (error) {
+      await restoreBuildVersionPin(variablesUrl, previousPin, headers, fetcher).catch(
+        () => undefined
+      );
+      throw error;
+    }
+  });
 }
 
 function assertManagedTrigger(trigger: {
