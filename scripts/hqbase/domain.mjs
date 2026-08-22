@@ -1,4 +1,3 @@
-import { randomUUID } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 
@@ -7,7 +6,7 @@ import {
   assertAttachmentAllowed,
   createWorkerDomainsClient,
   planAttachment,
-  requireCloudflareApiToken
+  requireDomainApiToken
 } from "./cloudflare-domains.mjs";
 import { run } from "./command.mjs";
 import { writeWranglerConfig } from "./config.mjs";
@@ -15,17 +14,24 @@ import {
   assertResumable,
   domainChangeNotes,
   hostOf,
+  migrateStagedMoveRecord,
   stagedMoveRecord,
   updateDomainManifest
 } from "./domain-plan.mjs";
+import { assertManagedHosts, domainSnapshot, rollbackDomainMove } from "./domain-recovery.mjs";
+import {
+  createDomainProbe,
+  probeServiceOrigin,
+  readCanonicalPortal,
+  setCanonicalPortal
+} from "./domain-runtime.mjs";
 import { configPath, loadManifest, writeManifest } from "./manifest.mjs";
 import { rootDir } from "./paths.mjs";
 import { prepareManifest, resolveCloudflareAccount } from "./resources.mjs";
 
-const discoveryPath = "/api/v1/openapi.json";
-
 /**
- * Move a deployment to a different canonical portal hostname without touching D1, R2, or queues.
+ * Move a deployment to a different canonical portal hostname without changing mail data or the
+ * identities of its D1, R2, and queue resources.
  *
  * The workspace has one mutable canonical portal hostname and one stable machine-facing service
  * origin (BETTER_AUTH_URL: the auth issuer, the Mail API audience, and the MCP audience). A portal
@@ -34,13 +40,20 @@ const discoveryPath = "/api/v1/openapi.json";
  *
  *   pnpm hqbase domain --name dev-01 --app-domain app.example.com
  *   pnpm hqbase domain --name dev-01 --app-domain app.example.com --move-service-origin
- *   pnpm hqbase domain --name dev-01 --detach --auth-url https://mail.example.com --yes
+ *   pnpm hqbase domain --name dev-01 --detach --move-service-origin --yes
  */
 export async function configureDomain(flags, options = {}) {
   const name = requireString(flags, "name");
   const dryRun = optionalBoolean(flags, "dry-run");
-  const skipDeploy = optionalBoolean(flags, "skip-deploy");
   const yes = optionalBoolean(flags, "yes");
+  if (flags["skip-deploy"] !== undefined) {
+    throw new Error("--skip-deploy is not supported because a partial domain move is unsafe.");
+  }
+  if (flags["override-existing"] !== undefined) {
+    throw new Error(
+      "--override-existing is not supported. Move or remove the conflicting hostname in Cloudflare before retrying."
+    );
+  }
   const environment = options.environment ?? process.env;
   const runCommand = options.runCommand ?? run;
   const checkpoint = options.checkpoint ?? writeManifest;
@@ -50,15 +63,14 @@ export async function configureDomain(flags, options = {}) {
     detach: optionalBoolean(flags, "detach"),
     detachOld: optionalBoolean(flags, "detach-old"),
     keepServiceOrigin: optionalBoolean(flags, "keep-service-origin"),
-    moveServiceOrigin: optionalBoolean(flags, "move-service-origin"),
-    override: optionalBoolean(flags, "override-existing")
+    moveServiceOrigin: optionalBoolean(flags, "move-service-origin")
   };
 
-  const committed = loadManifest(name);
-  const proposed = updateDomainManifest(committed, input);
+  const loaded = loadManifest(name);
 
   if (dryRun) {
-    reportPlan(name, committed, proposed, { dryRun: true });
+    const proposed = updateDomainManifest(loaded, input);
+    reportPlan(name, loaded, proposed, { dryRun: true });
     return proposed;
   }
   if ((input.detach || input.detachOld) && !yes) {
@@ -67,35 +79,48 @@ export async function configureDomain(flags, options = {}) {
     );
   }
 
-  const accountId = resolveCloudflareAccount(committed.accountId, { environment, runCommand });
-  const verified = prepareManifest(committed, accountId, {
+  const domainApiToken = options.domains ? null : requireDomainApiToken(environment);
+  const accountId = resolveCloudflareAccount(loaded.accountId, { environment, runCommand });
+  const verified = prepareManifest(loaded, accountId, {
     allowDomainMove: true,
     checkpoint,
     runCommand
   });
+  const proposed = updateDomainManifest(verified, input);
   const target = { ...proposed, accountId: verified.accountId };
-  assertResumable(verified, target);
+  assertResumable(verified, target, { detachOld: input.detachOld });
 
   const domains =
     options.domains ??
     createWorkerDomainsClient({
       accountId: verified.accountId,
-      token: requireCloudflareApiToken(environment)
+      token: domainApiToken
     });
   const context = {
     checkpoint,
     committed: verified,
     deployConfiguration: options.deployConfiguration ?? defaultDeployConfiguration,
     domains,
-    confirmed: yes,
-    override: input.override,
-    probe: options.probe ?? defaultProbe,
-    retry: options.retry ?? { attempts: 10, delayMs: 3000 },
+    probe: options.probe ?? createDomainProbe(environment),
+    retry: options.retry ?? { attempts: 150, delayMs: 2000 },
     runCommand,
-    skipDeploy,
+    setCanonicalPortal: options.setCanonicalPortal ?? setCanonicalPortal,
+    readCanonicalPortal: options.readCanonicalPortal ?? readCanonicalPortal,
     target
   };
 
+  if (!verified.domainMove) {
+    await assertManagedHosts(context);
+    const canonical = await context.readCanonicalPortal({
+      manifest: verified,
+      runCommand: context.runCommand
+    });
+    if (canonical !== (verified.appDomain ?? null)) {
+      throw new Error(
+        `Refusing to continue: D1 reports ${canonical ?? "no canonical portal"}, not the saved hostname ${verified.appDomain ?? "none"}.`
+      );
+    }
+  }
   const move = stageMove(verified, target, { checkpoint, detachOld: input.detachOld });
   try {
     if (target.appDomain) {
@@ -105,9 +130,10 @@ export async function configureDomain(flags, options = {}) {
     await cutover(context, move);
     await redirect(context, move);
     await detachRetiredHosts(context, move);
+    await assertManagedHosts(context, target);
     commitMove(context, move);
   } catch (error) {
-    await rollback(context, move, error);
+    await rollbackDomainMove(context, move, error);
     throw error;
   }
 
@@ -117,7 +143,8 @@ export async function configureDomain(flags, options = {}) {
 
 function stageMove(manifest, target, options) {
   const move =
-    manifest.domainMove ?? stagedMoveRecord(manifest, target, { detachOld: options.detachOld });
+    (manifest.domainMove && migrateStagedMoveRecord(manifest.domainMove)) ??
+    stagedMoveRecord(manifest, target, { detachOld: options.detachOld });
   manifest.domainMove = move;
   options.checkpoint(manifest);
   return move;
@@ -126,18 +153,17 @@ function stageMove(manifest, target, options) {
 async function attachHost(context, move) {
   const { committed, domains, target } = context;
   const hostname = target.appDomain;
-  const plan = planAttachment(await domains.list(), {
+  const plan = planAttachment(await domains.list({ hostname }), {
     hostname,
     service: committed.worker.name
   });
   assertAttachmentAllowed(plan, {
     hostname,
-    confirmed: context.confirmed,
-    override: context.override,
     service: committed.worker.name
   });
   if (plan.action === "keep") {
     move.attachedDomainId = plan.existing.id ?? null;
+    move.targetZoneId = plan.existing.zone_id ?? plan.existing.zoneId ?? null;
     move.state = "attached";
     context.checkpoint(committed);
     return;
@@ -150,16 +176,16 @@ async function attachHost(context, move) {
     );
   }
   move.state = "attaching";
+  move.attachedByThisRun = true;
   context.checkpoint(committed);
   const attached = await domains.attach({
     hostname,
     service: committed.worker.name,
     zoneId: zone.id,
-    zoneName: zone.name,
-    override: context.override
+    zoneName: zone.name
   });
   move.attachedDomainId = attached?.id ?? null;
-  move.attachedByThisRun = true;
+  move.targetZoneId = attached?.zone_id ?? attached?.zoneId ?? zone.id;
   move.state = "attached";
   context.checkpoint(committed);
 }
@@ -167,7 +193,9 @@ async function attachHost(context, move) {
 async function verifyHost(context, move) {
   const { committed, domains, target } = context;
   const hostname = target.appDomain;
-  const attached = (await domains.list()).find((domain) => domain?.hostname === hostname);
+  const attached = (await domains.list({ hostname })).find(
+    (domain) => domain?.hostname === hostname
+  );
   if (!attached || attached.service !== committed.worker.name) {
     throw new Error(
       `Refusing to continue: Cloudflare does not report ${hostname} as a custom domain of Worker "${committed.worker.name}".`
@@ -181,19 +209,16 @@ async function verifyHost(context, move) {
 async function cutover(context, move) {
   const { committed, target } = context;
   writeWranglerConfig(target);
-  if (context.skipDeploy) {
-    move.state = "cutover";
-    context.checkpoint(committed);
-    return;
-  }
   // wrangler validates assets.directory even for a configuration deployment.
   fs.mkdirSync(path.join(rootDir, "dist"), { recursive: true });
-  context.deployConfiguration({
+  move.configurationDeployAttempted = true;
+  move.state = "deploying";
+  context.checkpoint(committed);
+  await context.deployConfiguration({
     accountId: committed.accountId,
     configFile: configPath(committed.name),
     runCommand: context.runCommand
   });
-  move.deployed = true;
   move.state = "cutover";
   context.checkpoint(committed);
 
@@ -211,31 +236,15 @@ async function cutover(context, move) {
 
 async function redirect(context, move) {
   const { committed, target } = context;
-  if (!target.appDomain || context.skipDeploy) {
-    return;
-  }
-  const statements = [
-    `INSERT INTO workspace_hosts (id, hostname, zone_id, kind, is_canonical, status, verified_at, created_at, updated_at) VALUES ('host_${randomUUID()}', '${target.appDomain}', NULL, 'portal', 0, 'ready', datetime('now'), datetime('now'), datetime('now')) ON CONFLICT(hostname) DO UPDATE SET status = 'ready', verified_at = datetime('now'), updated_at = datetime('now')`,
-    "UPDATE workspace_hosts SET is_canonical = 0, updated_at = datetime('now') WHERE kind = 'portal'",
-    `UPDATE workspace_hosts SET is_canonical = 1, updated_at = datetime('now') WHERE hostname = '${target.appDomain}'`
-  ];
-  context.runCommand(
-    "pnpm",
-    [
-      "exec",
-      "wrangler",
-      "d1",
-      "execute",
-      committed.d1.name,
-      "--remote",
-      "--yes",
-      "--command",
-      `${statements.join("; ")};`,
-      "--config",
-      configPath(committed.name)
-    ],
-    { env: { CLOUDFLARE_ACCOUNT_ID: committed.accountId } }
-  );
+  move.canonicalUpdateAttempted = true;
+  move.state = "redirecting";
+  context.checkpoint(committed);
+  await context.setCanonicalPortal({
+    hostname: target.appDomain ?? null,
+    manifest: target,
+    runCommand: context.runCommand,
+    zoneId: move.targetZoneId
+  });
   move.state = "redirected";
   context.checkpoint(committed);
 }
@@ -244,22 +253,29 @@ async function detachRetiredHosts(context, move) {
   const { committed, domains, target } = context;
   const keep = new Set([target.appDomain, ...(target.retiredDomains ?? [])].filter(Boolean));
   const owned = new Set([committed.appDomain, ...(committed.retiredDomains ?? [])].filter(Boolean));
-  const removable = (list) =>
-    list.filter(
-      (domain) =>
-        domain?.service === committed.worker.name &&
-        owned.has(domain.hostname) &&
-        !keep.has(domain.hostname)
+  for (const hostname of [...owned].filter((candidate) => !keep.has(candidate))) {
+    const domain = (await domains.list({ hostname })).find(
+      (candidate) =>
+        candidate?.hostname === hostname && candidate?.service === committed.worker.name
     );
-
-  for (const domain of removable(await domains.list())) {
+    if (!domain) continue;
+    move.pendingRemoval = domainSnapshot(domain);
+    move.state = "detaching";
+    context.checkpoint(committed);
     await domains.remove(domain.id);
-  }
-  const stale = removable(await domains.list());
-  if (stale.length > 0) {
-    throw new Error(
-      `Refusing to finish: Cloudflare still reports ${stale.map((domain) => domain.hostname).join(", ")} as a custom domain of Worker "${committed.worker.name}".`
+    const stillAttached = (await domains.list({ hostname })).some(
+      (candidate) =>
+        candidate?.hostname === hostname && candidate?.service === committed.worker.name
     );
+    if (stillAttached) {
+      throw new Error(
+        `Refusing to finish: Cloudflare still reports ${hostname} as a custom domain of Worker "${committed.worker.name}".`
+      );
+    }
+    move.removedDomains ??= [];
+    move.removedDomains.push(move.pendingRemoval);
+    move.pendingRemoval = null;
+    context.checkpoint(committed);
   }
   move.state = "detached";
   context.checkpoint(committed);
@@ -274,73 +290,8 @@ function commitMove(context, move) {
   writeWranglerConfig(next);
 }
 
-async function rollback(context, move, cause) {
-  const { committed, domains, target } = context;
-  console.error(`Domain move failed after step "${move.state}": ${cause.message}`);
-  try {
-    if (move.deployed) {
-      writeWranglerConfig(committed);
-      if (!context.skipDeploy) {
-        context.deployConfiguration({
-          accountId: committed.accountId,
-          configFile: configPath(committed.name),
-          runCommand: context.runCommand
-        });
-      }
-      move.deployed = false;
-    }
-    if (move.attachedByThisRun && move.attachedDomainId && !context.override) {
-      await domains.remove(move.attachedDomainId);
-      move.attachedByThisRun = false;
-      move.attachedDomainId = null;
-    }
-    move.state = "rolled-back";
-  } catch (rollbackError) {
-    console.error(`Rollback is incomplete: ${rollbackError.message}`);
-  } finally {
-    committed.domainMove = move;
-    context.checkpoint(committed);
-    writeWranglerConfig(committed);
-    console.error(
-      `The saved deployment record still describes ${committed.appDomain ?? "the default hostname"}. Re-run the same command to resume, or inspect Cloudflare and repair "${committed.name}".`
-    );
-    if (move.attachedByThisRun && move.attachedDomainId) {
-      console.error(
-        `Custom domain recovery: DELETE /accounts/${committed.accountId}/workers/domains/${move.attachedDomainId} removes ${target.appDomain}.`
-      );
-    }
-  }
-}
-
 async function probeOrigin(context, origin) {
-  const { attempts, delayMs } = context.retry;
-  let lastError = null;
-  for (let attempt = 1; attempt <= attempts; attempt += 1) {
-    try {
-      const advertised = await context.probe(`${origin}${discoveryPath}`);
-      if (typeof advertised === "string" && advertised) {
-        return advertised.replace(/\/$/, "");
-      }
-      lastError = new Error("the installation did not advertise a service origin");
-    } catch (error) {
-      lastError = error;
-    }
-    if (attempt < attempts) {
-      await new Promise((resolve) => setTimeout(resolve, delayMs));
-    }
-  }
-  throw new Error(
-    `Refusing to continue: ${origin} did not serve a healthy HQBase installation (${lastError?.message ?? "no response"}). DNS or the certificate is not ready.`
-  );
-}
-
-async function defaultProbe(url) {
-  const response = await fetch(url, { headers: { accept: "application/json" } });
-  if (!response.ok) {
-    throw new Error(`HTTP ${response.status}`);
-  }
-  const document = await response.json();
-  return document?.servers?.[0]?.url;
+  return probeServiceOrigin({ origin, probe: context.probe, retry: context.retry });
 }
 
 function defaultDeployConfiguration({ accountId, configFile, runCommand }) {

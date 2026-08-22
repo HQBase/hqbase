@@ -61,6 +61,7 @@ test("HQBase web lifecycle remains healthy", async ({ page, request }) => {
         ownerEmail: email,
         ownerName: "HQBase E2E Owner",
         ownerPassword: password,
+        portalHostname: new URL(stagingUrl).hostname,
         primaryDomain: domain
       },
       headers: { cookie: grantCookie }

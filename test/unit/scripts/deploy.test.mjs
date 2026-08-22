@@ -62,7 +62,9 @@ describe("HQBase release deployment", () => {
         run: (command, args) => commands.push([command, ...args].join(" "))
       })
     ).toMatchObject({ versionId: "version-2" });
-    expect(commands[0]).toContain("wrangler deploy --keep-vars");
+    expect(commands[0]).toContain("wrangler deploy");
+    expect(commands[0]).toContain("--keep-vars");
+    expect(commands[0]).toContain("--strict");
     expect(commands[0]).toContain("--tag hqbase:1.2.3");
 
     const unchanged = { versionId: "version-1", version: "1.2.3", tag: "hqbase:1.2.3" };

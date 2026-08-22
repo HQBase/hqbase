@@ -1,19 +1,27 @@
 import fs from "node:fs";
-import { afterEach, describe, expect, it } from "vitest";
+import { DatabaseSync } from "node:sqlite";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import {
   createWorkerDomainsClient,
   planAttachment,
-  requireCloudflareApiToken
+  requireDomainApiToken
 } from "../../../scripts/hqbase/cloudflare-domains.mjs";
 import { createWranglerConfig } from "../../../scripts/hqbase/config.mjs";
 import { configureDomain } from "../../../scripts/hqbase/domain.mjs";
 import {
   assertResumable,
   domainChangeNotes,
+  migrateStagedMoveRecord,
   resolveServiceOrigin,
+  stagedMoveRecord,
   updateDomainManifest
 } from "../../../scripts/hqbase/domain-plan.mjs";
+import {
+  canonicalHostnameFromD1Output,
+  createDomainProbe,
+  setCanonicalPortal
+} from "../../../scripts/hqbase/domain-runtime.mjs";
 import { assertUnambiguousManifest } from "../../../scripts/hqbase/lifecycle-manifest.mjs";
 import {
   configPath,
@@ -77,18 +85,40 @@ function fakeWrangler() {
   return { calls, runCommand };
 }
 
-function fakeDomains(initial = []) {
+function fakeDomains(
+  initial = [
+    {
+      id: "domain-old.example.com",
+      hostname: "old.example.com",
+      service: "hqbase-qa",
+      zone_id: "zone-1",
+      zone_name: "example.com"
+    }
+  ]
+) {
   const records = [...initial];
   const calls = [];
   return {
     calls,
     records,
-    async list() {
-      return records.map((record) => ({ ...record }));
+    async list(filters = {}) {
+      return records
+        .filter(
+          (record) =>
+            (!filters.hostname || record.hostname === filters.hostname) &&
+            (!filters.service || record.service === filters.service)
+        )
+        .map((record) => ({ ...record }));
     },
-    async attach({ hostname, service, override }) {
-      calls.push({ kind: "attach", hostname, service, override });
-      const record = { id: `domain-${hostname}`, hostname, service };
+    async attach({ hostname, service, zoneId, zoneName }) {
+      calls.push({ kind: "attach", hostname, service, zoneId, zoneName });
+      const record = {
+        id: `domain-${hostname}`,
+        hostname,
+        service,
+        zone_id: zoneId,
+        zone_name: zoneName
+      };
       const index = records.findIndex((candidate) => candidate.hostname === hostname);
       if (index >= 0) {
         records[index] = record;
@@ -115,30 +145,39 @@ function harness(overrides = {}) {
   const wrangler = fakeWrangler();
   const domains = overrides.domains ?? fakeDomains();
   const deploys = [];
+  const canonical = { hostname: overrides.canonicalHostname ?? "old.example.com" };
   return {
+    canonical,
     domains,
     deploys,
     wrangler,
     options: {
       domains,
       deployConfiguration: (input) => deploys.push(input),
-      environment: { CLOUDFLARE_API_TOKEN: "token" },
+      environment: { HQBASE_DOMAIN_API_TOKEN: "token" },
       probe: overrides.probe ?? (async () => "https://new.example.com"),
+      readCanonicalPortal: async () => canonical.hostname,
       retry: { attempts: 1, delayMs: 0 },
       runCommand: wrangler.runCommand,
+      setCanonicalPortal: async ({ hostname }) => {
+        canonical.hostname = hostname;
+      },
       ...overrides.options
     }
   };
 }
 
-afterEach(() => {
+function clean() {
   fs.rmSync(deploymentDir(deployment), { recursive: true, force: true });
-});
+}
+
+beforeEach(clean);
+afterEach(clean);
 
 describe("operator domain command", () => {
   it("attaches, verifies, cuts over, and commits the manifest only after Cloudflare confirms", async () => {
     install();
-    const { domains, deploys, options, wrangler } = harness();
+    const { canonical, domains, deploys, options } = harness();
 
     await configureDomain(
       { name: deployment, "app-domain": "new.example.com", "move-service-origin": true },
@@ -154,7 +193,7 @@ describe("operator domain command", () => {
     expect(saved.d1).toEqual(manifest().d1);
     expect(saved.r2).toEqual(manifest().r2);
     expect(saved.queue).toEqual(manifest().queue);
-    expect(wrangler.calls.some((call) => call.includes("d1 execute"))).toBe(true);
+    expect(canonical.hostname).toBe("new.example.com");
   });
 
   it("keeps the old hostname attached and records the canonical portal host", async () => {
@@ -162,7 +201,7 @@ describe("operator domain command", () => {
     const domains = fakeDomains([
       { id: "domain-old.example.com", hostname: "old.example.com", service: "hqbase-qa" }
     ]);
-    const { options, wrangler } = harness({
+    const { canonical, options } = harness({
       domains,
       probe: async () => "https://old.example.com"
     });
@@ -180,8 +219,7 @@ describe("operator domain command", () => {
       "new.example.com",
       "old.example.com"
     ]);
-    const redirect = wrangler.calls.find((call) => call.includes("d1 execute"));
-    expect(redirect).toMatch(/is_canonical = 1[\s\S]*new\.example\.com/);
+    expect(canonical.hostname).toBe("new.example.com");
     expect(JSON.parse(fs.readFileSync(configPath(deployment), "utf8")).routes).toEqual([
       { pattern: "new.example.com", custom_domain: true },
       { pattern: "old.example.com", custom_domain: true }
@@ -211,12 +249,43 @@ describe("operator domain command", () => {
     expect(loadManifest(deployment).retiredDomains).toEqual([]);
   });
 
+  it("preserves other retired hostnames when it deletes the previous portal", async () => {
+    install({ retiredDomains: ["legacy.example.com"] });
+    const domains = fakeDomains([
+      { id: "domain-old.example.com", hostname: "old.example.com", service: "hqbase-qa" },
+      {
+        id: "domain-legacy.example.com",
+        hostname: "legacy.example.com",
+        service: "hqbase-qa"
+      }
+    ]);
+    const { options } = harness({ domains });
+
+    await configureDomain(
+      {
+        name: deployment,
+        "app-domain": "new.example.com",
+        "move-service-origin": true,
+        "detach-old": true,
+        yes: true
+      },
+      options
+    );
+
+    expect(domains.calls).toContainEqual({ kind: "remove", id: "domain-old.example.com" });
+    expect(domains.calls).not.toContainEqual({
+      kind: "remove",
+      id: "domain-legacy.example.com"
+    });
+    expect(loadManifest(deployment).retiredDomains).toEqual(["legacy.example.com"]);
+  });
+
   it("really deletes the custom domain and its DNS record on detach", async () => {
     install();
     const domains = fakeDomains([
       { id: "domain-old.example.com", hostname: "old.example.com", service: "hqbase-qa" }
     ]);
-    const { deploys, options } = harness({ domains });
+    const { canonical, deploys, options } = harness({ domains });
 
     await configureDomain(
       { name: deployment, detach: true, "move-service-origin": true, yes: true },
@@ -228,6 +297,7 @@ describe("operator domain command", () => {
     const saved = loadManifest(deployment);
     expect(saved.appDomain).toBeUndefined();
     expect(saved.authUrl).toBeUndefined();
+    expect(canonical.hostname).toBeNull();
     expect(deploys).toHaveLength(1);
     const config = JSON.parse(fs.readFileSync(configPath(deployment), "utf8"));
     expect(config.routes).toBeUndefined();
@@ -278,6 +348,7 @@ describe("operator domain command", () => {
   it("refuses a hostname that already routes to another Worker", async () => {
     install();
     const domains = fakeDomains([
+      { id: "domain-old", hostname: "old.example.com", service: "hqbase-qa" },
       { id: "domain-new", hostname: "new.example.com", service: "someone-else" }
     ]);
     const { options } = harness({ domains });
@@ -291,7 +362,7 @@ describe("operator domain command", () => {
     expect(domains.calls).toEqual([]);
   });
 
-  it("refuses to take over a hostname without an explicit confirmation", async () => {
+  it("refuses the legacy hostname takeover flag", async () => {
     install();
     const domains = fakeDomains([
       { id: "domain-new", hostname: "new.example.com", service: "someone-else" }
@@ -308,9 +379,29 @@ describe("operator domain command", () => {
         },
         options
       )
-    ).rejects.toThrowError(/without an explicit confirmation/);
+    ).rejects.toThrowError(/--override-existing is not supported/);
     expect(domains.calls).toEqual([]);
     expect(loadManifest(deployment).appDomain).toBe("old.example.com");
+  });
+
+  it("refuses the legacy partial-deployment flag before it changes anything", async () => {
+    install();
+    const { domains, options } = harness();
+    const before = fs.readFileSync(manifestPath(deployment), "utf8");
+
+    await expect(
+      configureDomain(
+        {
+          name: deployment,
+          "app-domain": "new.example.com",
+          "move-service-origin": true,
+          "skip-deploy": true
+        },
+        options
+      )
+    ).rejects.toThrowError(/--skip-deploy is not supported/);
+    expect(fs.readFileSync(manifestPath(deployment), "utf8")).toBe(before);
+    expect(domains.calls).toEqual([]);
   });
 
   it("rolls back the attachment and keeps the saved record when verification fails", async () => {
@@ -331,14 +422,57 @@ describe("operator domain command", () => {
     ).rejects.toThrowError(/did not serve a healthy HQBase installation/);
 
     expect(domains.calls.map((call) => call.kind)).toEqual(["attach", "remove"]);
-    expect(domains.records).toEqual([]);
+    expect(domains.records.map((record) => record.hostname)).toEqual(["old.example.com"]);
     const saved = loadManifest(deployment);
     expect(saved.appDomain).toBe("old.example.com");
     expect(saved.authUrl).toBe("https://old.example.com");
-    expect(saved.domainMove.state).toBe("rolled-back");
+    expect(saved.domainMove).toBeUndefined();
     expect(JSON.parse(fs.readFileSync(configPath(deployment), "utf8")).routes).toEqual([
       { pattern: "old.example.com", custom_domain: true }
     ]);
+  });
+
+  it("rolls back an attachment when Cloudflare applies it but the response is lost", async () => {
+    install();
+    const domains = fakeDomains();
+    const attach = domains.attach;
+    domains.attach = async (input) => {
+      await attach(input);
+      throw new Error("Cloudflare response was lost");
+    };
+    const { options } = harness({ domains });
+
+    await expect(
+      configureDomain(
+        { name: deployment, "app-domain": "new.example.com", "move-service-origin": true },
+        options
+      )
+    ).rejects.toThrowError(/response was lost/);
+
+    expect(domains.records.map((record) => record.hostname)).toEqual(["old.example.com"]);
+    expect(loadManifest(deployment).domainMove).toBeUndefined();
+  });
+
+  it("waits for an asynchronous configuration deployment before it probes", async () => {
+    install();
+    let deployed = false;
+    const { options } = harness({
+      probe: async () => (deployed ? "https://new.example.com" : "https://old.example.com"),
+      options: {
+        deployConfiguration: async () => {
+          await Promise.resolve();
+          deployed = true;
+        }
+      }
+    });
+
+    await configureDomain(
+      { name: deployment, "app-domain": "new.example.com", "move-service-origin": true },
+      options
+    );
+
+    expect(deployed).toBe(true);
+    expect(loadManifest(deployment).appDomain).toBe("new.example.com");
   });
 
   it("redeploys the previous configuration when the cutover fails", async () => {
@@ -368,6 +502,111 @@ describe("operator domain command", () => {
     expect(JSON.parse(fs.readFileSync(configPath(deployment), "utf8")).vars.BETTER_AUTH_URL).toBe(
       "https://old.example.com"
     );
+  });
+
+  it("rolls back an ambiguous configuration deployment", async () => {
+    install();
+    let deployments = 0;
+    const { domains, options } = harness({
+      options: {
+        deployConfiguration: () => {
+          deployments += 1;
+          if (deployments === 1) throw new Error("Wrangler disconnected after upload");
+        }
+      }
+    });
+
+    await expect(
+      configureDomain(
+        { name: deployment, "app-domain": "new.example.com", "move-service-origin": true },
+        options
+      )
+    ).rejects.toThrowError(/disconnected after upload/);
+
+    expect(deployments).toBe(2);
+    expect(domains.records.map((record) => record.hostname)).toEqual(["old.example.com"]);
+    expect(loadManifest(deployment).domainMove).toBeUndefined();
+  });
+
+  it("restores a domain when Cloudflare deletes it but the response fails", async () => {
+    install();
+    const domains = fakeDomains();
+    const remove = domains.remove;
+    domains.remove = async (id) => {
+      await remove(id);
+      if (id === "domain-old.example.com") throw new Error("Cloudflare response was lost");
+    };
+    const { canonical, deploys, options } = harness({ domains });
+
+    await expect(
+      configureDomain(
+        {
+          name: deployment,
+          "app-domain": "new.example.com",
+          "move-service-origin": true,
+          "detach-old": true,
+          yes: true
+        },
+        options
+      )
+    ).rejects.toThrowError(/response was lost/);
+
+    expect(canonical.hostname).toBe("old.example.com");
+    expect(deploys).toHaveLength(2);
+    expect(domains.records.map((record) => record.hostname)).toEqual(["old.example.com"]);
+    expect(loadManifest(deployment).domainMove).toBeUndefined();
+  });
+
+  it("keeps the deployment locked when rollback is incomplete", async () => {
+    install();
+    const { options } = harness({
+      options: {
+        deployConfiguration: () => {
+          throw new Error("Cloudflare is unavailable");
+        }
+      }
+    });
+
+    await expect(
+      configureDomain(
+        { name: deployment, "app-domain": "new.example.com", "move-service-origin": true },
+        options
+      )
+    ).rejects.toThrowError(/Cloudflare is unavailable/);
+
+    const saved = loadManifest(deployment);
+    expect(saved.domainMove).toMatchObject({
+      state: "recovery-required",
+      recoveryFailures: ["restore Worker configuration"]
+    });
+    expect(() => assertUnambiguousManifest(saved)).toThrowError(/unfinished domain move/);
+  });
+
+  it("runs rollback when a step rejects with a non-Error value", async () => {
+    install();
+    const { options } = harness({
+      options: {
+        deployConfiguration: () => {
+          throw null;
+        }
+      }
+    });
+
+    let rejection = "not rejected";
+    try {
+      await configureDomain(
+        { name: deployment, "app-domain": "new.example.com", "move-service-origin": true },
+        options
+      );
+    } catch (error) {
+      rejection = error;
+    }
+
+    expect(rejection).toBeNull();
+    expect(loadManifest(deployment).domainMove).toMatchObject({
+      state: "recovery-required",
+      recoveryFailures: ["restore Worker configuration"]
+    });
   });
 
   it("does not write anything for a dry run", async () => {
@@ -402,8 +641,7 @@ describe("operator domain command", () => {
         toAuthUrl: "https://new.example.com",
         detachOld: false,
         attachedDomainId: "domain-new.example.com",
-        attachedByThisRun: true,
-        deployed: false
+        attachedByThisRun: true
       }
     });
     const domains = fakeDomains([
@@ -429,6 +667,32 @@ describe("operator domain command", () => {
     expect(saved.domainMove).toBeUndefined();
     expect(domains.calls.filter((call) => call.kind === "attach")).toEqual([]);
   });
+
+  it("migrates a complete version 2 manifest before it builds the target", async () => {
+    const legacy = {
+      ...manifest(),
+      version: 2,
+      accountId: undefined,
+      d1: { name: "hqbase-qa", id: manifest().d1.id, created: true, reused: false },
+      r2: { bucket: "hqbase-qa-mail", created: true, reused: false },
+      queue: {
+        name: "hqbase-qa-jobs",
+        deadLetterName: "hqbase-qa-jobs-dlq",
+        created: true
+      }
+    };
+    writeManifest(legacy);
+    const { options } = harness();
+
+    await configureDomain(
+      { name: deployment, "app-domain": "new.example.com", "move-service-origin": true },
+      options
+    );
+
+    const saved = loadManifest(deployment);
+    expect(saved.version).toBe(3);
+    expect(saved.queue).toEqual(manifest().queue);
+  });
 });
 
 describe("operator domain contract", () => {
@@ -445,6 +709,51 @@ describe("operator domain contract", () => {
         { appDomain: "new.example.com" }
       )
     ).toThrowError(/--keep-service-origin|--move-service-origin/);
+  });
+
+  it("normalizes an explicit service origin before it compares or stores it", () => {
+    expect(
+      resolveServiceOrigin(
+        { appDomain: "old.example.com", authUrl: "https://service.example.com" },
+        { appDomain: "new.example.com", authUrl: "https://service.example.com/" }
+      )
+    ).toEqual({ authUrl: "https://service.example.com", moved: false });
+  });
+
+  it("normalizes a stored service origin when it builds the next manifest", () => {
+    const after = updateDomainManifest(manifest({ authUrl: "https://old.example.com/" }), {
+      appDomain: "new.example.com",
+      keepServiceOrigin: true
+    });
+
+    expect(after.authUrl).toBe("https://old.example.com");
+    expect(after.retiredDomains).toEqual(["old.example.com"]);
+  });
+
+  it("adds recovery defaults to fresh and earlier staged move records", () => {
+    const defaults = {
+      attachedDomainId: null,
+      attachedByThisRun: false,
+      targetZoneId: null,
+      configurationDeployAttempted: false,
+      canonicalUpdateAttempted: false,
+      pendingRemoval: null,
+      removedDomains: []
+    };
+    expect(
+      stagedMoveRecord(manifest(), { appDomain: "new.example.com", authUrl: undefined })
+    ).toMatchObject(defaults);
+    expect(
+      migrateStagedMoveRecord({
+        startedAt: "2026-08-17T00:00:00.000Z",
+        state: "attached",
+        fromAppDomain: "old.example.com",
+        toAppDomain: "new.example.com",
+        fromAuthUrl: "https://old.example.com",
+        toAuthUrl: "https://old.example.com",
+        detachOld: false
+      })
+    ).toMatchObject(defaults);
   });
 
   it("keeps the service origin hostname attached when the portal moves away from it", () => {
@@ -520,11 +829,33 @@ describe("operator domain contract", () => {
     expect(notes).toMatch(/old\.example\.com stays attached and redirects/);
     expect(notes).toMatch(/new\.example\.com must be a zone/);
     expect(notes).toMatch(/Service origin changed to https:\/\/new\.example\.com/);
-    expect(notes).toMatch(/D1, R2, and queues were not modified/);
+    expect(notes).toMatch(/resource identities were not modified/);
   });
 });
 
 describe("Cloudflare custom domain seam", () => {
+  it("uses an exact hostname filter so a later API page cannot hide a match", async () => {
+    const requests = [];
+    const client = createWorkerDomainsClient({
+      accountId,
+      token: "token",
+      fetchImpl: async (url) => {
+        requests.push(url);
+        return {
+          ok: true,
+          async json() {
+            return { success: true, result: [] };
+          }
+        };
+      }
+    });
+
+    await client.list({ hostname: "new.example.com" });
+
+    expect(requests[0]).toContain("environment=production");
+    expect(requests[0]).toContain("hostname=new.example.com");
+  });
+
   it("never lets Cloudflare override an origin or DNS record implicitly", async () => {
     const requests = [];
     const client = createWorkerDomainsClient({
@@ -559,6 +890,22 @@ describe("Cloudflare custom domain seam", () => {
     expect(requests[1].url).toMatch(/\/workers\/domains\/domain-1$/);
   });
 
+  it("accepts an empty successful response when Cloudflare deletes a domain", async () => {
+    const client = createWorkerDomainsClient({
+      accountId,
+      token: "token",
+      fetchImpl: async () => ({
+        ok: true,
+        status: 204,
+        async json() {
+          throw new SyntaxError("Unexpected end of JSON input");
+        }
+      })
+    });
+
+    await expect(client.remove("domain-1")).resolves.toBeNull();
+  });
+
   it("classifies an attachment before anything is changed", () => {
     const domains = [{ id: "a", hostname: "app.example.com", service: "other-worker" }];
     expect(planAttachment(domains, { hostname: "app.example.com", service: "hqbase-qa" })).toEqual({
@@ -575,7 +922,125 @@ describe("Cloudflare custom domain seam", () => {
   });
 
   it("requires an explicit Cloudflare API token", () => {
-    expect(() => requireCloudflareApiToken({})).toThrowError(/CLOUDFLARE_API_TOKEN/);
-    expect(requireCloudflareApiToken({ CLOUDFLARE_API_TOKEN: " token " })).toBe("token");
+    expect(() => requireDomainApiToken({})).toThrowError(/HQBASE_DOMAIN_API_TOKEN/);
+    expect(requireDomainApiToken({ HQBASE_DOMAIN_API_TOKEN: " token " })).toBe("token");
+  });
+
+  it("adds Cloudflare Access service-token headers only when both values are set", async () => {
+    const requests = [];
+    const probe = createDomainProbe(
+      {
+        HQBASE_DOMAIN_ACCESS_CLIENT_ID: "client-id",
+        HQBASE_DOMAIN_ACCESS_CLIENT_SECRET: "client-secret"
+      },
+      async (url, init) => {
+        requests.push({ url, init });
+        return {
+          ok: true,
+          async json() {
+            return { servers: [{ url: "https://service.example.com" }] };
+          }
+        };
+      }
+    );
+
+    await expect(probe("https://app.example.com/api/v1/openapi.json")).resolves.toBe(
+      "https://service.example.com"
+    );
+    expect(requests[0].init.headers).toMatchObject({
+      "cf-access-client-id": "client-id",
+      "cf-access-client-secret": "client-secret"
+    });
+    expect(() => createDomainProbe({ HQBASE_DOMAIN_ACCESS_CLIENT_ID: "client-id" })).toThrowError(
+      /both HQBASE_DOMAIN_ACCESS/
+    );
+  });
+
+  it("aborts a stalled discovery request after its deadline", async () => {
+    let requestSignal;
+    const probe = createDomainProbe(
+      {},
+      async (_url, init) => {
+        requestSignal = init.signal;
+        return new Promise((_resolve, reject) => {
+          init.signal.addEventListener("abort", () => reject(init.signal.reason), { once: true });
+        });
+      },
+      { timeoutMs: 10 }
+    );
+
+    await expect(probe("https://app.example.com/api/v1/openapi.json")).rejects.toMatchObject({
+      name: "TimeoutError"
+    });
+    expect(requestSignal.aborted).toBe(true);
+  });
+
+  it("rejects ambiguous canonical portal query results", () => {
+    expect(
+      canonicalHostnameFromD1Output(
+        JSON.stringify([{ results: [{ hostname: "app.example.com" }] }])
+      )
+    ).toBe("app.example.com");
+    expect(() =>
+      canonicalHostnameFromD1Output(
+        JSON.stringify([
+          { results: [{ hostname: "one.example.com" }, { hostname: "two.example.com" }] }
+        ])
+      )
+    ).toThrowError(/more than one canonical/);
+  });
+
+  it("records the verified Cloudflare zone on a new portal row", () => {
+    const calls = [];
+    setCanonicalPortal({
+      hostname: "app.example.com",
+      manifest: manifest(),
+      runCommand: (_command, args) => {
+        calls.push(args);
+        return JSON.stringify([{ results: [{ hostname: "app.example.com" }] }]);
+      },
+      zoneId: "zone-1"
+    });
+
+    const sql = calls[0].at(calls[0].indexOf("--command") + 1);
+    expect(sql).toContain("'zone-1'");
+    expect(sql.indexOf("SET is_canonical = 0")).toBeLessThan(sql.indexOf("SET is_canonical = 1"));
+  });
+
+  it("moves the canonical marker without violating the unique portal index", () => {
+    const database = new DatabaseSync(":memory:");
+    try {
+      database.exec(
+        fs.readFileSync(new URL("../../../migrations/0001_initial.sql", import.meta.url), "utf8")
+      );
+      database.exec(
+        fs.readFileSync(new URL("../../../migrations/0002_workspace.sql", import.meta.url), "utf8")
+      );
+      database.exec(`
+        INSERT INTO workspace_hosts VALUES
+          ('old', 'old.example.com', 'zone-1', 'portal', 0, 'ready', NULL, 'now', 'now'),
+          ('new', 'new.example.com', 'zone-1', 'portal', 1, 'ready', NULL, 'now', 'now');
+      `);
+
+      setCanonicalPortal({
+        hostname: "old.example.com",
+        manifest: manifest(),
+        runCommand: (_command, args) => {
+          const sql = args.at(args.indexOf("--command") + 1);
+          if (sql.startsWith("SELECT")) {
+            return JSON.stringify([{ results: database.prepare(sql).all() }]);
+          }
+          database.exec(sql);
+          return "";
+        },
+        zoneId: "zone-1"
+      });
+
+      expect(
+        database.prepare("SELECT hostname FROM workspace_hosts WHERE is_canonical = 1").get()
+      ).toEqual({ hostname: "old.example.com" });
+    } finally {
+      database.close();
+    }
   });
 });

@@ -46,7 +46,7 @@ export function updateDomainManifest(manifest, input) {
  * origin is served by the hostname that is being replaced, the operator must choose.
  */
 export function resolveServiceOrigin(manifest, input) {
-  const previous = manifest.authUrl;
+  const previous = manifest.authUrl?.replace(/\/$/, "");
   if (input.keepServiceOrigin && input.moveServiceOrigin) {
     throw new Error("Use either --keep-service-origin or --move-service-origin, not both.");
   }
@@ -68,7 +68,8 @@ export function resolveServiceOrigin(manifest, input) {
   }
   if (input.authUrl) {
     assertCanonicalOrigin(input.authUrl);
-    return { authUrl: input.authUrl, moved: previous !== input.authUrl };
+    const authUrl = input.authUrl.replace(/\/$/, "");
+    return { authUrl, moved: previous !== authUrl };
   }
   const ridesOnPortal = Boolean(
     previous && manifest.appDomain && previous === `https://${manifest.appDomain}`
@@ -114,12 +115,12 @@ export function domainChangeNotes(previous, next) {
   } else if (next.authUrl) {
     notes.push(`Service origin ${next.authUrl} is unchanged.`);
   }
-  notes.push("D1, R2, and queues were not modified.");
+  notes.push("Mail data and the D1, R2, and queue resource identities were not modified.");
   return notes;
 }
 
 export function stagedMoveRecord(manifest, target, options = {}) {
-  return {
+  return migrateStagedMoveRecord({
     startedAt: options.now ?? new Date().toISOString(),
     state: "staged",
     fromAppDomain: manifest.appDomain ?? null,
@@ -129,18 +130,36 @@ export function stagedMoveRecord(manifest, target, options = {}) {
     detachOld: Boolean(options.detachOld),
     attachedDomainId: null,
     attachedByThisRun: false,
-    deployed: false
+    targetZoneId: null,
+    configurationDeployAttempted: false,
+    canonicalUpdateAttempted: false,
+    pendingRemoval: null,
+    removedDomains: []
+  });
+}
+
+export function migrateStagedMoveRecord(move) {
+  return {
+    ...move,
+    attachedDomainId: move.attachedDomainId ?? null,
+    attachedByThisRun: Boolean(move.attachedByThisRun),
+    targetZoneId: move.targetZoneId ?? null,
+    configurationDeployAttempted: Boolean(move.configurationDeployAttempted),
+    canonicalUpdateAttempted: Boolean(move.canonicalUpdateAttempted),
+    pendingRemoval: move.pendingRemoval ?? null,
+    removedDomains: move.removedDomains ?? []
   };
 }
 
-export function assertResumable(manifest, target) {
+export function assertResumable(manifest, target, options = {}) {
   const move = manifest.domainMove;
   if (!move) {
     return;
   }
   if (
     move.toAppDomain !== (target.appDomain ?? null) ||
-    move.toAuthUrl !== (target.authUrl ?? null)
+    move.toAuthUrl !== (target.authUrl ?? null) ||
+    Boolean(move.detachOld) !== Boolean(options.detachOld)
   ) {
     throw new Error(
       `Refusing to continue: deployment "${manifest.name}" has an unfinished domain move to ${move.toAppDomain ?? "the default hostname"} started at ${move.startedAt}. Re-run the same move to resume it, or repair the manifest from verified Cloudflare records.`
@@ -154,7 +173,9 @@ function resolveRetiredDomains(manifest, input) {
     return [];
   }
   if (input.detachOld) {
-    retired.clear();
+    if (manifest.appDomain) {
+      retired.delete(manifest.appDomain);
+    }
   } else if (manifest.appDomain && manifest.appDomain !== input.appDomain) {
     retired.add(manifest.appDomain);
   }

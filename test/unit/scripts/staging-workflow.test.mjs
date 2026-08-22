@@ -35,6 +35,28 @@ describe("staging workflow lifecycle record", () => {
     expect(cleanup).toBeGreaterThan(checkpoint);
   });
 
+  it("moves the live portal to a second hostname and back", () => {
+    const lifecycle = workflow.indexOf("pnpm test:e2e:staging");
+    const move = workflow.indexOf("node scripts/test-domain-staging.mjs");
+    const recovery = workflow.indexOf("node scripts/test-domain-staging.mjs --cleanup-only");
+    const backup = workflow.indexOf("Exercise populated remote backup and restore");
+    const destroy = workflow.indexOf('pnpm hqbase destroy --name "$DEPLOYMENT_NAME"');
+
+    expect(lifecycle).toBeGreaterThan(-1);
+    expect(move).toBeGreaterThan(-1);
+    expect(recovery).toBeGreaterThan(-1);
+    expect(backup).toBeGreaterThan(-1);
+    expect(destroy).toBeGreaterThan(-1);
+    expect(move).toBeGreaterThan(lifecycle);
+    expect(recovery).toBeGreaterThan(move);
+    expect(backup).toBeGreaterThan(recovery);
+    expect(destroy).toBeGreaterThan(recovery);
+    expect(workflow).toContain("HQBASE_DOMAIN_API_TOKEN:");
+    expect(workflow).toContain("HQBASE_DOMAIN_ACCESS_CLIENT_ID:");
+    expect(workflow).toContain("HQBASE_DOMAIN_ACCESS_CLIENT_SECRET:");
+    expect(workflow).toContain("HQBASE_DOMAIN_MOVE_HOST:");
+  });
+
   it("waits for the exact live candidate version before release checks", () => {
     const waitStart = releaseWorkflow.indexOf("      - name: Wait for the signed candidate");
     const nextStep = releaseWorkflow.indexOf("\n      - name:", waitStart + 1);

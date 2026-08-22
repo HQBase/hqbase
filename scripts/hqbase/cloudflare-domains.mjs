@@ -6,11 +6,11 @@ const apiBase = "https://api.cloudflare.com/client/v4";
  * override_existing_dns_record. The operator therefore reads and writes them through the documented
  * Cloudflare API, where every override is explicit and every result can be verified.
  */
-export function requireCloudflareApiToken(environment = process.env) {
-  const token = environment.CLOUDFLARE_API_TOKEN?.trim();
+export function requireDomainApiToken(environment = process.env) {
+  const token = environment.HQBASE_DOMAIN_API_TOKEN?.trim();
   if (!token) {
     throw new Error(
-      "Refusing to continue: set CLOUDFLARE_API_TOKEN for the domain command. The token needs Workers Scripts:Edit, Zone:Read, and DNS:Edit for the target zone."
+      "Refusing to continue: set HQBASE_DOMAIN_API_TOKEN for the domain command. Use a short-lived token with Workers Scripts:Edit and Zone:Read, then unset it after the command."
     );
   }
   return token;
@@ -27,7 +27,15 @@ export function createWorkerDomainsClient({ accountId, token, fetchImpl }) {
         authorization: `Bearer ${token}`
       }
     });
-    const body = await response.json();
+    let body;
+    try {
+      body = await response.json();
+    } catch {
+      if (response.ok && init?.method === "DELETE") return null;
+      throw new Error(
+        `Cloudflare returned an unreadable response for ${path} (HTTP ${response.status}).`
+      );
+    }
     if (!response.ok || body?.success !== true) {
       const message = body?.errors?.[0]?.message ?? `HTTP ${response.status}`;
       throw new Error(`Cloudflare rejected ${path}: ${message}`);
@@ -36,11 +44,14 @@ export function createWorkerDomainsClient({ accountId, token, fetchImpl }) {
   }
 
   return {
-    async list() {
-      const result = await request(`/accounts/${accountId}/workers/domains`);
+    async list(filters = {}) {
+      const query = new URLSearchParams({ environment: "production" });
+      if (filters.hostname) query.set("hostname", filters.hostname);
+      if (filters.service) query.set("service", filters.service);
+      const result = await request(`/accounts/${accountId}/workers/domains?${query}`);
       return Array.isArray(result) ? result : [];
     },
-    async attach({ hostname, service, zoneId, zoneName, override = false }) {
+    async attach({ hostname, service, zoneId, zoneName }) {
       return request(`/accounts/${accountId}/workers/domains`, {
         method: "PUT",
         body: JSON.stringify({
@@ -50,8 +61,8 @@ export function createWorkerDomainsClient({ accountId, token, fetchImpl }) {
           zone_id: zoneId,
           zone_name: zoneName,
           // Always explicit. Wrangler defaults these to true without a TTY.
-          override_existing_origin: override,
-          override_existing_dns_record: override
+          override_existing_origin: false,
+          override_existing_dns_record: false
         })
       });
     },
@@ -62,8 +73,11 @@ export function createWorkerDomainsClient({ accountId, token, fetchImpl }) {
       const labels = hostname.split(".");
       for (let index = 0; index < labels.length - 1; index += 1) {
         const candidate = labels.slice(index).join(".");
-        const zones = await request(`/zones?name=${encodeURIComponent(candidate)}`);
-        const zone = Array.isArray(zones) ? zones[0] : null;
+        const query = new URLSearchParams({ "account.id": accountId, name: candidate });
+        const zones = await request(`/zones?${query}`);
+        const zone = Array.isArray(zones)
+          ? zones.find((item) => item?.account?.id === accountId)
+          : null;
         if (zone?.id) {
           return { id: zone.id, name: zone.name };
         }
@@ -87,19 +101,11 @@ export function planAttachment(domains, { hostname, service }) {
   return { action: "conflict", existing };
 }
 
-export function assertAttachmentAllowed(plan, { confirmed, hostname, override, service }) {
+export function assertAttachmentAllowed(plan, { hostname, service }) {
   if (plan.action !== "conflict") {
     return plan;
   }
-  if (!override) {
-    throw new Error(
-      `Refusing to attach ${hostname}: it already routes to Worker "${plan.existing.service}", not "${service}". Choose another hostname, or re-run with --override-existing --yes to take it over.`
-    );
-  }
-  if (!confirmed) {
-    throw new Error(
-      `Refusing to take over ${hostname} from Worker "${plan.existing.service}" without an explicit confirmation. Re-run with --override-existing --yes.`
-    );
-  }
-  return plan;
+  throw new Error(
+    `Refusing to attach ${hostname}: it already routes to Worker "${plan.existing.service}", not "${service}". Remove or move that domain explicitly in Cloudflare before retrying.`
+  );
 }

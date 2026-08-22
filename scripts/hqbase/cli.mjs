@@ -101,7 +101,7 @@ OAuth options:
   --skip-deploy          Validate and write local deployment configuration without deploying.
   --dry-run              Validate without writing or deploying.
 
-Domain options (moves the canonical portal host; D1, R2, and queues are untouched):
+Domain options (moves the canonical portal host; mail data and resource identities stay in place):
   --app-domain <host>    Attach this hostname and make it the canonical portal host.
   --detach               Remove every custom domain and serve from workers.dev. Requires --yes.
   --keep-service-origin  Keep the machine-facing service origin on the current hostname.
@@ -110,13 +110,12 @@ Domain options (moves the canonical portal host; D1, R2, and queues are untouche
   --auth-url <origin>    Set the service origin explicitly to a canonical HTTPS origin.
   --detach-old           Delete the previous hostname instead of keeping it as a redirect.
                          Requires --yes.
-  --override-existing    Take over a hostname that already routes elsewhere. Requires --yes in a
-                         non-interactive shell.
-  --yes                  Confirm the steps that delete a Cloudflare DNS record or take a hostname.
-  --skip-deploy          Attach and verify without deploying configuration.
+  --yes                  Confirm the steps that delete a Cloudflare DNS record.
   --dry-run              Validate without contacting Cloudflare, writing, or deploying.
 
 The domain command reads and writes Worker custom domains through the Cloudflare API and needs
-CLOUDFLARE_API_TOKEN with Workers Scripts:Edit, Zone:Read, and DNS:Edit.
+HQBASE_DOMAIN_API_TOKEN with Workers Scripts:Edit and Zone:Read. Use a short-lived token and unset
+it after the command. Wrangler keeps using its own login. For a portal protected by Cloudflare
+Access, also set HQBASE_DOMAIN_ACCESS_CLIENT_ID and HQBASE_DOMAIN_ACCESS_CLIENT_SECRET.
 `);
 }

@@ -84,6 +84,7 @@ export async function deploy(options = {}) {
         );
       }
       deployConfiguration(source, config.name, releaseTag);
+      recordWorkerDeployed();
       console.log(`HQBase ${manifest.version} configuration deployed.`);
       return;
     }
@@ -213,6 +214,7 @@ export function deployConfiguration(source, workerName, releaseTag, options = {}
       "exec",
       "wrangler",
       "deploy",
+      "--strict",
       "--keep-vars",
       "--config",
       "wrangler.jsonc",
