@@ -71,10 +71,15 @@ function findPlainTextQuoteStart(value: string): number | null {
     }
 
     let attributionStart = attributionEnd;
-    while (attributionStart > 0 && (lines[attributionStart - 1] ?? "").trim()) {
+    let attribution = lines[attributionStart] ?? "";
+    while (
+      attributionStart > 0 &&
+      !plainTextEmailAddress.test(attribution) &&
+      (lines[attributionStart - 1] ?? "").trim()
+    ) {
       attributionStart -= 1;
+      attribution = `${lines[attributionStart] ?? ""} ${attribution}`;
     }
-    const attribution = lines.slice(attributionStart, attributionEnd + 1).join(" ");
     if (plainTextEmailAddress.test(attribution)) return offsets[attributionStart] ?? 0;
   }
 
