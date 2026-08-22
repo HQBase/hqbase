@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 
 import { recordWorkerDeployedForConfig } from "../hqbase/manifest.mjs";
+import { windowsSystem32Executable } from "../windows-system32.mjs";
 import { inspectActiveRelease } from "./active-version.mjs";
 import { capture, run } from "./command.mjs";
 import {
@@ -58,7 +59,7 @@ export async function deploy(options = {}) {
     const source = resolve(workspace, "source");
     writeFileSync(archive, bytes);
     mkdirSync(source, { recursive: true });
-    run("tar", ["-xzf", archive, "-C", source], root);
+    run(archiveExtractor(), ["-xzf", archive, "-C", source], root);
     const config = normalizeConfig(
       JSON.parse(readFileSync(configFile, "utf8")),
       manifest.version,
@@ -188,6 +189,11 @@ export async function deploy(options = {}) {
   } finally {
     rmSync(workspace, { recursive: true, force: true });
   }
+}
+
+export function archiveExtractor(options = {}) {
+  const platform = options.platform ?? process.platform;
+  return platform === "win32" ? windowsSystem32Executable("tar.exe", options.environment) : "tar";
 }
 
 export function assertSourceDeployConfig(

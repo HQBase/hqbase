@@ -1,3 +1,4 @@
+import { fileURLToPath } from "node:url";
 import { defineConfig } from "vitest/config";
 
 export default defineConfig({
@@ -6,8 +7,8 @@ export default defineConfig({
   },
   resolve: {
     alias: {
-      "@": new URL("./app", import.meta.url).pathname,
-      "@worker": new URL("./worker", import.meta.url).pathname
+      "@": fileURLToPath(new URL("./app", import.meta.url)),
+      "@worker": fileURLToPath(new URL("./worker", import.meta.url))
     }
   },
   test: {
