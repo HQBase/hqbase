@@ -1,0 +1,27 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.hqbase/hqbase",
+  "title": "HQBase",
+  "description": "Connect AI agents to your self-hosted HQBase shared email workspace.",
+  "repository": {
+    "url": "https://github.com/HQBase/hqbase",
+    "source": "github",
+    "id": "1328183085"
+  },
+  "version": "1.0.0",
+  "websiteUrl": "https://hqbase.io/docs/mcp/",
+  "remotes": [
+    {
+      "type": "streamable-http",
+      "url": "https://{installation_domain}/mcp",
+      "variables": {
+        "installation_domain": {
+          "description": "Your HQBase installation domain, without https:// (for example, mail.example.com).",
+          "isRequired": true,
+          "format": "string",
+          "placeholder": "mail.example.com"
+        }
+      }
+    }
+  ]
+}
