@@ -1,12 +1,6 @@
 import { apiGet, apiPost } from "@/lib/api-client";
 import type { MailFolderId } from "@/lib/routes";
-import type {
-  ConversationAction,
-  ConversationPage,
-  MessageDetail,
-  MessageHtml,
-  MessageSummary
-} from "./types";
+import type { ConversationAction, ConversationPage, MessageDetail, MessageHtml } from "./types";
 
 export type MessageListParams = {
   cursor?: string | undefined;
@@ -14,15 +8,6 @@ export type MessageListParams = {
   mailboxId?: string | undefined;
   search?: string | undefined;
 };
-
-export async function listMessages(params: MessageListParams): Promise<MessageSummary[]> {
-  const query = new URLSearchParams();
-  if (params.folder) query.set("folder", params.folder);
-  if (params.mailboxId) query.set("mailboxId", params.mailboxId);
-  if (params.search) query.set("search", params.search);
-  const suffix = query.toString() ? `?${query.toString()}` : "";
-  return apiGet<MessageSummary[]>(`/api/v1/messages${suffix}`);
-}
 
 export async function listConversations(
   params: MessageListParams & { folder: MailFolderId }
@@ -32,10 +17,6 @@ export async function listConversations(
   if (params.mailboxId) query.set("mailboxId", params.mailboxId);
   if (params.search) query.set("search", params.search);
   return apiGet<ConversationPage>(`/api/v1/conversations?${query.toString()}`);
-}
-
-export async function getMessage(id: string): Promise<MessageDetail> {
-  return apiGet<MessageDetail>(`/api/v1/messages/${id}`);
 }
 
 export async function getMessageThread(id: string): Promise<MessageDetail[]> {
@@ -49,13 +30,6 @@ export async function getMessageHtml(id: string, loadRemoteImages = false): Prom
 
 export async function trustRemoteMediaSender(id: string): Promise<void> {
   await apiPost(`/api/v1/messages/${id}/remote-media/trust`);
-}
-
-export async function runMessageAction(
-  id: string,
-  action: "read" | "unread" | "star" | "unstar" | "archive" | "unarchive" | "trash" | "restore"
-): Promise<MessageSummary> {
-  return apiPost<MessageSummary>(`/api/v1/messages/${id}/${action}`);
 }
 
 export async function runConversationAction(

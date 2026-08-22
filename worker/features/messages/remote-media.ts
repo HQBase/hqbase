@@ -49,6 +49,6 @@ export async function trustRemoteMediaSender(
     .run();
 }
 
-export function normalizeSenderAddress(value: string): string {
+function normalizeSenderAddress(value: string): string {
   return value.trim().toLowerCase();
 }

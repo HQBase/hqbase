@@ -1,5 +1,5 @@
-export const messageFolders = ["inbox", "sent", "drafts", "archived", "trash", "catchall"] as const;
-export const messageDirections = ["inbound", "outbound"] as const;
+const messageFolders = ["inbox", "sent", "drafts", "archived", "trash", "catchall"] as const;
+const messageDirections = ["inbound", "outbound"] as const;
 export const conversationFolders = [
   "inbox",
   "sent",

@@ -10,10 +10,6 @@ export function ensureReplySubject(subject: string): string {
   return /^re:/i.test(subject.trim()) ? subject.trim() : `Re: ${subject.trim()}`;
 }
 
-export function createMessageId(primaryDomain: string): string {
-  return `<${crypto.randomUUID()}@${primaryDomain}>`;
-}
-
 export function parseReferences(value: string | null | undefined): string[] {
   if (!value) {
     return [];

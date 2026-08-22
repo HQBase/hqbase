@@ -45,7 +45,7 @@ export function currentUserSid() {
 // `icacls /save` writes the directory name followed by its security descriptor in SDDL form.
 // Reading the descriptor keeps this independent of the display language and of whether the path
 // arrived in its long or 8.3 short form.
-export function directorySecurityDescriptor(directory) {
+function directorySecurityDescriptor(directory) {
   const aclFile = `${directory}.acl`;
   try {
     runOrThrow(ICACLS, [directory, "/save", aclFile, "/q"]);
@@ -57,7 +57,7 @@ export function directorySecurityDescriptor(directory) {
 
 // SDDL names well-known principals by two-letter alias rather than by SID, so trustees come back
 // as a mix of aliases and raw SIDs.
-export function directoryTrustees(directory) {
+function directoryTrustees(directory) {
   return [...directorySecurityDescriptor(directory).matchAll(/\(([^)]*)\)/g)]
     .map((entry) => entry[1].split(";")[5])
     .filter((trustee) => Boolean(trustee));

@@ -3,7 +3,7 @@ import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { AppError, toAppError } from "../../lib/errors";
 import type { StoredAttachment } from "../messages/types";
 
-export const maxMcpAttachmentBytes = 10 * 1024 * 1024;
+const maxMcpAttachmentBytes = 10 * 1024 * 1024;
 export const maxMcpAttachmentBase64Length = Math.ceil(maxMcpAttachmentBytes / 3) * 4;
 
 export async function toolResult(run: () => Promise<unknown>): Promise<CallToolResult> {

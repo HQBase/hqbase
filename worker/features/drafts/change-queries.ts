@@ -16,7 +16,7 @@ import type { Draft } from "./types";
 export const defaultDraftChangeLimit = 100;
 export const maxDraftChangeLimit = 100;
 
-export type DraftChange = { type: "upsert"; draft: Draft } | { type: "delete"; draftId: string };
+type DraftChange = { type: "upsert"; draft: Draft } | { type: "delete"; draftId: string };
 
 export type DraftChangePage = {
   changes: DraftChange[];

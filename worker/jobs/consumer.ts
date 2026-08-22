@@ -93,7 +93,7 @@ async function integrityCounters(env: WorkerEnv): Promise<Record<string, number>
   };
 }
 
-export async function processJob(env: WorkerEnv, job: Job): Promise<void> {
+async function processJob(env: WorkerEnv, job: Job): Promise<void> {
   const startedAt = nowIso();
   const database = createDatabase(env.DB);
   const inserted = await database

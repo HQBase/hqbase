@@ -3,8 +3,8 @@ import mailApiDocumentSource from "../../../api/hqbase-mail-api-v1.openapi.json"
 import { authOrigin } from "../../auth/auth";
 import type { WorkerEnv } from "../../lib/env";
 
-export const agentSkillPath = "/skills/hqbase-mail/SKILL.md";
-export const mailApiOpenApiPath = "/api/v1/openapi.json";
+const agentSkillPath = "/skills/hqbase-mail/SKILL.md";
+const mailApiOpenApiPath = "/api/v1/openapi.json";
 
 const legacyAgentInstructionPaths = new Set(["/AGENTS.md", "/agents.md"]);
 

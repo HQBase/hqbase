@@ -10,7 +10,7 @@ export function domainSnapshot(domain) {
   };
 }
 
-export function uniqueDomains(domains) {
+function uniqueDomains(domains) {
   const unique = new Map();
   for (const domain of domains) {
     if (domain?.hostname) unique.set(domain.hostname, domain);
@@ -36,7 +36,7 @@ export async function assertManagedHosts(context, manifest = context.committed) 
   }
 }
 
-export async function restoreDomain(context, snapshot) {
+async function restoreDomain(context, snapshot) {
   const { committed, domains } = context;
   const records = await domains.list({ hostname: snapshot.hostname });
   const current = records.find((record) => record?.hostname === snapshot.hostname);
@@ -63,7 +63,7 @@ export async function restoreDomain(context, snapshot) {
   if (!restored) throw new Error(`Cloudflare did not restore ${snapshot.hostname}.`);
 }
 
-export async function removeDomainForWorker(context, hostname) {
+async function removeDomainForWorker(context, hostname) {
   const { committed, domains } = context;
   const records = await domains.list({ hostname });
   const attached = records.find(

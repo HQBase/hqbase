@@ -5,9 +5,9 @@ import { authOrigin, mailApiResource } from "./auth";
 import { authenticateOAuthBearer, OAuthBearerError } from "./oauth-principal";
 import { type AuthContext, requireAuthContext } from "./session";
 
-export const mailApiScopes = ["mail:read", "mail:write", "mail:send"] as const;
+const mailApiScopes = ["mail:read", "mail:write", "mail:send"] as const;
 export type MailApiScope = (typeof mailApiScopes)[number];
-export const mailApiMetadataPath = "/.well-known/oauth-protected-resource/api/v1";
+const mailApiMetadataPath = "/.well-known/oauth-protected-resource/api/v1";
 const agentSkillPath = "/skills/hqbase-mail/SKILL.md";
 
 export type MailApiPrincipal = {

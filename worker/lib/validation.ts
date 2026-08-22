@@ -7,7 +7,7 @@ export type WorkspaceRole = z.infer<typeof workspaceRoleSchema>;
 
 export const emailAddressSchema = z.string().email().max(254).transform(normalizeEmail);
 
-export function normalizeEmail(value: string): string {
+function normalizeEmail(value: string): string {
   return value.trim().toLowerCase();
 }
 
@@ -31,8 +31,4 @@ export function requireMailboxDomain(address: string, primaryDomain: string): vo
       400
     );
   }
-}
-
-export function cleanStringList(values: string[]): string[] {
-  return values.map((value) => value.trim()).filter(Boolean);
 }

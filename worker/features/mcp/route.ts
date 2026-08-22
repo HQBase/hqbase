@@ -7,7 +7,6 @@ import type { WorkspaceRole } from "../../lib/validation";
 
 import { serveMcp } from "./server";
 
-export const mcpScopes = ["mail:read", "mail:write", "mail:send", "offline_access"] as const;
 const mcpMailScopes = ["mail:read", "mail:write", "mail:send"] as const;
 
 type McpProfile = {

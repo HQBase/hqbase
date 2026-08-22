@@ -36,10 +36,7 @@ export type AuthContext = {
   };
 };
 
-export async function getAuthContext(
-  env: WorkerEnv,
-  request: Request
-): Promise<AuthContext | null> {
+async function getAuthContext(env: WorkerEnv, request: Request): Promise<AuthContext | null> {
   const auth = createAuth(env, request);
   const rawSession = await auth.api.getSession({
     headers: request.headers

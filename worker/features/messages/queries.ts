@@ -44,7 +44,7 @@ export type MessagePage = {
   nextCursor: string | null;
 };
 
-export function decodeMessageCursor(value: string): KeysetCursor {
+function decodeMessageCursor(value: string): KeysetCursor {
   const cursor = decodeKeysetCursor(messageCursorVersion, value);
   if (!cursor) {
     throw new AppError("INVALID_CURSOR", "Message cursor is invalid.", 400);

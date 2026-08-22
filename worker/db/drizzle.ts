@@ -7,8 +7,6 @@ export function createDatabase(client: D1Database) {
   return drizzle(client, { schema });
 }
 
-export type Database = ReturnType<typeof createDatabase>;
-
 export async function getRow<T>(client: D1Database, query: SQL): Promise<T | null> {
   return (await createDatabase(client).get<T>(query)) ?? null;
 }

@@ -44,7 +44,7 @@ export function groupDrafts(
   return groups;
 }
 
-export function displayNameFromAddress(value: string): string {
+function displayNameFromAddress(value: string): string {
   const trimmed = value.trim();
   if (!trimmed) return "";
   const named = trimmed.match(/^(?:"([^"]+)"|([^<]+?))\s*<([^>]+)>$/);

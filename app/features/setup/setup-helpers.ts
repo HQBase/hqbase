@@ -17,14 +17,6 @@ export function inferWorkerName(): string {
   return "hqbase";
 }
 
-export function connectionFingerprint(input: {
-  appHostname: string;
-  workerName: string;
-  zoneId: string;
-}): string {
-  return [input.zoneId, input.workerName.trim(), input.appHostname].join("|");
-}
-
 export function customDomainSucceeded(result: CloudflareConfigureResult): boolean {
   return result.steps.find((step) => step.id === "custom-domain")?.status === "success";
 }

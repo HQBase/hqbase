@@ -10,8 +10,6 @@ import {
   PiPalette,
   PiPaperPlaneTilt,
   PiPlug,
-  PiSidebar,
-  PiSidebarSimple,
   PiStar,
   PiTrash,
   PiTray,
@@ -67,4 +65,4 @@ export const settingsTabLabels: Record<SettingsTabId, string> = {
   debug: "Debug"
 };
 
-export { PiGear, PiNotePencil, PiSidebar, PiSidebarSimple, PiTray };
+export { PiNotePencil };

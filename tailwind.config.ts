@@ -40,7 +40,6 @@ export default {
           foreground: "hsl(var(--card-foreground))"
         },
         star: "hsl(var(--star))",
-        "star-foreground": "hsl(var(--star-foreground))",
         rail: "hsl(var(--surface-rail))",
         sidebar: "hsl(var(--surface-sidebar))",
         toolbar: "hsl(var(--surface-toolbar))",
@@ -73,22 +72,6 @@ export default {
         "6xl": ["80px", { lineHeight: "1.05", letterSpacing: "-3px" }]
       },
       keyframes: {
-        "accordion-down": {
-          from: {
-            height: "0"
-          },
-          to: {
-            height: "var(--radix-accordion-content-height)"
-          }
-        },
-        "accordion-up": {
-          from: {
-            height: "var(--radix-accordion-content-height)"
-          },
-          to: {
-            height: "0"
-          }
-        },
         "overlay-in": {
           from: { opacity: "0" },
           to: { opacity: "1" }
@@ -112,27 +95,15 @@ export default {
         "sheet-out-right": {
           from: { transform: "translateX(100%)" },
           to: { transform: "translateX(0)" }
-        },
-        "icon-enter": {
-          from: { opacity: "0", filter: "blur(4px)", transform: "scale(0.25)" },
-          to: { opacity: "1", filter: "blur(0px)", transform: "scale(1)" }
-        },
-        "icon-exit": {
-          from: { opacity: "1", filter: "blur(0px)", transform: "scale(1)" },
-          to: { opacity: "0", filter: "blur(4px)", transform: "scale(0.25)" }
         }
       },
       animation: {
-        "accordion-down": "accordion-down 0.2s ease-out",
-        "accordion-up": "accordion-up 0.2s ease-out",
         "overlay-in": "overlay-in 0.18s ease-out",
         "overlay-out": "overlay-out 0.18s ease-in",
         "sheet-in-left": "sheet-in-left 0.22s ease-out",
         "sheet-out-left": "sheet-out-left 0.18s ease-in",
         "sheet-in-right": "sheet-in-right 0.22s ease-out",
-        "sheet-out-right": "sheet-out-right 0.18s ease-in",
-        "icon-enter": "icon-enter 0.2s ease-out",
-        "icon-exit": "icon-exit 0.15s ease-in forwards"
+        "sheet-out-right": "sheet-out-right 0.18s ease-in"
       }
     }
   },

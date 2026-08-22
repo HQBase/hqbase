@@ -3,7 +3,6 @@ import type {
   BootstrapSetupInput,
   CloudflareAccessStatus,
   CloudflareConfigureResult,
-  CloudflareDomainStatus,
   CloudflareZone,
   SetupStatus
 } from "./types";
@@ -23,13 +22,6 @@ export async function verifyCloudflareAccess(): Promise<CloudflareAccessStatus> 
 export async function listCloudflareZones(): Promise<CloudflareZone[]> {
   const response = await apiPost<{ zones: CloudflareZone[] }>("/api/setup/cloudflare/zones", {});
   return response.zones;
-}
-
-export async function inspectCloudflareDomain(input: {
-  workerName: string;
-  zoneId: string;
-}): Promise<CloudflareDomainStatus> {
-  return apiPost<CloudflareDomainStatus>("/api/setup/cloudflare/inspect", input);
 }
 
 export async function configureCloudflareDomain(input: {

@@ -1,4 +1,4 @@
-import { AppError, errorBody } from "./errors";
+import { AppError } from "./errors";
 
 export async function readJson(request: Request): Promise<unknown> {
   try {
@@ -8,7 +8,7 @@ export async function readJson(request: Request): Promise<unknown> {
   }
 }
 
-export function jsonHeaders(headers?: HeadersInit): Headers {
+function jsonHeaders(headers?: HeadersInit): Headers {
   const next = new Headers(headers);
   next.set("content-type", "application/json; charset=utf-8");
   return next;
@@ -19,8 +19,4 @@ export function jsonResponse(body: unknown, init?: ResponseInit): Response {
     ...init,
     headers: jsonHeaders(init?.headers)
   });
-}
-
-export function jsonError(code: string, message: string, status = 400): Response {
-  return jsonResponse(errorBody(code, message), { status });
 }
