@@ -1,6 +1,13 @@
-import type { LucideIcon } from "lucide-react";
-import { ArrowLeft, ArrowRight, Check, Circle, CircleAlert, Loader2 } from "lucide-react";
 import type * as React from "react";
+import type { IconType } from "react-icons";
+import {
+  PiArrowLeft,
+  PiArrowRight,
+  PiCheck,
+  PiCircle,
+  PiCircleNotch,
+  PiWarningCircle
+} from "react-icons/pi";
 
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -9,7 +16,7 @@ import { cn } from "@/lib/cn";
 export type SetupPhase = 1 | 2 | 3;
 
 export type WizardStep = {
-  icon: LucideIcon;
+  icon: IconType;
   title: string;
 };
 
@@ -103,14 +110,14 @@ function InstallationTimelineStep({
       <div className="flex items-start space-x-2.5">
         <div className="relative flex size-6 flex-none items-center justify-center bg-background">
           {status === "complete" ? (
-            <Check aria-hidden="true" className="size-5 text-primary" />
+            <PiCheck aria-hidden="true" className="size-5 text-primary" />
           ) : status === "current" ? (
             <span
               aria-hidden="true"
               className="size-2.5 rounded-full bg-primary ring-4 ring-background"
             />
           ) : status === "failed" ? (
-            <CircleAlert
+            <PiWarningCircle
               aria-hidden="true"
               className="size-4 bg-background text-destructive ring-4 ring-background"
             />
@@ -169,11 +176,11 @@ function ConfigurationProgress({
             />
             <div className="mt-2 flex min-w-0 items-start gap-1.5">
               {status === "complete" ? (
-                <Check aria-hidden="true" className="size-4 shrink-0 text-primary" />
+                <PiCheck aria-hidden="true" className="size-4 shrink-0 text-primary" />
               ) : status === "active" ? (
                 <StepIcon aria-hidden="true" className="size-4 shrink-0 text-primary" />
               ) : (
-                <Circle aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" />
+                <PiCircle aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" />
               )}
               <span
                 className={cn(
@@ -243,16 +250,16 @@ export function WizardActions({
     <div className="flex w-full flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-between">
       {onBack ? (
         <Button type="button" variant="ghost" onClick={onBack}>
-          <ArrowLeft data-icon="inline-start" />
+          <PiArrowLeft data-icon="inline-start" />
           Back
         </Button>
       ) : (
         <span />
       )}
       <Button disabled={nextDisabled || isLoading} type="button" onClick={onNext}>
-        {isLoading ? <Loader2 className="animate-spin" data-icon="inline-start" /> : null}
+        {isLoading ? <PiCircleNotch className="animate-spin" data-icon="inline-start" /> : null}
         {nextLabel}
-        {!isLoading ? <ArrowRight data-icon="inline-end" /> : null}
+        {!isLoading ? <PiArrowRight data-icon="inline-end" /> : null}
       </Button>
     </div>
   );

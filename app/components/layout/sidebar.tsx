@@ -1,35 +1,18 @@
-import type { LucideIcon } from "lucide-react";
-import {
-  Archive,
-  FilePenLine,
-  Inbox,
-  Send,
-  Settings,
-  Star,
-  Trash2,
-  TriangleAlert
-} from "lucide-react";
 import type * as React from "react";
+import { PiSidebar, PiSidebarSimple } from "react-icons/pi";
 
 import { Button } from "@/components/ui/button";
-import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectTrigger,
-  SelectValue
-} from "@/components/ui/select";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import type { CurrentUser } from "@/features/auth/types";
 import type { Mailbox } from "@/features/mailboxes/types";
 import type { UnreadCounts } from "@/features/notifications/types";
-import { inboxUnreadForMailbox, mailboxUnreadLabel } from "@/features/notifications/unread";
-import { ThemeSwitcher } from "@/features/theme/theme-switcher";
 import { cn } from "@/lib/cn";
-import type { FolderId } from "@/lib/routes";
-import { appRoutePath, draftFolder, mailFolders } from "@/lib/routes";
+import type { FolderId, SettingsTabId } from "@/lib/routes";
+import { appRoutePath } from "@/lib/routes";
 import { AccountMenu } from "./account-menu";
+import { quickAccess } from "./sidebar/constants";
+import { isModifiedNavigation } from "./sidebar/sidebar-helpers";
+import { MailNav, SettingsNav } from "./sidebar/sidebar-nav";
 
 type SidebarProps = {
   activeFolder: FolderId;
@@ -40,24 +23,17 @@ type SidebarProps = {
     value: string;
     onChange: (mailboxId: string) => void;
   };
-  utilityAction?: React.ReactNode;
   user: CurrentUser;
   unread: UnreadCounts;
+  onCompose?: () => void;
   onFolderChange: (folder: FolderId) => void;
   onSignedOut: () => void;
-  resizable?: boolean;
   variant?: "desktop" | "drawer";
-};
-
-const icons: Record<FolderId, LucideIcon> = {
-  inbox: Inbox,
-  sent: Send,
-  drafts: FilePenLine,
-  starred: Star,
-  archived: Archive,
-  trash: Trash2,
-  catchall: TriangleAlert,
-  settings: Settings
+  sidebarCollapsed?: boolean;
+  activeSettingsTab?: SettingsTabId | undefined;
+  canManage?: boolean | undefined;
+  onSettingsTabChange?: ((tab: SettingsTabId) => void) | undefined;
+  onToggleSidebar?: () => void;
 };
 
 export function Sidebar({
@@ -65,156 +41,153 @@ export function Sidebar({
   draftCount = 0,
   mailboxId,
   mailboxFilter,
-  utilityAction,
   unread,
   user,
+  onCompose,
   onFolderChange,
   onSignedOut,
-  resizable = false,
-  variant = "desktop"
+  variant = "desktop",
+  sidebarCollapsed = false,
+  activeSettingsTab,
+  canManage = false,
+  onSettingsTabChange,
+  onToggleSidebar
 }: SidebarProps): React.ReactElement {
   const isDrawer = variant === "drawer";
-  const navigationFolders: Array<(typeof mailFolders)[number] | typeof draftFolder> = [];
-  for (const folder of mailFolders) {
-    navigationFolders.push(folder);
-    if (folder.id === "sent" && (draftCount > 0 || activeFolder === "drafts")) {
-      navigationFolders.push(draftFolder);
-    }
-  }
 
   return (
     <aside
       className={cn(
-        "flex-col bg-background px-3 py-3",
+        "flex-col text-foreground",
         isDrawer
-          ? "flex h-full w-full pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-[max(0.75rem,env(safe-area-inset-top))]"
-          : resizable
-            ? "hidden h-full w-full md:flex"
-            : "hidden w-56 shrink-0 border-r md:flex"
+          ? "flex h-full w-full bg-sidebar pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-[max(0.75rem,env(safe-area-inset-top))]"
+          : "hidden h-full w-full bg-rail lg:flex"
       )}
     >
-      <div className="mb-7 flex h-9 items-center gap-2.5 px-2">
-        <img alt="" className="h-7 w-auto shrink-0" src="/logo.svg" />
-        <span className="text-sm font-medium tracking-tight">HQBase</span>
-      </div>
-      {isDrawer && mailboxFilter ? (
-        <FieldGroup className="mb-4 gap-0 px-2">
-          <Field className="gap-1.5">
-            <FieldLabel
-              className="text-xs font-medium text-muted-foreground"
-              htmlFor="drawer-mailbox-filter"
+      <div className="flex h-full min-h-0 flex-1">
+        {!isDrawer ? (
+          <nav
+            aria-label="Quick access"
+            className="flex w-12 shrink-0 flex-col items-center py-2 pr-2 pl-1"
+          >
+            <a
+              aria-label="Inbox"
+              className="rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              href={appRoutePath({ kind: "mail", folder: "inbox", messageId: null })}
+              onClick={(event) => {
+                if (isModifiedNavigation(event)) return;
+                event.preventDefault();
+                onFolderChange("inbox");
+              }}
             >
-              Mailbox
-            </FieldLabel>
-            <Select value={mailboxFilter.value} onValueChange={mailboxFilter.onChange}>
-              <SelectTrigger
-                aria-label="Mailbox filter"
-                className="h-11 bg-muted/70 shadow-none [&>span]:truncate"
-                id="drawer-mailbox-filter"
-              >
-                <SelectValue placeholder="All mailboxes" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectGroup>
-                  <SelectItem value="all">
-                    {mailboxUnreadLabel("All mailboxes", "all", unread)}
-                  </SelectItem>
-                  {mailboxFilter.mailboxes.map((mailbox) => (
-                    <SelectItem key={mailbox.id} value={mailbox.id}>
-                      {mailboxUnreadLabel(mailbox.address, mailbox.id, unread)}
-                    </SelectItem>
-                  ))}
-                </SelectGroup>
-              </SelectContent>
-            </Select>
-          </Field>
-        </FieldGroup>
-      ) : null}
-      <nav className="flex flex-1 flex-col gap-0.5">
-        {navigationFolders.map((folder) => {
-          const Icon = icons[folder.id];
-          const unreadCount =
-            folder.id === "inbox"
-              ? inboxUnreadForMailbox(unread, mailboxId)
-              : folder.id === "catchall"
-                ? unread.catchall
-                : 0;
-          const count = folder.id === "drafts" ? draftCount : unreadCount;
-          return (
-            <Button
-              asChild
-              className={cn(
-                "h-8 justify-start gap-2.5 px-2.5 text-[13px] font-normal text-muted-foreground",
-                isDrawer && "h-11 text-sm",
-                activeFolder === folder.id && "bg-muted text-foreground"
-              )}
-              key={folder.id}
-              variant="ghost"
-            >
-              <a
-                aria-current={activeFolder === folder.id ? "page" : undefined}
-                data-navigation-item
-                href={appRoutePath(
-                  folder.id === "drafts"
-                    ? { kind: "drafts", draftId: null }
-                    : { kind: "mail", folder: folder.id, messageId: null }
-                )}
-                onClick={(event) => {
-                  if (isModifiedNavigation(event)) return;
-                  event.preventDefault();
-                  onFolderChange(folder.id);
-                }}
-              >
-                <Icon />
-                <span className="min-w-0 flex-1 truncate">{folder.label}</span>
-                {count > 0 ? (
-                  <span className="ml-auto font-mono text-[11px] text-foreground">
-                    <span className="sr-only">
-                      {folder.id === "drafts" ? `${count} drafts` : `${count} unread`}
-                    </span>
-                    <span aria-hidden="true">{count.toLocaleString()}</span>
-                  </span>
-                ) : null}
-              </a>
-            </Button>
-          );
-        })}
-        <div className="mt-auto">
-          <div className="flex flex-col gap-0.5 border-t pt-2">
-            {utilityAction}
-            <Button
-              asChild
-              className={cn(
-                "h-8 w-full justify-start gap-2.5 px-2.5 text-[13px] font-normal text-muted-foreground",
-                isDrawer && "h-11 text-sm",
-                activeFolder === "settings" && "bg-muted text-foreground"
-              )}
-              variant="ghost"
-            >
-              <a
-                aria-current={activeFolder === "settings" ? "page" : undefined}
-                href={appRoutePath({ kind: "settings", tab: "mailboxes" })}
-                onClick={(event) => {
-                  if (isModifiedNavigation(event)) return;
-                  event.preventDefault();
-                  onFolderChange("settings");
-                }}
-              >
-                <Settings />
-                Settings
-              </a>
-            </Button>
-            <ThemeSwitcher drawer={isDrawer} />
+              <img alt="" className="size-7 rounded-md object-contain" src="/logo.svg" />
+            </a>
+            <div className="mt-5 flex flex-col gap-1">
+              {quickAccess.map(({ folder, icon: Icon, label }) => {
+                const isActive =
+                  folder === "settings" ? activeFolder === "settings" : activeFolder !== "settings";
+                return (
+                  <Button
+                    asChild
+                    className={cn(
+                      "size-9 text-tertiary [@media(hover:hover)]:hover:bg-muted/70 [@media(hover:hover)]:hover:text-foreground",
+                      isActive && "bg-selected text-foreground"
+                    )}
+                    key={folder}
+                    size="icon"
+                    title={label}
+                    type="button"
+                    variant="ghost"
+                  >
+                    <a
+                      aria-current={isActive ? "page" : undefined}
+                      aria-label={label}
+                      href={
+                        folder === "settings"
+                          ? appRoutePath({ kind: "settings", tab: "mailboxes" })
+                          : appRoutePath({ kind: "mail", folder, messageId: null })
+                      }
+                      onClick={(event) => {
+                        if (isModifiedNavigation(event)) return;
+                        event.preventDefault();
+                        onFolderChange(folder);
+                      }}
+                    >
+                      <Icon />
+                    </a>
+                  </Button>
+                );
+              })}
+            </div>
+            <div className="mt-auto flex flex-col items-center gap-1">
+              <AccountMenu compact user={user} onSignedOut={onSignedOut} />
+            </div>
+          </nav>
+        ) : null}
+        <div
+          className={cn(
+            "flex min-w-0 flex-1 flex-col p-2",
+            !isDrawer &&
+              "ml-2 h-full overflow-hidden rounded-[24px] border border-divider bg-sidebar p-2 shadow-sm"
+          )}
+        >
+          <div className="mb-5 flex h-9 items-center justify-between gap-3 px-3.5 pr-0">
+            <div className="flex min-w-0 items-center gap-3">
+              {isDrawer ? <img alt="" className="h-7 w-auto shrink-0" src="/logo.svg" /> : null}
+              <span className="truncate text-sm font-semibold leading-none tracking-tight">
+                Mail
+              </span>
+            </div>
+            {onToggleSidebar ? (
+              <TooltipProvider delayDuration={250}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      aria-label={sidebarCollapsed ? "Show sidebar" : "Hide sidebar"}
+                      className="size-10 min-h-10 min-w-10 shrink-0 text-tertiary"
+                      onClick={onToggleSidebar}
+                      size="icon"
+                      title={sidebarCollapsed ? "Show sidebar" : "Hide sidebar"}
+                      type="button"
+                      variant="ghost"
+                    >
+                      {sidebarCollapsed ? <PiSidebarSimple /> : <PiSidebar />}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom">
+                    {sidebarCollapsed ? "Show sidebar" : "Hide sidebar"}
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            ) : null}
           </div>
-          <div className="mt-2 border-t pt-2">
-            <AccountMenu drawer={isDrawer} user={user} onSignedOut={onSignedOut} />
-          </div>
+          {activeFolder === "settings" ? (
+            <SettingsNav
+              activeSettingsTab={activeSettingsTab}
+              canManage={canManage}
+              isDrawer={isDrawer}
+              user={user}
+              onCompose={onCompose}
+              onFolderChange={onFolderChange}
+              onSettingsTabChange={onSettingsTabChange}
+              onSignedOut={onSignedOut}
+            />
+          ) : (
+            <MailNav
+              activeFolder={activeFolder}
+              draftCount={draftCount}
+              mailboxId={mailboxId}
+              mailboxFilter={mailboxFilter}
+              unread={unread}
+              isDrawer={isDrawer}
+              user={user}
+              onCompose={onCompose}
+              onFolderChange={onFolderChange}
+              onSignedOut={onSignedOut}
+            />
+          )}
         </div>
-      </nav>
+      </div>
     </aside>
   );
-}
-
-function isModifiedNavigation(event: React.MouseEvent<HTMLAnchorElement>): boolean {
-  return event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey;
 }

@@ -13,6 +13,15 @@ let ownerCookie = "";
 let ownerSessionId = "";
 let otherCookie = "";
 
+type OAuthTokenResponse = {
+  access_token: string;
+  expires_at: number;
+  expires_in: number;
+  refresh_token: string;
+  scope: string;
+  token_type: string;
+};
+
 describe("OAuth Device Authorization Grant", () => {
   beforeAll(async () => {
     await applyCurrentMigrations();
@@ -103,11 +112,7 @@ describe("OAuth Device Authorization Grant", () => {
       .run();
     const tokenResponse = await pollToken(authorization.device_code);
     expect(tokenResponse.status, await tokenResponse.clone().text()).toBe(200);
-    const token = (await tokenResponse.json()) as {
-      access_token?: string;
-      refresh_token?: string;
-      scope?: string;
-    };
+    const token = (await tokenResponse.json()) as OAuthTokenResponse;
     expect(token.access_token).toMatch(/^hqb_access_/);
     expect(token.refresh_token).toMatch(/^hqb_refresh_/);
     expect(token.scope?.split(" ")).toEqual(
@@ -137,6 +142,37 @@ describe("OAuth Device Authorization Grant", () => {
     });
     expect(api.status, await api.clone().text()).toBe(200);
     await expect(api.json()).resolves.toEqual([]);
+
+    if (!token.refresh_token) throw new Error("Refresh token was not issued.");
+    const rotatedResponse = await refreshToken(token.refresh_token);
+    expect(rotatedResponse.status, await rotatedResponse.clone().text()).toBe(200);
+    const rotated = (await rotatedResponse.json()) as OAuthTokenResponse;
+    expect(rotated.access_token).toMatch(/^hqb_access_/);
+    expect(rotated.refresh_token).toMatch(/^hqb_refresh_/);
+
+    const concurrentReplay = await refreshToken(token.refresh_token);
+    expect(concurrentReplay.status, await concurrentReplay.clone().text()).toBe(200);
+    const replayed = (await concurrentReplay.json()) as OAuthTokenResponse;
+    const { expires_in: rotatedExpiresIn, ...rotatedStable } = rotated;
+    const { expires_in: replayedExpiresIn, ...replayedStable } = replayed;
+    expect(replayedStable).toEqual(rotatedStable);
+    expect(replayedExpiresIn).toBeGreaterThan(0);
+    expect(replayedExpiresIn).toBeLessThanOrEqual(rotatedExpiresIn);
+
+    await env.DB.prepare(
+      `UPDATE oauthRefreshToken
+       SET rotationReplayExpiresAt = ?
+       WHERE sessionId = ? AND rotatedAt IS NOT NULL`
+    )
+      .bind("2000-01-01T00:00:00.000Z", ownerSessionId)
+      .run();
+    const lateReplay = await refreshToken(token.refresh_token);
+    expect(lateReplay.status).toBe(400);
+    await expect(lateReplay.json()).resolves.toMatchObject({ error: "invalid_grant" });
+    if (!rotated.refresh_token) throw new Error("Rotated refresh token was not issued.");
+    const invalidatedFamily = await refreshToken(rotated.refresh_token);
+    expect(invalidatedFamily.status).toBe(400);
+    await expect(invalidatedFamily.json()).resolves.toMatchObject({ error: "invalid_grant" });
 
     const replay = await pollToken(authorization.device_code);
     expect(replay.status).toBe(400);
@@ -273,6 +309,19 @@ function pollToken(deviceCode: string): Promise<Response> {
       client_id: clientId,
       device_code: deviceCode,
       grant_type: deviceCodeGrantType,
+      resource: apiResource
+    }),
+    headers: { "content-type": "application/x-www-form-urlencoded" },
+    method: "POST"
+  });
+}
+
+function refreshToken(token: string): Promise<Response> {
+  return SELF.fetch(`${origin}/api/auth/oauth2/token`, {
+    body: new URLSearchParams({
+      client_id: clientId,
+      grant_type: "refresh_token",
+      refresh_token: token,
       resource: apiResource
     }),
     headers: { "content-type": "application/x-www-form-urlencoded" },

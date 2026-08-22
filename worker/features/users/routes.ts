@@ -1,6 +1,8 @@
+import { sql } from "drizzle-orm";
 import { Hono } from "hono";
 
 import { requireAuthContext, requireRole } from "../../auth/session";
+import { getRow } from "../../db/drizzle";
 import type { HonoApp } from "../../lib/env";
 import { AppError } from "../../lib/errors";
 import { readJson } from "../../lib/json";
@@ -48,9 +50,7 @@ userRoutes.post("/", async (c) => {
 userRoutes.post("/:id/resend-invitation", async (c) => {
   const authContext = await requireAuthContext(c.env, c.req.raw);
   requireRole(authContext, ["owner", "admin"]);
-  const target = await c.env.DB.prepare('SELECT role FROM "user" WHERE id = ?')
-    .bind(c.req.param("id"))
-    .first<{ role: string | null }>();
+  const target = await getUserRole(c.env.DB, c.req.param("id"));
   if (!target) throw new AppError("USER_NOT_FOUND", "User not found.", 404);
   if (target.role === "owner" && authContext.user.role !== "owner") {
     throw new AppError("OWNER_REQUIRED", "Only an owner can manage another owner.", 403);
@@ -73,9 +73,7 @@ userRoutes.post("/:id/resend-invitation", async (c) => {
 userRoutes.post("/:id/temporary-password", async (c) => {
   const authContext = await requireAuthContext(c.env, c.req.raw);
   requireRole(authContext, ["owner", "admin"]);
-  const target = await c.env.DB.prepare('SELECT role FROM "user" WHERE id = ?')
-    .bind(c.req.param("id"))
-    .first<{ role: string | null }>();
+  const target = await getUserRole(c.env.DB, c.req.param("id"));
   if (!target) throw new AppError("USER_NOT_FOUND", "User not found.", 404);
   if (target.role === "owner" && authContext.user.role !== "owner") {
     throw new AppError("OWNER_REQUIRED", "Only an owner can manage another owner.", 403);
@@ -100,17 +98,18 @@ userRoutes.patch("/:id", async (c) => {
   requireRole(authContext, ["owner", "admin"]);
 
   const input = parseWith(updateUserSchema, await readJson(c.req.raw));
-  const target = await c.env.DB.prepare('SELECT role FROM "user" WHERE id = ?')
-    .bind(c.req.param("id"))
-    .first<{ role: string | null }>();
+  const target = await getUserRole(c.env.DB, c.req.param("id"));
   if (!target) throw new AppError("USER_NOT_FOUND", "User not found.", 404);
   if ((input.role === "owner" || target.role === "owner") && authContext.user.role !== "owner") {
     throw new AppError("OWNER_REQUIRED", "Only an owner can change owner membership.", 403);
   }
   if (target.role === "owner" && input.role !== "owner") {
-    const owners = await c.env.DB.prepare(
-      `SELECT COUNT(*) AS count FROM "user" WHERE role = 'owner' AND COALESCE(banned, 0) = 0`
-    ).first<{ count: number }>();
+    const owners = await getRow<{ count: number }>(
+      c.env.DB,
+      sql`SELECT COUNT(*) AS count
+          FROM "user"
+          WHERE role = 'owner' AND COALESCE(banned, 0) = 0`
+    );
     if ((owners?.count ?? 0) <= 1) {
       throw new AppError("LAST_OWNER", "The last active owner cannot be demoted.", 409);
     }
@@ -128,3 +127,7 @@ userRoutes.patch("/:id", async (c) => {
   });
   return c.json({ ok: true });
 });
+
+function getUserRole(db: D1Database, userId: string): Promise<{ role: string | null } | null> {
+  return getRow(db, sql`SELECT role FROM "user" WHERE id = ${userId}`);
+}

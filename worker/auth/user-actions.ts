@@ -1,5 +1,8 @@
+import { eq } from "drizzle-orm";
 import { z } from "zod";
 
+import { createDatabase } from "../db/drizzle";
+import { users } from "../db/schema";
 import type { WorkerEnv } from "../lib/env";
 import { AppError } from "../lib/errors";
 import type { WorkspaceRole } from "../lib/validation";
@@ -175,8 +178,9 @@ function extractAuthError(data: unknown): string {
 }
 
 async function setUserRole(db: D1Database, userId: string, role: WorkspaceRole): Promise<void> {
-  await db
-    .prepare('UPDATE "user" SET role = ?, updatedAt = ? WHERE id = ?')
-    .bind(role, new Date().toISOString(), userId)
+  await createDatabase(db)
+    .update(users)
+    .set({ role, updatedAt: new Date().toISOString() })
+    .where(eq(users.id, userId))
     .run();
 }

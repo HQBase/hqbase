@@ -16,19 +16,21 @@ vi.mock("web-push", () => {
     }
   };
 });
-vi.mock("@worker/auth/mailbox-access", () => ({ accessibleMailboxIds: vi.fn() }));
+vi.mock("@worker/auth/mailbox-access", () => ({ accessibleMessageScope: vi.fn() }));
 vi.mock("@worker/features/notifications/queries", () => ({
   countUnreadMessages: vi.fn(),
   listPushSubscriptionsForMailbox: vi.fn(),
+  listPushSubscriptionsForUnassigned: vi.fn(),
   markPushSubscriptionSuccessful: vi.fn(),
   removePushSubscriptionsById: vi.fn()
 }));
 
-import { accessibleMailboxIds } from "@worker/auth/mailbox-access";
+import { accessibleMessageScope } from "@worker/auth/mailbox-access";
 import { notifyInboundMessage } from "@worker/features/notifications/delivery";
 import {
   countUnreadMessages,
   listPushSubscriptionsForMailbox,
+  listPushSubscriptionsForUnassigned,
   markPushSubscriptionSuccessful,
   removePushSubscriptionsById
 } from "@worker/features/notifications/queries";
@@ -62,7 +64,10 @@ const env = {
 describe("push delivery", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(accessibleMailboxIds).mockResolvedValue(["mbx_1"]);
+    vi.mocked(accessibleMessageScope).mockResolvedValue({
+      includeUnassigned: false,
+      mailboxIds: ["mbx_1"]
+    });
     vi.mocked(countUnreadMessages).mockResolvedValue({
       catchall: 1,
       inbox: 2,
@@ -97,7 +102,7 @@ describe("push delivery", () => {
       headers: {},
       statusCode: 201
     });
-    await notifyInboundMessage(env, message);
+    await notifyInboundMessage(env, message, false);
 
     expect(webpush.sendNotification).toHaveBeenCalledTimes(2);
     const payload = JSON.parse(
@@ -119,21 +124,87 @@ describe("push delivery", () => {
     vi.mocked(webpush.sendNotification)
       .mockRejectedValueOnce({ statusCode: 410 })
       .mockRejectedValueOnce({ statusCode: 503 });
-    await expect(notifyInboundMessage(env, message)).resolves.toBeUndefined();
+    await expect(notifyInboundMessage(env, message, false)).resolves.toBeUndefined();
     expect(removePushSubscriptionsById).toHaveBeenCalledWith(env.DB, ["push_1"]);
     expect(markPushSubscriptionSuccessful).not.toHaveBeenCalled();
   });
 
   it("rechecks live mailbox access before sending", async () => {
-    vi.mocked(accessibleMailboxIds).mockResolvedValue([]);
-    await notifyInboundMessage(env, message);
+    vi.mocked(accessibleMessageScope).mockResolvedValue({
+      includeUnassigned: false,
+      mailboxIds: []
+    });
+    await notifyInboundMessage(env, message, false);
     expect(webpush.sendNotification).not.toHaveBeenCalled();
     expect(countUnreadMessages).not.toHaveBeenCalled();
   });
 
-  it("does nothing when the stored message has no mailbox", async () => {
-    await notifyInboundMessage(env, { ...message, mailboxId: null });
+  it("notifies catch-all subscribers for a message that matched no mailbox", async () => {
+    vi.mocked(accessibleMessageScope).mockResolvedValue({
+      includeUnassigned: true,
+      mailboxIds: []
+    });
+    vi.mocked(listPushSubscriptionsForUnassigned).mockResolvedValue([
+      {
+        id: "push_catchall",
+        user_id: "usr_owner",
+        endpoint: "https://push.example/owner",
+        p256dh_key: "p256dh",
+        auth_key: "auth",
+        expiration_time: null,
+        role: "owner"
+      }
+    ]);
+    vi.mocked(webpush.sendNotification).mockResolvedValue({
+      body: "",
+      headers: {},
+      statusCode: 201
+    });
+
+    await notifyInboundMessage(env, { ...message, folder: "catchall", mailboxId: null }, true);
+
     expect(listPushSubscriptionsForMailbox).not.toHaveBeenCalled();
+    expect(webpush.sendNotification).toHaveBeenCalledTimes(1);
+    expect(
+      JSON.parse(vi.mocked(webpush.sendNotification).mock.calls[0]?.[1] as string)
+    ).toMatchObject({ url: "/catch-all/msg_1" });
+  });
+
+  it("does not notify a subscriber whose scope excludes catch-all", async () => {
+    vi.mocked(listPushSubscriptionsForUnassigned).mockResolvedValue([
+      {
+        id: "push_member",
+        user_id: "usr_member",
+        endpoint: "https://push.example/member",
+        p256dh_key: "p256dh",
+        auth_key: "auth",
+        expiration_time: null,
+        role: "member"
+      }
+    ]);
+
+    await notifyInboundMessage(env, { ...message, folder: "catchall", mailboxId: null }, true);
+
+    expect(webpush.sendNotification).not.toHaveBeenCalled();
+    expect(countUnreadMessages).not.toHaveBeenCalled();
+  });
+
+  it("does not treat another null mailbox reference as unassigned", async () => {
+    await notifyInboundMessage(env, { ...message, mailboxId: null }, false);
+
+    expect(listPushSubscriptionsForMailbox).not.toHaveBeenCalled();
+    expect(listPushSubscriptionsForUnassigned).not.toHaveBeenCalled();
+    expect(webpush.sendNotification).not.toHaveBeenCalled();
+  });
+
+  it("does nothing when push is not configured", async () => {
+    await notifyInboundMessage(
+      { ...env, VAPID_PRIVATE_KEY: undefined } as unknown as WorkerEnv,
+      message,
+      false
+    );
+    expect(listPushSubscriptionsForMailbox).not.toHaveBeenCalled();
+    expect(listPushSubscriptionsForUnassigned).not.toHaveBeenCalled();
     expect(webpush.sendNotification).not.toHaveBeenCalled();
   });
 });

@@ -1,4 +1,4 @@
-import { Paperclip, X } from "lucide-react";
+import { PiPaperclip, PiX } from "react-icons/pi";
 import { Button } from "@/components/ui/button";
 import type { DraftAttachment } from "@/features/drafts/types";
 export function AttachmentList({
@@ -16,18 +16,18 @@ export function AttachmentList({
           className="flex items-center gap-2 rounded-md border bg-background px-3 py-1.5 text-xs"
           key={item.id}
         >
-          <Paperclip />
+          <PiPaperclip aria-hidden="true" className="pointer-events-none" />
           <span className="max-w-48 truncate">{item.filename}</span>
           <span className="text-muted-foreground">{formatBytes(item.sizeBytes)}</span>
           <Button
             aria-label={`Remove ${item.filename}`}
-            className="size-6"
+            className="size-10 min-h-10 min-w-10"
             size="icon"
             type="button"
             variant="ghost"
             onClick={() => onRemove(item)}
           >
-            <X />
+            <PiX aria-hidden="true" className="pointer-events-none" />
           </Button>
         </div>
       ))}

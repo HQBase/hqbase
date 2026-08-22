@@ -19,6 +19,7 @@ export function createWranglerConfig(manifest) {
   const cloudflareOAuth = manifest.cloudflareOAuth ?? { mode: "official" };
   const config = {
     $schema: `${rootFromDeployment}/node_modules/wrangler/config-schema.json`,
+    ...(manifest.accountId ? { account_id: manifest.accountId } : {}),
     name: manifest.worker.name,
     main: `${rootFromDeployment}/worker/index.ts`,
     // Matches the repository Wrangler configuration: a mail workspace should be
@@ -65,11 +66,11 @@ export function createWranglerConfig(manifest) {
       }
     ],
     queues: {
-      producers: [{ binding: "HQBASE_JOBS", queue: manifest.queue.name }],
+      producers: [{ binding: "HQBASE_JOBS", queue: manifest.queue.primary.name }],
       consumers: [
         {
-          queue: manifest.queue.name,
-          dead_letter_queue: manifest.queue.deadLetterName,
+          queue: manifest.queue.primary.name,
+          dead_letter_queue: manifest.queue.deadLetter.name,
           max_batch_size: 10,
           max_batch_timeout: 5,
           max_retries: 3

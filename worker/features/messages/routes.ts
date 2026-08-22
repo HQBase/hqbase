@@ -1,21 +1,22 @@
 import { Hono } from "hono";
 import { isVersionedMailApiRequest, requireMailApiContext } from "../../auth/mail-api";
-import { accessibleMailboxIds, requireMailboxAccess } from "../../auth/mailbox-access";
+import { accessibleMessageScope } from "../../auth/mailbox-access";
 import type { HonoApp } from "../../lib/env";
 import { AppError } from "../../lib/errors";
 
+import { requireAttachmentAccess, requireMessageAccess } from "./access";
 import type { MessageAction } from "./actions";
 import { sanitizeMessageHtml } from "./html-sanitizer";
 import { isSafeInlineImage, normalizedContentType } from "./inline-media";
 import { publicMessage } from "./public-message";
 import {
+  defaultMessageLimit,
   findAttachment,
-  getAttachmentMailboxId,
   getMessageDetail,
   getMessageHtmlKey,
-  getMessageMailboxId,
-  listMessages,
+  listMessagePage,
   listThreadMessages,
+  maxMessageLimit,
   updateMessageAction
 } from "./queries";
 import { isRemoteMediaTrusted, trustRemoteMediaSender } from "./remote-media";
@@ -24,19 +25,35 @@ export { isSafeInlineImage } from "./inline-media";
 
 export const messageRoutes = new Hono<HonoApp>();
 
-const actions: readonly MessageAction[] = ["read", "unread", "star", "unstar", "archive", "trash"];
+const actions: readonly MessageAction[] = [
+  "read",
+  "unread",
+  "star",
+  "unstar",
+  "archive",
+  "unarchive",
+  "trash",
+  "restore"
+];
 
 messageRoutes.get("/", async (c) => {
   const auth = await requireMailApiContext(c.env, c.req.raw, "mail:read");
-  const mailboxIds = await accessibleMailboxIds(c.env.DB, auth.user.id, auth.user.role, "read");
-  return c.json(
-    await listMessages(c.env.DB, {
-      folder: c.req.query("folder"),
-      mailboxId: c.req.query("mailboxId"),
-      search: c.req.query("search"),
-      mailboxIds
-    })
-  );
+  const scope = await accessibleMessageScope(c.env.DB, auth.user.id, auth.user.role, "read");
+  const limit = parseMessageLimit(c.req.query("limit"));
+  const page = await listMessagePage(c.env.DB, {
+    cursor: c.req.query("cursor"),
+    folder: c.req.query("folder"),
+    limit,
+    mailboxId: c.req.query("mailboxId"),
+    search: c.req.query("search"),
+    scope
+  });
+
+  const response = c.json(page.messages);
+  if (page.nextCursor) {
+    response.headers.set("link", `<${nextMessagePageUrl(c.req.url, page.nextCursor)}>; rel="next"`);
+  }
+  return response;
 });
 
 messageRoutes.get("/:id/thread", async (c) => {
@@ -45,22 +62,14 @@ messageRoutes.get("/:id/thread", async (c) => {
   if (!message) {
     throw new AppError("MESSAGE_NOT_FOUND", "Message not found.", 404);
   }
-  await requireMailboxAccess(c.env.DB, auth.user.id, auth.user.role, message.mailboxId, "read");
-  const mailboxIds = await accessibleMailboxIds(c.env.DB, auth.user.id, auth.user.role, "read");
-  return c.json(
-    (await listThreadMessages(c.env.DB, message.threadId, mailboxIds)).map(publicMessage)
-  );
+  await requireMessageAccess(c.env.DB, auth.user.id, auth.user.role, message.id, "read");
+  const scope = await accessibleMessageScope(c.env.DB, auth.user.id, auth.user.role, "read");
+  return c.json((await listThreadMessages(c.env.DB, message.threadId, scope)).map(publicMessage));
 });
 
 messageRoutes.get("/:id", async (c) => {
   const auth = await requireMailApiContext(c.env, c.req.raw, "mail:read");
-  await requireMailboxAccess(
-    c.env.DB,
-    auth.user.id,
-    auth.user.role,
-    await getMessageMailboxId(c.env.DB, c.req.param("id")),
-    "read"
-  );
+  await requireMessageAccess(c.env.DB, auth.user.id, auth.user.role, c.req.param("id"), "read");
   const message = await getMessageDetail(c.env.DB, c.req.param("id"));
   if (!message) {
     throw new AppError("MESSAGE_NOT_FOUND", "Message not found.", 404);
@@ -70,13 +79,7 @@ messageRoutes.get("/:id", async (c) => {
 
 messageRoutes.get("/:id/html", async (c) => {
   const auth = await requireMailApiContext(c.env, c.req.raw, "mail:read");
-  await requireMailboxAccess(
-    c.env.DB,
-    auth.user.id,
-    auth.user.role,
-    await getMessageMailboxId(c.env.DB, c.req.param("id")),
-    "read"
-  );
+  await requireMessageAccess(c.env.DB, auth.user.id, auth.user.role, c.req.param("id"), "read");
   const message = await getMessageDetail(c.env.DB, c.req.param("id"));
   if (!message) {
     throw new AppError("MESSAGE_NOT_FOUND", "Message not found.", 404);
@@ -106,13 +109,7 @@ messageRoutes.get("/:id/html", async (c) => {
 
 messageRoutes.post("/:id/remote-media/trust", async (c) => {
   const auth = await requireMailApiContext(c.env, c.req.raw, "mail:write");
-  await requireMailboxAccess(
-    c.env.DB,
-    auth.user.id,
-    auth.user.role,
-    await getMessageMailboxId(c.env.DB, c.req.param("id")),
-    "read"
-  );
+  await requireMessageAccess(c.env.DB, auth.user.id, auth.user.role, c.req.param("id"), "read");
   const message = await getMessageDetail(c.env.DB, c.req.param("id"));
   if (!message) {
     throw new AppError("MESSAGE_NOT_FOUND", "Message not found.", 404);
@@ -123,11 +120,11 @@ messageRoutes.post("/:id/remote-media/trust", async (c) => {
 
 messageRoutes.get("/:id/inline/:attachmentId", async (c) => {
   const auth = await requireMailApiContext(c.env, c.req.raw, "mail:read");
-  await requireMailboxAccess(
+  await requireAttachmentAccess(
     c.env.DB,
     auth.user.id,
     auth.user.role,
-    await getAttachmentMailboxId(c.env.DB, c.req.param("attachmentId")),
+    c.req.param("attachmentId"),
     "read"
   );
   const attachment = await findAttachment(c.env.DB, c.req.param("attachmentId"));
@@ -155,11 +152,11 @@ messageRoutes.get("/:id/inline/:attachmentId", async (c) => {
 for (const action of actions) {
   messageRoutes.post(`/:id/${action}`, async (c) => {
     const auth = await requireMailApiContext(c.env, c.req.raw, "mail:write");
-    await requireMailboxAccess(
+    await requireMessageAccess(
       c.env.DB,
       auth.user.id,
       auth.user.role,
-      await getMessageMailboxId(c.env.DB, c.req.param("id")),
+      c.req.param("id"),
       action === "read" || action === "unread" ? "read" : "agent"
     );
     return c.json(await updateMessageAction(c.env.DB, c.req.param("id"), action));
@@ -170,13 +167,7 @@ export const attachmentRoutes = new Hono<HonoApp>();
 
 attachmentRoutes.get("/:id", async (c) => {
   const auth = await requireMailApiContext(c.env, c.req.raw, "mail:read");
-  await requireMailboxAccess(
-    c.env.DB,
-    auth.user.id,
-    auth.user.role,
-    await getAttachmentMailboxId(c.env.DB, c.req.param("id")),
-    "read"
-  );
+  await requireAttachmentAccess(c.env.DB, auth.user.id, auth.user.role, c.req.param("id"), "read");
   const attachment = await findAttachment(c.env.DB, c.req.param("id"));
   if (!attachment) {
     throw new AppError("ATTACHMENT_NOT_FOUND", "Attachment not found.", 404);
@@ -193,3 +184,32 @@ attachmentRoutes.get("/:id", async (c) => {
   headers.set("content-disposition", `attachment; filename="${attachment.filename}"`);
   return new Response(object.body, { headers });
 });
+
+/** Returns the requested page size, or throws INVALID_LIMIT when the value is not 1 to 100. */
+function parseMessageLimit(value: string | undefined): number {
+  if (value === undefined) {
+    return defaultMessageLimit;
+  }
+  const limit = Number(value);
+  if (!/^\d+$/u.test(value) || !Number.isInteger(limit) || limit < 1 || limit > maxMessageLimit) {
+    throw new AppError(
+      "INVALID_LIMIT",
+      `Limit must be an integer from 1 to ${maxMessageLimit}.`,
+      400
+    );
+  }
+  return limit;
+}
+
+/** Keeps mailboxId, folder, search, and limit, and replaces the cursor. */
+function nextMessagePageUrl(requestUrl: string, cursor: string): string {
+  const url = new URL(requestUrl);
+  const preserved = new URLSearchParams();
+  for (const name of ["mailboxId", "folder", "search", "limit"]) {
+    const value = url.searchParams.get(name);
+    if (value !== null) preserved.set(name, value);
+  }
+  preserved.set("cursor", cursor);
+  url.search = preserved.toString();
+  return url.toString();
+}

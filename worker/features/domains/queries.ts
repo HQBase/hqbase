@@ -1,4 +1,8 @@
+import { eq, sql } from "drizzle-orm";
+
 import { newId, nowIso } from "../../db/client";
+import { createDatabase, getRow, getRows } from "../../db/drizzle";
+import { mailDomains } from "../../db/schema";
 import { assertDomainUnusedByLoginEmails } from "../../security/login-email";
 import type { CatchAllPolicy, DomainStatus, MailDomain, MailDomainRow } from "./types";
 
@@ -22,28 +26,26 @@ export function mapMailDomain(row: MailDomainRow): MailDomain {
 }
 
 export async function listMailDomains(db: D1Database): Promise<MailDomain[]> {
-  const rows = await db
-    .prepare("SELECT * FROM mail_domains ORDER BY is_enabled DESC, name")
-    .all<MailDomainRow>();
-  return rows.results.map(mapMailDomain);
+  const rows = await getRows<MailDomainRow>(
+    db,
+    sql`SELECT * FROM mail_domains ORDER BY is_enabled DESC, name`
+  );
+  return rows.map(mapMailDomain);
 }
 
 export async function findMailDomainByName(
   db: D1Database,
   name: string
 ): Promise<MailDomain | null> {
-  const row = await db
-    .prepare("SELECT * FROM mail_domains WHERE name = ?")
-    .bind(name.toLowerCase())
-    .first<MailDomainRow>();
+  const row = await getRow<MailDomainRow>(
+    db,
+    sql`SELECT * FROM mail_domains WHERE name = ${name.toLowerCase()}`
+  );
   return row ? mapMailDomain(row) : null;
 }
 
 export async function findMailDomainById(db: D1Database, id: string): Promise<MailDomain | null> {
-  const row = await db
-    .prepare("SELECT * FROM mail_domains WHERE id = ?")
-    .bind(id)
-    .first<MailDomainRow>();
+  const row = await getRow<MailDomainRow>(db, sql`SELECT * FROM mail_domains WHERE id = ${id}`);
   return row ? mapMailDomain(row) : null;
 }
 
@@ -64,34 +66,40 @@ export async function upsertMailDomain(
   }
   const timestamp = nowIso();
   const id = existing?.id ?? newId("dom");
-  await db
-    .prepare(
-      `INSERT INTO mail_domains
-     (id, name, zone_id, account_id, receiving_status, sending_status, dns_status,
-      catch_all_policy, is_enabled, verified_at, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, 'reject', 1, ?, ?, ?)
-     ON CONFLICT(name) DO UPDATE SET
-       zone_id = COALESCE(excluded.zone_id, mail_domains.zone_id),
-       account_id = COALESCE(excluded.account_id, mail_domains.account_id),
-       receiving_status = excluded.receiving_status,
-       sending_status = excluded.sending_status,
-       dns_status = excluded.dns_status,
-       is_enabled = 1,
-       verified_at = excluded.verified_at,
-       updated_at = excluded.updated_at`
-    )
-    .bind(
+  const zoneId = input.zoneId ?? existing?.zoneId ?? null;
+  const accountId = input.accountId ?? existing?.accountId ?? null;
+  const receivingStatus = input.receivingStatus ?? existing?.receivingStatus ?? "pending";
+  const sendingStatus = input.sendingStatus ?? existing?.sendingStatus ?? "pending";
+  const dnsStatus = input.dnsStatus ?? existing?.dnsStatus ?? "pending";
+  await createDatabase(db)
+    .insert(mailDomains)
+    .values({
       id,
-      input.name.toLowerCase(),
-      input.zoneId ?? existing?.zoneId ?? null,
-      input.accountId ?? existing?.accountId ?? null,
-      input.receivingStatus ?? existing?.receivingStatus ?? "pending",
-      input.sendingStatus ?? existing?.sendingStatus ?? "pending",
-      input.dnsStatus ?? existing?.dnsStatus ?? "pending",
-      timestamp,
-      existing?.createdAt ?? timestamp,
-      timestamp
-    )
+      name: input.name.toLowerCase(),
+      zoneId,
+      accountId,
+      receivingStatus,
+      sendingStatus,
+      dnsStatus,
+      catchAllPolicy: "reject",
+      isEnabled: true,
+      verifiedAt: timestamp,
+      createdAt: existing?.createdAt ?? timestamp,
+      updatedAt: timestamp
+    })
+    .onConflictDoUpdate({
+      target: mailDomains.name,
+      set: {
+        zoneId,
+        accountId,
+        receivingStatus,
+        sendingStatus,
+        dnsStatus,
+        isEnabled: true,
+        verifiedAt: timestamp,
+        updatedAt: timestamp
+      }
+    })
     .run();
   const domain = await findMailDomainByName(db, input.name);
   if (!domain) throw new Error("Mail domain upsert did not persist.");
@@ -112,18 +120,15 @@ export async function updateMailDomainSettings(
   const catchAllPolicy = input.catchAllPolicy ?? current.catchAllPolicy;
   const catchAllMailboxId =
     catchAllPolicy === "mailbox" ? (input.catchAllMailboxId ?? current.catchAllMailboxId) : null;
-  await db
-    .prepare(
-      `UPDATE mail_domains SET catch_all_policy = ?, catch_all_mailbox_id = ?,
-     is_enabled = ?, updated_at = ? WHERE id = ?`
-    )
-    .bind(
+  await createDatabase(db)
+    .update(mailDomains)
+    .set({
       catchAllPolicy,
       catchAllMailboxId,
-      (input.isEnabled ?? current.isEnabled) ? 1 : 0,
-      nowIso(),
-      id
-    )
+      isEnabled: input.isEnabled ?? current.isEnabled,
+      updatedAt: nowIso()
+    })
+    .where(eq(mailDomains.id, id))
     .run();
   return findMailDomainById(db, id);
 }

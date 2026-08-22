@@ -1,12 +1,11 @@
-import { ChevronDown, LogOut } from "lucide-react";
 import type * as React from "react";
+import { PiCaretDown, PiSignOut } from "react-icons/pi";
 
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuTrigger
@@ -17,19 +16,24 @@ import { cn } from "@/lib/cn";
 import { initials } from "@/lib/format";
 
 type AccountMenuProps = {
+  compact?: boolean;
   drawer?: boolean;
   user: CurrentUser;
   onSignedOut: () => void;
 };
 
 export function AccountMenu({
+  compact = false,
   drawer = false,
   user,
   onSignedOut
 }: AccountMenuProps): React.ReactElement {
   async function handleSignOut(): Promise<void> {
-    await signOut();
-    onSignedOut();
+    try {
+      await signOut();
+    } finally {
+      onSignedOut();
+    }
   }
 
   return (
@@ -38,8 +42,10 @@ export function AccountMenu({
         <Button
           aria-label="Open profile menu"
           className={cn(
-            "h-10 w-full justify-start gap-2.5 px-2.5 text-left font-normal",
-            drawer && "h-11"
+            compact
+              ? "size-9 rounded-md p-0"
+              : "h-10 w-full justify-start gap-2.5 px-2.5 text-left font-normal",
+            drawer && !compact && "h-11"
           )}
           type="button"
           variant="ghost"
@@ -49,15 +55,20 @@ export function AccountMenu({
               {initials(user.name)}
             </AvatarFallback>
           </Avatar>
-          <span className="min-w-0 flex-1">
-            <span className="block truncate text-[13px] text-foreground">{user.name}</span>
-            <span className="block truncate text-[11px] text-muted-foreground">{user.role}</span>
-          </span>
-          <ChevronDown
-            aria-hidden="true"
-            className="size-3.5 text-muted-foreground"
-            strokeWidth={1.5}
-          />
+          {!compact ? (
+            <>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-[13px] text-foreground">{user.name}</span>
+                <span className="block truncate text-[11px] text-muted-foreground">
+                  {user.role}
+                </span>
+              </span>
+              <PiCaretDown
+                aria-hidden="true"
+                className="pointer-events-none size-3.5 text-muted-foreground"
+              />
+            </>
+          ) : null}
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-52" side="top">
@@ -67,12 +78,10 @@ export function AccountMenu({
             <span className="text-xs font-normal text-muted-foreground">{user.role}</span>
           </div>
         </DropdownMenuLabel>
-        <DropdownMenuGroup>
-          <DropdownMenuItem className="gap-2" onSelect={() => void handleSignOut()}>
-            <LogOut className="size-4" strokeWidth={1.5} />
-            Sign out
-          </DropdownMenuItem>
-        </DropdownMenuGroup>
+        <DropdownMenuItem className="gap-2" onSelect={() => void handleSignOut()}>
+          <PiSignOut aria-hidden="true" className="pointer-events-none size-4" />
+          Sign out
+        </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   );

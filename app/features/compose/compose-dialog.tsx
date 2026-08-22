@@ -15,6 +15,7 @@ import { replyToMessage, sendMessage } from "./api";
 import { ComposeForm } from "./compose-form";
 import {
   type ComposeDialogProps,
+  composeContextLabel,
   composeTitle,
   type DraftSaveState,
   defaultSendingIdentity,
@@ -23,6 +24,7 @@ import {
   forwardedMessage,
   normalizeDraftHtml,
   readDraftRecovery,
+  replyRecipients,
   replySendingIdentity,
   sendingIdentities,
   splitRecipients
@@ -68,6 +70,7 @@ export function ComposeDialog({
   const formId = React.useId();
   const replyToMessageId = mode === "reply" ? (message?.id ?? null) : null;
   const forwardOfMessageId = mode === "forward" ? (message?.id ?? null) : null;
+  const contextLabel = composeContextLabel(mode, message);
   const recoveryKey = `hqbase:compose:${mode}:${draftId ?? message?.id ?? "new"}`;
   const { initializeAutosave, resetAutosave } = useDraftAutosave({
     open,
@@ -115,7 +118,7 @@ export function ComposeDialog({
             replyToMessageId,
             forwardOfMessageId,
             from: preferredIdentity?.address ?? "",
-            to: mode === "reply" && message ? [message.fromAddress] : [],
+            to: mode === "reply" && message ? replyRecipients(message) : [],
             cc: [],
             bcc: [],
             subject:
@@ -253,6 +256,7 @@ export function ComposeDialog({
       attachments={attachments}
       bcc={bcc}
       cc={cc}
+      contextLabel={contextLabel}
       formId={formId}
       from={from}
       html={html}

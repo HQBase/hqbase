@@ -1,9 +1,9 @@
-import { CheckCircle2, KeyRound } from "lucide-react";
 import * as React from "react";
+import { PiCheckCircle, PiKey } from "react-icons/pi";
 import { toast } from "sonner";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field";
+import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
 import {
@@ -12,6 +12,7 @@ import {
   resetPassword,
   signOut
 } from "./api";
+import { PasswordFields } from "./password-fields";
 import { authenticationPath } from "./password-recovery";
 import { PasswordShell } from "./password-shell";
 import type { CurrentUser } from "./types";
@@ -46,7 +47,7 @@ export function ForgotPasswordPage({ returnTo }: { returnTo: string }): React.Re
         title="Check your email"
       >
         <Alert>
-          <CheckCircle2 />
+          <PiCheckCircle />
           <AlertTitle>Reset link requested</AlertTitle>
           <AlertDescription>
             If an account uses that Login email, HQBase sent a single-use link that expires in seven
@@ -62,7 +63,7 @@ export function ForgotPasswordPage({ returnTo }: { returnTo: string }): React.Re
 
   return (
     <PasswordShell
-      description="Enter your Login email. HQBase will send a reset link if the account exists."
+      description="HQBase will send a reset link if the account exists."
       title="Forgot your password?"
     >
       <form className="flex flex-col gap-5" onSubmit={(event) => void handleSubmit(event)}>
@@ -80,7 +81,12 @@ export function ForgotPasswordPage({ returnTo }: { returnTo: string }): React.Re
             />
           </Field>
         </FieldGroup>
-        <Button disabled={pending} type="submit">
+        <Button
+          className="h-11 rounded-full"
+          disabled={pending}
+          type="submit"
+          variant="liquidGlass"
+        >
           {pending ? <Spinner data-icon="inline-start" /> : null}
           Send reset link
         </Button>
@@ -166,7 +172,7 @@ function TokenPasswordPage({
         title={resetting ? "Password changed" : "Invitation accepted"}
       >
         <Alert>
-          <CheckCircle2 />
+          <PiCheckCircle />
           <AlertTitle>{resetting ? "Account recovered" : "Password created"}</AlertTitle>
           <AlertDescription>
             {resetting
@@ -174,7 +180,12 @@ function TokenPasswordPage({
               : "Your workspace identity is now active."}
           </AlertDescription>
         </Alert>
-        <Button onClick={() => window.location.assign(returnTo)} type="button">
+        <Button
+          className="h-11 rounded-full"
+          onClick={() => window.location.assign(returnTo)}
+          type="button"
+          variant="liquidGlass"
+        >
           Continue to sign in
         </Button>
       </PasswordShell>
@@ -193,7 +204,7 @@ function TokenPasswordPage({
       {invalid ? (
         <>
           <Alert variant="destructive">
-            <KeyRound />
+            <PiKey />
             <AlertTitle>
               {resetting ? "Reset link unavailable" : "Invitation link unavailable"}
             </AlertTitle>
@@ -204,13 +215,14 @@ function TokenPasswordPage({
             </AlertDescription>
           </Alert>
           <Button
+            className="h-11 rounded-full"
             onClick={() =>
               window.location.assign(
                 resetting ? authenticationPath("/forgot-password", returnTo) : "/"
               )
             }
             type="button"
-            variant="outline"
+            variant="liquidGlass"
           >
             {resetting ? "Request a new link" : "Return to sign in"}
           </Button>
@@ -302,7 +314,12 @@ export function TemporaryPasswordSetupPage({
             onNewPasswordChange={setNewPassword}
           />
         </FieldGroup>
-        <Button disabled={pending} type="submit">
+        <Button
+          className="h-11 rounded-full"
+          disabled={pending}
+          type="submit"
+          variant="liquidGlass"
+        >
           {pending ? <Spinner data-icon="inline-start" /> : null}
           Save password
         </Button>
@@ -338,54 +355,10 @@ function PasswordForm({
           onNewPasswordChange={onNewPasswordChange}
         />
       </FieldGroup>
-      <Button disabled={pending} type="submit">
+      <Button className="h-11 rounded-full" disabled={pending} type="submit" variant="liquidGlass">
         {pending ? <Spinner data-icon="inline-start" /> : null}
         {submitLabel}
       </Button>
     </form>
-  );
-}
-
-function PasswordFields({
-  confirmPassword,
-  newPassword,
-  onConfirmPasswordChange,
-  onNewPasswordChange
-}: {
-  confirmPassword: string;
-  newPassword: string;
-  onConfirmPasswordChange: (value: string) => void;
-  onNewPasswordChange: (value: string) => void;
-}): React.ReactElement {
-  return (
-    <>
-      <Field>
-        <FieldLabel htmlFor="new-password">New password</FieldLabel>
-        <Input
-          autoComplete="new-password"
-          id="new-password"
-          maxLength={128}
-          minLength={8}
-          onChange={(event) => onNewPasswordChange(event.target.value)}
-          required
-          type="password"
-          value={newPassword}
-        />
-        <FieldDescription>Use at least 8 characters.</FieldDescription>
-      </Field>
-      <Field>
-        <FieldLabel htmlFor="confirm-password">Confirm new password</FieldLabel>
-        <Input
-          autoComplete="new-password"
-          id="confirm-password"
-          maxLength={128}
-          minLength={8}
-          onChange={(event) => onConfirmPasswordChange(event.target.value)}
-          required
-          type="password"
-          value={confirmPassword}
-        />
-      </Field>
-    </>
   );
 }

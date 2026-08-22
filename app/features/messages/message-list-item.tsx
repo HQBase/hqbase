@@ -1,9 +1,11 @@
-import { MessagesSquare, Paperclip, Star } from "lucide-react";
 import type * as React from "react";
+import { PiChats, PiPaperclip, PiStar } from "react-icons/pi";
+
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/cn";
-import { formatDateTime } from "@/lib/format";
+import { formatConversationTimestamp } from "@/lib/format";
 import type { MailFolderId } from "@/lib/routes";
+import { conversationActivityTimestamp, correspondentLabel } from "./conversation-display";
 import type { ConversationSummary } from "./types";
 
 type MessageListItemProps = {
@@ -12,6 +14,7 @@ type MessageListItemProps = {
   href: string;
   isActive: boolean;
   onSelect: (conversation: ConversationSummary) => void;
+  onToggleStar: (conversation: ConversationSummary) => void;
 };
 
 export function MessageListItem({
@@ -19,20 +22,17 @@ export function MessageListItem({
   conversation,
   href,
   isActive,
-  onSelect
+  onSelect,
+  onToggleStar
 }: MessageListItemProps): React.ReactElement {
   const isUnread = conversation.unreadCount > 0;
-  const correspondent =
-    conversation.direction === "inbound"
-      ? conversation.fromAddress
-      : `To: ${conversation.to[0] ?? "recipient"}`;
+  const timestamp = formatConversationTimestamp(conversationActivityTimestamp(conversation));
 
   return (
     <a
       className={cn(
-        "relative grid w-full gap-1.5 border-b border-border/70 px-4 py-3 text-left transition-colors hover:bg-muted/55",
-        isActive && "bg-muted/85",
-        isUnread && !isActive && "bg-card/70"
+        "group flex w-full items-center gap-4 rounded-xl px-3 py-2 text-left text-[13px] leading-5 transition-colors [@media(hover:hover)]:hover:bg-hover focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring",
+        isActive && "bg-selected"
       )}
       href={href}
       onClick={(event) => {
@@ -49,50 +49,88 @@ export function MessageListItem({
         onSelect(conversation);
       }}
     >
-      <div className="flex min-w-0 items-center justify-between gap-3">
-        <div className="flex min-w-0 items-center gap-2">
-          {isUnread && (
-            <span
-              aria-label="Unread"
-              className="size-1.5 shrink-0 rounded-full bg-foreground"
-              role="status"
-              title="Unread"
-            />
+      <button
+        aria-label={conversation.isStarred ? "Unstar conversation" : "Star conversation"}
+        aria-pressed={conversation.isStarred}
+        className={cn(
+          "flex size-10 min-h-10 min-w-10 shrink-0 items-center justify-center rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+          conversation.isStarred
+            ? "text-star"
+            : "text-muted-foreground/45 [@media(hover:hover)]:hover:bg-accent [@media(hover:hover)]:hover:text-muted-foreground group-hover:text-muted-foreground"
+        )}
+        onClick={(event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          onToggleStar(conversation);
+        }}
+        title={conversation.isStarred ? "Starred" : "Not starred"}
+        type="button"
+      >
+        <PiStar
+          aria-hidden="true"
+          className={cn("pointer-events-none size-4", conversation.isStarred && "fill-star")}
+        />
+      </button>
+      <span className="flex w-[30%] min-w-0 max-w-[16rem] shrink-0 items-center gap-2">
+        <span
+          className={cn(
+            "min-w-0 truncate",
+            isUnread
+              ? "font-bold text-foreground dark:text-white"
+              : "font-normal text-foreground/85 dark:text-white/65"
           )}
-          <span className={cn("truncate text-[13px]", isUnread && "font-medium")}>
-            {correspondent}
-          </span>
-        </div>
-        <div className="shrink-0 font-mono text-[10px] text-muted-foreground">
-          {formatDateTime(conversation.receivedAt ?? conversation.sentAt ?? conversation.createdAt)}
-        </div>
-      </div>
-      <div className="flex min-w-0 items-center gap-2">
-        {conversation.isStarred && <Star className="size-3 fill-foreground text-foreground" />}
-        <span className={cn("truncate text-[13px]", isUnread && "font-medium")}>
-          {conversation.subject}
+        >
+          {correspondentLabel(conversation)}
         </span>
-        {conversation.messageCount > 1 && (
+      </span>
+      <span className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden">
+        <span className="min-w-0 flex-1 truncate">
           <span
-            className="shrink-0 font-mono text-[10px] tabular-nums text-muted-foreground"
+            className={cn(
+              isUnread
+                ? "font-semibold text-foreground dark:text-white"
+                : "font-normal text-foreground/85 dark:text-white/65"
+            )}
+          >
+            {conversation.subject || "No subject"}
+          </span>
+          <span
+            className={cn(
+              isUnread ? "text-foreground/75 dark:text-white/75" : "text-muted-foreground"
+            )}
+          >
+            {" — "}
+            {conversation.snippet || "No preview"}
+          </span>
+        </span>
+        {conversation.messageCount > 1 ? (
+          <span
+            className="shrink-0 rounded-md bg-muted px-1.5 py-0.5 text-[11px] tabular-nums text-tertiary"
             title={`${conversation.messageCount} messages`}
           >
-            <span aria-hidden="true">{conversation.messageCount}</span>
-            <span className="sr-only">{conversation.messageCount} messages</span>
+            {conversation.messageCount}
           </span>
-        )}
-        {conversation.hasAttachments && <Paperclip className="size-3 text-muted-foreground" />}
-      </div>
-      <div className="flex min-w-0 items-center gap-2">
-        <p className="truncate text-[12px] leading-5 text-muted-foreground">
-          {conversation.snippet || "No preview"}
-        </p>
-        {activeFolder === "catchall" && (
-          <Badge className="h-5 px-1.5 text-[10px]" variant="outline">
+        ) : null}
+        {conversation.hasAttachments ? (
+          <PiPaperclip
+            aria-label="Has attachments"
+            className="pointer-events-none size-3.5 shrink-0 text-tertiary"
+          />
+        ) : null}
+        {activeFolder === "catchall" ? (
+          <Badge className="h-5 shrink-0 px-1.5 text-[10px]" variant="outline">
             Unknown
           </Badge>
+        ) : null}
+      </span>
+      <time
+        className={cn(
+          "w-[5.75rem] shrink-0 text-right text-[12px] tabular-nums",
+          isUnread ? "font-medium text-foreground dark:text-white" : "text-muted-foreground"
         )}
-      </div>
+      >
+        {timestamp}
+      </time>
     </a>
   );
 }
@@ -100,8 +138,8 @@ export function MessageListItem({
 export function EmptyMessageList(): React.ReactElement {
   return (
     <div className="flex h-full flex-col items-center justify-center gap-3 p-8 text-center text-muted-foreground">
-      <div className="flex size-9 items-center justify-center rounded-md border bg-card">
-        <MessagesSquare className="size-4" />
+      <div className="flex size-9 items-center justify-center rounded-md border border-divider bg-reader">
+        <PiChats className="size-4" />
       </div>
       <div className="text-xs">No conversations in this view</div>
     </div>

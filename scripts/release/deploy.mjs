@@ -4,6 +4,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 
+import { recordWorkerDeployedForConfig } from "../hqbase/manifest.mjs";
 import { inspectActiveRelease } from "./active-version.mjs";
 import { capture, run } from "./command.mjs";
 import {
@@ -38,7 +39,10 @@ export {
 
 export async function deploy(options = {}) {
   const configFile = resolve(options.configFile ?? resolve(root, "wrangler.jsonc"));
-  if (process.env.HQBASE_FORCE_SOURCE_DEPLOY === "1") return sourceDeploy(root);
+  if (process.env.HQBASE_FORCE_SOURCE_DEPLOY === "1") {
+    assertSourceDeployConfig(configFile);
+    return sourceDeploy(root);
+  }
   const { bytes, manifest } = await loadVerifiedRelease({
     artifactFile: options.artifactFile ?? process.env.HQBASE_RELEASE_ARTIFACT_FILE,
     expectedVersion: options.expectedVersion ?? process.env.HQBASE_EXPECTED_RELEASE_VERSION,
@@ -60,6 +64,7 @@ export async function deploy(options = {}) {
       manifest.version,
       manifest.artifact.sha256
     );
+    const recordWorkerDeployed = () => recordWorkerDeployedForConfig(configFile, config.name);
     writeFileSync(resolve(source, "wrangler.jsonc"), `${JSON.stringify(config, null, 2)}\n`);
     run("pnpm", ["install", "--frozen-lockfile"], source);
     run("pnpm", ["build"], source);
@@ -68,6 +73,7 @@ export async function deploy(options = {}) {
     if (!activeRelease) {
       applyMigrations(source);
       deploySource(source, { releaseTag });
+      recordWorkerDeployed();
       executeSql(
         source,
         `UPDATE release_state SET installed_version = ${quote(manifest.version)}, installed_schema_version = ${manifest.schemaVersion}, updated_at = datetime('now') WHERE singleton = 1`
@@ -85,6 +91,7 @@ export async function deploy(options = {}) {
       );
     }
     if (activeRelease.version === manifest.version && activeRelease.tag === releaseTag) {
+      recordWorkerDeployed();
       console.log(`HQBase ${manifest.version} is already the active signed release.`);
       return;
     }
@@ -136,6 +143,7 @@ export async function deploy(options = {}) {
       ],
       source
     );
+    recordWorkerDeployed();
     capture(
       "pnpm",
       [
@@ -162,6 +170,20 @@ export async function deploy(options = {}) {
   } finally {
     rmSync(workspace, { recursive: true, force: true });
   }
+}
+
+export function assertSourceDeployConfig(
+  configFile,
+  sourceConfigFile = resolve(root, "wrangler.jsonc")
+) {
+  const selectedConfig = resolve(configFile);
+  const repositoryConfig = resolve(sourceConfigFile);
+  if (selectedConfig !== repositoryConfig) {
+    throw new Error(
+      "HQBASE_FORCE_SOURCE_DEPLOY supports only the repository-root wrangler.jsonc. Unset it before deploying a managed installation."
+    );
+  }
+  return repositoryConfig;
 }
 
 function sourceDeploy(cwd) {

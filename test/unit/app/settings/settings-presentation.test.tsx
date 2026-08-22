@@ -7,6 +7,7 @@ import { formatMailboxAccessSummary } from "@/features/mailbox-access/mailbox-ac
 import { MailboxSettings } from "@/features/mailboxes/mailbox-settings";
 import { MailboxSelectionBar } from "@/features/mailboxes/mailbox-table";
 import type { Mailbox } from "@/features/mailboxes/types";
+import { McpSettings } from "@/features/mcp/mcp-settings";
 import { SettingsPage } from "@/features/settings/settings-page";
 import { RoleGuidanceCopy } from "@/features/users/role-guidance";
 import type { WorkspaceUser } from "@/features/users/types";
@@ -80,6 +81,26 @@ const notifications = {
 };
 
 describe("settings presentation", () => {
+  it("offers MCP and the deployment-local Agent Skill on the MCP page", () => {
+    const html = renderToStaticMarkup(
+      <McpSettings
+        user={{
+          defaultFromMailboxId: null,
+          email: "owner@example.com",
+          id: "user-1",
+          name: "Owner",
+          passwordSetupRequired: false,
+          role: "owner"
+        }}
+      />
+    );
+
+    expect(html).toContain("Connecting as");
+    expect(html).toContain("MCP");
+    expect(html).toContain("Agent Skill");
+    expect(html).not.toContain("Connect AI agent");
+  });
+
   it("renders mailbox content at the top level and opens creation from a dialog trigger", () => {
     const html = renderToStaticMarkup(
       <MailboxSettings
@@ -254,10 +275,19 @@ describe("settings presentation", () => {
   });
 
   it("replaces General and Upgrade with Debug as the final tab", () => {
+    const user = {
+      id: "user-1",
+      name: "Avery Stone",
+      email: "avery@example.com",
+      role: "owner" as const,
+      passwordSetupRequired: false,
+      defaultFromMailboxId: null as string | null
+    };
     const html = renderToStaticMarkup(
       <SettingsPage
         activeTab="mailboxes"
         canManage
+        currentUser={user as never}
         defaultFromMailboxId={null}
         mailboxes={[]}
         notifications={notifications}
@@ -266,7 +296,6 @@ describe("settings presentation", () => {
         users={[]}
         onDefaultFromMailboxChange={() => undefined}
         onRefresh={() => undefined}
-        onTabChange={() => undefined}
         onUpdateStarted={() => undefined}
         onUpdateStatusChange={() => undefined}
         updateProgress={null}
@@ -276,11 +305,7 @@ describe("settings presentation", () => {
     expect(html).not.toContain(">General<");
     expect(html).not.toContain(">Upgrade<");
     expect(html).not.toContain('value="access"');
-    expect(html).toContain(">Debug<");
-    expect(html).toContain(">Notifications<");
-    expect(html).toContain('href="/settings/mailboxes"');
-    expect(html).toContain('href="/settings/notifications"');
-    expect(html).toContain('href="/settings/debug"');
-    expect(html.indexOf(">Debug<")).toBeGreaterThan(html.indexOf(">Updates<"));
+    expect(html).toContain(">Mailboxes<");
+    expect(html).not.toContain('role="tablist"');
   });
 });

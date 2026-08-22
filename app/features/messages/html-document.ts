@@ -31,12 +31,12 @@ function baseStyles(theme: AppTheme): string {
         };
 
   return `
-  @font-face { font-family: "Geist Sans"; src: url("/fonts/Geist-Regular.woff2") format("woff2"); font-style: normal; font-weight: 400; font-display: swap; }
   :root { color-scheme: ${theme}; }
   * { box-sizing: border-box; }
   html { overflow-x: auto; overflow-y: hidden; -webkit-overflow-scrolling: touch; background: transparent; }
-  body { margin: 0; padding: 0; background: transparent; color: ${palette.foreground}; font-family: "Geist Sans", ui-sans-serif, system-ui, sans-serif; font-size: 14px; line-height: 1.55; }
+  body { margin: 0; padding: 0; background: transparent; color: ${palette.foreground}; font: small/1.5 Arial, Helvetica, sans-serif; }
   a { color: ${palette.link}; }
-  blockquote { margin-left: 0; padding-left: 16px; border-left: 3px solid ${palette.quoteBorder}; }
+  blockquote.gmail_quote { margin: 0 0 0 0.8ex; border-left: 1px solid ${palette.quoteBorder}; padding-left: 1ex; }
+  blockquote { margin: 0 0 0 0.8ex; border-left: 1px solid ${palette.quoteBorder}; padding-left: 1ex; }
 `;
 }

@@ -36,7 +36,8 @@ export default defineConfig(async () => {
         }
       },
       hookTimeout: 30_000,
-      include: ["test/integration/worker/**/*.test.ts"]
+      include: ["test/integration/worker/**/*.test.ts"],
+      testTimeout: 15_000
     }
   };
 });

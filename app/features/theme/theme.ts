@@ -22,12 +22,20 @@ export function normalizeTheme(value: string | null): AppTheme {
 
 export function applyTheme(theme: AppTheme): void {
   if (typeof document === "undefined") return;
-  document.documentElement.classList.toggle("dark", theme === "dark");
-  document.documentElement.style.colorScheme = theme;
-  document.documentElement.dataset.theme = theme;
+  const root = document.documentElement;
+  const hadTransitionBlock = root.classList.contains("disable-transitions");
+  if (!hadTransitionBlock) root.classList.add("disable-transitions");
+  root.classList.toggle("dark", theme === "dark");
+  root.style.colorScheme = theme;
+  root.dataset.theme = theme;
   document
     .querySelector<HTMLMetaElement>('meta[name="theme-color"]')
     ?.setAttribute("content", themeColors[theme]);
+  if (!hadTransitionBlock) {
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => root.classList.remove("disable-transitions"));
+    });
+  }
 }
 
 export function persistTheme(theme: AppTheme): void {

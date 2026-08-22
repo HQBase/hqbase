@@ -45,7 +45,7 @@ const DraftComposeDialog = React.lazy(() =>
 export function App(): React.ReactElement {
   const publicAuthenticationPath = isPublicAuthenticationPath(window.location.pathname);
   const [setup, setSetup] = React.useState<SetupStatus | null>(null);
-  const [user, setUser] = React.useState<CurrentUser | null>(null);
+  const [user, setUser] = React.useState<CurrentUser | null | undefined>(undefined);
   const [mailboxes, setMailboxes] = React.useState<Mailbox[]>([]);
   const [users, setUsers] = React.useState<WorkspaceUser[]>([]);
   const [mailboxId, setMailboxId] = React.useState("all");
@@ -64,6 +64,9 @@ export function App(): React.ReactElement {
     selectedDraftId === null
       ? null
       : (draftState.drafts.find((draft) => draft.id === selectedDraftId) ?? null);
+  const selectedDraftHasContext = Boolean(
+    selectedDraft?.replyToMessageId ?? selectedDraft?.forwardOfMessageId
+  );
   const contentMailboxes = React.useMemo(
     () => mailboxes.filter((mailbox) => mailbox.accessLevel !== null),
     [mailboxes]
@@ -148,7 +151,7 @@ export function App(): React.ReactElement {
     );
   }
 
-  if (isLoading && setup === null) {
+  if (isLoading || user === undefined || setup === null) {
     return <FullScreenStatus label="Loading HQBase" />;
   }
 
@@ -187,6 +190,8 @@ export function App(): React.ReactElement {
     <>
       <AppShell
         activeFolder={activeFolder}
+        activeSettingsTab={settingsTab}
+        canManage={user.role === "owner" || user.role === "admin"}
         draftCount={draftState.drafts.length}
         mailboxId={mailboxId}
         mailboxes={contentMailboxes}
@@ -211,6 +216,7 @@ export function App(): React.ReactElement {
                 : { kind: "mail", folder, messageId: null }
           );
         }}
+        onSettingsTabChange={(tab) => navigate({ kind: "settings", tab })}
         onMailboxChange={setMailboxId}
         onSearchChange={setSearch}
         onSignedOut={() => {
@@ -223,6 +229,7 @@ export function App(): React.ReactElement {
               <SettingsPage
                 activeTab={settingsTab}
                 canManage={user.role === "owner" || user.role === "admin"}
+                currentUser={user}
                 defaultFromMailboxId={user.defaultFromMailboxId}
                 mailboxes={mailboxes}
                 notifications={mailSync.notifications}
@@ -232,12 +239,29 @@ export function App(): React.ReactElement {
                   setUser((current) => (current ? { ...current, defaultFromMailboxId } : current));
                 }}
                 onRefresh={() => void reload()}
-                onTabChange={(tab) => navigate({ kind: "settings", tab })}
                 onUpdateStarted={updateMonitor.start}
                 onUpdateStatusChange={updateMonitor.acceptStatus}
                 updateProgress={updateMonitor.progress}
                 updateStatus={updateMonitor.status}
               />
+            ) : activeFolder === "drafts" && selectedDraft && selectedDraftHasContext ? (
+              <React.Suspense
+                fallback={
+                  <div className="grid h-full place-items-center text-sm text-muted-foreground">
+                    Opening draft…
+                  </div>
+                }
+              >
+                <DraftComposeDialog
+                  draft={selectedDraft}
+                  mailboxes={contentMailboxes}
+                  onDraftsChange={() => void draftState.refresh().catch(() => undefined)}
+                  onOpenChange={(open) => {
+                    if (!open) navigate({ kind: "drafts", draftId: null });
+                  }}
+                  onSent={() => void mailSync.refresh().catch(() => undefined)}
+                />
+              </React.Suspense>
             ) : activeFolder === "drafts" ? (
               <DraftsPage
                 drafts={draftState.drafts}
@@ -287,7 +311,7 @@ export function App(): React.ReactElement {
           />
         </React.Suspense>
       ) : null}
-      {selectedDraft ? (
+      {selectedDraft && !selectedDraftHasContext ? (
         <React.Suspense fallback={null}>
           <DraftComposeDialog
             draft={selectedDraft}
@@ -307,8 +331,15 @@ export function App(): React.ReactElement {
 
 function FullScreenStatus({ label }: { label: string }): React.ReactElement {
   return (
-    <main className="flex min-h-screen items-center justify-center text-sm text-muted-foreground">
-      {label}
+    <main
+      aria-busy="true"
+      className="flex min-h-screen items-center justify-center bg-rail text-sm text-muted-foreground"
+    >
+      <span
+        aria-hidden="true"
+        className="size-5 rounded-full border-2 border-muted-foreground/20 border-t-foreground animate-spin"
+      />
+      <span className="sr-only">{label}</span>
     </main>
   );
 }

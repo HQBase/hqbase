@@ -1,4 +1,8 @@
+import { eq, sql } from "drizzle-orm";
+
 import { newId, nowIso } from "../../db/client";
+import { createDatabase, getRow } from "../../db/drizzle";
+import { threads } from "../../db/schema";
 
 import { normalizeSubject, parseReferences } from "./headers";
 
@@ -11,12 +15,15 @@ export async function createThread(
 ): Promise<string> {
   const id = newId("thr");
   const timestamp = nowIso();
-  await db
-    .prepare(
-      `INSERT INTO threads (id, subject_normalized, last_message_at, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?)`
-    )
-    .bind(id, normalizeSubject(subject), lastMessageAt, timestamp, timestamp)
+  await createDatabase(db)
+    .insert(threads)
+    .values({
+      id,
+      subjectNormalized: normalizeSubject(subject),
+      lastMessageAt,
+      createdAt: timestamp,
+      updatedAt: timestamp
+    })
     .run();
   return id;
 }
@@ -45,13 +52,13 @@ export async function touchThread(
   threadId: string,
   lastMessageAt: string
 ): Promise<void> {
-  await db
-    .prepare(
-      `UPDATE threads
-       SET last_message_at = MAX(last_message_at, ?), updated_at = ?
-       WHERE id = ?`
-    )
-    .bind(lastMessageAt, nowIso(), threadId)
+  await createDatabase(db)
+    .update(threads)
+    .set({
+      lastMessageAt: sql`MAX(${threads.lastMessageAt}, ${lastMessageAt})`,
+      updatedAt: nowIso()
+    })
+    .where(eq(threads.id, threadId))
     .run();
 }
 
@@ -71,22 +78,19 @@ async function findReferencedThread(
     return null;
   }
 
-  const values = candidates.map(() => "(?, ?)").join(", ");
-  const bindings = candidates.flatMap((value, priority) => [value, priority]);
-  const row = await db
-    .prepare(
-      `WITH candidates(value, priority) AS (VALUES ${values})
+  const values = candidates.map((value, priority) => sql`(${value}, ${priority})`);
+  const row = await getRow<{ thread_id: string }>(
+    db,
+    sql`WITH candidates(value, priority) AS (VALUES ${sql.join(values, sql`, `)})
        SELECT messages.thread_id
        FROM candidates
        JOIN messages
          ON messages.message_id = candidates.value OR messages.id = candidates.value
        ORDER BY candidates.priority,
-         CASE WHEN messages.mailbox_id IS ? THEN 0 ELSE 1 END,
+         CASE WHEN messages.mailbox_id IS ${input.mailboxId} THEN 0 ELSE 1 END,
          COALESCE(messages.received_at, messages.sent_at, messages.created_at) DESC
        LIMIT 1`
-    )
-    .bind(...bindings, input.mailboxId)
-    .first<{ thread_id: string }>();
+  );
   return row?.thread_id ?? null;
 }
 

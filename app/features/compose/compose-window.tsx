@@ -1,5 +1,6 @@
-import { ChevronUp, Maximize2, Minimize2, Minus, X } from "lucide-react";
 import * as React from "react";
+import { createPortal } from "react-dom";
+import { PiArrowsIn, PiArrowsOut, PiCaretUp, PiMinus, PiX } from "react-icons/pi";
 
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
@@ -48,13 +49,13 @@ export function ComposeWindow({
 
   if (!open) return null;
 
-  return (
+  const content = (
     <section
       aria-describedby={statusId}
       aria-labelledby={titleId}
       aria-modal="false"
       className={cn(
-        "fixed inset-0 z-50 flex h-[100dvh] w-full flex-col overflow-hidden bg-card pt-[env(safe-area-inset-top)] shadow-2xl outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring md:inset-auto md:bottom-0 md:right-4 md:z-40 md:h-[min(42rem,calc(100vh-5rem))] md:w-[min(42rem,calc(100vw-2rem))] md:rounded-t-lg md:border md:pt-0",
+        "fixed inset-0 z-[60] flex h-[100dvh] w-full flex-col overflow-hidden bg-card pt-[env(safe-area-inset-top)] shadow-2xl outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring md:inset-auto md:bottom-0 md:right-4 md:z-[60] md:h-[min(42rem,calc(100vh-5rem))] md:w-[min(42rem,calc(100vw-2rem))] md:rounded-t-lg md:border md:pt-0",
         expanded &&
           "md:bottom-6 md:right-1/2 md:h-[min(48rem,calc(100vh-3rem))] md:w-[min(64rem,calc(100vw-3rem))] md:translate-x-1/2 md:rounded-lg",
         minimized &&
@@ -79,34 +80,42 @@ export function ComposeWindow({
         <div className="flex items-center gap-1">
           <Button
             aria-label={minimized ? "Restore compose" : "Minimize compose"}
-            className="hidden size-8 md:inline-flex"
+            className="hidden size-10 min-h-10 min-w-10 md:inline-flex"
             size="icon"
             type="button"
             variant="ghost"
             onClick={() => setMinimized((current) => !current)}
           >
-            {minimized ? <ChevronUp /> : <Minus />}
+            {minimized ? (
+              <PiCaretUp aria-hidden="true" className="pointer-events-none" />
+            ) : (
+              <PiMinus aria-hidden="true" className="pointer-events-none" />
+            )}
           </Button>
           <Button
             aria-label={expanded ? "Restore compose size" : "Expand compose"}
-            className="hidden size-8 md:inline-flex"
+            className="hidden size-10 min-h-10 min-w-10 md:inline-flex"
             disabled={minimized}
             size="icon"
             type="button"
             variant="ghost"
             onClick={() => setExpanded((current) => !current)}
           >
-            {expanded ? <Minimize2 /> : <Maximize2 />}
+            {expanded ? (
+              <PiArrowsIn aria-hidden="true" className="pointer-events-none" />
+            ) : (
+              <PiArrowsOut aria-hidden="true" className="pointer-events-none" />
+            )}
           </Button>
           <Button
             aria-label="Close compose"
-            className="size-8"
+            className="size-10 min-h-10 min-w-10"
             size="icon"
             type="button"
             variant="ghost"
             onClick={() => onOpenChange(false)}
           >
-            <X />
+            <PiX aria-hidden="true" className="pointer-events-none" />
           </Button>
         </div>
       </header>
@@ -115,4 +124,7 @@ export function ComposeWindow({
       </div>
     </section>
   );
+
+  if (typeof document === "undefined") return content;
+  return createPortal(content, document.body);
 }

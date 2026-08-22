@@ -1,7 +1,10 @@
+import { and, desc, eq } from "drizzle-orm";
 import { Hono } from "hono";
 import { z } from "zod";
 import { reauthenticateUser } from "../../auth/reauthenticate";
 import { isRecentSession, requireAuthContext } from "../../auth/session";
+import { createDatabase } from "../../db/drizzle";
+import { sessions } from "../../db/schema";
 import type { HonoApp } from "../../lib/env";
 import { AppError } from "../../lib/errors";
 import { readJson } from "../../lib/json";
@@ -55,20 +58,19 @@ sessionControlRoutes.get("/", async (c) => {
   const requestedUser = c.req.query("userId");
   const canManageAll = auth.user.role === "owner" || auth.user.role === "admin";
   const userId = canManageAll && requestedUser ? requestedUser : auth.user.id;
-  const web = await c.env.DB.prepare(
-    `SELECT id, createdAt AS created_at, expiresAt AS expires_at
-     FROM "session" WHERE userId = ? ORDER BY createdAt DESC`
-  )
-    .bind(userId)
-    .all<{ id: string; created_at: string; expires_at: string }>();
+  const web = await createDatabase(c.env.DB)
+    .select({ id: sessions.id, createdAt: sessions.createdAt, expiresAt: sessions.expiresAt })
+    .from(sessions)
+    .where(eq(sessions.userId, userId))
+    .orderBy(desc(sessions.createdAt));
   return c.json({
     userId,
     sessions: [
-      ...web.results.map((row) => ({
+      ...web.map((row) => ({
         id: row.id,
         kind: "web" as const,
-        createdAt: row.created_at,
-        expiresAt: row.expires_at,
+        createdAt: row.createdAt,
+        expiresAt: row.expiresAt,
         revokedAt: null
       }))
     ]
@@ -79,10 +81,13 @@ sessionControlRoutes.delete("/:id", async (c) => {
   const auth = await requireAuthContext(c.env, c.req.raw);
   const id = c.req.param("id");
   const canManageAll = auth.user.role === "owner" || auth.user.role === "admin";
-  const result = await c.env.DB.prepare(
-    `DELETE FROM "session" WHERE id = ? AND (? = 1 OR userId = ?)`
-  )
-    .bind(id, canManageAll ? 1 : 0, auth.user.id)
+  const result = await createDatabase(c.env.DB)
+    .delete(sessions)
+    .where(
+      canManageAll
+        ? eq(sessions.id, id)
+        : and(eq(sessions.id, id), eq(sessions.userId, auth.user.id))
+    )
     .run();
   if ((result.meta.changes ?? 0) === 0) {
     throw new AppError("SESSION_NOT_FOUND", "Active session not found.", 404);

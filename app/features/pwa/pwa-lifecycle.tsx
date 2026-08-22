@@ -48,7 +48,7 @@ export function PwaLifecycle(): React.ReactElement | null {
       </span>
       {online && update ? (
         <button
-          className="shrink-0 rounded-md bg-primary px-3 py-2 font-medium text-primary-foreground outline-none hover:bg-primary/90 focus-visible:ring-2 focus-visible:ring-ring"
+          className="shrink-0 rounded-md bg-primary px-3 py-2 font-medium text-primary-foreground outline-none [@media(hover:hover)]:hover:bg-primary/90 focus-visible:ring-2 focus-visible:ring-ring"
           onClick={update.activate}
           type="button"
         >

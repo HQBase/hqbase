@@ -118,8 +118,8 @@ Use this exact OAuth resource and token audience: \`${apiBase}\`. MCP uses separ
 ## Permissions
 
 - \`mail:read\` — List visible mailboxes and conversations, search and open messages, render message HTML, and download attachments.
-- \`mail:write\` — Mark mail read or unread, add or remove stars, archive mail, move mail to Trash, and trust remote images from a sender.
-- \`mail:send\` — Create and manage drafts and attachments, send new messages, and reply.
+- \`mail:write\` — Mark mail read or unread, add or remove stars, archive or unarchive mail, move mail to Trash, restore mail, and trust remote images from a sender.
+- \`mail:send\` — Create and manage drafts and attachments, send new messages, reply, and forward.
 - \`offline_access\` — Request an optional refresh token. This is not an API endpoint permission.
 
 OAuth permissions do not override HQBase mailbox access. The connected person must also have the necessary Read or Agent mailbox grant. This API never grants Manager access.
@@ -133,14 +133,17 @@ The method index is an orientation aid. Consult ${openApiUrl} for exact paramete
 ## Operating rules
 
 - Use \`Content-Type: application/json\` for JSON requests and \`multipart/form-data\` for draft attachment uploads.
-- Treat conversation cursors as opaque strings and return them unchanged.
+- Treat message, conversation, and change cursors as opaque strings and return them unchanged. Do not construct or edit a cursor.
+- \`GET ${apiBase}/messages\` returns one page. Follow the \`Link: <url>; rel="next"\` response header for the next page. No \`Link\` header means the last page.
+- To start message synchronization, get a checkpoint from \`GET ${apiBase}/changes\` without a cursor, paginate the full message list, then read changes after the checkpoint until \`hasMore\` is false.
+- List mailboxes before each change cycle. Remove cached mail for mailboxes that are no longer readable, and bootstrap each newly readable mailbox.
 - Ignore response fields you do not recognize.
 - Do not log access tokens, refresh tokens, message bodies, or attachments.
 - Do not log device codes or user codes, and do not paste them into unrelated chats or tools.
-- Do not send or reply unless that external action matches the person's request.
-- Sending and replying are not idempotent. Never retry them blindly.
+- Do not send, reply, or forward unless that external action matches the person's request.
+- Sending, replying, and forwarding are not idempotent. Never retry them blindly.
 - Use the returned draft version when updating a draft so newer work is not overwritten.
-- HQBase does not currently expose a changes or delta feed. Refresh by listing messages or conversations again.
+- A \`410 CHANGE_CURSOR_EXPIRED\` response requires a new full message bootstrap.
 
 ## Errors
 
@@ -148,7 +151,7 @@ JSON errors contain a stable \`error.code\` and human-readable \`error.message\`
 
 ## API boundary and stability
 
-The Mail API covers mailboxes, messages, conversations, attachments, drafts, sending, and replying. It does not manage people, mailbox grants, domains, setup, updates, audits, sessions, notifications, app secrets, or Cloudflare credentials.
+The Mail API covers mailboxes, messages, conversations, attachments, drafts, sending, replying, and forwarding. It does not manage people, mailbox grants, domains, setup, updates, audits, sessions, notifications, app secrets, or Cloudflare credentials.
 
 \`/api/v1\` is HQBase's stable public Mail API. Additive fields and endpoints may appear, so ignore unknown response fields. Breaking changes use a new versioned base path such as \`/api/v2\`.
 `;

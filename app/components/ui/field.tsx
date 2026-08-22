@@ -1,5 +1,5 @@
-import { Info } from "lucide-react";
 import type * as React from "react";
+import { PiInfo } from "react-icons/pi";
 
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/cn";
@@ -53,13 +53,13 @@ export function FieldDescription({
   return (
     <p
       className={cn(
-        "flex items-start gap-1.5 text-xs font-normal leading-4 text-muted-foreground",
+        "flex items-start gap-1.5 text-pretty text-xs font-normal leading-4 text-muted-foreground [text-wrap:pretty]",
         className
       )}
       data-slot="field-description"
       {...props}
     >
-      <Info aria-hidden="true" className="mt-px size-3.5 shrink-0" />
+      <PiInfo aria-hidden="true" className="mt-px size-3.5 shrink-0" />
       <span>{children}</span>
     </p>
   );

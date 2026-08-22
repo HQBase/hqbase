@@ -85,6 +85,15 @@ test("HQBase web lifecycle remains healthy", async ({ page, request }) => {
     login.ok(),
     `Owner API sign-in failed (${login.status()}): ${await login.text()}`
   ).toBeTruthy();
+  if ((process.env.HQBASE_STAGING_MAIL_API_BASE_PATH ?? "/api/v1") === "/api/v1") {
+    const checkpoint = await request.get(stagingMailApiPath("/changes"));
+    expect(checkpoint.ok(), await checkpoint.text()).toBeTruthy();
+    await expect(checkpoint.json()).resolves.toMatchObject({
+      changes: [],
+      nextCursor: expect.any(String),
+      hasMore: false
+    });
+  }
   const primaryEmailAction = page.getByRole("button", {
     name: /^(?:Compose|New email)$/
   });

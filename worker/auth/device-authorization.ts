@@ -1,3 +1,7 @@
+import { and, eq, sql } from "drizzle-orm";
+
+import { createDatabase, getRow } from "../db/drizzle";
+import { deviceCodes, oauthAccessTokens, oauthConsents, oauthRefreshTokens } from "../db/schema";
 import type { WorkerEnv } from "../lib/env";
 import { AppError } from "../lib/errors";
 import { enforceRateLimit } from "../security/rate-limit";
@@ -106,12 +110,16 @@ export async function approveDeviceAuthorization(
     userId: authContext.user.id
   });
 
-  const approved = await env.DB.prepare(
-    `UPDATE deviceCode
-     SET status = 'approved', sessionId = ?
-     WHERE id = ? AND status = 'pending' AND userId = ?`
-  )
-    .bind(authContext.session.id, code.id, authContext.user.id)
+  const approved = await createDatabase(env.DB)
+    .update(deviceCodes)
+    .set({ status: "approved", sessionId: authContext.session.id })
+    .where(
+      and(
+        eq(deviceCodes.id, code.id),
+        eq(deviceCodes.status, "pending"),
+        eq(deviceCodes.userId, authContext.user.id)
+      )
+    )
     .run();
   if (approved.meta.changes !== 1) {
     return oauthError(400, "invalid_request", "This device authorization was already processed.");
@@ -132,19 +140,18 @@ export async function handleDeviceTokenRequest(
   if (tokenRequest.grantType !== deviceCodeGrantType) return handle();
 
   const code = tokenRequest.deviceCode
-    ? await env.DB.prepare(
-        `SELECT id, userCode, userId, expiresAt, status, clientId, oauthClientId,
+    ? await getRow<DeviceCodeRow>(
+        env.DB,
+        sql`SELECT id, userCode, userId, expiresAt, status, clientId, oauthClientId,
                 scope, resources, sessionId
          FROM deviceCode
-         WHERE deviceCode = ?`
+         WHERE deviceCode = ${tokenRequest.deviceCode}`
       )
-        .bind(tokenRequest.deviceCode)
-        .first<DeviceCodeRow>()
     : null;
 
   if (code?.status === "approved") {
     if (!code.userId || !code.sessionId || !(await isActiveSession(env.DB, code))) {
-      await env.DB.prepare("DELETE FROM deviceCode WHERE id = ?").bind(code.id).run();
+      await createDatabase(env.DB).delete(deviceCodes).where(eq(deviceCodes.id, code.id)).run();
       return oauthError(400, "access_denied", "The approving HQBase session is no longer active.");
     }
   }
@@ -171,29 +178,36 @@ export async function handleDeviceTokenRequest(
   }
 
   const accessTokenHash = await hashOAuthToken(accessToken.slice(accessTokenPrefix.length));
-  const statements = [
-    env.DB.prepare(
-      `UPDATE oauthAccessToken
-       SET sessionId = ?
-       WHERE token = ? AND userId = ? AND clientId = ?`
-    ).bind(code.sessionId, accessTokenHash, code.userId, code.oauthClientId ?? code.clientId)
-  ];
-  if (refreshToken?.startsWith(refreshTokenPrefix)) {
-    statements.push(
-      env.DB.prepare(
-        `UPDATE oauthRefreshToken
-         SET sessionId = ?
-         WHERE token = ? AND userId = ? AND clientId = ?`
-      ).bind(
-        code.sessionId,
-        await hashOAuthToken(refreshToken.slice(refreshTokenPrefix.length)),
-        code.userId,
-        code.oauthClientId ?? code.clientId
+  const clientId = code.oauthClientId ?? code.clientId;
+  const database = createDatabase(env.DB);
+  const accessUpdate = database
+    .update(oauthAccessTokens)
+    .set({ sessionId: code.sessionId })
+    .where(
+      and(
+        eq(oauthAccessTokens.token, accessTokenHash),
+        eq(oauthAccessTokens.userId, code.userId),
+        sql`${oauthAccessTokens.clientId} = ${clientId}`
       )
     );
-  }
-
-  const results = await env.DB.batch(statements);
+  const results = refreshToken?.startsWith(refreshTokenPrefix)
+    ? await database.batch([
+        accessUpdate,
+        database
+          .update(oauthRefreshTokens)
+          .set({ sessionId: code.sessionId })
+          .where(
+            and(
+              eq(
+                oauthRefreshTokens.token,
+                await hashOAuthToken(refreshToken.slice(refreshTokenPrefix.length))
+              ),
+              eq(oauthRefreshTokens.userId, code.userId),
+              sql`${oauthRefreshTokens.clientId} = ${clientId}`
+            )
+          )
+      ])
+    : await database.batch([accessUpdate]);
   if (results.some((result) => result.meta.changes !== 1)) {
     await deleteIssuedTokens(env.DB, accessToken, refreshToken);
     return oauthError(
@@ -240,33 +254,29 @@ async function findDeviceCodeByUserCode(
 ): Promise<DeviceCodeRow | null> {
   const exact = suppliedCode.trim();
   const normalized = exact.replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
-  return db
-    .prepare(
-      `SELECT id, userCode, userId, expiresAt, status, clientId, oauthClientId,
+  return getRow<DeviceCodeRow>(
+    db,
+    sql`SELECT id, userCode, userId, expiresAt, status, clientId, oauthClientId,
               scope, resources, sessionId
        FROM deviceCode
-       WHERE userCode = ? OR userCode = ?
-       ORDER BY CASE WHEN userCode = ? THEN 0 ELSE 1 END
+       WHERE userCode = ${exact} OR userCode = ${normalized}
+       ORDER BY CASE WHEN userCode = ${exact} THEN 0 ELSE 1 END
        LIMIT 1`
-    )
-    .bind(exact, normalized, exact)
-    .first<DeviceCodeRow>();
+  );
 }
 
 async function preserveConsent(
   db: D1Database,
   input: { clientId: string; resources: string[]; scopes: string[]; userId: string }
 ): Promise<void> {
-  const existing = await db
-    .prepare(
-      `SELECT id, scopes, resources
+  const existing = await getRow<ConsentRow>(
+    db,
+    sql`SELECT id, scopes, resources
        FROM oauthConsent
-       WHERE clientId = ? AND userId = ?
+       WHERE clientId = ${input.clientId} AND userId = ${input.userId}
        ORDER BY updatedAt DESC
        LIMIT 1`
-    )
-    .bind(input.clientId, input.userId)
-    .first<ConsentRow>();
+  );
   const scopes = [
     ...new Set([...(existing ? parseStoredList(existing.scopes) : []), ...input.scopes])
   ];
@@ -274,42 +284,40 @@ async function preserveConsent(
     ...new Set([...(existing ? parseStoredList(existing.resources) : []), ...input.resources])
   ];
   const now = new Date().toISOString();
+  const database = createDatabase(db);
 
   if (existing) {
-    await db
-      .prepare("UPDATE oauthConsent SET scopes = ?, resources = ?, updatedAt = ? WHERE id = ?")
-      .bind(JSON.stringify(scopes), JSON.stringify(resources), now, existing.id)
+    await database
+      .update(oauthConsents)
+      .set({ scopes: JSON.stringify(scopes), resources: JSON.stringify(resources), updatedAt: now })
+      .where(eq(oauthConsents.id, existing.id))
       .run();
     return;
   }
 
-  await db
-    .prepare(
-      `INSERT INTO oauthConsent
-       (id, clientId, userId, scopes, resources, createdAt, updatedAt)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`
-    )
-    .bind(
-      crypto.randomUUID(),
-      input.clientId,
-      input.userId,
-      JSON.stringify(scopes),
-      JSON.stringify(resources),
-      now,
-      now
-    )
+  await database
+    .insert(oauthConsents)
+    .values({
+      id: crypto.randomUUID(),
+      clientId: input.clientId,
+      userId: input.userId,
+      scopes: JSON.stringify(scopes),
+      resources: JSON.stringify(resources),
+      createdAt: now,
+      updatedAt: now
+    })
     .run();
 }
 
 async function isActiveSession(db: D1Database, code: DeviceCodeRow): Promise<boolean> {
-  const row = await db
-    .prepare(
-      `SELECT id
+  const row = await getRow<{ id: string }>(
+    db,
+    sql`SELECT id
        FROM "session"
-       WHERE id = ? AND userId = ? AND expiresAt > ?`
-    )
-    .bind(code.sessionId, code.userId, new Date().toISOString())
-    .first<{ id: string }>();
+       WHERE id = ${code.sessionId}
+         AND userId = ${code.userId}
+         AND expiresAt > ${new Date().toISOString()}`
+  );
   return row !== null;
 }
 
@@ -335,22 +343,23 @@ async function deleteIssuedTokens(
   accessToken: string | null,
   refreshToken: string | null
 ): Promise<void> {
-  const statements: D1PreparedStatement[] = [];
-  if (accessToken?.startsWith(accessTokenPrefix)) {
-    statements.push(
-      db
-        .prepare("DELETE FROM oauthAccessToken WHERE token = ?")
-        .bind(await hashOAuthToken(accessToken.slice(accessTokenPrefix.length)))
-    );
+  const accessTokenHash = accessToken?.startsWith(accessTokenPrefix)
+    ? await hashOAuthToken(accessToken.slice(accessTokenPrefix.length))
+    : null;
+  const refreshTokenHash = refreshToken?.startsWith(refreshTokenPrefix)
+    ? await hashOAuthToken(refreshToken.slice(refreshTokenPrefix.length))
+    : null;
+  const database = createDatabase(db);
+  if (accessTokenHash && refreshTokenHash) {
+    await database.batch([
+      database.delete(oauthAccessTokens).where(eq(oauthAccessTokens.token, accessTokenHash)),
+      database.delete(oauthRefreshTokens).where(eq(oauthRefreshTokens.token, refreshTokenHash))
+    ]);
+  } else if (accessTokenHash) {
+    await database.delete(oauthAccessTokens).where(eq(oauthAccessTokens.token, accessTokenHash));
+  } else if (refreshTokenHash) {
+    await database.delete(oauthRefreshTokens).where(eq(oauthRefreshTokens.token, refreshTokenHash));
   }
-  if (refreshToken?.startsWith(refreshTokenPrefix)) {
-    statements.push(
-      db
-        .prepare("DELETE FROM oauthRefreshToken WHERE token = ?")
-        .bind(await hashOAuthToken(refreshToken.slice(refreshTokenPrefix.length)))
-    );
-  }
-  if (statements.length > 0) await db.batch(statements);
 }
 
 function hasSameOrigin(request: Request, env: WorkerEnv): boolean {

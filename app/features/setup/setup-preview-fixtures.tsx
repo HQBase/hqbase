@@ -1,5 +1,5 @@
-import { Globe2, Inbox, UserRound } from "lucide-react";
 import type * as React from "react";
+import { PiGlobe, PiTray, PiUserCircle } from "react-icons/pi";
 
 import { Spinner } from "@/components/ui/spinner";
 
@@ -47,15 +47,15 @@ export const zones: CloudflareZone[] = [
 
 export const steps: WizardStep[] = [
   {
-    icon: Globe2,
+    icon: PiGlobe,
     title: "Domain"
   },
   {
-    icon: UserRound,
+    icon: PiUserCircle,
     title: "Owner account"
   },
   {
-    icon: Inbox,
+    icon: PiTray,
     title: "Mailboxes"
   }
 ];

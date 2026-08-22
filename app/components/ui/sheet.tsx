@@ -1,6 +1,6 @@
 import * as DialogPrimitive from "@radix-ui/react-dialog";
-import { X } from "lucide-react";
 import * as React from "react";
+import { PiX } from "react-icons/pi";
 
 import { cn } from "@/lib/cn";
 
@@ -41,11 +41,11 @@ export const SheetContent = React.forwardRef<
       {children}
       <DialogPrimitive.Close
         className={cn(
-          "absolute right-3 top-3 inline-flex size-9 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+          "absolute right-3 top-3 inline-flex size-10 min-h-10 min-w-10 items-center justify-center rounded-md text-muted-foreground transition-[color,background-color,transform] duration-200 [@media(hover:hover)]:hover:bg-muted [@media(hover:hover)]:hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:scale-[0.97] will-change-transform motion-reduce:transition-none",
           side === "right" && "max-md:top-[max(0.75rem,env(safe-area-inset-top))]"
         )}
       >
-        <X />
+        <PiX />
         <span className="sr-only">Close</span>
       </DialogPrimitive.Close>
     </DialogPrimitive.Content>

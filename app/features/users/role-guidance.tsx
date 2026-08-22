@@ -1,5 +1,5 @@
-import { Info } from "lucide-react";
 import * as React from "react";
+import { PiInfo } from "react-icons/pi";
 
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
@@ -12,11 +12,11 @@ export function RoleGuidance(): React.ReactElement {
         <TooltipTrigger asChild>
           <button
             aria-label="About workspace roles"
-            className="inline-flex size-6 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="inline-flex size-10 min-h-10 min-w-10 items-center justify-center rounded-md text-muted-foreground transition-colors [@media(hover:hover)]:hover:bg-muted [@media(hover:hover)]:hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             onClick={() => setOpen(true)}
             type="button"
           >
-            <Info aria-hidden="true" className="size-3.5" />
+            <PiInfo aria-hidden="true" className="pointer-events-none size-3.5" />
           </button>
         </TooltipTrigger>
         <TooltipContent

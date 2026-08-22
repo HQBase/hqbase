@@ -24,7 +24,7 @@ export function DomainTable({
   return (
     <Table containerClassName="rounded-lg border">
       <TableHeader className="bg-muted/40">
-        <TableRow className="hover:bg-transparent">
+        <TableRow className="[@media(hover:hover)]:hover:bg-transparent">
           <TableHead>Domain</TableHead>
           <TableHead className="hidden w-28 sm:table-cell">Receive</TableHead>
           <TableHead className="hidden w-28 sm:table-cell">Send</TableHead>

@@ -1,5 +1,5 @@
-import { Moon, Sun } from "lucide-react";
 import type * as React from "react";
+import { PiMoon, PiSun } from "react-icons/pi";
 
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
@@ -9,7 +9,7 @@ export function ThemeSwitcher({ drawer = false }: { drawer?: boolean }): React.R
   const { setTheme, theme } = useTheme();
   const isDark = theme === "dark";
   const nextTheme = isDark ? "light" : "dark";
-  const Icon = isDark ? Moon : Sun;
+  const Icon = isDark ? PiMoon : PiSun;
 
   return (
     <Button
@@ -24,7 +24,7 @@ export function ThemeSwitcher({ drawer = false }: { drawer?: boolean }): React.R
       type="button"
       variant="ghost"
     >
-      <Icon strokeWidth={1.5} />
+      <Icon />
       <span>{isDark ? "Dark mode" : "Light mode"}</span>
       <span
         aria-hidden="true"

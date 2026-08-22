@@ -24,6 +24,9 @@
       "name": "Messages"
     },
     {
+      "name": "Changes"
+    },
+    {
       "name": "Conversations"
     },
     {
@@ -114,6 +117,108 @@
         "operationId": "listMailboxes"
       }
     },
+    "/api/v1/changes": {
+      "get": {
+        "summary": "Read message changes",
+        "description": "Returns a bounded page of message upserts and deletion tombstones in journal order. A request without a cursor returns an empty checkpoint at the current high-water sequence.",
+        "security": [
+          {
+            "oauth2": ["mail:read"]
+          },
+          {
+            "cookieSession": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A bounded page of message changes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessageChangePage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request. `INVALID_LIMIT` when limit is not an integer from 1 to 100. `INVALID_CHANGE_CURSOR` when the cursor is malformed, foreign, or beyond the current journal. `INVALID_CHANGE_FILTER` when a mailbox, folder, or search filter is supplied.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid authentication",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient OAuth scope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "`CHANGE_CURSOR_EXPIRED` when future journal retention removes a required range. The client must start a new full bootstrap.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "tags": ["Changes"],
+        "operationId": "listMessageChanges",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 512
+            },
+            "description": "Opaque cursor from a checkpoint or previous changes page. Omit it only to create a new checkpoint."
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 100
+            },
+            "description": "Maximum number of journal entries read for this page."
+          }
+        ]
+      }
+    },
     "/api/v1/messages": {
       "get": {
         "summary": "List or search messages",
@@ -127,7 +232,16 @@
         ],
         "responses": {
           "200": {
-            "description": "Messages",
+            "description": "One page of messages, newest activity first.",
+            "headers": {
+              "Link": {
+                "required": false,
+                "description": "RFC 8288 link to the next page, as `<url>; rel=\"next\"`. The header is absent on the last page.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
             "content": {
               "application/json": {
                 "schema": {
@@ -140,7 +254,7 @@
             }
           },
           "400": {
-            "description": "Invalid request",
+            "description": "Invalid request. `INVALID_LIMIT` when limit is not an integer from 1 to 100. `INVALID_CURSOR` when the cursor is malformed or is not a message cursor.",
             "content": {
               "application/json": {
                 "schema": {
@@ -222,6 +336,28 @@
               "maxLength": 200
             },
             "description": "Search subject, sender, recipient, and message text."
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 100
+            },
+            "description": "Maximum number of messages in the page."
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 512
+            },
+            "description": "Opaque cursor from the previous page. Read it from the Link header and send it unchanged."
           }
         ]
       }
@@ -887,7 +1023,16 @@
             "required": true,
             "schema": {
               "type": "string",
-              "enum": ["read", "unread", "star", "unstar", "archive", "trash"]
+              "enum": [
+                "read",
+                "unread",
+                "star",
+                "unstar",
+                "archive",
+                "unarchive",
+                "trash",
+                "restore"
+              ]
             }
           }
         ]
@@ -1106,7 +1251,16 @@
             "required": true,
             "schema": {
               "type": "string",
-              "enum": ["read", "unread", "star", "unstar", "archive", "trash"]
+              "enum": [
+                "read",
+                "unread",
+                "star",
+                "unstar",
+                "archive",
+                "unarchive",
+                "trash",
+                "restore"
+              ]
             }
           }
         ],
@@ -1594,6 +1748,7 @@
     "/api/v1/drafts/{id}/attachments": {
       "post": {
         "summary": "Add a draft attachment",
+        "description": "Records the file part's Content-Type, or application/octet-stream when no type is present. One file and all files in one draft can each total at most 25 MiB; larger uploads return 413 ATTACHMENTS_TOO_LARGE.",
         "security": [
           {
             "oauth2": ["mail:send"]
@@ -1653,6 +1808,16 @@
               }
             }
           },
+          "413": {
+            "description": "File or draft attachment total exceeds 25 MiB",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
           "429": {
             "description": "Rate limit exceeded",
             "content": {
@@ -1688,8 +1853,14 @@
                 "properties": {
                   "file": {
                     "type": "string",
+                    "format": "binary",
                     "contentEncoding": "binary"
                   }
+                }
+              },
+              "encoding": {
+                "file": {
+                  "contentType": "*/*"
                 }
               }
             }
@@ -1981,6 +2152,104 @@
           }
         }
       }
+    },
+    "/api/v1/forward": {
+      "post": {
+        "summary": "Forward a message",
+        "security": [
+          {
+            "oauth2": ["mail:send"]
+          },
+          {
+            "cookieSession": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Sent forward",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessageSummary"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid authentication",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient OAuth scope or mailbox access",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found or not visible",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "tags": ["Sending"],
+        "operationId": "forwardMessage",
+        "description": "Not idempotent. Do not retry blindly. Set includeOriginalAttachments to false to omit the source message's attachments.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ForwardInput"
+              },
+              "example": {
+                "messageId": "msg_example",
+                "from": "support@example.com",
+                "to": ["person@example.net"],
+                "cc": [],
+                "bcc": [],
+                "text": "Please review this message.",
+                "attachmentIds": [],
+                "includeOriginalAttachments": true
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -2231,6 +2500,71 @@
           "createdAt": {
             "type": "string",
             "format": "date-time"
+          }
+        }
+      },
+      "MessageChangeUpsert": {
+        "type": "object",
+        "required": ["type", "message"],
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "upsert"
+          },
+          "message": {
+            "$ref": "#/components/schemas/MessageSummary"
+          }
+        }
+      },
+      "MessageChangeDelete": {
+        "type": "object",
+        "required": ["type", "messageId", "mailboxId"],
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "delete"
+          },
+          "messageId": {
+            "type": "string"
+          },
+          "mailboxId": {
+            "description": "The mailbox at deletion, or null for owner-only unassigned mail.",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "MessageChange": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/MessageChangeUpsert"
+          },
+          {
+            "$ref": "#/components/schemas/MessageChangeDelete"
+          }
+        ]
+      },
+      "MessageChangePage": {
+        "type": "object",
+        "required": ["changes", "nextCursor", "hasMore"],
+        "properties": {
+          "changes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MessageChange"
+            }
+          },
+          "nextCursor": {
+            "type": "string"
+          },
+          "hasMore": {
+            "type": "boolean"
           }
         }
       },
@@ -2708,6 +3042,76 @@
           },
           "draftId": {
             "type": "string"
+          }
+        }
+      },
+      "ForwardInput": {
+        "type": "object",
+        "required": ["messageId", "from", "to"],
+        "properties": {
+          "messageId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "from": {
+            "type": "string",
+            "format": "email"
+          },
+          "to": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "email"
+            },
+            "minItems": 1,
+            "maxItems": 50
+          },
+          "cc": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "email"
+            },
+            "maxItems": 50,
+            "default": []
+          },
+          "bcc": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "email"
+            },
+            "maxItems": 50,
+            "default": []
+          },
+          "subject": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "text": {
+            "type": "string",
+            "maxLength": 100000,
+            "default": ""
+          },
+          "html": {
+            "type": "string",
+            "maxLength": 200000
+          },
+          "attachmentIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100
+            },
+            "maxItems": 20,
+            "default": []
+          },
+          "includeOriginalAttachments": {
+            "type": "boolean",
+            "default": true
           }
         }
       }

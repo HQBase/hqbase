@@ -54,7 +54,7 @@ function buildCollection(document) {
       _postman_id: "62c6dbf4-835d-4a3f-87df-77b7ddcf2db1",
       name: "HQBase Mail API v1",
       description:
-        "Generated from api/hqbase-mail-api-v1.openapi.json. Set base_url, run Register public client, and use Postman's OAuth 2.0 Authorization Code flow with PKCE (S256). Auth URL: {{base_url}}/api/auth/oauth2/authorize. Token URL: {{base_url}}/api/auth/oauth2/token. Client ID: {{client_id}}. Scope: mail:read mail:write mail:send offline_access. Add authorization request parameter resource={{api_resource}}, then store the resulting token only in your local environment as access_token. Sending and replying are not idempotent.",
+        "Generated from api/hqbase-mail-api-v1.openapi.json. Set base_url, run Register public client, and use Postman's OAuth 2.0 Authorization Code flow with PKCE (S256). Auth URL: {{base_url}}/api/auth/oauth2/authorize. Token URL: {{base_url}}/api/auth/oauth2/token. Client ID: {{client_id}}. Scope: mail:read mail:write mail:send offline_access. Add authorization request parameter resource={{api_resource}}, then store the resulting token only in your local environment as access_token. Sending, replying, and forwarding are not idempotent.",
       schema: "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
     },
     auth: {
@@ -82,10 +82,12 @@ function validateOpenApi(document) {
   const requiredPaths = [
     "/api/v1/mailboxes",
     "/api/v1/messages",
+    "/api/v1/changes",
     "/api/v1/conversations",
     "/api/v1/drafts",
     "/api/v1/send",
-    "/api/v1/reply"
+    "/api/v1/reply",
+    "/api/v1/forward"
   ];
   for (const route of requiredPaths) {
     if (!document.paths?.[route]) throw new Error(`Mail API contract is missing ${route}.`);

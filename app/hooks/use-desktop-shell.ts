@@ -1,6 +1,6 @@
 import * as React from "react";
 
-export const desktopShellMediaQuery = "(hover: hover) and (pointer: fine)";
+export const desktopShellMediaQuery = "(min-width: 1024px)";
 
 export function useDesktopShell(): boolean {
   const [matches, setMatches] = React.useState(() =>

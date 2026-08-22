@@ -1,6 +1,22 @@
 import { oauthDeviceAuthorization, oauthProvider } from "@better-auth/oauth-provider";
 import { betterAuth } from "better-auth";
+import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { admin } from "better-auth/plugins";
+import { createDatabase } from "../db/drizzle";
+import {
+  accounts,
+  deviceCodes,
+  oauthAccessTokens,
+  oauthClientAssertions,
+  oauthClientResources,
+  oauthClients,
+  oauthConsents,
+  oauthRefreshTokens,
+  oauthResources,
+  sessions,
+  users,
+  verifications
+} from "../db/schema";
 import { recordAudit } from "../features/audit/service";
 import { sendPasswordSetupEmail } from "../features/users/email";
 import type { WorkerEnv } from "../lib/env";
@@ -22,7 +38,34 @@ export function createAuth(
     appName: "HQBase",
     basePath: "/api/auth",
     baseURL,
-    database: env.DB,
+    trustedOrigins: async (request) => {
+      if (!request) return [];
+      try {
+        const host = new URL(request.url).hostname;
+        if (host === "localhost" || host === "127.0.0.1") {
+          return ["http://localhost:5173", "http://127.0.0.1:5173"];
+        }
+      } catch {}
+      return [];
+    },
+    database: drizzleAdapter(createDatabase(env.DB), {
+      provider: "sqlite",
+      schema: {
+        account: accounts,
+        deviceCode: deviceCodes,
+        oauthAccessToken: oauthAccessTokens,
+        oauthClient: oauthClients,
+        oauthClientAssertion: oauthClientAssertions,
+        oauthClientResource: oauthClientResources,
+        oauthConsent: oauthConsents,
+        oauthRefreshToken: oauthRefreshTokens,
+        oauthResource: oauthResources,
+        session: sessions,
+        user: users,
+        verification: verifications
+      },
+      transaction: false
+    }),
     disabledPaths: ["/token"],
     secret: env.BETTER_AUTH_SECRET,
     ...(backgroundTaskHandler
@@ -85,6 +128,7 @@ export function createAuth(
         disableJwtPlugin: true,
         grantTypes: ["authorization_code", "refresh_token"],
         loginPage: "/",
+        refreshTokenReuseInterval: 30,
         prefix: {
           clientSecret: "hqb_client_",
           opaqueAccessToken: "hqb_access_",

@@ -1,7 +1,8 @@
-import { Paperclip, Trash2 } from "lucide-react";
 import type * as React from "react";
+import { PiPaperclip, PiPaperPlaneTilt, PiTrash } from "react-icons/pi";
 
 import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/spinner";
 import type { DraftAttachment } from "@/features/drafts/types";
 import { cn } from "@/lib/cn";
 import { AttachmentList } from "./attachment-list";
@@ -14,6 +15,7 @@ type ComposeFormProps = {
   attachments: DraftAttachment[];
   bcc: string;
   cc: string;
+  contextLabel: string | null;
   formId: string;
   from: string;
   html: string;
@@ -55,6 +57,11 @@ export function ComposeForm(props: ComposeFormProps): React.ReactElement {
           onKeyDownCapture={(event) => submitComposeOnShortcut(event, props.sendDisabled)}
           onSubmit={props.onSubmit}
         >
+          {props.contextLabel ? (
+            <div className="border-b bg-muted/30 px-5 py-2 text-xs text-muted-foreground">
+              {props.contextLabel}
+            </div>
+          ) : null}
           <ComposeFields
             identities={props.identities}
             mode={props.mode}
@@ -85,15 +92,22 @@ export function ComposeForm(props: ComposeFormProps): React.ReactElement {
           >
             <div className="flex gap-2">
               <Button
+                aria-label={props.isPending ? "Sending message" : "Send message"}
                 className={cn(props.presentation === "thread" && "hidden lg:inline-flex")}
                 disabled={props.sendDisabled}
+                size="icon"
                 type="submit"
+                variant="liquidGlass"
               >
-                {props.isPending ? "Sending" : "Send"}
+                {props.isPending ? (
+                  <Spinner aria-hidden="true" />
+                ) : (
+                  <PiPaperPlaneTilt aria-hidden="true" className="pointer-events-none" />
+                )}
               </Button>
               <Button asChild size="icon" type="button" variant="ghost">
                 <label aria-label="Add attachment" className="cursor-pointer">
-                  <Paperclip />
+                  <PiPaperclip aria-hidden="true" className="pointer-events-none" />
                   <input
                     className="sr-only"
                     multiple
@@ -113,7 +127,7 @@ export function ComposeForm(props: ComposeFormProps): React.ReactElement {
               variant="ghost"
               onClick={props.onDiscard}
             >
-              <Trash2 />
+              <PiTrash aria-hidden="true" className="pointer-events-none" />
             </Button>
           </footer>
         </form>

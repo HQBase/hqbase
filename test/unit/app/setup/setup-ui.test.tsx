@@ -1,5 +1,5 @@
-import { Globe2, Inbox, UserRound } from "lucide-react";
 import { renderToStaticMarkup } from "react-dom/server";
+import { PiGlobe, PiTray, PiUserCircle } from "react-icons/pi";
 import { describe, expect, it } from "vitest";
 
 import { AccessStep } from "@/features/setup/setup-access-screen";
@@ -60,9 +60,9 @@ describe("setup UI", () => {
           activePhase={3}
           activeStep={3}
           steps={[
-            { icon: Globe2, title: "Domain" },
-            { icon: UserRound, title: "Owner account" },
-            { icon: Inbox, title: "Mailboxes" }
+            { icon: PiGlobe, title: "Domain" },
+            { icon: PiUserCircle, title: "Owner account" },
+            { icon: PiTray, title: "Mailboxes" }
           ]}
         >
           <p>Complete setup</p>

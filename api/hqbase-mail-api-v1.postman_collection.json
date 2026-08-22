@@ -2,7 +2,7 @@
   "info": {
     "_postman_id": "62c6dbf4-835d-4a3f-87df-77b7ddcf2db1",
     "name": "HQBase Mail API v1",
-    "description": "Generated from api/hqbase-mail-api-v1.openapi.json. Set base_url, run Register public client, and use Postman's OAuth 2.0 Authorization Code flow with PKCE (S256). Auth URL: {{base_url}}/api/auth/oauth2/authorize. Token URL: {{base_url}}/api/auth/oauth2/token. Client ID: {{client_id}}. Scope: mail:read mail:write mail:send offline_access. Add authorization request parameter resource={{api_resource}}, then store the resulting token only in your local environment as access_token. Sending and replying are not idempotent.",
+    "description": "Generated from api/hqbase-mail-api-v1.openapi.json. Set base_url, run Register public client, and use Postman's OAuth 2.0 Authorization Code flow with PKCE (S256). Auth URL: {{base_url}}/api/auth/oauth2/authorize. Token URL: {{base_url}}/api/auth/oauth2/token. Client ID: {{client_id}}. Scope: mail:read mail:write mail:send offline_access. Add authorization request parameter resource={{api_resource}}, then store the resulting token only in your local environment as access_token. Sending, replying, and forwarding are not idempotent.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "auth": {
@@ -151,6 +151,38 @@
       ]
     },
     {
+      "name": "Changes",
+      "item": [
+        {
+          "name": "Read message changes",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/changes",
+              "variable": [],
+              "query": [
+                {
+                  "key": "cursor",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Opaque cursor from a checkpoint or previous changes page. Omit it only to create a new checkpoint."
+                },
+                {
+                  "key": "limit",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Maximum number of journal entries read for this page."
+                }
+              ]
+            },
+            "description": "Returns a bounded page of message upserts and deletion tombstones in journal order. A request without a cursor returns an empty checkpoint at the current high-water sequence."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
       "name": "Messages",
       "item": [
         {
@@ -179,6 +211,18 @@
                   "value": "",
                   "disabled": true,
                   "description": "Search subject, sender, recipient, and message text."
+                },
+                {
+                  "key": "limit",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Maximum number of messages in the page."
+                },
+                {
+                  "key": "cursor",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Opaque cursor from the previous page. Read it from the Link header and send it unchanged."
                 }
               ]
             },
@@ -535,7 +579,7 @@
                 }
               ]
             },
-            "description": "Add a draft attachment",
+            "description": "Records the file part's Content-Type, or application/octet-stream when no type is present. One file and all files in one draft can each total at most 25 MiB; larger uploads return 413 ATTACHMENTS_TOO_LARGE.",
             "body": {
               "mode": "formdata",
               "formdata": [
@@ -621,6 +665,33 @@
             "body": {
               "mode": "raw",
               "raw": "{\n  \"messageId\": \"msg_example\",\n  \"from\": \"support@example.com\",\n  \"cc\": [],\n  \"bcc\": [],\n  \"text\": \"Thanks for your message.\",\n  \"attachmentIds\": []\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Forward a message",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/forward",
+              "variable": []
+            },
+            "description": "Not idempotent. Do not retry blindly. Set includeOriginalAttachments to false to omit the source message's attachments.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"messageId\": \"msg_example\",\n  \"from\": \"support@example.com\",\n  \"to\": [\n    \"person@example.net\"\n  ],\n  \"cc\": [],\n  \"bcc\": [],\n  \"text\": \"Please review this message.\",\n  \"attachmentIds\": [],\n  \"includeOriginalAttachments\": true\n}",
               "options": {
                 "raw": {
                   "language": "json"

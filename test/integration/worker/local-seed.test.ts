@@ -2,8 +2,16 @@ import { env, SELF } from "cloudflare:test";
 import { hashPassword } from "better-auth/crypto";
 import { beforeAll, describe, expect, it } from "vitest";
 
+import initialMigration from "../../../migrations/0001_initial.sql?raw";
+import workspaceMigration from "../../../migrations/0002_workspace.sql?raw";
+import oauthResourcesMigration from "../../../migrations/0003_oauth_resources.sql?raw";
+import conversationMigration from "../../../migrations/0004_conversations.sql?raw";
+import threadRebuildMigration from "../../../migrations/0005_rebuild_threads.sql?raw";
+import pushMigration from "../../../migrations/0006_push_notifications.sql?raw";
+import userMailPreferencesMigration from "../../../migrations/0007_user_mail_preferences.sql?raw";
+import userOnboardingMigration from "../../../migrations/0008_user_onboarding.sql?raw";
+import loginEmailDomainMigration from "../../../migrations/0009_login_email_domain_isolation.sql?raw";
 import { buildSeedSql } from "../../../scripts/local-seed-fixture.mjs";
-import { applyCurrentMigrations } from "./current-migrations";
 import { migrationStatements } from "./migration-statements";
 
 const origin = "https://hqbase.test";
@@ -11,19 +19,31 @@ const password = "local-seed-password";
 
 describe("local database seed fixture", () => {
   beforeAll(async () => {
-    await applyCurrentMigrations();
+    for (const migration of [
+      initialMigration,
+      workspaceMigration,
+      oauthResourcesMigration,
+      conversationMigration,
+      threadRebuildMigration,
+      pushMigration,
+      userMailPreferencesMigration,
+      userOnboardingMigration,
+      loginEmailDomainMigration
+    ]) {
+      await applyStatements(migration);
+    }
     await applyStatements(
       buildSeedSql(await hashPassword(password), new Date("2026-08-14T18:00:00.000Z"))
     );
-  });
+  }, 60_000);
 
   it("creates a complete workspace with representative records", async () => {
     const setup = await SELF.fetch(`${origin}/api/setup/status`);
     await expect(setup.json()).resolves.toMatchObject({
       isComplete: true,
       primaryDomain: "example.test",
-      userCount: 1,
-      mailboxCount: 2
+      userCount: 4,
+      mailboxCount: 6
     });
 
     const counts = await env.DB.prepare(
@@ -41,11 +61,11 @@ describe("local database seed fixture", () => {
       seed_version: string;
     }>();
     expect(counts).toEqual({
-      threads: 3,
-      messages: 4,
-      drafts: 1,
-      addresses: 2,
-      seed_version: '"local-demo-v1"'
+      threads: 116,
+      messages: 123,
+      drafts: 4,
+      addresses: 8,
+      seed_version: '"local-demo-v3"'
     });
 
     const deliveries = await env.DB.prepare(
@@ -53,7 +73,7 @@ describe("local database seed fixture", () => {
        FROM messages
        WHERE direction = 'inbound' AND delivered_to_address_id IS NOT NULL`
     ).first<{ count: number }>();
-    expect(deliveries?.count).toBe(3);
+    expect(deliveries?.count).toBe(118);
   });
 
   it("is repeatable without duplicating fixture records", async () => {
@@ -66,7 +86,7 @@ describe("local database seed fixture", () => {
           (SELECT COUNT(*) FROM messages WHERE id LIKE 'msg_local_%') AS messages,
           (SELECT COUNT(*) FROM drafts WHERE id LIKE 'drf_local_%') AS drafts`
     ).first<{ users: number; messages: number; drafts: number }>();
-    expect(counts).toEqual({ users: 1, messages: 4, drafts: 1 });
+    expect(counts).toEqual({ users: 1, messages: 123, drafts: 4 });
   });
 
   it("creates credentials that Better Auth can use for a normal session", async () => {

@@ -1,18 +1,20 @@
+import { eq } from "drizzle-orm";
+
 import { nowIso } from "../../db/client";
+import { createDatabase } from "../../db/drizzle";
+import { userMailPreferences } from "../../db/schema";
 
 export async function getDefaultFromMailboxId(
   db: D1Database,
   userId: string
 ): Promise<string | null> {
-  const row = await db
-    .prepare(
-      `SELECT default_from_mailbox_id
-       FROM user_mail_preferences
-       WHERE user_id = ?`
-    )
-    .bind(userId)
-    .first<{ default_from_mailbox_id: string | null }>();
-  return row?.default_from_mailbox_id ?? null;
+  const database = createDatabase(db);
+  const row = await database
+    .select({ defaultFromMailboxId: userMailPreferences.defaultFromMailboxId })
+    .from(userMailPreferences)
+    .where(eq(userMailPreferences.userId, userId))
+    .get();
+  return row?.defaultFromMailboxId ?? null;
 }
 
 export async function setDefaultFromMailboxId(
@@ -21,15 +23,21 @@ export async function setDefaultFromMailboxId(
   mailboxId: string
 ): Promise<void> {
   const timestamp = nowIso();
-  await db
-    .prepare(
-      `INSERT INTO user_mail_preferences
-       (user_id, default_from_mailbox_id, created_at, updated_at)
-       VALUES (?, ?, ?, ?)
-       ON CONFLICT(user_id) DO UPDATE SET
-         default_from_mailbox_id = excluded.default_from_mailbox_id,
-         updated_at = excluded.updated_at`
-    )
-    .bind(userId, mailboxId, timestamp, timestamp)
+  const database = createDatabase(db);
+  await database
+    .insert(userMailPreferences)
+    .values({
+      userId,
+      defaultFromMailboxId: mailboxId,
+      createdAt: timestamp,
+      updatedAt: timestamp
+    })
+    .onConflictDoUpdate({
+      target: userMailPreferences.userId,
+      set: {
+        defaultFromMailboxId: mailboxId,
+        updatedAt: timestamp
+      }
+    })
     .run();
 }

@@ -28,6 +28,7 @@ DROP TABLE IF EXISTS rate_limits;
 DROP TABLE IF EXISTS audit_events;
 DROP TABLE IF EXISTS mailbox_grants;
 DROP TABLE IF EXISTS hqbase_schema_state;
+DROP TABLE IF EXISTS message_changes;
 DROP TABLE IF EXISTS message_attachments;
 DROP TABLE IF EXISTS messages;
 DROP TABLE IF EXISTS threads;

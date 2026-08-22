@@ -1,9 +1,12 @@
+import { sql } from "drizzle-orm";
 import { Hono } from "hono";
 import { z } from "zod";
 
 import { requireMailboxAccess } from "../../auth/mailbox-access";
 import { requireAuthContext, requireRole } from "../../auth/session";
 import { nowIso } from "../../db/client";
+import { createDatabase, getRow, getRows } from "../../db/drizzle";
+import { retentionPolicies } from "../../db/schema";
 import type { HonoApp } from "../../lib/env";
 import { readJson } from "../../lib/json";
 import { parseWith } from "../../lib/validation";
@@ -20,25 +23,22 @@ operationRoutes.get("/diagnostics", async (c) => {
   const auth = await requireAuthContext(c.env, c.req.raw);
   requireRole(auth, ["owner", "admin"]);
   const [schema, counts, operations] = await Promise.all([
-    c.env.DB.prepare("SELECT key, value, updated_at FROM hqbase_schema_state ORDER BY key").all<{
-      key: string;
-      value: string;
-      updated_at: string;
-    }>(),
-    c.env.DB.prepare(
-      `SELECT
-       (SELECT COUNT(*) FROM "user" WHERE COALESCE(banned, 0) = 0) AS users,
-       (SELECT COUNT(*) FROM mailboxes WHERE is_active = 1) AS active_mailboxes,
-       (SELECT COUNT(*) FROM operation_runs WHERE status = 'failed') AS failed_operations`
-    ).first<{
+    getRows<{ key: string; value: string; updated_at: string }>(
+      c.env.DB,
+      sql`SELECT key, value, updated_at FROM hqbase_schema_state ORDER BY key`
+    ),
+    getRow<{
       users: number;
       active_mailboxes: number;
       failed_operations: number;
-    }>(),
-    c.env.DB.prepare(
-      `SELECT id, kind, status, counters_json, error_code, started_at, finished_at
-       FROM operation_runs ORDER BY started_at DESC LIMIT 20`
-    ).all<{
+    }>(
+      c.env.DB,
+      sql`SELECT
+       (SELECT COUNT(*) FROM "user" WHERE COALESCE(banned, 0) = 0) AS users,
+       (SELECT COUNT(*) FROM mailboxes WHERE is_active = 1) AS active_mailboxes,
+       (SELECT COUNT(*) FROM operation_runs WHERE status = 'failed') AS failed_operations`
+    ),
+    getRows<{
       id: string;
       kind: string;
       status: string;
@@ -46,17 +46,21 @@ operationRoutes.get("/diagnostics", async (c) => {
       error_code: string | null;
       started_at: string;
       finished_at: string | null;
-    }>()
+    }>(
+      c.env.DB,
+      sql`SELECT id, kind, status, counters_json, error_code, started_at, finished_at
+          FROM operation_runs ORDER BY started_at DESC LIMIT 20`
+    )
   ]);
   return c.json({
-    ready: schema.results.some((row) => row.key === "product" && row.value === "hqbase"),
-    schema: schema.results,
+    ready: schema.some((row) => row.key === "product" && row.value === "hqbase"),
+    schema,
     counts: {
       users: counts?.users ?? 0,
       activeMailboxes: counts?.active_mailboxes ?? 0,
       failedOperations: counts?.failed_operations ?? 0
     },
-    operations: operations.results.map((row) => ({
+    operations: operations.map((row) => ({
       id: row.id,
       kind: row.kind,
       status: row.status,
@@ -95,12 +99,11 @@ operationRoutes.get("/retention/:mailboxId", async (c) => {
     c.req.param("mailboxId"),
     "manager"
   );
-  const policy = await c.env.DB.prepare(
-    `SELECT mailbox_id, message_days, trash_days, updated_at
-     FROM retention_policies WHERE mailbox_id = ?`
-  )
-    .bind(c.req.param("mailboxId"))
-    .first();
+  const policy = await getRow(
+    c.env.DB,
+    sql`SELECT mailbox_id, message_days, trash_days, updated_at
+        FROM retention_policies WHERE mailbox_id = ${c.req.param("mailboxId")}`
+  );
   return c.json(
     policy ?? { mailbox_id: c.req.param("mailboxId"), message_days: null, trash_days: 30 }
   );
@@ -111,15 +114,25 @@ operationRoutes.put("/retention/:mailboxId", async (c) => {
   const mailboxId = c.req.param("mailboxId");
   await requireMailboxAccess(c.env.DB, auth.user.id, auth.user.role, mailboxId, "manager");
   const input = parseWith(retentionSchema, await readJson(c.req.raw));
-  await c.env.DB.prepare(
-    `INSERT INTO retention_policies
-     (mailbox_id, message_days, trash_days, updated_by, updated_at)
-     VALUES (?, ?, ?, ?, ?)
-     ON CONFLICT(mailbox_id) DO UPDATE SET message_days = excluded.message_days,
-       trash_days = excluded.trash_days, updated_by = excluded.updated_by,
-       updated_at = excluded.updated_at`
-  )
-    .bind(mailboxId, input.messageDays, input.trashDays, auth.user.id, nowIso())
+  const updatedAt = nowIso();
+  await createDatabase(c.env.DB)
+    .insert(retentionPolicies)
+    .values({
+      mailboxId,
+      messageDays: input.messageDays,
+      trashDays: input.trashDays,
+      updatedBy: auth.user.id,
+      updatedAt
+    })
+    .onConflictDoUpdate({
+      target: retentionPolicies.mailboxId,
+      set: {
+        messageDays: input.messageDays,
+        trashDays: input.trashDays,
+        updatedBy: auth.user.id,
+        updatedAt
+      }
+    })
     .run();
   await recordAudit(c.env.DB, {
     correlationId: c.get("correlationId"),

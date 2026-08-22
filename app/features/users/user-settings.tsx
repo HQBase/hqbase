@@ -1,5 +1,5 @@
-import { KeyRound, Mail } from "lucide-react";
 import * as React from "react";
+import { PiEnvelope, PiKey } from "react-icons/pi";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -72,7 +72,7 @@ export function UserSettings({
       >
         <Table containerClassName="rounded-lg border">
           <TableHeader className="bg-muted/40">
-            <TableRow className="hover:bg-transparent">
+            <TableRow className="[@media(hover:hover)]:hover:bg-transparent">
               <TableHead className="hidden sm:table-cell">Name</TableHead>
               <TableHead>Login email</TableHead>
               <TableHead>Status</TableHead>
@@ -119,9 +119,9 @@ export function UserSettings({
                       {pendingAction === user.id ? (
                         <Spinner data-icon="inline-start" />
                       ) : user.onboardingMethod === "email_invite" ? (
-                        <Mail data-icon="inline-start" />
+                        <PiEnvelope data-icon="inline-start" />
                       ) : (
-                        <KeyRound data-icon="inline-start" />
+                        <PiKey data-icon="inline-start" />
                       )}
                       {user.onboardingMethod === "email_invite" ? "Resend" : "New password"}
                     </Button>

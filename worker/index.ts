@@ -1,4 +1,7 @@
+import { sql } from "drizzle-orm";
+
 import { handleMailApiMetadata } from "./auth/mail-api";
+import { getRow } from "./db/drizzle";
 import { handleInboundEmail } from "./email/inbound";
 import { handleMailApiDiscovery } from "./features/mail-api/discovery";
 import { handleMcpRoute } from "./features/mcp/route";
@@ -21,15 +24,13 @@ export default {
     }
 
     const portal = request.headers.get("accept")?.includes("text/html")
-      ? await env.DB.prepare(
-          `SELECT current.is_canonical, canonical.hostname AS canonical_hostname
+      ? await getRow<{ is_canonical: number; canonical_hostname: string }>(
+          env.DB,
+          sql`SELECT current.is_canonical, canonical.hostname AS canonical_hostname
        FROM workspace_hosts current
        JOIN workspace_hosts canonical ON canonical.kind = 'portal' AND canonical.is_canonical = 1
-       WHERE current.kind = 'portal' AND current.hostname = ?`
-        )
-          .bind(url.hostname.toLowerCase())
-          .first<{ is_canonical: number; canonical_hostname: string }>()
-          .catch(() => null)
+       WHERE current.kind = 'portal' AND current.hostname = ${url.hostname.toLowerCase()}`
+        ).catch(() => null)
       : null;
     if (portal && portal.is_canonical !== 1) {
       url.hostname = portal.canonical_hostname;
@@ -47,7 +48,7 @@ export default {
     const stored = await handleInboundEmail(message, env);
     if (stored.inserted) {
       ctx.waitUntil(
-        notifyInboundMessage(env, stored.message).catch(() => {
+        notifyInboundMessage(env, stored.message, stored.isUnassigned).catch(() => {
           // Push delivery is additive and never changes accepted inbound mail.
         })
       );

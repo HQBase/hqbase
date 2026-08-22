@@ -1,3 +1,6 @@
+import { sql } from "drizzle-orm";
+
+import { getRow } from "../db/drizzle";
 import type { WorkerEnv } from "../lib/env";
 import type { WorkspaceRole } from "../lib/validation";
 import { workspaceRoleSchema } from "../lib/validation";
@@ -36,8 +39,9 @@ export async function authenticateOAuthBearer(
   options: { allowedScopes: readonly string[]; resource: string }
 ): Promise<OAuthPrincipal> {
   const bearer = readBearer(request);
-  const row = await env.DB.prepare(
-    `SELECT at.userId, at.sessionId, at.clientId, at.scopes, at.resources,
+  const row = await getRow<OAuthTokenRow>(
+    env.DB,
+    sql`SELECT at.userId, at.sessionId, at.clientId, at.scopes, at.resources,
             at.expiresAt AS tokenExpiresAt, at.revoked,
             c.disabled AS clientDisabled,
             oc.scopes AS consentScopes, oc.resources AS consentResources,
@@ -48,12 +52,10 @@ export async function authenticateOAuthBearer(
      JOIN oauthConsent oc ON oc.clientId = at.clientId AND oc.userId = at.userId
      JOIN "user" u ON u.id = at.userId
      JOIN "session" s ON s.id = at.sessionId AND s.userId = at.userId
-     WHERE at.token = ?
+     WHERE at.token = ${await hashOAuthToken(bearer.slice(accessTokenPrefix.length))}
      ORDER BY oc.updatedAt DESC
      LIMIT 1`
-  )
-    .bind(await hashOAuthToken(bearer.slice(accessTokenPrefix.length)))
-    .first<OAuthTokenRow>();
+  );
 
   const now = Date.now();
   const tokenExpiresAt = Date.parse(row?.tokenExpiresAt ?? "");

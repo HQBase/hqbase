@@ -1,5 +1,5 @@
-import { ArrowRight, RefreshCw } from "lucide-react";
 import * as React from "react";
+import { PiArrowRight, PiArrowsClockwise } from "react-icons/pi";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
@@ -125,7 +125,10 @@ export function UpdateSettings({
       >
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-xs">
           <Version label="Current" value={status?.installedVersion ?? "Unknown"} />
-          <ArrowRight aria-hidden="true" className="size-3.5 text-muted-foreground/70" />
+          <PiArrowRight
+            aria-hidden="true"
+            className="pointer-events-none size-3.5 text-muted-foreground/70"
+          />
           <Version label="Available" value={status?.release.version ?? "Not checked"} />
         </div>
         <Button
@@ -143,7 +146,7 @@ export function UpdateSettings({
             </>
           ) : (
             <>
-              <RefreshCw aria-hidden="true" />
+              <PiArrowsClockwise aria-hidden="true" className="pointer-events-none" />
               Check updates
             </>
           )}

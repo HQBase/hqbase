@@ -13,6 +13,9 @@ import userOnboardingMigration from "../../../migrations/0008_user_onboarding.sq
 import loginEmailDomainMigration from "../../../migrations/0009_login_email_domain_isolation.sql?raw";
 import deviceAuthorizationMigration from "../../../migrations/0010_oauth_device_authorization.sql?raw";
 import latestPasswordResetTokenMigration from "../../../migrations/0011_latest_password_reset_token.sql?raw";
+import messageActivityIndexMigration from "../../../migrations/0012_message_activity_index.sql?raw";
+import messageChangesMigration from "../../../migrations/0013_message_changes.sql?raw";
+import unassignedMessagesMigration from "../../../migrations/0014_unassigned_messages.sql?raw";
 import resetSql from "../../../scripts/hqbase/reset-d1.sql?raw";
 import { buildSeedSql } from "../../../scripts/local-seed-fixture.mjs";
 import { migrationStatements } from "./migration-statements";
@@ -29,7 +32,10 @@ const migrations = [
   userOnboardingMigration,
   loginEmailDomainMigration,
   deviceAuthorizationMigration,
-  latestPasswordResetTokenMigration
+  latestPasswordResetTokenMigration,
+  messageActivityIndexMigration,
+  messageChangesMigration,
+  unassignedMessagesMigration
 ];
 
 describe("local database reset", () => {
@@ -38,7 +44,7 @@ describe("local database reset", () => {
     await applyStatements(
       buildSeedSql(await hashPassword("local-seed-password"), new Date("2026-08-14T18:00:00.000Z"))
     );
-  });
+  }, 60_000);
 
   it("removes current data and supports a fresh migration", async () => {
     await applyStatements(resetSql);
@@ -67,6 +73,37 @@ describe("local database reset", () => {
        WHERE type = 'trigger' AND name = 'verification_latest_password_reset_token'`
     ).first<{ name: string }>();
     expect(resetTokenTrigger?.name).toBe("verification_latest_password_reset_token");
+
+    const activityIndexes = await env.DB.prepare(
+      `SELECT name FROM sqlite_master
+       WHERE type = 'index'
+         AND name IN (
+           'messages_activity_idx', 'messages_mailbox_activity_idx', 'messages_folder_activity_idx'
+         )
+       ORDER BY name`
+    ).all<{ name: string }>();
+    expect(activityIndexes.results.map((row) => row.name)).toEqual([
+      "messages_activity_idx",
+      "messages_folder_activity_idx",
+      "messages_mailbox_activity_idx"
+    ]);
+
+    const changeJournal = await env.DB.prepare(
+      `SELECT type, name FROM sqlite_master
+       WHERE name = 'message_changes' OR name LIKE 'message_changes_after_%'
+       ORDER BY type, name`
+    ).all<{ type: string; name: string }>();
+    expect(changeJournal.results).toEqual([
+      { type: "table", name: "message_changes" },
+      { type: "trigger", name: "message_changes_after_delete" },
+      { type: "trigger", name: "message_changes_after_insert" },
+      { type: "trigger", name: "message_changes_after_update" }
+    ]);
+
+    const messageColumns = await env.DB.prepare("PRAGMA table_info(messages)").all<{
+      name: string;
+    }>();
+    expect(messageColumns.results.map((column) => column.name)).toContain("is_unassigned");
   });
 });
 

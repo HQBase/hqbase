@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { z } from "zod";
 
-import { accessibleMailboxIds } from "../../auth/mailbox-access";
+import { accessibleMessageScope } from "../../auth/mailbox-access";
 import { requireAuthContext } from "../../auth/session";
 import type { HonoApp } from "../../lib/env";
 import { AppError } from "../../lib/errors";
@@ -39,10 +39,10 @@ const unsubscribeSchema = z.object({ endpoint: endpointSchema });
 
 notificationRoutes.get("/status", async (c) => {
   const auth = await requireAuthContext(c.env, c.req.raw);
-  const mailboxIds = await accessibleMailboxIds(c.env.DB, auth.user.id, auth.user.role, "read");
+  const scope = await accessibleMessageScope(c.env.DB, auth.user.id, auth.user.role, "read");
   const [unread, latestMessageId] = await Promise.all([
-    countUnreadMessages(c.env.DB, mailboxIds),
-    latestInboundMessageId(c.env.DB, mailboxIds)
+    countUnreadMessages(c.env.DB, scope),
+    latestInboundMessageId(c.env.DB, scope)
   ]);
   return c.json({
     latestInboundMessageId: latestMessageId,

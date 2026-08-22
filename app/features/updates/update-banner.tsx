@@ -1,5 +1,5 @@
-import { ArrowUpCircle } from "lucide-react";
 import type * as React from "react";
+import { PiArrowCircleUp } from "react-icons/pi";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import type { UpdateStatus } from "./types";
@@ -20,7 +20,7 @@ export function UpdateBanner({
   return (
     <div
       aria-live="polite"
-      className="flex min-h-10 shrink-0 items-center justify-between gap-3 border-b bg-muted/45 px-3 text-xs md:px-4"
+      className="flex min-h-10 shrink-0 px-4 py-2 items-center justify-between gap-3 border-b bg-muted/45 px-3 text-xs md:px-8"
       role="status"
     >
       <div className="flex items-center gap-2">
@@ -31,7 +31,7 @@ export function UpdateBanner({
             role="presentation"
           />
         ) : (
-          <ArrowUpCircle aria-hidden="true" className="size-4 text-muted-foreground" />
+          <PiArrowCircleUp aria-hidden="true" className="size-4 text-muted-foreground" />
         )}
         <span>
           <strong>{inProgress ? "Update in progress" : "Update available"}</strong>

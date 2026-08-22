@@ -3,12 +3,14 @@ import { existsSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync 
 import { tmpdir } from "node:os";
 import { dirname, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
+import { configPath } from "../../../scripts/hqbase/manifest.mjs";
 import {
   inspectActiveRelease,
   isDeployButtonBootstrap,
   parseActiveRelease
 } from "../../../scripts/release/active-version.mjs";
 import {
+  assertSourceDeployConfig,
   compareVersions,
   deploySource,
   executeSql,
@@ -228,6 +230,14 @@ describe("HQBase release deployment", () => {
   it("uses the configured Worker name as the runtime automation identity", () => {
     expect(workerNameFromConfig({ name: "hqbase-deeptake-test" })).toBe("hqbase-deeptake-test");
     expect(() => workerNameFromConfig({ name: "" })).toThrow("deployed Worker name");
+  });
+  it("rejects managed configurations in forced-source mode", () => {
+    const repositoryConfig = resolve("wrangler.jsonc");
+
+    expect(assertSourceDeployConfig(repositoryConfig)).toBe(repositoryConfig);
+    expect(() => assertSourceDeployConfig(configPath("release-test"))).toThrow(
+      /HQBASE_FORCE_SOURCE_DEPLOY supports only the repository-root wrangler\.jsonc/
+    );
   });
   it("generates masked auth and Web Push secrets when the first Workers Build needs them", () => {
     let secretFile;

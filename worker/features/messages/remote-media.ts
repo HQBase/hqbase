@@ -1,18 +1,26 @@
+import { and, eq } from "drizzle-orm";
+
 import { nowIso } from "../../db/client";
+import { createDatabase } from "../../db/drizzle";
+import { messageSenderPreferences } from "../../db/schema";
 
 export async function isRemoteMediaTrusted(
   db: D1Database,
   userId: string,
   senderAddress: string
 ): Promise<boolean> {
-  const row = await db
-    .prepare(
-      `SELECT load_remote_media FROM message_sender_preferences
-       WHERE user_id = ? AND sender_address = ?`
+  const database = createDatabase(db);
+  const row = await database
+    .select({ loadRemoteMedia: messageSenderPreferences.loadRemoteMedia })
+    .from(messageSenderPreferences)
+    .where(
+      and(
+        eq(messageSenderPreferences.userId, userId),
+        eq(messageSenderPreferences.senderAddress, normalizeSenderAddress(senderAddress))
+      )
     )
-    .bind(userId, normalizeSenderAddress(senderAddress))
-    .first<{ load_remote_media: number }>();
-  return row?.load_remote_media === 1;
+    .get();
+  return row?.loadRemoteMedia ?? false;
 }
 
 export async function trustRemoteMediaSender(
@@ -21,15 +29,23 @@ export async function trustRemoteMediaSender(
   senderAddress: string
 ): Promise<void> {
   const timestamp = nowIso();
-  await db
-    .prepare(
-      `INSERT INTO message_sender_preferences
-       (user_id, sender_address, load_remote_media, created_at, updated_at)
-       VALUES (?, ?, 1, ?, ?)
-       ON CONFLICT(user_id, sender_address) DO UPDATE SET
-         load_remote_media = 1, updated_at = excluded.updated_at`
-    )
-    .bind(userId, normalizeSenderAddress(senderAddress), timestamp, timestamp)
+  const database = createDatabase(db);
+  await database
+    .insert(messageSenderPreferences)
+    .values({
+      userId,
+      senderAddress: normalizeSenderAddress(senderAddress),
+      loadRemoteMedia: true,
+      createdAt: timestamp,
+      updatedAt: timestamp
+    })
+    .onConflictDoUpdate({
+      target: [messageSenderPreferences.userId, messageSenderPreferences.senderAddress],
+      set: {
+        loadRemoteMedia: true,
+        updatedAt: timestamp
+      }
+    })
     .run();
 }
 

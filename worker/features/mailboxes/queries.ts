@@ -1,5 +1,9 @@
+import { and, eq, sql } from "drizzle-orm";
+
 import type { MailboxAccessLevel } from "../../auth/mailbox-access";
 import { newId, nowIso } from "../../db/client";
+import { createDatabase, getRow, getRows } from "../../db/drizzle";
+import { mailboxAddresses, mailboxes } from "../../db/schema";
 import type { WorkspaceRole } from "../../lib/validation";
 
 import type {
@@ -43,16 +47,18 @@ export async function addressMap(
 ): Promise<Map<string, MailboxAddress[]>> {
   const mapped = new Map<string, MailboxAddress[]>();
   if (mailboxIds.length === 0) return mapped;
-  const rows = await db
-    .prepare(
-      `SELECT id, mailbox_id, mail_domain_id, address, display_name,
+  const rows = await getRows<MailboxAddressRow>(
+    db,
+    sql`SELECT id, mailbox_id, mail_domain_id, address, display_name,
      receive_enabled, send_enabled, is_primary
-     FROM mailbox_addresses WHERE mailbox_id IN (${mailboxIds.map(() => "?").join(", ")})
+     FROM mailbox_addresses
+     WHERE mailbox_id IN (${sql.join(
+       mailboxIds.map((mailboxId) => sql`${mailboxId}`),
+       sql`, `
+     )})
      ORDER BY is_primary DESC, address`
-    )
-    .bind(...mailboxIds)
-    .all<MailboxAddressRow>();
-  for (const row of rows.results) {
+  );
+  for (const row of rows) {
     const addresses = mapped.get(row.mailbox_id) ?? [];
     addresses.push(mapMailboxAddress(row));
     mapped.set(row.mailbox_id, addresses);
@@ -61,15 +67,16 @@ export async function addressMap(
 }
 
 export async function listMailboxes(db: D1Database): Promise<Mailbox[]> {
-  const result = await db
-    .prepare("SELECT * FROM mailboxes ORDER BY is_active DESC, address ASC")
-    .all<MailboxRow>();
+  const rows = await getRows<MailboxRow>(
+    db,
+    sql`SELECT * FROM mailboxes ORDER BY is_active DESC, address ASC`
+  );
 
   const addresses = await addressMap(
     db,
-    result.results.map((row) => row.id)
+    rows.map((row) => row.id)
   );
-  return result.results.map((row) => mapMailbox(row, addresses.get(row.id)));
+  return rows.map((row) => mapMailbox(row, addresses.get(row.id)));
 }
 
 export async function listMailboxesForUser(
@@ -81,29 +88,25 @@ export async function listMailboxesForUser(
     return (await listMailboxes(db)).map((mailbox) => ({ ...mailbox, accessLevel: "manager" }));
   }
   const includeWithoutGrant = role === "admin";
-  const result = await db
-    .prepare(
-      `SELECT m.*, g.access_level FROM mailboxes m
-       LEFT JOIN mailbox_grants g ON g.mailbox_id = m.id AND g.user_id = ?
-       WHERE ? = 1 OR g.access_level IS NOT NULL
+  const rows = await getRows<MailboxRow & { access_level: MailboxAccessLevel | null }>(
+    db,
+    sql`SELECT m.*, g.access_level FROM mailboxes m
+       LEFT JOIN mailbox_grants g ON g.mailbox_id = m.id AND g.user_id = ${userId}
+       WHERE ${includeWithoutGrant ? 1 : 0} = 1 OR g.access_level IS NOT NULL
        ORDER BY m.is_active DESC, m.address ASC`
-    )
-    .bind(userId, includeWithoutGrant ? 1 : 0)
-    .all<MailboxRow & { access_level: MailboxAccessLevel | null }>();
+  );
   const addresses = await addressMap(
     db,
-    result.results.map((row) => row.id)
+    rows.map((row) => row.id)
   );
-  return result.results.map((row) => ({
+  return rows.map((row) => ({
     ...mapMailbox(row, addresses.get(row.id)),
     accessLevel: row.access_level
   }));
 }
 
 export async function countMailboxes(db: D1Database): Promise<number> {
-  const row = await db
-    .prepare("SELECT COUNT(*) AS count FROM mailboxes")
-    .first<{ count: number }>();
+  const row = await getRow<{ count: number }>(db, sql`SELECT COUNT(*) AS count FROM mailboxes`);
   return row?.count ?? 0;
 }
 
@@ -111,17 +114,16 @@ export async function findMailboxByAddress(
   db: D1Database,
   address: string
 ): Promise<Mailbox | null> {
-  const row = await db
-    .prepare(
-      `SELECT m.* FROM mailbox_addresses a
+  const normalized = address.toLowerCase();
+  const row = await getRow<MailboxRow>(
+    db,
+    sql`SELECT m.* FROM mailbox_addresses a
        JOIN mailboxes m ON m.id = a.mailbox_id
        JOIN mail_domains d ON d.id = a.mail_domain_id
-       WHERE a.address = ? AND a.receive_enabled = 1 AND d.is_enabled = 1
-       UNION SELECT * FROM mailboxes WHERE address = ?
+       WHERE a.address = ${normalized} AND a.receive_enabled = 1 AND d.is_enabled = 1
+       UNION SELECT * FROM mailboxes WHERE address = ${normalized}
        LIMIT 1`
-    )
-    .bind(address.toLowerCase(), address.toLowerCase())
-    .first<MailboxRow>();
+  );
 
   if (!row) return null;
   const addresses = await addressMap(db, [row.id]);
@@ -132,24 +134,22 @@ export async function findMailboxForSending(
   db: D1Database,
   address: string
 ): Promise<Mailbox | null> {
-  const row = await db
-    .prepare(
-      `SELECT m.* FROM mailbox_addresses a
+  const row = await getRow<MailboxRow>(
+    db,
+    sql`SELECT m.* FROM mailbox_addresses a
        JOIN mailboxes m ON m.id = a.mailbox_id
        JOIN mail_domains d ON d.id = a.mail_domain_id
-       WHERE a.address = ? AND a.send_enabled = 1 AND d.is_enabled = 1
+       WHERE a.address = ${address.toLowerCase()} AND a.send_enabled = 1 AND d.is_enabled = 1
          AND d.sending_status = 'ready'
        LIMIT 1`
-    )
-    .bind(address.toLowerCase())
-    .first<MailboxRow>();
+  );
   if (!row) return null;
   const addresses = await addressMap(db, [row.id]);
   return mapMailbox(row, addresses.get(row.id));
 }
 
 export async function findMailboxById(db: D1Database, id: string): Promise<Mailbox | null> {
-  const row = await db.prepare("SELECT * FROM mailboxes WHERE id = ?").bind(id).first<MailboxRow>();
+  const row = await getRow<MailboxRow>(db, sql`SELECT * FROM mailboxes WHERE id = ${id}`);
   if (!row) return null;
   const addresses = await addressMap(db, [row.id]);
   return mapMailbox(row, addresses.get(row.id));
@@ -164,30 +164,29 @@ export async function insertMailbox(
   const id = newId("mbx");
 
   const addressId = newId("addr");
-  await db.batch([
-    db
-      .prepare(
-        `INSERT INTO mailboxes (id, address, display_name, is_active, created_at, updated_at)
-       VALUES (?, ?, ?, 1, ?, ?)`
-      )
-      .bind(id, input.address, input.displayName, timestamp, timestamp),
-    db
-      .prepare(
-        `INSERT INTO mailbox_addresses
-       (id, mailbox_id, mail_domain_id, local_part, address, display_name,
-        receive_enabled, send_enabled, is_primary, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, 1, 1, 1, ?, ?)`
-      )
-      .bind(
-        addressId,
-        id,
-        mailDomainId,
-        input.address.split("@")[0],
-        input.address,
-        input.displayName,
-        timestamp,
-        timestamp
-      )
+  const database = createDatabase(db);
+  await database.batch([
+    database.insert(mailboxes).values({
+      id,
+      address: input.address,
+      displayName: input.displayName,
+      isActive: true,
+      createdAt: timestamp,
+      updatedAt: timestamp
+    }),
+    database.insert(mailboxAddresses).values({
+      id: addressId,
+      mailboxId: id,
+      mailDomainId,
+      localPart: input.address.split("@")[0] ?? input.address,
+      address: input.address,
+      displayName: input.displayName,
+      receiveEnabled: true,
+      sendEnabled: true,
+      isPrimary: true,
+      createdAt: timestamp,
+      updatedAt: timestamp
+    })
   ]);
 
   return {
@@ -220,25 +219,21 @@ export async function insertMailboxAddress(
 ): Promise<MailboxAddress> {
   const id = newId("addr");
   const timestamp = nowIso();
-  await db
-    .prepare(
-      `INSERT INTO mailbox_addresses
-     (id, mailbox_id, mail_domain_id, local_part, address, display_name,
-      receive_enabled, send_enabled, is_primary, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)`
-    )
-    .bind(
+  await createDatabase(db)
+    .insert(mailboxAddresses)
+    .values({
       id,
       mailboxId,
       mailDomainId,
-      input.address.split("@")[0],
-      input.address,
-      input.displayName,
-      input.receiveEnabled === false ? 0 : 1,
-      input.sendEnabled === false ? 0 : 1,
-      timestamp,
-      timestamp
-    )
+      localPart: input.address.split("@")[0] ?? input.address,
+      address: input.address,
+      displayName: input.displayName,
+      receiveEnabled: input.receiveEnabled !== false,
+      sendEnabled: input.sendEnabled !== false,
+      isPrimary: false,
+      createdAt: timestamp,
+      updatedAt: timestamp
+    })
     .run();
   return {
     id,
@@ -257,9 +252,15 @@ export async function deleteMailboxAddress(
   mailboxId: string,
   addressId: string
 ): Promise<boolean> {
-  const result = await db
-    .prepare("DELETE FROM mailbox_addresses WHERE id = ? AND mailbox_id = ? AND is_primary = 0")
-    .bind(addressId, mailboxId)
+  const result = await createDatabase(db)
+    .delete(mailboxAddresses)
+    .where(
+      and(
+        eq(mailboxAddresses.id, addressId),
+        eq(mailboxAddresses.mailboxId, mailboxId),
+        eq(mailboxAddresses.isPrimary, false)
+      )
+    )
     .run();
   return (result.meta.changes ?? 0) > 0;
 }
@@ -278,13 +279,10 @@ export async function updateMailbox(
   const nextIsActive = input.isActive ?? current.isActive;
   const timestamp = nowIso();
 
-  await db
-    .prepare(
-      `UPDATE mailboxes
-       SET display_name = ?, is_active = ?, updated_at = ?
-       WHERE id = ?`
-    )
-    .bind(nextDisplayName, nextIsActive ? 1 : 0, timestamp, id)
+  await createDatabase(db)
+    .update(mailboxes)
+    .set({ displayName: nextDisplayName, isActive: nextIsActive, updatedAt: timestamp })
+    .where(eq(mailboxes.id, id))
     .run();
 
   return {

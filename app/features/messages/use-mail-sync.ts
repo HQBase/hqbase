@@ -212,7 +212,9 @@ export function useMailSync({ activeFolder, mailboxId, search, userId }: MailSyn
       if (affected === 0) return;
       const removesConversation =
         action === "archive" ||
+        action === "unarchive" ||
         action === "trash" ||
+        action === "restore" ||
         (activeFolder === "starred" && action === "unstar");
       if (removesConversation) {
         setTotalCount((current) => (current === null ? null : Math.max(0, current - 1)));

@@ -239,15 +239,18 @@ jobs:
       - name: Wait for the signed candidate
         run: |
           for attempt in $(seq 1 150); do
-            if curl --fail --silent --show-error \
+            if candidate_health="$(curl --fail --silent --show-error \
               -H "CF-Access-Client-Id: $HQBASE_STAGING_ACCESS_CLIENT_ID" \
               -H "CF-Access-Client-Secret: $HQBASE_STAGING_ACCESS_CLIENT_SECRET" \
-              "$HQBASE_STAGING_URL/api/health" >/dev/null; then
+              "$HQBASE_STAGING_URL/api/health?candidate=$CANDIDATE_VERSION&attempt=$attempt")" && \
+              jq -e --arg version "$CANDIDATE_VERSION" \
+                '.ok == true and .service == "hqbase" and .version == $version' \
+                <<<"$candidate_health" >/dev/null; then
               exit 0
             fi
             sleep 2
           done
-          echo "Signed HQBase candidate was not healthy within 300 seconds"
+          echo "Signed HQBase candidate was not active within 300 seconds"
           exit 1
       - name: Verify the installed candidate release marker
         run: |

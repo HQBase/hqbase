@@ -20,6 +20,8 @@ export const settingsTabs = [
   "users",
   "domains",
   "notifications",
+  "interface",
+  "mcp",
   "updates",
   "debug"
 ] as const;
@@ -60,10 +62,28 @@ export function readAppRoute(input: string | URL): AppRoute {
     return { kind: "settings", tab: tab ?? "mailboxes" };
   }
 
+  // Drafts canonical: /mail/drafts[/draftId], legacy: /drafts[/draftId]
   if (segments[0] === draftFolder.path) {
     return {
       kind: "drafts",
       draftId: segments[1] ? decodePathSegment(segments[1]) : null
+    };
+  }
+
+  // New canonical: /mail/<folder>[/messageId], legacy: /<folder>[/messageId] (redirect handled via appRoutePath)
+  if (segments[0] === "mail") {
+    if (segments[1] === draftFolder.path) {
+      return {
+        kind: "drafts",
+        draftId: segments[2] ? decodePathSegment(segments[2]) : null
+      };
+    }
+    const folder = readMailFolder(segments[1]);
+    if (!folder) return { kind: "mail", folder: "inbox", messageId: null };
+    return {
+      kind: "mail",
+      folder,
+      messageId: segments[2] ? decodePathSegment(segments[2]) : null
     };
   }
 
@@ -80,11 +100,11 @@ export function readAppRoute(input: string | URL): AppRoute {
 export function appRoutePath(route: AppRoute): string {
   if (route.kind === "settings") return `/settings/${route.tab}`;
   if (route.kind === "drafts") {
-    const base = `/${draftFolder.path}`;
+    const base = `/mail/${draftFolder.path}`;
     return route.draftId ? `${base}/${encodeURIComponent(route.draftId)}` : base;
   }
   const folder = mailFolders.find((item) => item.id === route.folder);
-  const base = `/${folder?.path ?? "inbox"}`;
+  const base = `/mail/${folder?.path ?? "inbox"}`;
   return route.messageId ? `${base}/${encodeURIComponent(route.messageId)}` : base;
 }
 

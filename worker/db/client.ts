@@ -1,6 +1,9 @@
+import { eq } from "drizzle-orm";
 import type { z } from "zod";
 
 import { AppError } from "../lib/errors";
+import { createDatabase } from "./drizzle";
+import { appSettings } from "./schema";
 
 export function nowIso(): string {
   return new Date().toISOString();
@@ -27,26 +30,37 @@ export async function getSetting<T>(
   key: string,
   schema: z.ZodType<T>
 ): Promise<T | null> {
-  const row = await db
-    .prepare("SELECT value_json FROM app_settings WHERE key = ?")
-    .bind(key)
-    .first<{ value_json: string }>();
+  const database = createDatabase(db);
+  const row = await database
+    .select({ value: appSettings.value })
+    .from(appSettings)
+    .where(eq(appSettings.key, key))
+    .get();
 
   if (!row) {
     return null;
   }
 
-  return schema.parse(JSON.parse(row.value_json));
+  return schema.parse(row.value);
 }
 
 export async function setSetting(db: D1Database, key: string, value: unknown): Promise<void> {
   const timestamp = nowIso();
-  await db
-    .prepare(
-      `INSERT INTO app_settings (key, value_json, created_at, updated_at)
-       VALUES (?, ?, ?, ?)
-       ON CONFLICT(key) DO UPDATE SET value_json = excluded.value_json, updated_at = excluded.updated_at`
-    )
-    .bind(key, JSON.stringify(value), timestamp, timestamp)
+  const database = createDatabase(db);
+  await database
+    .insert(appSettings)
+    .values({
+      key,
+      value,
+      createdAt: timestamp,
+      updatedAt: timestamp
+    })
+    .onConflictDoUpdate({
+      target: appSettings.key,
+      set: {
+        value,
+        updatedAt: timestamp
+      }
+    })
     .run();
 }

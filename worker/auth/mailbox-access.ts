@@ -1,3 +1,7 @@
+import { and, eq, inArray, sql } from "drizzle-orm";
+
+import { createDatabase, getRow } from "../db/drizzle";
+import { mailboxes, mailboxGrants } from "../db/schema";
 import { AppError } from "../lib/errors";
 import type { WorkspaceRole } from "../lib/validation";
 
@@ -5,6 +9,57 @@ export const mailboxAccessLevels = ["read", "agent", "manager"] as const;
 export type MailboxAccessLevel = (typeof mailboxAccessLevels)[number];
 
 const rank: Record<MailboxAccessLevel, number> = { read: 1, agent: 2, manager: 3 };
+
+/** Unassigned messages have no mailbox grant, so only workspace owners can access them. */
+export function canAccessUnassignedMail(role: WorkspaceRole): boolean {
+  return role === "owner";
+}
+
+export type MessageScope = {
+  includeUnassigned: boolean;
+  mailboxIds: string[];
+};
+
+/**
+ * Builds one message-visibility predicate for mailbox grants and owner-only unassigned mail.
+ * The stored marker is separate from `mailbox_id` because a deleted mailbox also sets that column
+ * to null. Returns null when the scope selects nothing.
+ */
+export function messageScopeSql(
+  scope: MessageScope,
+  mailboxColumn: string,
+  unassignedColumn: string
+): { params: string[]; sql: string } | null {
+  const clauses: string[] = [];
+  if (scope.mailboxIds.length > 0) {
+    clauses.push(`${mailboxColumn} IN (${scope.mailboxIds.map(() => "?").join(", ")})`);
+  }
+  if (scope.includeUnassigned) {
+    clauses.push(`${unassignedColumn} = 1`);
+  }
+  if (clauses.length === 0) return null;
+  return { params: [...scope.mailboxIds], sql: `(${clauses.join(" OR ")})` };
+}
+
+export function messageScopeCondition(
+  scope: MessageScope,
+  mailboxColumn: string,
+  unassignedColumn: string
+) {
+  const clauses = [];
+  if (scope.mailboxIds.length > 0) {
+    clauses.push(
+      sql`${sql.raw(mailboxColumn)} IN (${sql.join(
+        scope.mailboxIds.map((mailboxId) => sql`${mailboxId}`),
+        sql`, `
+      )})`
+    );
+  }
+  if (scope.includeUnassigned) {
+    clauses.push(sql`${sql.raw(unassignedColumn)} = 1`);
+  }
+  return clauses.length > 0 ? sql`(${sql.join(clauses, sql` OR `)})` : null;
+}
 
 export function accessAllows(
   actual: MailboxAccessLevel | null,
@@ -20,14 +75,14 @@ export async function mailboxAccess(
   mailboxId: string
 ): Promise<MailboxAccessLevel | null> {
   if (role === "owner") return "manager";
-  const row = await db
-    .prepare(
-      `SELECT g.access_level FROM mailbox_grants g
+  const row = await getRow<{ access_level: MailboxAccessLevel }>(
+    db,
+    sql`SELECT g.access_level FROM mailbox_grants g
        JOIN "user" u ON u.id = g.user_id
-       WHERE g.mailbox_id = ? AND g.user_id = ? AND COALESCE(u.banned, 0) = 0`
-    )
-    .bind(mailboxId, userId)
-    .first<{ access_level: MailboxAccessLevel }>();
+       WHERE g.mailbox_id = ${mailboxId}
+         AND g.user_id = ${userId}
+         AND COALESCE(u.banned, 0) = 0`
+  );
   return row?.access_level ?? null;
 }
 
@@ -35,10 +90,10 @@ export async function requireMailboxAccess(
   db: D1Database,
   userId: string,
   role: WorkspaceRole,
-  mailboxId: string | null,
+  mailboxId: string,
   required: MailboxAccessLevel
 ): Promise<MailboxAccessLevel> {
-  const actual = mailboxId ? await mailboxAccess(db, userId, role, mailboxId) : null;
+  const actual = await mailboxAccess(db, userId, role, mailboxId);
   if (!accessAllows(actual, required)) {
     throw new AppError("MAILBOX_FORBIDDEN", "You do not have access to this mailbox.", 403);
   }
@@ -51,18 +106,27 @@ export async function accessibleMailboxIds(
   role: WorkspaceRole,
   required: MailboxAccessLevel
 ): Promise<string[]> {
+  const database = createDatabase(db);
   if (role === "owner") {
-    const result = await db.prepare("SELECT id FROM mailboxes").all<{ id: string }>();
-    return result.results.map((row) => row.id);
+    const rows = await database.select({ id: mailboxes.id }).from(mailboxes);
+    return rows.map((row) => row.id);
   }
   const allowed = mailboxAccessLevels.filter((level) => rank[level] >= rank[required]);
-  const placeholders = allowed.map(() => "?").join(", ");
-  const result = await db
-    .prepare(
-      `SELECT mailbox_id FROM mailbox_grants
-       WHERE user_id = ? AND access_level IN (${placeholders})`
-    )
-    .bind(userId, ...allowed)
-    .all<{ mailbox_id: string }>();
-  return result.results.map((row) => row.mailbox_id);
+  const rows = await database
+    .select({ mailboxId: mailboxGrants.mailboxId })
+    .from(mailboxGrants)
+    .where(and(eq(mailboxGrants.userId, userId), inArray(mailboxGrants.accessLevel, allowed)));
+  return rows.map((row) => row.mailboxId);
+}
+
+export async function accessibleMessageScope(
+  db: D1Database,
+  userId: string,
+  role: WorkspaceRole,
+  required: MailboxAccessLevel
+): Promise<MessageScope> {
+  return {
+    includeUnassigned: canAccessUnassignedMail(role),
+    mailboxIds: await accessibleMailboxIds(db, userId, role, required)
+  };
 }

@@ -16,14 +16,17 @@ export function reset(flags) {
   }
 
   const manifest = loadManifest(name);
+  const environment = manifest.accountId
+    ? { CLOUDFLARE_ACCOUNT_ID: manifest.accountId }
+    : undefined;
   if (scope === "data" || scope === "all") {
-    resetData(manifest, { dryRun });
+    resetData(manifest, { dryRun, env: environment });
   }
   if (scope === "storage" || scope === "all") {
-    resetStorage(manifest, { dryRun });
+    resetStorage(manifest, { dryRun, env: environment });
   }
   if (scope === "domain" || scope === "all") {
-    resetDomain(manifest, { dryRun });
+    resetDomain(manifest, { dryRun, env: environment });
   }
 
   writeManifest(manifest, { dryRun });

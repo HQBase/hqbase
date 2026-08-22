@@ -53,6 +53,8 @@ jobs:
           restore-keys: ${{ runner.os }}-${{ runner.arch }}-playwright-
       - run: pnpm install --frozen-lockfile
       - run: pnpm exec playwright install --with-deps chromium
+      - name: Verify resumable operator provisioning and cleanup
+        run: node scripts/test-cli-recovery.mjs "recovery-${{ github.run_id }}"
       - name: Create disposable customer resources
         run: >-
           pnpm hqbase install
@@ -66,6 +68,37 @@ jobs:
           --oauth-client-id "$HQBASE_STAGING_OAUTH_CLIENT_ID"
           --skip-build
           --skip-deploy
+      - name: Verify populated SQL migration upgrade and retry
+        run: |
+          config=".hqbase/deployments/$DEPLOYMENT_NAME/wrangler.jsonc"
+          legacy_dir=".hqbase/deployments/$DEPLOYMENT_NAME/migrations-before-0014"
+          mkdir -p "$legacy_dir"
+          for migration in migrations/00*.sql; do
+            if [[ "$(basename "$migration")" != "0014_unassigned_messages.sql" ]]; then
+              cp "$migration" "$legacy_dir/"
+            fi
+          done
+          set_migrations_dir() {
+            jq --arg directory "$1" \
+              '.d1_databases[0].migrations_dir = $directory | del(.d1_databases[0].migrations_pattern)' \
+              "$config" > "$config.tmp"
+            mv "$config.tmp" "$config"
+          }
+
+          set_migrations_dir "migrations-before-0014"
+          pnpm exec wrangler d1 migrations apply DB --remote --config "$config"
+          pnpm exec wrangler d1 execute DB --remote --config "$config" \
+            --command "INSERT INTO app_settings (key, value_json, created_at, updated_at) VALUES ('sql-upgrade-probe', '{\"state\":\"preserved\"}', datetime('now'), datetime('now'))"
+          pnpm exec wrangler d1 execute DB --remote --config "$config" \
+            --command "INSERT INTO threads (id, subject_normalized, last_message_at, created_at, updated_at) VALUES ('thr_sql_upgrade', 'sql upgrade', datetime('now'), datetime('now'), datetime('now'))"
+          pnpm exec wrangler d1 execute DB --remote --config "$config" \
+            --command "INSERT INTO messages (id, thread_id, mailbox_id, direction, folder, from_address, to_json, cc_json, bcc_json, subject, snippet, text_body, references_json, created_at, updated_at) VALUES ('msg_sql_upgrade', 'thr_sql_upgrade', NULL, 'inbound', 'catchall', 'sender@example.com', '[]', '[]', '[]', 'SQL upgrade', 'SQL upgrade', 'SQL upgrade', '[]', datetime('now'), datetime('now'))"
+          set_migrations_dir "../../../migrations"
+          pnpm exec wrangler d1 migrations apply DB --remote --config "$config"
+          pnpm exec wrangler d1 migrations apply DB --remote --config "$config"
+          result=$(pnpm exec wrangler d1 execute DB --remote --config "$config" --json \
+            --command "SELECT (SELECT value_json FROM app_settings WHERE key = 'sql-upgrade-probe') AS value_json, (SELECT is_unassigned FROM messages WHERE id = 'msg_sql_upgrade') AS is_unassigned, (SELECT is_unassigned FROM message_changes WHERE message_id = 'msg_sql_upgrade' LIMIT 1) AS change_is_unassigned, (SELECT COUNT(*) FROM d1_migrations) AS migration_count")
+          jq -e '.[0].results[0] == {"value_json":"{\"state\":\"preserved\"}","is_unassigned":1,"change_is_unassigned":1,"migration_count":14}' <<<"$result"
       - name: Deploy reviewed source candidate
         run: |
           config=".hqbase/deployments/$DEPLOYMENT_NAME/wrangler.jsonc"
@@ -85,6 +118,16 @@ jobs:
           pnpm build
           pnpm exec wrangler d1 migrations apply DB --remote --config "$config"
           pnpm exec wrangler deploy --config "$config" --secrets-file /tmp/hqbase-e2e-secrets.json
+          node --input-type=module -e '
+            import {
+              configPath,
+              recordWorkerDeployedForConfig
+            } from "./scripts/hqbase/manifest.mjs";
+            recordWorkerDeployedForConfig(
+              configPath(process.env.DEPLOYMENT_NAME),
+              "hqbase-e2e-staging"
+            );
+          '
       - name: Wait for the disposable custom domain
         run: |
           readiness_paths=(

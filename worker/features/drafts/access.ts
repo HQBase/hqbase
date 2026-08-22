@@ -4,7 +4,7 @@ import { AppError } from "../../lib/errors";
 import type { WorkspaceRole } from "../../lib/validation";
 import { listMailboxesForUser } from "../mailboxes/queries";
 import type { Mailbox } from "../mailboxes/types";
-import { getMessageMailboxId } from "../messages/queries";
+import { requireMessageAccess } from "../messages/access";
 
 import { draftIdsForAttachmentIds, getDraft, listDrafts } from "./queries";
 import type { Draft } from "./types";
@@ -91,12 +91,6 @@ export async function requireDraftAccess(
   }
   for (const messageId of [draft.replyToMessageId, draft.forwardOfMessageId]) {
     if (!messageId) continue;
-    await requireMailboxAccess(
-      env.DB,
-      principal.userId,
-      principal.role,
-      await getMessageMailboxId(env.DB, messageId),
-      "agent"
-    );
+    await requireMessageAccess(env.DB, principal.userId, principal.role, messageId, "agent");
   }
 }

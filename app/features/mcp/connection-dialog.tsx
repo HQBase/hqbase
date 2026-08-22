@@ -1,34 +1,55 @@
-import { Check, Copy, Send, ShieldCheck } from "lucide-react";
 import * as React from "react";
+import { PiCheck, PiCopy, PiPaperPlaneTilt, PiShieldCheck } from "react-icons/pi";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import type { CurrentUser } from "@/features/auth/types";
 
 export function McpConnectionDetails({
   fullEndpoint,
   fullEndpointId,
   readOnlyEndpoint,
-  readOnlyEndpointId
+  readOnlyEndpointId,
+  showIdentity = true,
+  user
 }: {
   fullEndpoint: string;
   fullEndpointId: string;
   readOnlyEndpoint: string;
   readOnlyEndpointId: string;
+  showIdentity?: boolean;
+  user: CurrentUser;
 }): React.ReactElement {
   return (
     <div className="flex flex-col gap-3 text-sm">
+      {showIdentity ? (
+        <section className="rounded-lg border bg-muted/30 px-3 py-2.5">
+          <p className="text-xs font-medium text-muted-foreground">Connecting as</p>
+          <div className="flex flex-wrap items-baseline gap-x-2">
+            <p className="font-medium">{user.name}</p>
+            <p className="text-xs text-muted-foreground">
+              {user.email} · {user.role}
+            </p>
+          </div>
+          <p className="mt-1 text-xs leading-4 text-muted-foreground">
+            After consent, HQBase rechecks this user&apos;s current workspace role and live mailbox
+            grants.
+          </p>
+        </section>
+      ) : null}
+
       <Tabs defaultValue="read-only">
         <div className="flex flex-col gap-1.5">
           <p className="text-xs font-medium text-muted-foreground">Server profile</p>
           <TabsList
             aria-label="Server profile"
-            className="grid h-9 w-full grid-cols-2 rounded-full"
+            className="inline-flex h-8 w-fit gap-1 rounded-full p-1"
           >
-            <TabsTrigger className="rounded-full px-2 text-xs" value="read-only">
+            <TabsTrigger className="h-6 min-h-0 rounded-full px-3 text-xs" value="read-only">
               Read only
             </TabsTrigger>
-            <TabsTrigger className="rounded-full px-2 text-xs" value="mail-actions">
+            <TabsTrigger className="h-6 min-h-0 rounded-full px-3 text-xs" value="mail-actions">
               Mail actions
             </TabsTrigger>
           </TabsList>
@@ -39,7 +60,7 @@ export function McpConnectionDetails({
             description="Search and read allowed mail without changing it."
             endpoint={readOnlyEndpoint}
             endpointId={readOnlyEndpointId}
-            icon={<ShieldCheck aria-hidden="true" className="size-4" />}
+            icon={<PiShieldCheck aria-hidden="true" className="pointer-events-none size-4" />}
             permissions="Mailboxes, conversations, messages, threads, and attachments"
             title="Read only"
           />
@@ -49,8 +70,8 @@ export function McpConnectionDetails({
             description="Read mail, manage its state, work with drafts, and send."
             endpoint={fullEndpoint}
             endpointId={fullEndpointId}
-            icon={<Send aria-hidden="true" className="size-4" />}
-            permissions="Archive and trash actions, drafts, send, reply, and forward"
+            icon={<PiPaperPlaneTilt aria-hidden="true" className="pointer-events-none size-4" />}
+            permissions="Archive, unarchive, trash, and restore actions, drafts, send, reply, and forward"
             title="Read, manage & send"
           />
         </TabsContent>
@@ -128,9 +149,9 @@ function McpEndpointOption({
           variant="outline"
         >
           {copied ? (
-            <Check aria-hidden="true" data-icon="inline-start" />
+            <PiCheck aria-hidden="true" className="pointer-events-none" data-icon="inline-start" />
           ) : (
-            <Copy aria-hidden="true" data-icon="inline-start" />
+            <PiCopy aria-hidden="true" className="pointer-events-none" data-icon="inline-start" />
           )}
           {copied ? "Copied" : "Copy"}
         </Button>

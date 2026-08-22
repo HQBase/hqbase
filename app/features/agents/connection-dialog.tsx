@@ -1,79 +1,11 @@
-import { Check, Copy, Download, FileText, Sparkles } from "lucide-react";
 import * as React from "react";
+import { PiCheck, PiCopy, PiDownload, PiFileText } from "react-icons/pi";
 
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle
-} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { CurrentUser } from "@/features/auth/types";
 import { McpConnectionDetails } from "@/features/mcp/connection-dialog";
-
-type AgentConnectionDialogProps = {
-  open: boolean;
-  restoreFocusRef: React.RefObject<HTMLButtonElement | null>;
-  user: CurrentUser;
-  onOpenChange: (open: boolean) => void;
-};
-
-export function AgentConnectionDialog({
-  open,
-  restoreFocusRef,
-  user,
-  onOpenChange
-}: AgentConnectionDialogProps): React.ReactElement {
-  const [readOnlyEndpoint, setReadOnlyEndpoint] = React.useState("/mcp");
-  const [fullEndpoint, setFullEndpoint] = React.useState("/mcp/full");
-  const [skillUrl, setSkillUrl] = React.useState("/skills/hqbase-mail/SKILL.md");
-  const readOnlyEndpointId = React.useId();
-  const fullEndpointId = React.useId();
-  const skillUrlId = React.useId();
-
-  React.useEffect(() => {
-    setReadOnlyEndpoint(new URL("/mcp", window.location.origin).toString());
-    setFullEndpoint(new URL("/mcp/full", window.location.origin).toString());
-    setSkillUrl(new URL("/skills/hqbase-mail/SKILL.md", window.location.origin).toString());
-  }, []);
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent
-        className="top-[calc(env(safe-area-inset-top)+(100dvh-env(safe-area-inset-top)-env(safe-area-inset-bottom))/2)] max-h-[calc(100dvh-env(safe-area-inset-top)-env(safe-area-inset-bottom)-1rem)] w-[min(92vw,560px)] gap-3 overflow-y-auto overscroll-contain p-4 sm:top-1/2 sm:max-h-[calc(100dvh-2rem)] sm:gap-4 sm:p-5"
-        onCloseAutoFocus={(event) => {
-          event.preventDefault();
-          restoreFocusRef.current?.focus();
-        }}
-      >
-        <DialogHeader>
-          <div className="flex items-center gap-2">
-            <span className="inline-flex size-8 items-center justify-center rounded-md border bg-muted/50 text-muted-foreground">
-              <Sparkles aria-hidden="true" className="size-4" />
-            </span>
-            <DialogTitle>Connect AI agent</DialogTitle>
-          </div>
-          <DialogDescription>
-            Connect through MCP or install this deployment&apos;s Agent Skill.
-          </DialogDescription>
-        </DialogHeader>
-
-        <AgentConnectionDetails
-          fullEndpoint={fullEndpoint}
-          fullEndpointId={fullEndpointId}
-          skillUrl={skillUrl}
-          skillUrlId={skillUrlId}
-          readOnlyEndpoint={readOnlyEndpoint}
-          readOnlyEndpointId={readOnlyEndpointId}
-          user={user}
-        />
-      </DialogContent>
-    </Dialog>
-  );
-}
 
 export function AgentConnectionDetails({
   fullEndpoint,
@@ -101,10 +33,10 @@ export function AgentConnectionDetails({
           aria-label="Connection method"
           className="grid h-9 w-full grid-cols-2 rounded-full"
         >
-          <TabsTrigger className="rounded-full px-2 text-xs" value="mcp">
+          <TabsTrigger className="h-7 min-h-0 rounded-full px-2 text-xs" value="mcp">
             MCP
           </TabsTrigger>
-          <TabsTrigger className="rounded-full px-2 text-xs" value="agent-skill">
+          <TabsTrigger className="h-7 min-h-0 rounded-full px-2 text-xs" value="agent-skill">
             Agent Skill
           </TabsTrigger>
         </TabsList>
@@ -115,6 +47,8 @@ export function AgentConnectionDetails({
             fullEndpointId={fullEndpointId}
             readOnlyEndpoint={readOnlyEndpoint}
             readOnlyEndpointId={readOnlyEndpointId}
+            showIdentity={false}
+            user={user}
           />
         </TabsContent>
         <TabsContent className="mt-3" value="agent-skill">
@@ -148,7 +82,7 @@ export function AgentSkillDetails({
       <section className="flex flex-col gap-3 rounded-lg border bg-muted/20 p-3">
         <div className="flex items-start gap-3">
           <span className="mt-0.5 inline-flex size-8 shrink-0 items-center justify-center rounded-md border bg-background text-muted-foreground">
-            <FileText aria-hidden="true" className="size-4" />
+            <PiFileText aria-hidden="true" className="size-4" />
           </span>
           <div className="min-w-0">
             <p className="font-medium text-foreground">Deployment-local Agent Skill</p>
@@ -178,15 +112,15 @@ export function AgentSkillDetails({
               variant="outline"
             >
               {copied ? (
-                <Check aria-hidden="true" data-icon="inline-start" />
+                <PiCheck aria-hidden="true" data-icon="inline-start" />
               ) : (
-                <Copy aria-hidden="true" data-icon="inline-start" />
+                <PiCopy aria-hidden="true" data-icon="inline-start" />
               )}
               {copied ? "Copied" : "Copy URL"}
             </Button>
             <Button asChild size="sm" variant="outline">
               <a download="SKILL.md" href={skillUrl}>
-                <Download aria-hidden="true" data-icon="inline-start" />
+                <PiDownload aria-hidden="true" data-icon="inline-start" />
                 Download Skill
               </a>
             </Button>

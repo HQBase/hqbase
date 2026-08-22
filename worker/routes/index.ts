@@ -94,6 +94,21 @@ apiRoutes.all("/api/auth/*", async (c) => {
     );
   }
 
+  // better-auth's admin plugin exposes owner-equivalent operations (set-role,
+  // set-user-password, ban-user, remove-user, impersonate-user, ...) under
+  // this prefix, gated only by the coarse "admin" ac role, which adminRole
+  // intentionally shares with ownerRole (see worker/auth/access.ts). The
+  // app-level owner-only checks (OWNER_REQUIRED, LAST_OWNER) live only in
+  // worker/features/users/routes.ts, so this raw surface must never be
+  // reachable directly: an admin-role user could otherwise call
+  // /api/auth/admin/set-role to promote themselves to owner. The app's own
+  // admin flows (create-user, set-user-password) call auth.handler()
+  // in-process via worker/auth/user-actions.ts and never traverse this HTTP
+  // route, so blocking it here does not affect them.
+  if (pathname.startsWith("/api/auth/admin/")) {
+    return c.json(errorBody("FORBIDDEN", "This endpoint is not available directly."), 403);
+  }
+
   if (pathname === "/api/auth/sign-in/email" && c.req.method === "POST") {
     const body: { email?: unknown } = await c.req.raw
       .clone()

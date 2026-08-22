@@ -1,17 +1,26 @@
 import { describe, expect, it } from "vitest";
 
-import { destroyPlan, destroyTargets } from "../../../scripts/hqbase/destroy.mjs";
+import { destroyPlan, destroyResources, destroyTargets } from "../../../scripts/hqbase/destroy.mjs";
+import { configPath, recordWorkerDeployedForConfig } from "../../../scripts/hqbase/manifest.mjs";
 
 const scopes = ["worker", "data", "storage", "state", "domain", "all"];
 
-function manifest({ reused = false } = {}) {
+function manifest({ ownership = "created" } = {}) {
   return {
-    version: 1,
+    version: 3,
     name: "qa",
-    worker: { name: "hqbase-qa" },
-    d1: { name: "hqbase-data", reused },
-    r2: { bucket: "hqbase-mail", reused },
-    queue: { name: "hqbase-jobs", deadLetterName: "hqbase-jobs-dlq" },
+    accountId: "a".repeat(32),
+    worker: { name: "hqbase-qa", deployed: true },
+    d1: {
+      name: "hqbase-data",
+      id: "11111111-1111-4111-8111-111111111111",
+      ownership
+    },
+    r2: { bucket: "hqbase-mail", ownership },
+    queue: {
+      primary: { name: "hqbase-jobs", id: "1".repeat(32), ownership },
+      deadLetter: { name: "hqbase-jobs-dlq", id: "2".repeat(32), ownership }
+    },
     email: null
   };
 }
@@ -41,75 +50,207 @@ describe("operator destroy scopes", () => {
     expect(() => destroyTargets("ephemeral")).toThrowError(/Unknown destroy scope/);
   });
 
-  it.each(scopes)("honors the %s scope for fresh resources", (scope) => {
+  it.each(scopes)("honors the %s scope for created resources", (scope) => {
     const targets = destroyTargets(scope);
+    const plan = destroyPlan(scope, manifest());
 
-    expect(destroyPlan(scope, manifest())).toEqual({
+    expect(plan).toMatchObject({
       ...targets,
-      preserved: { data: false, storage: false }
-    });
-  });
-
-  it.each(scopes)("preserves externally owned D1 and R2 for the %s scope", (scope) => {
-    const targets = destroyTargets(scope);
-
-    expect(destroyPlan(scope, manifest({ reused: true }))).toEqual({
-      ...targets,
-      data: false,
-      storage: false,
+      worker: targets.worker,
+      data: targets.data,
+      storage: targets.storage,
+      queueResources: { primary: targets.queues, deadLetter: targets.queues },
       preserved: {
-        data: targets.data,
-        storage: targets.storage
+        data: false,
+        storage: false,
+        primaryQueue: false,
+        deadLetterQueue: false
       }
     });
   });
 
-  it("fails closed on a legacy manifest without ownership flags", () => {
-    expect(() =>
-      destroyPlan("all", {
-        version: 1,
-        d1: { name: "external-data" },
-        r2: { bucket: "external-mail", reused: true }
-      })
-    ).toThrowError(/"d1\.reused".*Migrate or repair/);
-  });
+  it.each(scopes)("preserves every reused resource for the %s scope", (scope) => {
+    const targets = destroyTargets(scope);
+    const plan = destroyPlan(scope, manifest({ ownership: "reused" }));
 
-  it("fails closed on an unsupported manifest version", () => {
-    expect(() => destroyPlan("worker", { ...manifest(), version: 0 })).toThrowError(
-      /"version".*Migrate or repair/
-    );
-  });
-
-  it("fails closed on non-boolean ownership metadata", () => {
-    expect(() =>
-      destroyPlan("all", {
-        ...manifest(),
-        r2: { bucket: "external-mail", reused: "true" }
-      })
-    ).toThrowError(/"r2\.reused".*explicit boolean/);
-  });
-
-  it.each([
-    { d1Reused: true, r2Reused: false, data: false, storage: true },
-    { d1Reused: false, r2Reused: true, data: true, storage: false }
-  ])("honors independent D1 and R2 ownership flags", ({ d1Reused, r2Reused, data, storage }) => {
-    const input = manifest();
-    input.d1.reused = d1Reused;
-    input.r2.reused = r2Reused;
-
-    expect(destroyPlan("state", input)).toMatchObject({
-      data,
-      storage,
-      preserved: { data: d1Reused, storage: r2Reused }
+    expect(plan).toMatchObject({
+      data: false,
+      storage: false,
+      queueResources: { primary: false, deadLetter: false },
+      preserved: {
+        data: targets.data,
+        storage: targets.storage,
+        primaryQueue: targets.queues,
+        deadLetterQueue: targets.queues
+      }
     });
   });
 
-  it("fails before mutation when a selected resource name is ambiguous", () => {
+  it("skips resources already removed by a partial cleanup", () => {
     const input = manifest();
-    input.queue.deadLetterName = "";
+    input.d1.ownership = "removed";
+    input.queue.primary.ownership = "removed";
 
-    expect(() => destroyPlan("state", input)).toThrowError(
-      /"queue\.deadLetterName".*Migrate or repair/
+    expect(destroyPlan("state", input)).toMatchObject({
+      data: false,
+      storage: true,
+      queueResources: { primary: false, deadLetter: true }
+    });
+  });
+
+  it("does not delete a Worker that was never recorded as deployed", () => {
+    const input = manifest();
+    input.worker.deployed = false;
+
+    expect(destroyPlan("worker", input).worker).toBe(false);
+  });
+
+  it("fails closed on a legacy manifest before planning a mutation", () => {
+    expect(() => destroyPlan("all", { ...manifest(), version: 2 })).toThrowError(
+      /version.*must be 3/
     );
+  });
+
+  it("fails closed on a placeholder D1 UUID", () => {
+    const input = manifest();
+    input.d1.id = "00000000-0000-0000-0000-000000000000";
+
+    expect(() => destroyPlan("data", input)).toThrowError(/real D1 database UUID/);
+  });
+
+  it("fails before mutation when queue ownership is ambiguous", () => {
+    const input = manifest();
+    input.queue.deadLetter.ownership = "creating";
+    input.queue.deadLetter.id = null;
+
+    expect(() => destroyPlan("state", input)).toThrowError(/ambiguous result/);
+  });
+
+  it("deletes D1 by its real UUID and checkpoints each independent resource", () => {
+    const input = manifest();
+    input.worker.deployed = false;
+    const commands = [];
+    const checkpoints = [];
+
+    destroyResources("state", input, {
+      checkpoint: (next) => checkpoints.push(structuredClone(next)),
+      runCommand: (_command, args) => {
+        commands.push(args.slice(2));
+        return "";
+      }
+    });
+
+    expect(commands).toContainEqual([
+      "d1",
+      "delete",
+      "11111111-1111-4111-8111-111111111111",
+      "--skip-confirmation"
+    ]);
+    expect(commands).not.toContainEqual(["d1", "delete", "hqbase-data", "--skip-confirmation"]);
+    expect(checkpoints).toHaveLength(4);
+    expect(checkpoints.at(-1)).toMatchObject({
+      d1: { ownership: "removed" },
+      r2: { ownership: "removed" },
+      queue: {
+        primary: { ownership: "removed" },
+        deadLetter: { ownership: "removed" }
+      }
+    });
+  });
+
+  it("detaches the queue consumer before deleting the Worker", () => {
+    const commands = [];
+
+    destroyResources("all", manifest(), {
+      checkpoint: () => {},
+      runCommand: (_command, args) => {
+        commands.push(args.slice(2));
+        return "";
+      }
+    });
+
+    const detach = commands.findIndex(
+      (args) => args.join(" ") === "queues consumer worker remove hqbase-jobs hqbase-qa"
+    );
+    const removeWorker = commands.findIndex(
+      (args) => args.join(" ") === "delete hqbase-qa --force"
+    );
+    expect(detach).toBeGreaterThanOrEqual(0);
+    expect(removeWorker).toBeGreaterThan(detach);
+  });
+
+  it("records a direct signed deploy before deleting its bound queues", () => {
+    const input = manifest();
+    input.worker.deployed = false;
+    const checkpoints = [];
+
+    recordWorkerDeployedForConfig(configPath(input.name), input.worker.name, {
+      loadManifest: () => input,
+      writeManifest: (next) => checkpoints.push(structuredClone(next))
+    });
+
+    const commands = [];
+    destroyResources("all", input, {
+      checkpoint: () => {},
+      runCommand: (_command, args) => {
+        commands.push(args.slice(2));
+        return "";
+      }
+    });
+
+    const removeWorker = commands.findIndex(
+      (args) => args.join(" ") === "delete hqbase-qa --force"
+    );
+    const removeQueue = commands.findIndex(
+      (args) => args.join(" ") === "queues delete hqbase-jobs"
+    );
+    expect(checkpoints).toHaveLength(1);
+    expect(checkpoints[0].worker.deployed).toBe(true);
+    expect(removeWorker).toBeGreaterThanOrEqual(0);
+    expect(removeQueue).toBeGreaterThan(removeWorker);
+  });
+
+  it("refuses to update a manifest from another deployment directory", () => {
+    const input = manifest();
+    input.name = "other";
+    input.worker.deployed = false;
+    const checkpoints = [];
+
+    expect(() =>
+      recordWorkerDeployedForConfig(configPath("qa"), input.worker.name, {
+        loadManifest: () => input,
+        writeManifest: (next) => checkpoints.push(structuredClone(next))
+      })
+    ).toThrow(/manifest name "other" does not match deployment "qa"/);
+    expect(input.worker.deployed).toBe(false);
+    expect(checkpoints).toEqual([]);
+  });
+
+  it("keeps completed cleanup checkpoints when a later deletion fails", () => {
+    const input = manifest();
+    input.worker.deployed = false;
+    const checkpoints = [];
+
+    expect(() =>
+      destroyResources("state", input, {
+        checkpoint: (next) => checkpoints.push(structuredClone(next)),
+        runCommand: (_command, args) => {
+          if (args.slice(2, 6).join(" ") === "r2 bucket delete hqbase-mail") {
+            throw new Error("bucket is not empty");
+          }
+          return "";
+        }
+      })
+    ).toThrow(/bucket is not empty/);
+
+    expect(checkpoints).toHaveLength(2);
+    expect(input).toMatchObject({
+      d1: { ownership: "created" },
+      r2: { ownership: "created" },
+      queue: {
+        primary: { ownership: "removed" },
+        deadLetter: { ownership: "removed" }
+      }
+    });
   });
 });
