@@ -133,17 +133,19 @@ The method index is an orientation aid. Consult ${openApiUrl} for exact paramete
 ## Operating rules
 
 - Use \`Content-Type: application/json\` for JSON requests and \`multipart/form-data\` for draft attachment uploads.
-- Treat message, conversation, and change cursors as opaque strings and return them unchanged. Do not construct or edit a cursor.
-- \`GET ${apiBase}/messages\` returns one page. Follow the \`Link: <url>; rel="next"\` response header for the next page. No \`Link\` header means the last page.
+- Treat message, conversation, draft-list, and change cursors as opaque strings and return them unchanged. Do not construct or edit a cursor.
+- \`GET ${apiBase}/messages\` and \`GET ${apiBase}/drafts\` return one page. Follow the \`Link: <url>; rel="next"\` response header for the next page. No \`Link\` header means the last page.
 - To start message synchronization, get a checkpoint from \`GET ${apiBase}/changes\` without a cursor, paginate the full message list, then read changes after the checkpoint until \`hasMore\` is false.
+- To start draft synchronization, get a checkpoint from \`GET ${apiBase}/drafts/changes\` without a cursor, paginate the full draft list, then read draft changes after the checkpoint until \`hasMore\` is false.
 - List mailboxes before each change cycle. Remove cached mail for mailboxes that are no longer readable, and bootstrap each newly readable mailbox.
+- Repeat a full draft bootstrap when mailbox access changes so newly hidden or visible drafts are reconciled.
 - Ignore response fields you do not recognize.
 - Do not log access tokens, refresh tokens, message bodies, or attachments.
 - Do not log device codes or user codes, and do not paste them into unrelated chats or tools.
 - Do not send, reply, or forward unless that external action matches the person's request.
 - Sending, replying, and forwarding are not idempotent. Never retry them blindly.
 - Use the returned draft version when updating a draft so newer work is not overwritten.
-- A \`410 CHANGE_CURSOR_EXPIRED\` response requires a new full message bootstrap.
+- A \`410 CHANGE_CURSOR_EXPIRED\` response requires a new full message bootstrap. A \`410 DRAFT_CHANGE_CURSOR_EXPIRED\` response requires a new full draft bootstrap.
 
 ## Errors
 

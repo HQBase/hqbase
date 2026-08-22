@@ -135,7 +135,11 @@ export const drafts = sqliteTable(
     })
   },
   (table) => [
-    index("drafts_user_updated_idx").on(table.userId, sql`${table.updatedAt} DESC`),
+    index("drafts_user_updated_id_idx").on(
+      table.userId,
+      sql`${table.updatedAt} DESC`,
+      sql`${table.id} DESC`
+    ),
     index("drafts_forward_message_idx").on(table.forwardOfMessageId)
   ]
 );
@@ -154,4 +158,19 @@ export const draftAttachments = sqliteTable(
     createdAt: text("created_at").notNull()
   },
   (table) => [index("draft_attachments_draft_idx").on(table.draftId, table.createdAt)]
+);
+
+export const draftChanges = sqliteTable(
+  "draft_changes",
+  {
+    sequence: integer("sequence").primaryKey({ autoIncrement: true }),
+    draftId: text("draft_id").notNull(),
+    userId: text("user_id").notNull(),
+    kind: text("kind", { enum: ["upsert", "delete"] }).notNull(),
+    changedAt: text("changed_at").notNull()
+  },
+  (table) => [
+    check("draft_changes_kind_check", sql`${table.kind} IN ('upsert', 'delete')`),
+    index("draft_changes_user_sequence_idx").on(table.userId, table.sequence)
+  ]
 );

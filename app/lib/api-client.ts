@@ -9,6 +9,21 @@ export async function apiGet<T>(path: string): Promise<T> {
   return apiRequest<T>(path, { method: "GET" });
 }
 
+export async function apiGetPage<T>(
+  path: string
+): Promise<{ data: T; nextPageUrl: string | null }> {
+  const response = await fetch(path, { credentials: "include", method: "GET" });
+  const data = (await readResponseJson(response)) as T | ApiError;
+  if (!response.ok) {
+    const message =
+      typeof data === "object" && data && "error" in data ? data.error.message : "Request failed.";
+    throw new Error(message);
+  }
+  const link = response.headers.get("link");
+  const match = link?.match(/^<([^>]+)>;\s*rel="next"$/u);
+  return { data: data as T, nextPageUrl: match?.[1] ?? null };
+}
+
 export async function apiPost<T>(path: string, body?: unknown): Promise<T> {
   const init: RequestInit = { method: "POST" };
   if (body !== undefined) {

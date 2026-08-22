@@ -6,7 +6,7 @@ import { draftAttachments, drafts } from "../../db/schema";
 import { AppError } from "../../lib/errors";
 import type { Draft, DraftAttachment } from "./types";
 
-type DraftRow = {
+export type DraftRow = {
   id: string;
   mailbox_id: string | null;
   reply_to_message_id: string | null;
@@ -21,13 +21,14 @@ type DraftRow = {
   version: number;
   updated_at: string;
 };
-type AttachmentRow = {
+export type AttachmentRow = {
   id: string;
   filename: string;
   content_type: string;
   size_bytes: number;
   r2_key: string;
 };
+export type PageAttachmentRow = AttachmentRow & { draft_id: string };
 const parse = (value: string): string[] => {
   try {
     const result: unknown = JSON.parse(value);
@@ -38,7 +39,7 @@ const parse = (value: string): string[] => {
     return [];
   }
 };
-const mapAttachment = (row: AttachmentRow): DraftAttachment => ({
+export const mapAttachment = (row: AttachmentRow): DraftAttachment => ({
   id: row.id,
   filename: row.filename,
   contentType: row.content_type,
@@ -55,6 +56,9 @@ async function attachments(db: D1Database, draftId: string) {
   );
 }
 async function mapDraft(db: D1Database, row: DraftRow): Promise<Draft> {
+  return mapDraftRow(row, (await attachments(db, row.id)).map(mapAttachment));
+}
+export function mapDraftRow(row: DraftRow, draftAttachments: DraftAttachment[]): Draft {
   return {
     id: row.id,
     mailboxId: row.mailbox_id,
@@ -69,15 +73,8 @@ async function mapDraft(db: D1Database, row: DraftRow): Promise<Draft> {
     html: row.html_body,
     version: row.version,
     updatedAt: row.updated_at,
-    attachments: (await attachments(db, row.id)).map(mapAttachment)
+    attachments: draftAttachments
   };
-}
-export async function listDrafts(db: D1Database, userId: string): Promise<Draft[]> {
-  const rows = await getRows<DraftRow>(
-    db,
-    sql`SELECT * FROM drafts WHERE user_id = ${userId} ORDER BY updated_at DESC`
-  );
-  return Promise.all(rows.map((row) => mapDraft(db, row)));
 }
 export async function getDraft(db: D1Database, userId: string, id: string): Promise<Draft | null> {
   const row = await getRow<DraftRow>(
@@ -85,6 +82,23 @@ export async function getDraft(db: D1Database, userId: string, id: string): Prom
     sql`SELECT * FROM drafts WHERE id = ${id} AND user_id = ${userId}`
   );
   return row ? mapDraft(db, row) : null;
+}
+
+export async function attachmentsForDrafts(
+  db: D1Database,
+  draftIds: string[]
+): Promise<PageAttachmentRow[]> {
+  if (draftIds.length === 0) return [];
+  return getRows<PageAttachmentRow>(
+    db,
+    sql`SELECT draft_id, id, filename, content_type, size_bytes, r2_key
+        FROM draft_attachments
+        WHERE draft_id IN (${sql.join(
+          draftIds.map((id) => sql`${id}`),
+          sql`, `
+        )})
+        ORDER BY draft_id, created_at`
+  );
 }
 export async function saveDraft(
   db: D1Database,

@@ -85,6 +85,7 @@ function validateOpenApi(document) {
     "/api/v1/changes",
     "/api/v1/conversations",
     "/api/v1/drafts",
+    "/api/v1/drafts/changes",
     "/api/v1/send",
     "/api/v1/reply",
     "/api/v1/forward"

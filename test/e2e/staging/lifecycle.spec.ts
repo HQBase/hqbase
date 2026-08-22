@@ -93,6 +93,13 @@ test("HQBase web lifecycle remains healthy", async ({ page, request }) => {
       nextCursor: expect.any(String),
       hasMore: false
     });
+    const draftCheckpoint = await request.get(stagingMailApiPath("/drafts/changes"));
+    expect(draftCheckpoint.ok(), await draftCheckpoint.text()).toBeTruthy();
+    await expect(draftCheckpoint.json()).resolves.toMatchObject({
+      changes: [],
+      nextCursor: expect.any(String),
+      hasMore: false
+    });
   }
   const primaryEmailAction = page.getByRole("button", {
     name: /^(?:Compose|New email)$/

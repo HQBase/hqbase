@@ -198,7 +198,7 @@
                   "key": "folder",
                   "value": "inbox",
                   "disabled": false,
-                  "description": "Folder to list."
+                  "description": "Message folder to list. The `drafts` value remains for v1 compatibility, but current write paths do not store drafts as message rows. Use `/api/v1/drafts` for drafts."
                 },
                 {
                   "key": "mailboxId",
@@ -464,7 +464,21 @@
             "header": [],
             "url": {
               "raw": "{{base_url}}/api/v1/drafts",
-              "variable": []
+              "variable": [],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Maximum number of draft rows read for this page. Live access filtering can make the returned array shorter."
+                },
+                {
+                  "key": "cursor",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Opaque cursor from the previous page. Read it from the Link header and send it unchanged."
+                }
+              ]
             },
             "description": "List drafts"
           },
@@ -494,6 +508,33 @@
                 }
               }
             }
+          },
+          "response": []
+        },
+        {
+          "name": "Read draft changes",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/drafts/changes",
+              "variable": [],
+              "query": [
+                {
+                  "key": "cursor",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Opaque cursor from a draft checkpoint or previous draft-changes page. Omit it only to create a new checkpoint."
+                },
+                {
+                  "key": "limit",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Maximum number of draft journal entries read for this page."
+                }
+              ]
+            },
+            "description": "Returns a bounded page of private draft upserts and deletion tombstones in journal order. A request without a cursor returns an empty checkpoint at the current user-specific high-water sequence."
           },
           "response": []
         },

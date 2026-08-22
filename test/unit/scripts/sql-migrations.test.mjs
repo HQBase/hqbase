@@ -19,7 +19,8 @@ const expectedMigrationNames = [
   "0011_latest_password_reset_token.sql",
   "0012_message_activity_index.sql",
   "0013_message_changes.sql",
-  "0014_unassigned_messages.sql"
+  "0014_unassigned_messages.sql",
+  "0015_draft_changes.sql"
 ];
 const databases = [];
 
@@ -132,15 +133,16 @@ describe("SQL migration contract", () => {
     const tables = database
       .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'")
       .all();
-    expect(tables).toHaveLength(39);
+    expect(tables).toHaveLength(40);
   });
 
   it("preserves populated data through the latest upgrade and skips it on retry", async () => {
     const database = createDatabase();
     const migrations = await readD1Migrations(migrationsDirectory);
-    for (const migration of migrations.slice(0, -1)) applyMigration(database, migration);
+    for (const migration of migrations.slice(0, -2)) applyMigration(database, migration);
     insertRepresentativeData(database);
 
+    expect(applyMigration(database, migrations.at(-2))).toBe(true);
     expect(applyMigration(database, migrations.at(-1))).toBe(true);
     expect(database.prepare("SELECT id, email FROM user WHERE id = 'usr_upgrade'").get()).toEqual({
       id: "usr_upgrade",
@@ -164,7 +166,7 @@ describe("SQL migration contract", () => {
 
     expect(applyMigration(database, migrations.at(-1))).toBe(false);
     expect(database.prepare("SELECT count(*) AS count FROM d1_migrations").get()).toEqual({
-      count: 14
+      count: 15
     });
   });
 });

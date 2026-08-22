@@ -315,7 +315,7 @@
               "type": "string",
               "enum": ["inbox", "sent", "drafts", "archived", "trash", "catchall"]
             },
-            "description": "Folder to list."
+            "description": "Message folder to list. The `drafts` value remains for v1 compatibility, but current write paths do not store drafts as message rows. Use `/api/v1/drafts` for drafts."
           },
           {
             "in": "query",
@@ -1292,7 +1292,16 @@
         ],
         "responses": {
           "200": {
-            "description": "Drafts",
+            "description": "One page of drafts, newest update first.",
+            "headers": {
+              "Link": {
+                "required": false,
+                "description": "RFC 8288 link to the next page, as `<url>; rel=\"next\"`. The header is absent on the last page.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
             "content": {
               "application/json": {
                 "schema": {
@@ -1305,7 +1314,7 @@
             }
           },
           "400": {
-            "description": "Invalid request",
+            "description": "Invalid request. `INVALID_LIMIT` when limit is not an integer from 1 to 100. `INVALID_DRAFT_CURSOR` when the cursor is malformed or is not a draft-list cursor.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1356,7 +1365,31 @@
           }
         },
         "tags": ["Drafts"],
-        "operationId": "listDrafts"
+        "operationId": "listDrafts",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 100
+            },
+            "description": "Maximum number of draft rows read for this page. Live access filtering can make the returned array shorter."
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 512
+            },
+            "description": "Opaque cursor from the previous page. Read it from the Link header and send it unchanged."
+          }
+        ]
       },
       "post": {
         "summary": "Create a draft",
@@ -1454,6 +1487,108 @@
             }
           }
         }
+      }
+    },
+    "/api/v1/drafts/changes": {
+      "get": {
+        "summary": "Read draft changes",
+        "description": "Returns a bounded page of private draft upserts and deletion tombstones in journal order. A request without a cursor returns an empty checkpoint at the current user-specific high-water sequence.",
+        "security": [
+          {
+            "oauth2": ["mail:send"]
+          },
+          {
+            "cookieSession": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A bounded page of draft changes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DraftChangePage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request. `INVALID_LIMIT` when limit is not an integer from 1 to 100. `INVALID_DRAFT_CHANGE_CURSOR` when the cursor is malformed, foreign, or beyond the user's current journal. `INVALID_DRAFT_CHANGE_FILTER` when a mailbox, folder, search, or timestamp filter is supplied.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid authentication",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient OAuth scope or mailbox access",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "`DRAFT_CHANGE_CURSOR_EXPIRED` when future journal retention removes a required range. The client must start a new full draft bootstrap.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "tags": ["Drafts"],
+        "operationId": "listDraftChanges",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 512
+            },
+            "description": "Opaque cursor from a draft checkpoint or previous draft-changes page. Omit it only to create a new checkpoint."
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 100
+            },
+            "description": "Maximum number of draft journal entries read for this page."
+          }
+        ]
       }
     },
     "/api/v1/drafts/{id}": {
@@ -2432,7 +2567,8 @@
           },
           "folder": {
             "type": "string",
-            "enum": ["inbox", "sent", "drafts", "archived", "trash", "catchall"]
+            "enum": ["inbox", "sent", "drafts", "archived", "trash", "catchall"],
+            "description": "Stored message folder. Drafts use the separate Draft schema and endpoints; current write paths do not produce message summaries with `folder: drafts`."
           },
           "fromAddress": {
             "type": "string",
@@ -2952,6 +3088,60 @@
             }
           }
         ]
+      },
+      "DraftChangeUpsert": {
+        "type": "object",
+        "required": ["type", "draft"],
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "upsert"
+          },
+          "draft": {
+            "$ref": "#/components/schemas/Draft"
+          }
+        }
+      },
+      "DraftChangeDelete": {
+        "type": "object",
+        "required": ["type", "draftId"],
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "delete"
+          },
+          "draftId": {
+            "type": "string"
+          }
+        }
+      },
+      "DraftChange": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/DraftChangeUpsert"
+          },
+          {
+            "$ref": "#/components/schemas/DraftChangeDelete"
+          }
+        ]
+      },
+      "DraftChangePage": {
+        "type": "object",
+        "required": ["changes", "nextCursor", "hasMore"],
+        "properties": {
+          "changes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DraftChange"
+            }
+          },
+          "nextCursor": {
+            "type": "string"
+          },
+          "hasMore": {
+            "type": "boolean"
+          }
+        }
       },
       "SendInput": {
         "type": "object",
