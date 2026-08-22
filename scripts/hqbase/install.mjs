@@ -82,7 +82,6 @@ export function install(flags, options = {}) {
       dryRun,
       env: {
         CLOUDFLARE_ACCOUNT_ID: manifest.accountId,
-        WORKERS_CI: "1",
         ...((optionalString(flags, "auth-secret") ?? process.env.HQBASE_AUTH_SECRET)
           ? {
               HQBASE_AUTH_SECRET:
