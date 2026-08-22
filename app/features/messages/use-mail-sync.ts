@@ -8,7 +8,7 @@ import type { FolderId } from "@/lib/routes";
 import { listConversations } from "./api";
 import type { ConversationAction, ConversationSummary } from "./types";
 
-const refreshIntervalMs = 10_000;
+const refreshIntervalMs = 60_000;
 
 type MailSyncOptions = {
   activeFolder: FolderId;

@@ -83,6 +83,7 @@ function validateOpenApi(document) {
     "/api/v1/mailboxes",
     "/api/v1/messages",
     "/api/v1/changes",
+    "/api/v1/events",
     "/api/v1/conversations",
     "/api/v1/drafts",
     "/api/v1/drafts/changes",
@@ -176,9 +177,17 @@ function postmanRequest(route, method, operation) {
       disabled: parameter.name !== "folder",
       description: parameter.description
     }));
+  const headers = (operation.parameters ?? [])
+    .filter((parameter) => parameter.in === "header")
+    .map((parameter) => ({
+      key: parameter.name,
+      value: parameter.schema?.const ?? "",
+      disabled: parameter.required !== true,
+      description: parameter.description
+    }));
   const request = {
     method: method.toUpperCase(),
-    header: [],
+    header: headers,
     url: {
       raw: `{{base_url}}${postmanRoute}`,
       variable: variables.map((name) => ({ key: name, value: `{{${name}}}` })),

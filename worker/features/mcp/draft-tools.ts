@@ -13,6 +13,7 @@ import {
   saveDraft
 } from "../drafts/queries";
 import { draftSchema } from "../drafts/validation";
+import { ignoreMailEventFailure, publishUserMailEvent } from "../events/service";
 
 import type { McpPrincipal } from "./route";
 import { base64File, maxMcpAttachmentBase64Length, toolResult } from "./tool-result";
@@ -73,6 +74,7 @@ export function registerDraftTools(
         await requireDraftAccess(env, principal, parsed);
         const draft = await saveDraft(env.DB, principal.userId, parsed);
         await recordDraftMutation(env, principal, "mcp.draft.create", draft.id);
+        await notifyDraftChange(env, principal.userId);
         return draft;
       })
   );
@@ -110,6 +112,7 @@ export function registerDraftTools(
         await requireDraftAccess(env, principal, parsed);
         const draft = await saveDraft(env.DB, principal.userId, parsed);
         await recordDraftMutation(env, principal, "mcp.draft.update", draft.id);
+        await notifyDraftChange(env, principal.userId);
         return draft;
       })
   );
@@ -126,6 +129,7 @@ export function registerDraftTools(
         await getAccessibleDraft(env, principal, draftId);
         await deleteDraft(env.DB, env.MAIL_OBJECTS, principal.userId, draftId);
         await recordDraftMutation(env, principal, "mcp.draft.delete", draftId);
+        await notifyDraftChange(env, principal.userId);
         return { deleted: true, draftId };
       })
   );
@@ -173,6 +177,7 @@ function registerDraftAttachmentTools(
           httpMetadata: { contentType: added.attachment.contentType }
         });
         await recordDraftMutation(env, principal, "mcp.draft.attachment.add", added.attachment.id);
+        await notifyDraftChange(env, principal.userId);
         return added.attachment;
       })
   );
@@ -202,6 +207,7 @@ function registerDraftAttachmentTools(
           throw new AppError("ATTACHMENT_NOT_FOUND", "Attachment not found.", 404);
         }
         await recordDraftMutation(env, principal, "mcp.draft.attachment.remove", attachmentId);
+        await notifyDraftChange(env, principal.userId);
         return { deleted: true, attachmentId, draftId };
       })
   );
@@ -222,4 +228,8 @@ function recordDraftMutation(
     resourceId,
     outcome: "success"
   });
+}
+
+function notifyDraftChange(env: WorkerEnv, userId: string): Promise<void> {
+  return ignoreMailEventFailure(publishUserMailEvent(env, userId, "drafts"));
 }

@@ -34,6 +34,9 @@
     },
     {
       "name": "Sending"
+    },
+    {
+      "name": "Events"
     }
   ],
   "paths": {
@@ -115,6 +118,89 @@
         },
         "tags": ["Mailboxes"],
         "operationId": "listMailboxes"
+      }
+    },
+    "/api/v1/events": {
+      "get": {
+        "summary": "Open change event WebSocket",
+        "description": "Opens an authenticated wake-only WebSocket. The server sends `changed` frames for messages, mailboxes, and permitted drafts. Frames contain no mail data or cursors. After a frame or reconnect, read the authoritative REST resources and change journals. OAuth tokens require `mail:read`; draft frames also require `mail:send`.",
+        "security": [
+          {
+            "oauth2": ["mail:read"]
+          },
+          {
+            "cookieSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "Upgrade",
+            "in": "header",
+            "required": true,
+            "description": "WebSocket upgrade request.",
+            "schema": {
+              "type": "string",
+              "const": "websocket"
+            }
+          }
+        ],
+        "responses": {
+          "101": {
+            "description": "WebSocket established. Text frames use `{\"type\":\"changed\",\"topic\":\"messages|drafts|mailboxes\"}`."
+          },
+          "401": {
+            "description": "Missing or invalid authentication",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient OAuth scope or invalid browser origin",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "Method not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "426": {
+            "description": "WebSocket upgrade required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Event connection unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "tags": ["Events"],
+        "operationId": "openMailEvents"
       }
     },
     "/api/v1/changes": {

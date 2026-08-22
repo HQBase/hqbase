@@ -15,6 +15,10 @@ describe("Mail API public artifacts", () => {
     expect(openApi.paths["/api/v1/changes"].get.security).toContainEqual({
       oauth2: ["mail:read"]
     });
+    expect(openApi.paths["/api/v1/events"].get.security).toContainEqual({
+      oauth2: ["mail:read"]
+    });
+    expect(openApi.paths["/api/v1/events"].get.responses["101"]).toBeDefined();
     expect(openApi.paths["/api/v1/drafts/changes"].get.security).toContainEqual({
       oauth2: ["mail:send"]
     });
@@ -55,6 +59,7 @@ describe("Mail API public artifacts", () => {
     const serialized = JSON.stringify(postman);
     expect(serialized).toContain("/.well-known/oauth-protected-resource/api/v1");
     expect(serialized).toContain("/api/auth/oauth2/register");
+    expect(serialized).toContain("Open change event WebSocket");
     const oauthSetup = postman.item.find((folder) => folder.name === "OAuth setup");
     const registrationRequest = oauthSetup.item.find(
       (request) => request.name === "Register public client"

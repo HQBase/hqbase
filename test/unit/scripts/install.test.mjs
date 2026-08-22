@@ -87,6 +87,12 @@ describe("HQBase installation resources", () => {
         }
       ]
     });
+    expect(config.durable_objects).toEqual({
+      bindings: [{ name: "MAIL_EVENTS", class_name: "MailEvents" }]
+    });
+    expect(config.migrations).toEqual([
+      { tag: "mail-events-v1", new_sqlite_classes: ["MailEvents"] }
+    ]);
   });
 
   it("records customer-managed OAuth as non-secret deployment configuration", () => {

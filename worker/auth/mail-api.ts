@@ -10,6 +10,12 @@ export type MailApiScope = (typeof mailApiScopes)[number];
 export const mailApiMetadataPath = "/.well-known/oauth-protected-resource/api/v1";
 const agentSkillPath = "/skills/hqbase-mail/SKILL.md";
 
+export type MailApiPrincipal = {
+  auth: AuthContext;
+  authentication: "bearer" | "session";
+  scopes: ReadonlySet<MailApiScope>;
+};
+
 export class MailApiAuthError extends AppError {
   readonly authError: "invalid_token" | "insufficient_scope" | null;
   readonly requiredScope: MailApiScope;
@@ -33,13 +39,29 @@ export async function requireMailApiContext(
   request: Request,
   requiredScope: MailApiScope
 ): Promise<AuthContext> {
+  return (await requireMailApiPrincipal(env, request, requiredScope)).auth;
+}
+
+export async function requireMailApiPrincipal(
+  env: WorkerEnv,
+  request: Request,
+  requiredScope: MailApiScope
+): Promise<MailApiPrincipal> {
   if (!isVersionedMailApiRequest(request)) {
-    return requireAuthContext(env, request);
+    return {
+      auth: await requireAuthContext(env, request),
+      authentication: "session",
+      scopes: new Set(mailApiScopes)
+    };
   }
 
   if (!request.headers.has("authorization")) {
     try {
-      return await requireAuthContext(env, request);
+      return {
+        auth: await requireAuthContext(env, request),
+        authentication: "session",
+        scopes: new Set(mailApiScopes)
+      };
     } catch (error) {
       if (error instanceof AppError && error.status === 401) {
         throw new MailApiAuthError(
@@ -68,7 +90,15 @@ export async function requireMailApiContext(
         "insufficient_scope"
       );
     }
-    return { session: principal.session, user: principal.user };
+    return {
+      auth: { session: principal.session, user: principal.user },
+      authentication: "bearer",
+      scopes: new Set(
+        [...principal.scopes].filter((scope): scope is MailApiScope =>
+          mailApiScopes.includes(scope as MailApiScope)
+        )
+      )
+    };
   } catch (error) {
     if (error instanceof MailApiAuthError) throw error;
     if (error instanceof OAuthBearerError) {

@@ -329,6 +329,47 @@ describe("HQBase Mail API v1", () => {
     expect(legacyBearer.status).toBe(401);
   });
 
+  it("opens an access-scoped wake-only WebSocket", async () => {
+    const missingUpgrade = await apiFetch("/api/v1/events", readToken);
+    expect(missingUpgrade.status).toBe(426);
+    expect(missingUpgrade.headers.get("upgrade")).toBe("websocket");
+
+    const insufficientScope = await apiFetch("/api/v1/events", writeToken, {
+      headers: { upgrade: "websocket" }
+    });
+    expect(insufficientScope.status).toBe(403);
+    expect(insufficientScope.headers.get("www-authenticate")).toContain('scope="mail:read"');
+
+    const invalidOrigin = await SELF.fetch(`${origin}/api/v1/events`, {
+      headers: { cookie, origin: "https://other.example", upgrade: "websocket" }
+    });
+    expect(invalidOrigin.status).toBe(403);
+
+    const messageSocket = await openEventSocket({
+      authorization: `Bearer ${readToken}`,
+      upgrade: "websocket"
+    });
+    const messageFrame = nextSocketFrame(messageSocket);
+    await env.MAIL_EVENTS.getByName("workspace").publish({
+      topic: "messages",
+      userIds: [userId]
+    });
+    await expect(messageFrame).resolves.toEqual({ type: "changed", topic: "messages" });
+    messageSocket.close(1000, "Test complete.");
+
+    const draftSocket = await openEventSocket({
+      authorization: `Bearer ${fullToken}`,
+      upgrade: "websocket"
+    });
+    const draftFrame = nextSocketFrame(draftSocket);
+    await env.MAIL_EVENTS.getByName("workspace").publish({
+      topic: "drafts",
+      userIds: [userId]
+    });
+    await expect(draftFrame).resolves.toEqual({ type: "changed", topic: "drafts" });
+    draftSocket.close(1000, "Test complete.");
+  });
+
   it("reads mail with an audience-bound bearer token without exposing storage keys", async () => {
     const list = await apiFetch("/api/v1/messages", readToken);
     expect(list.status, await list.clone().text()).toBe(200);
@@ -363,11 +404,18 @@ describe("HQBase Mail API v1", () => {
   });
 
   it("unarchives and restores mail through the versioned action route", async () => {
+    const socket = await openEventSocket({
+      authorization: `Bearer ${readToken}`,
+      upgrade: "websocket"
+    });
+    const changed = nextSocketFrame(socket);
     const archived = await apiFetch("/api/v1/messages/msg_api/archive", writeToken, {
       method: "POST"
     });
     expect(archived.status, await archived.clone().text()).toBe(200);
     await expect(archived.json()).resolves.toMatchObject({ folder: "archived" });
+    await expect(changed).resolves.toEqual({ type: "changed", topic: "messages" });
+    socket.close(1000, "Test complete.");
 
     const unarchived = await apiFetch("/api/v1/messages/msg_api/unarchive", writeToken, {
       method: "POST"
@@ -881,4 +929,30 @@ function extractSessionCookie(response: Response): string {
   const match = serialized.match(/(?:^|,\s*)((?:__Secure-)?better-auth\.session_token=[^;,]+)/);
   if (!match?.[1]) throw new Error("Session cookie was not returned.");
   return match[1];
+}
+
+async function openEventSocket(headers: HeadersInit): Promise<WebSocket> {
+  const response = await SELF.fetch(`${origin}/api/v1/events`, { headers });
+  if (response.status !== 101) {
+    throw new Error(`WebSocket upgrade failed (${response.status}): ${await response.text()}`);
+  }
+  if (!response.webSocket) throw new Error("WebSocket upgrade did not return a socket.");
+  response.webSocket.accept();
+  return response.webSocket;
+}
+
+function nextSocketFrame(socket: WebSocket): Promise<unknown> {
+  return new Promise((resolve, reject) => {
+    socket.addEventListener(
+      "message",
+      (event) => {
+        try {
+          resolve(JSON.parse(String(event.data)));
+        } catch (error) {
+          reject(error);
+        }
+      },
+      { once: true }
+    );
+  });
 }

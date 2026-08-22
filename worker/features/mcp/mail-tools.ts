@@ -5,6 +5,11 @@ import { accessibleMessageScope } from "../../auth/mailbox-access";
 import type { WorkerEnv } from "../../lib/env";
 import { AppError } from "../../lib/errors";
 import { recordAudit } from "../audit/service";
+import {
+  ignoreMailEventFailure,
+  messageEventTarget,
+  publishMessageMailEvent
+} from "../events/service";
 import { listMailboxesForUser } from "../mailboxes/queries";
 import { requireAttachmentAccess, requireMessageAccess } from "../messages/access";
 import { listConversations, updateConversationAction } from "../messages/conversation-queries";
@@ -193,6 +198,10 @@ function registerWriteTools(server: McpServer, env: WorkerEnv, principal: McpPri
       toolResult(async () => {
         await requireMessageAccess(env.DB, principal.userId, principal.role, messageId, "agent");
         const message = await updateMessageAction(env.DB, messageId, action);
+        const target = await messageEventTarget(env.DB, message.id);
+        if (target) {
+          await ignoreMailEventFailure(publishMessageMailEvent(env, [target]));
+        }
         await recordMutation(env, principal, `mcp.message.${action}`, "message", messageId);
         return message;
       })
@@ -219,12 +228,15 @@ function registerWriteTools(server: McpServer, env: WorkerEnv, principal: McpPri
           principal.role,
           "agent"
         );
-        const result = await updateConversationAction(env.DB, {
+        const { eventTargets, ...result } = await updateConversationAction(env.DB, {
           action,
           activeFolder,
           messageId,
           scope
         });
+        if (eventTargets.length > 0) {
+          await ignoreMailEventFailure(publishMessageMailEvent(env, eventTargets));
+        }
         await recordMutation(
           env,
           principal,

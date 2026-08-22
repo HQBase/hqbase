@@ -151,6 +151,31 @@
       ]
     },
     {
+      "name": "Events",
+      "item": [
+        {
+          "name": "Open change event WebSocket",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Upgrade",
+                "value": "websocket",
+                "disabled": false,
+                "description": "WebSocket upgrade request."
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/events",
+              "variable": []
+            },
+            "description": "Opens an authenticated wake-only WebSocket. The server sends `changed` frames for messages, mailboxes, and permitted drafts. Frames contain no mail data or cursors. After a frame or reconnect, read the authoritative REST resources and change journals. OAuth tokens require `mail:read`; draft frames also require `mail:send`."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
       "name": "Changes",
       "item": [
         {

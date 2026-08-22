@@ -48,6 +48,10 @@ export function createWranglerConfig(manifest) {
         invocation_logs: false
       }
     },
+    durable_objects: {
+      bindings: [{ name: "MAIL_EVENTS", class_name: "MailEvents" }]
+    },
+    migrations: [{ tag: "mail-events-v1", new_sqlite_classes: ["MailEvents"] }],
     secrets: {
       required: ["BETTER_AUTH_SECRET"]
     },

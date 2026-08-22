@@ -3,7 +3,7 @@ import * as React from "react";
 import { listDrafts } from "./api";
 import type { Draft } from "./types";
 
-const refreshIntervalMs = 10_000;
+const refreshIntervalMs = 60_000;
 
 export function useDrafts(userId: string | null): {
   drafts: Draft[];

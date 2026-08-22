@@ -1,9 +1,10 @@
-import { Hono } from "hono";
+import { type Context, Hono } from "hono";
 import { requireMailApiContext } from "../../auth/mail-api";
 import type { HonoApp } from "../../lib/env";
 import { AppError } from "../../lib/errors";
 import { readJson } from "../../lib/json";
 import { parseWith } from "../../lib/validation";
+import { ignoreMailEventFailure, publishUserMailEvent } from "../events/service";
 import { getAccessibleDraft, listAccessibleDraftPage, requireDraftAccess } from "./access";
 import { defaultDraftChangeLimit, listDraftChanges, maxDraftChangeLimit } from "./change-queries";
 import { defaultDraftLimit, maxDraftLimit } from "./list-queries";
@@ -49,20 +50,25 @@ draftRoutes.post("/", async (c) => {
   const auth = await requireMailApiContext(c.env, c.req.raw, "mail:send");
   const input = parseWith(draftSchema, await readJson(c.req.raw));
   await requireDraftAccess(c.env, principal(auth), input);
-  return c.json(await saveDraft(c.env.DB, auth.user.id, input), 201);
+  const draft = await saveDraft(c.env.DB, auth.user.id, input);
+  scheduleDraftEvent(c, auth.user.id);
+  return c.json(draft, 201);
 });
 draftRoutes.patch("/:id", async (c) => {
   const auth = await requireMailApiContext(c.env, c.req.raw, "mail:send");
   await getAccessibleDraft(c.env, principal(auth), c.req.param("id"));
   const input = parseWith(draftSchema, await readJson(c.req.raw));
   await requireDraftAccess(c.env, principal(auth), input);
-  return c.json(await saveDraft(c.env.DB, auth.user.id, { ...input, id: c.req.param("id") }));
+  const draft = await saveDraft(c.env.DB, auth.user.id, { ...input, id: c.req.param("id") });
+  scheduleDraftEvent(c, auth.user.id);
+  return c.json(draft);
 });
 draftRoutes.delete("/:id", async (c) => {
   const auth = await requireMailApiContext(c.env, c.req.raw, "mail:send");
   await getAccessibleDraft(c.env, principal(auth), c.req.param("id"));
   if (!(await deleteDraft(c.env.DB, c.env.MAIL_OBJECTS, auth.user.id, c.req.param("id"))))
     throw new AppError("DRAFT_NOT_FOUND", "Draft not found.", 404);
+  scheduleDraftEvent(c, auth.user.id);
   return c.body(null, 204);
 });
 draftRoutes.post("/:id/attachments", async (c) => {
@@ -75,6 +81,7 @@ draftRoutes.post("/:id/attachments", async (c) => {
   await c.env.MAIL_OBJECTS.put(added.r2Key, file.stream(), {
     httpMetadata: { contentType: added.attachment.contentType }
   });
+  scheduleDraftEvent(c, auth.user.id);
   return c.json(added.attachment, 201);
 });
 draftRoutes.delete("/:draftId/attachments/:id", async (c) => {
@@ -90,8 +97,13 @@ draftRoutes.delete("/:draftId/attachments/:id", async (c) => {
     ))
   )
     throw new AppError("ATTACHMENT_NOT_FOUND", "Attachment not found.", 404);
+  scheduleDraftEvent(c, auth.user.id);
   return c.body(null, 204);
 });
+
+function scheduleDraftEvent(c: Context<HonoApp>, userId: string): void {
+  c.executionCtx.waitUntil(ignoreMailEventFailure(publishUserMailEvent(c.env, userId, "drafts")));
+}
 
 function principal(auth: Awaited<ReturnType<typeof requireMailApiContext>>) {
   return { role: auth.user.role, userId: auth.user.id };

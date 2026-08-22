@@ -137,6 +137,7 @@ The method index is an orientation aid. Consult ${openApiUrl} for exact paramete
 - \`GET ${apiBase}/messages\` and \`GET ${apiBase}/drafts\` return one page. Follow the \`Link: <url>; rel="next"\` response header for the next page. No \`Link\` header means the last page.
 - To start message synchronization, get a checkpoint from \`GET ${apiBase}/changes\` without a cursor, paginate the full message list, then read changes after the checkpoint until \`hasMore\` is false.
 - To start draft synchronization, get a checkpoint from \`GET ${apiBase}/drafts/changes\` without a cursor, paginate the full draft list, then read draft changes after the checkpoint until \`hasMore\` is false.
+- Open \`${apiBase}/events\` as a WebSocket when low-latency updates are useful. Each frame only identifies a changed topic. After a frame or reconnect, use the REST resources and change journals to reconcile state. Reconnect with bounded exponential backoff. Keep periodic synchronization as a fallback.
 - List mailboxes before each change cycle. Remove cached mail for mailboxes that are no longer readable, and bootstrap each newly readable mailbox.
 - Repeat a full draft bootstrap when mailbox access changes so newly hidden or visible drafts are reconciled.
 - Ignore response fields you do not recognize.

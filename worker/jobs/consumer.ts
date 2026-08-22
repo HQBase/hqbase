@@ -3,6 +3,11 @@ import { eq, lt, sql } from "drizzle-orm";
 import { nowIso } from "../db/client";
 import { createDatabase, getRow, getRows } from "../db/drizzle";
 import { messages, operationRuns, rateLimits } from "../db/schema";
+import {
+  ignoreMailEventFailure,
+  type MessageEventTarget,
+  publishMessageMailEvent
+} from "../features/events/service";
 import type { WorkerEnv } from "../lib/env";
 import { operationalLog } from "../observability/log";
 import { isJob, type Job } from "./types";
@@ -21,9 +26,14 @@ async function deleteExpiredRows(env: WorkerEnv): Promise<Record<string, number>
 }
 
 async function applyRetention(env: WorkerEnv): Promise<number> {
-  const expired = await getRows<{ id: string; raw_r2_key: string | null }>(
+  const expired = await getRows<{
+    id: string;
+    is_unassigned: number;
+    mailbox_id: string | null;
+    raw_r2_key: string | null;
+  }>(
     env.DB,
-    sql`SELECT m.id, m.raw_r2_key FROM messages m
+    sql`SELECT m.id, m.mailbox_id, m.is_unassigned, m.raw_r2_key FROM messages m
      JOIN retention_policies p ON p.mailbox_id = m.mailbox_id
      WHERE (m.folder = 'trash'
        AND COALESCE(m.trashed_at, m.updated_at) < datetime('now', '-' || p.trash_days || ' days'))
@@ -48,6 +58,11 @@ async function applyRetention(env: WorkerEnv): Promise<number> {
     }
     if (keys.length) await env.MAIL_OBJECTS.delete(keys);
   }
+  const targets: MessageEventTarget[] = expired.map((message) => ({
+    isUnassigned: message.is_unassigned === 1,
+    mailboxId: message.mailbox_id
+  }));
+  await ignoreMailEventFailure(publishMessageMailEvent(env, targets));
   return expired.length;
 }
 

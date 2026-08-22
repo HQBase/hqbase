@@ -10,6 +10,7 @@ import { AppError } from "../../lib/errors";
 import { readJson } from "../../lib/json";
 import { parseWith } from "../../lib/validation";
 import { recordAudit } from "../audit/service";
+import { ignoreMailEventFailure, publishUserMailEvent } from "../events/service";
 import { listMailboxGrants, revokeMailboxGrant, setMailboxGrant } from "./queries";
 
 const grantSchema = z.object({
@@ -49,6 +50,9 @@ mailboxAccessRoutes.put("/", async (c) => {
     outcome: "success",
     metadata: { accessLevel: input.accessLevel }
   });
+  c.executionCtx.waitUntil(
+    ignoreMailEventFailure(publishUserMailEvent(c.env, input.userId, "mailboxes"))
+  );
   return c.body(null, 204);
 });
 
@@ -65,5 +69,8 @@ mailboxAccessRoutes.delete("/:mailboxId/:userId", async (c) => {
     resourceId: `${c.req.param("mailboxId")}:${c.req.param("userId")}`,
     outcome: "success"
   });
+  c.executionCtx.waitUntil(
+    ignoreMailEventFailure(publishUserMailEvent(c.env, c.req.param("userId"), "mailboxes"))
+  );
   return c.body(null, 204);
 });

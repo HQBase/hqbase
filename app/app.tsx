@@ -14,6 +14,7 @@ import {
 import type { CurrentUser } from "@/features/auth/types";
 import { DraftsPage } from "@/features/drafts/drafts-page";
 import { useDrafts } from "@/features/drafts/use-drafts";
+import { useMailEvents } from "@/features/events/use-mail-events";
 import { InboxPage } from "@/features/inbox/inbox-page";
 import { listMailboxes } from "@/features/mailboxes/api";
 import type { Mailbox } from "@/features/mailboxes/types";
@@ -113,6 +114,23 @@ export function App(): React.ReactElement {
       setIsLoading(false);
     }
   }, [loadWorkspace]);
+
+  const refreshWorkspace = React.useCallback(async () => {
+    if (!currentUserId) return;
+    const currentUser = await getCurrentUser();
+    setUser(currentUser);
+    if (!currentUser.passwordSetupRequired) await loadWorkspace(currentUser);
+  }, [currentUserId, loadWorkspace]);
+  const refreshRealtimeState = React.useCallback(async () => {
+    await Promise.allSettled([refreshWorkspace(), mailSync.refresh(), draftState.refresh()]);
+  }, [draftState.refresh, mailSync.refresh, refreshWorkspace]);
+
+  useMailEvents(currentUserId, {
+    onDrafts: draftState.refresh,
+    onMailboxes: refreshRealtimeState,
+    onMessages: mailSync.refresh,
+    onReconnect: refreshRealtimeState
+  });
 
   React.useEffect(() => {
     if (publicAuthenticationPath) return;

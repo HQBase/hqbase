@@ -6,6 +6,11 @@ import { drafts } from "../../db/schema";
 import type { WorkerEnv } from "../../lib/env";
 import { AppError } from "../../lib/errors";
 import { draftAttachmentObjects } from "../drafts/queries";
+import {
+  ignoreMailEventFailure,
+  publishMessageMailEvent,
+  publishUserMailEvent
+} from "../events/service";
 import { findAddressIdentity } from "../mailboxes/address-queries";
 import { findMailboxForSending } from "../mailboxes/queries";
 import { ensureReplySubject } from "../messages/headers";
@@ -211,6 +216,14 @@ async function storeSentMessage(
       .where(and(eq(drafts.id, input.draftId), eq(drafts.userId, input.userId)))
       .run();
   }
+  await Promise.all([
+    ignoreMailEventFailure(
+      publishMessageMailEvent(env, [{ isUnassigned: false, mailboxId: mailbox.id }])
+    ),
+    ...(input.draftId && input.userId
+      ? [ignoreMailEventFailure(publishUserMailEvent(env, input.userId, "drafts"))]
+      : [])
+  ]);
   return message;
 }
 
