@@ -21,8 +21,9 @@ describe("staging workflow lifecycle record", () => {
     expect(deploy).toBeGreaterThan(current);
     expect(workflow).toContain("sql-upgrade-probe");
     expect(workflow).toContain("msg_sql_upgrade");
+    expect(workflow).toContain('"$(basename "$migration")" < "0014_"');
     expect(workflow).toContain('"is_unassigned":1');
-    expect(workflow).toContain('"migration_count":14');
+    expect(workflow).toContain('"migration_count":15');
   });
 
   it("records the reviewed Worker deploy before cleanup", () => {

@@ -1,8 +1,18 @@
-import { apiDelete, apiGet, apiPatch, apiPost } from "@/lib/api-client";
+import { apiDelete, apiGetPage, apiPatch, apiPost } from "@/lib/api-client";
 
 import type { Draft, DraftAttachment, DraftInput } from "./types";
 
-export const listDrafts = () => apiGet<Draft[]>("/api/v1/drafts");
+export async function listDrafts(): Promise<Draft[]> {
+  const drafts: Draft[] = [];
+  let nextPageUrl: string | null = "/api/v1/drafts?limit=100";
+  while (nextPageUrl) {
+    const page: { data: Draft[]; nextPageUrl: string | null } =
+      await apiGetPage<Draft[]>(nextPageUrl);
+    drafts.push(...page.data);
+    nextPageUrl = page.nextPageUrl;
+  }
+  return drafts;
+}
 
 export const createDraft = (input: DraftInput) => apiPost<Draft>("/api/v1/drafts", input);
 
