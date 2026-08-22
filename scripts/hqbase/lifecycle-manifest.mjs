@@ -86,7 +86,12 @@ export function migrateVersion2(manifest, accountId) {
   };
 }
 
-export function assertUnambiguousManifest(manifest) {
+export function assertUnambiguousManifest(manifest, options = {}) {
+  if (manifest.domainMove && !options.allowDomainMove) {
+    throw new Error(
+      `Refusing to continue: deployment "${manifest.name}" has an unfinished domain move to ${manifest.domainMove.toAppDomain ?? "the default hostname"} in state "${manifest.domainMove.state}". Finish or roll it back with "pnpm hqbase domain" before any other lifecycle command.`
+    );
+  }
   for (const [path, resource] of [
     ["d1", manifest.d1],
     ["r2", manifest.r2],

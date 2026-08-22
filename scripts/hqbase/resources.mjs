@@ -61,7 +61,7 @@ export function prepareManifest(manifest, accountId, options = {}) {
     );
   }
 
-  assertUnambiguousManifest(current);
+  assertUnambiguousManifest(current, { allowDomainMove: options.allowDomainMove });
   const d1 = inspectD1(current, current.d1, { runCommand });
   inspectR2(current, current.r2, { runCommand });
   const primary = inspectQueue(current, current.queue.primary, { runCommand });

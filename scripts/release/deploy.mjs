@@ -70,6 +70,24 @@ export async function deploy(options = {}) {
     run("pnpm", ["build"], source);
     const activeRelease = inspectActiveRelease(source, config.name);
     const releaseTag = hqbaseReleaseTag(manifest.version, manifest.artifact.sha256);
+    if (options.configurationOnly) {
+      // A configuration deployment re-applies routes and Worker variables for the release that is
+      // already active. `wrangler triggers deploy` is experimental and never updates variables.
+      if (!activeRelease) {
+        throw new Error(
+          "Refusing to deploy configuration: the Worker has no active signed HQBase release."
+        );
+      }
+      if (activeRelease.version !== manifest.version || activeRelease.tag !== releaseTag) {
+        throw new Error(
+          `Refusing to deploy configuration: the Worker runs HQBase ${activeRelease.version}, not the signed stable release ${manifest.version}. Update the deployment first.`
+        );
+      }
+      deployConfiguration(source, config.name, releaseTag);
+      recordWorkerDeployed();
+      console.log(`HQBase ${manifest.version} configuration deployed.`);
+      return;
+    }
     if (!activeRelease) {
       applyMigrations(source);
       deploySource(source, { releaseTag });
@@ -186,6 +204,36 @@ export function assertSourceDeployConfig(
   return repositoryConfig;
 }
 
+export function deployConfiguration(source, workerName, releaseTag, options = {}) {
+  const runCommand = options.run ?? run;
+  const inspect = options.inspect ?? inspectActiveRelease;
+  const before = inspect(source, workerName);
+  runCommand(
+    "pnpm",
+    [
+      "exec",
+      "wrangler",
+      "deploy",
+      "--strict",
+      "--keep-vars",
+      "--config",
+      "wrangler.jsonc",
+      "--tag",
+      releaseTag,
+      "--var",
+      `HQBASE_WORKER_NAME:${workerName}`
+    ],
+    source
+  );
+  const after = inspect(source, workerName);
+  if (!after || after.tag !== releaseTag || after.versionId === before?.versionId) {
+    throw new Error(
+      "Refusing to continue: Cloudflare does not report a new active version for the configuration deployment."
+    );
+  }
+  return after;
+}
+
 function sourceDeploy(cwd) {
   run("pnpm", ["build"], cwd);
   run("pnpm", ["db:migrate:remote"], cwd);
@@ -237,5 +285,5 @@ function quote(value) {
 if (process.argv[1] && resolve(process.argv[1]) === resolve(import.meta.filename)) {
   const configIndex = process.argv.indexOf("--config");
   const configFile = configIndex >= 0 ? process.argv[configIndex + 1] : undefined;
-  await deploy({ configFile });
+  await deploy({ configFile, configurationOnly: process.argv.includes("--configuration-only") });
 }
