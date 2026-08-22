@@ -3,8 +3,11 @@ import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 
 import { spawnProcess } from "./shell.mjs";
+import { windowsSystem32Executable } from "./windows-system32.mjs";
 
 const isWindows = process.platform === "win32";
+const WHOAMI = windowsSystem32Executable("whoami.exe");
+const ICACLS = windowsSystem32Executable("icacls.exe");
 
 // Windows keeps the machine's trusted principals on every directory, and a member of
 // Administrators can read any file regardless of its access control list by taking ownership or
@@ -33,7 +36,7 @@ function runOrThrow(command, args) {
 // autoloading is unavailable.
 export function currentUserSid() {
   if (cachedSid) return cachedSid;
-  const sid = /S-1-[\d-]+/.exec(runOrThrow("whoami", ["/user", "/fo", "csv", "/nh"]))?.[0];
+  const sid = /S-1-[\d-]+/.exec(runOrThrow(WHOAMI, ["/user", "/fo", "csv", "/nh"]))?.[0];
   if (!sid) throw new Error("Could not determine the SID of the current Windows account.");
   cachedSid = sid;
   return sid;
@@ -45,7 +48,7 @@ export function currentUserSid() {
 export function directorySecurityDescriptor(directory) {
   const aclFile = `${directory}.acl`;
   try {
-    runOrThrow("icacls", [directory, "/save", aclFile, "/q"]);
+    runOrThrow(ICACLS, [directory, "/save", aclFile, "/q"]);
     return readFileSync(aclFile, "utf16le").split(/\r?\n/)[1] ?? "";
   } finally {
     rmSync(aclFile, { force: true });
@@ -79,7 +82,7 @@ function restrictDirectory(directory) {
     chmodSync(directory, 0o700);
     return;
   }
-  runOrThrow("icacls", [directory, "/inheritance:r", "/grant:r", `*${currentUserSid()}:(OI)(CI)F`]);
+  runOrThrow(ICACLS, [directory, "/inheritance:r", "/grant:r", `*${currentUserSid()}:(OI)(CI)F`]);
 }
 
 // Returns null when the directory is restricted, otherwise a description of what was observed.
