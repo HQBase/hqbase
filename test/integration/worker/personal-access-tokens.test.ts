@@ -267,13 +267,15 @@ describe("personal access token management API", () => {
       }
     }
 
-    expect(
-      await countRows(
-        `SELECT COUNT(*) AS count FROM personal_access_tokens
-         WHERE user_id = '${users.owner.id}' AND revoked_at IS NULL
-           AND (expires_at IS NULL OR expires_at > datetime('now'))`
-      )
-    ).toBe(10);
+    const assertionTime = new Date().toISOString();
+    const activeCount = await env.DB.prepare(
+      `SELECT COUNT(*) AS count FROM personal_access_tokens
+       WHERE user_id = ? AND revoked_at IS NULL
+         AND (expires_at IS NULL OR expires_at > ?)`
+    )
+      .bind(users.owner.id, assertionTime)
+      .first<{ count: number }>();
+    expect(activeCount?.count).toBe(10);
     const concurrentRows = await env.DB.prepare(
       `SELECT id, name FROM personal_access_tokens
        WHERE name IN ('Concurrent A', 'Concurrent B')`
@@ -400,11 +402,6 @@ async function auditCount(resourceId: string, action: string): Promise<number> {
   )
     .bind(resourceId, action)
     .first<{ count: number }>();
-  return row?.count ?? -1;
-}
-
-async function countRows(query: string): Promise<number> {
-  const row = await env.DB.prepare(query).first<{ count: number }>();
   return row?.count ?? -1;
 }
 

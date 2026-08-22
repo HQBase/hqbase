@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { renderToStaticMarkup } from "react-dom/server";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Dialog } from "@/components/ui/dialog";
 import {
   CloudflareAuthorizationDialogBody,
@@ -21,6 +21,8 @@ vi.mock("@/features/auth/recent-authentication-api", () => ({
 beforeEach(() => {
   vi.clearAllMocks();
 });
+
+afterEach(() => vi.restoreAllMocks());
 
 describe("Cloudflare authorization dialog", () => {
   it("explains the handoff and keeps authorization inside the modal", () => {
@@ -77,7 +79,6 @@ describe("Cloudflare authorization dialog", () => {
       throw new Error("The Cloudflare authorization transition did not complete.");
     }
     expect(onAuthorizeOrder).toBeLessThan(assignOrder);
-    assign.mockRestore();
     await view.unmount();
   });
 });

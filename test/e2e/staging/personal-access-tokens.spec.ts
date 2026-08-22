@@ -4,6 +4,10 @@ import {
   request as playwrightRequest,
   test
 } from "@playwright/test";
+import {
+  cleanupPersonalAccessToken,
+  throwWithCleanupContext
+} from "./personal-access-token-cleanup";
 
 test.use({ screenshot: "off", trace: "off", video: "off" });
 
@@ -17,6 +21,9 @@ test("personal access token creation, isolation, and revocation", async ({ page 
   let plaintext: string | null = null;
   let recordId: string | null = null;
   let patRequest: APIRequestContext | null = null;
+  let creationAttempted = false;
+  let mainFailed = false;
+  let mainFailure: unknown = null;
 
   try {
     await page.goto("/settings/api", { waitUntil: "domcontentloaded" });
@@ -39,6 +46,7 @@ test("personal access token creation, isolation, and revocation", async ({ page 
       await page.getByRole("button", { name: "Sign in and continue" }).click();
     }
     await tokenName.fill(uniqueName);
+    creationAttempted = true;
     await page.getByRole("button", { name: "Create personal access token" }).click();
 
     const oneTimeDialog = page.getByRole("dialog", {
@@ -114,31 +122,42 @@ test("personal access token creation, isolation, and revocation", async ({ page 
     expect(revokedMailboxes.status()).toBe(401);
     const revokedError = (await revokedMailboxes.json()) as { error?: { code?: string } };
     expect(revokedError.error?.code === "INVALID_PERSONAL_ACCESS_TOKEN").toBe(true);
-  } finally {
-    await patRequest?.dispose();
-    try {
-      const cleanupList = await page.request.get("/api/personal-access-tokens");
-      if (cleanupList.status() === 200) {
-        const cleanupMetadata = (await cleanupList.json()) as {
-          personalAccessTokens: Array<{ id: string; name: string }>;
-        };
-        const cleanupRecordId = recordId
-          ? cleanupMetadata.personalAccessTokens.some((token) => token.id === recordId)
-            ? recordId
-            : null
-          : (cleanupMetadata.personalAccessTokens.find((token) => token.name === uniqueName)?.id ??
-            null);
-        if (cleanupRecordId) {
-          const cleanupRevoke = await page.request.delete(
-            `/api/personal-access-tokens/${encodeURIComponent(cleanupRecordId)}`
-          );
-          expect(cleanupRevoke.status()).toBe(204);
-        }
-      }
-    } finally {
-      plaintext = null;
-    }
+  } catch (error) {
+    mainFailed = true;
+    mainFailure = error;
   }
+
+  const cleanupFailures: Error[] = [];
+  try {
+    await patRequest?.dispose();
+  } catch {
+    cleanupFailures.push(new Error("PAT request context disposal failed."));
+  }
+  try {
+    await cleanupPersonalAccessToken({
+      creationAttempted,
+      recordId,
+      uniqueName,
+      list: () => page.request.get("/api/personal-access-tokens"),
+      revoke: (id) => page.request.delete(`/api/personal-access-tokens/${encodeURIComponent(id)}`)
+    });
+  } catch (error) {
+    cleanupFailures.push(error instanceof Error ? error : new Error("PAT cleanup failed."));
+  } finally {
+    plaintext = null;
+  }
+
+  const cleanupFailure =
+    cleanupFailures.length === 0
+      ? null
+      : cleanupFailures.length === 1
+        ? cleanupFailures[0]
+        : new AggregateError(cleanupFailures, "PAT staging cleanup failed.");
+  if (mainFailed) {
+    if (cleanupFailure) throwWithCleanupContext(mainFailure, cleanupFailure);
+    throw mainFailure;
+  }
+  if (cleanupFailure) throw cleanupFailure;
 });
 
 function required(name: string): string {

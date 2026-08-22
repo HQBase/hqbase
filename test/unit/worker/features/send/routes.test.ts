@@ -147,6 +147,7 @@ describe("send routes", () => {
     const response = await requestSend();
 
     expect(response.status).toBe(201);
+    expect(mocks.recordAudit).toHaveBeenCalledOnce();
     const audit = mocks.recordAudit.mock.calls[0]?.[1];
     expect(audit).not.toHaveProperty("metadata");
   });

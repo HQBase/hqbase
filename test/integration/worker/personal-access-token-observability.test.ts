@@ -7,6 +7,7 @@ import { applyCurrentMigrations } from "./current-migrations";
 
 const origin = "https://hqbase.test";
 let cookie = "";
+let userId = "";
 
 describe("personal access token observability", () => {
   beforeAll(async () => {
@@ -29,7 +30,8 @@ describe("personal access token observability", () => {
       .bind("pat-observability@example.com")
       .first<{ id: string }>();
     if (!user) throw new Error("Expected the observability user.");
-    await env.DB.prepare('UPDATE "user" SET role = ? WHERE id = ?').bind("owner", user.id).run();
+    userId = user.id;
+    await env.DB.prepare('UPDATE "user" SET role = ? WHERE id = ?').bind("owner", userId).run();
   });
 
   afterEach(() => {
@@ -67,6 +69,13 @@ describe("personal access token observability", () => {
       headers: { authorization }
     });
     expect(accepted.status).toBe(200);
+    const marker = "synthetic-mail-content-marker";
+    const draft = await SELF.fetch(`${origin}/api/v1/drafts`, {
+      body: JSON.stringify({ text: marker }),
+      headers: { authorization, "content-type": "application/json" },
+      method: "POST"
+    });
+    expect(draft.status).toBe(201);
     const revoked = await SELF.fetch(
       `${origin}/api/personal-access-tokens/${createdBody.personalAccessToken.id}`,
       { headers: { cookie }, method: "DELETE" }
@@ -76,16 +85,25 @@ describe("personal access token observability", () => {
       headers: { authorization }
     });
     expect(rejected.status).toBe(401);
+    const auditRows = await env.DB.prepare(
+      `SELECT action, resource_id AS resourceId, metadata_json AS metadataJson
+       FROM audit_events
+       WHERE actor_id = ? OR resource_id = ?
+       ORDER BY occurred_at, id`
+    )
+      .bind(userId, createdBody.personalAccessToken.id)
+      .all<{ action: string; resourceId: string | null; metadataJson: string }>();
+    const serializedAuditRows = JSON.stringify(auditRows.results);
 
     assertSecretSafeAbsent(
-      [log.mock.calls, info.mock.calls, warn.mock.calls, error.mock.calls],
+      [log.mock.calls, info.mock.calls, warn.mock.calls, error.mock.calls, serializedAuditRows],
       [
         createdBody.token,
         stored.tokenHash,
         authorization,
         createRequestBody,
         serializedCreateResponse,
-        "synthetic-mail-content-marker"
+        marker
       ]
     );
   });

@@ -4,7 +4,7 @@ import { appRoutePath, readAppRoute, settingsTabs } from "@/lib/routes";
 
 const read = (path: string) => readFileSync(path, "utf8");
 
-describe("web Mail API routing", () => {
+describe("web API settings and Mail API routing", () => {
   it("routes every signed-in role to API settings", () => {
     expect(settingsTabs).toContain("api");
     expect(readAppRoute("https://mail.example.com/settings/api")).toEqual({

@@ -27,6 +27,12 @@ describe("personal access token route boundary", () => {
     bearer = created.token;
   });
 
+  it("authenticates the versioned Mail API", async () => {
+    const response = await patFetch("/api/v1/mailboxes");
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual([]);
+  });
+
   it.each([
     ["users", "/api/users"],
     ["PAT management", "/api/personal-access-tokens"]
