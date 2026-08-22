@@ -168,8 +168,8 @@ export async function triggerUpdate(
         409
       );
     }
-    await setBuildVersionPin(variablesUrl, expectedVersion, headers, fetcher);
     try {
+      await setBuildVersionPin(variablesUrl, expectedVersion, headers, fetcher);
       const build = await cloudflare<{
         result: { build_uuid?: string; id?: string; status?: string };
       }>(

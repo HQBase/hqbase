@@ -116,17 +116,31 @@ describe("HQBase updates", () => {
   });
   it("times out Cloudflare work before the update-build lease can expire", async () => {
     const originalTimeout = AbortSignal.timeout;
-    const controller = new AbortController();
-    const timeout = vi
-      .spyOn(AbortSignal, "timeout")
-      .mockImplementation((delay) =>
-        delay === 30_000 ? controller.signal : originalTimeout(delay)
-      );
-    const baseFetcher = cloudflareUpdateFetcher();
+    const controllers: AbortController[] = [];
+    const timeout = vi.spyOn(AbortSignal, "timeout").mockImplementation((delay) => {
+      if (delay !== 30_000) return originalTimeout(delay);
+      const controller = new AbortController();
+      controllers.push(controller);
+      return controller.signal;
+    });
+    const baseFetcher = cloudflareUpdateFetcher({
+      variables: {
+        HQBASE_EXPECTED_RELEASE_VERSION: { is_secret: false, value: "0.0.8" }
+      }
+    });
+    let firstPinTimedOut = false;
     const fetcher = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-      if (String(input).endsWith("/environment_variables") && !init?.method) {
+      if (
+        String(input).endsWith("/environment_variables") &&
+        init?.method === "PATCH" &&
+        !firstPinTimedOut
+      ) {
+        firstPinTimedOut = true;
         const signal = init?.signal;
-        expect(signal).toBe(controller.signal);
+        const controller = controllers.find((candidate) => candidate.signal === signal);
+        expect(controller).toBeDefined();
+        if (!controller) throw new Error("Expected the request timeout signal.");
+        await baseFetcher(input, init);
         controller.abort(new DOMException("Timed out", "TimeoutError"));
         throw signal?.reason;
       }
@@ -143,6 +157,14 @@ describe("HQBase updates", () => {
           fetcher as typeof fetch
         )
       ).rejects.toMatchObject({ code: "UPDATE_CLOUDFLARE_TIMEOUT", status: 504 });
+      const pinRequests = baseFetcher.mock.calls.filter(
+        ([input, init]) =>
+          String(input).endsWith("/environment_variables") && init?.method === "PATCH"
+      );
+      expect(pinRequests.map(([, init]) => init?.body)).toEqual([
+        JSON.stringify({ HQBASE_EXPECTED_RELEASE_VERSION: { is_secret: false, value: "0.1.0" } }),
+        JSON.stringify({ HQBASE_EXPECTED_RELEASE_VERSION: { is_secret: false, value: "0.0.8" } })
+      ]);
     } finally {
       timeout.mockRestore();
     }
