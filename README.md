@@ -38,7 +38,7 @@
 </p>
 
 <p align="center">
-  <a href="https://deploy.workers.cloudflare.com/?url=https%3A%2F%2Fgithub.com%2FHQBase%2Fhqbase">
+  <a href="https://deploy.workers.cloudflare.com/?url=https%3A%2F%2Fgithub.com%2FHQBase%2Fhqbase%2Ftree%2Fdeploy">
     <img src="https://deploy.workers.cloudflare.com/button" alt="Deploy to Cloudflare">
   </a>
 </p>

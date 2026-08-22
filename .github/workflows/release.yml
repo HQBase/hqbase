@@ -19,6 +19,7 @@ jobs:
       contents: write
     outputs:
       artifact_name: ${{ steps.metadata.outputs.artifact_name }}
+      commit: ${{ steps.metadata.outputs.commit }}
       draft_created: ${{ steps.draft.outputs.created }}
       previous_tag: ${{ steps.metadata.outputs.previous_tag }}
       version: ${{ steps.metadata.outputs.version }}
@@ -79,6 +80,7 @@ jobs:
           artifact_name="hqbase-release-${release_version}-${GITHUB_SHA}"
           echo "HQBASE_RELEASE_VERSION=$release_version" >> "$GITHUB_ENV"
           echo "artifact_name=$artifact_name" >> "$GITHUB_OUTPUT"
+          echo "commit=$GITHUB_SHA" >> "$GITHUB_OUTPUT"
           echo "previous_tag=$previous_tag" >> "$GITHUB_OUTPUT"
           echo "version=$release_version" >> "$GITHUB_OUTPUT"
       - run: pnpm install --frozen-lockfile
@@ -293,11 +295,75 @@ jobs:
       contents: write
     env:
       GH_TOKEN: ${{ github.token }}
+      RELEASE_COMMIT: ${{ needs.candidate.outputs.commit }}
       HQBASE_RELEASE_VERSION: ${{ needs.candidate.outputs.version }}
     steps:
       - uses: actions/checkout@v6
+      - name: Read current Deploy Button source
+        id: deploy_source
+        run: |
+          previous_commit="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/deploy" --jq .object.sha)"
+          test -n "$previous_commit"
+          echo "previous_commit=$previous_commit" >> "$GITHUB_OUTPUT"
+      - name: Verify any existing release tag source
+        run: |
+          tag_name="v${HQBASE_RELEASE_VERSION}"
+          tag_ref="$(gh api "repos/$GITHUB_REPOSITORY/git/matching-refs/tags/$tag_name" \
+            --jq ".[] | select(.ref == \"refs/tags/$tag_name\") | [.object.type, .object.sha] | @tsv")"
+          if test -z "$tag_ref"; then
+            exit 0
+          fi
+          read -r tag_type tag_commit <<< "$tag_ref"
+          while test "$tag_type" = "tag"; do
+            read -r tag_type tag_commit < <(
+              gh api "repos/$GITHUB_REPOSITORY/git/tags/$tag_commit" \
+                --jq '[.object.type, .object.sha] | @tsv'
+            )
+          done
+          test "$tag_type" = "commit"
+          test "$tag_commit" = "$RELEASE_COMMIT"
+      - name: Advance Deploy Button source to validated candidate
+        id: advance_deploy
+        run: >-
+          gh api --method PATCH "repos/$GITHUB_REPOSITORY/git/refs/heads/deploy"
+          -f sha="$RELEASE_COMMIT"
       - name: Publish the validated draft
+        id: publish_release
         run: gh release edit "v${HQBASE_RELEASE_VERSION}" --draft=false --latest
+      - name: Restore Deploy Button source after publication failure
+        if: ${{ failure() && steps.advance_deploy.outcome == 'success' && steps.publish_release.outcome == 'failure' }}
+        env:
+          PREVIOUS_DEPLOY_COMMIT: ${{ steps.deploy_source.outputs.previous_commit }}
+        run: |
+          release_lookup_succeeded=false
+          release_is_draft=""
+          for attempt in $(seq 1 5); do
+            if release_is_draft="$(gh release view "v${HQBASE_RELEASE_VERSION}" --json isDraft --jq .isDraft)"; then
+              release_lookup_succeeded=true
+              break
+            fi
+            sleep 2
+          done
+          if test "$release_lookup_succeeded" != "true"; then
+            echo "Could not determine whether the release is public; refusing to change the Deploy branch." >&2
+            exit 1
+          fi
+          if test "$release_is_draft" = "false"; then
+            echo "::warning title=Deploy branch retained::The release is public, so the validated Deploy Button source was not rolled back."
+            exit 0
+          fi
+          if test "$release_is_draft" != "true"; then
+            echo "GitHub returned an invalid release draft state: $release_is_draft" >&2
+            exit 1
+          fi
+          current_commit="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/deploy" --jq .object.sha)"
+          if test "$current_commit" != "$RELEASE_COMMIT"; then
+            echo "Deploy branch moved after the candidate update; refusing to overwrite it." >&2
+            exit 1
+          fi
+          gh api --method PATCH "repos/$GITHUB_REPOSITORY/git/refs/heads/deploy" \
+            -f sha="$PREVIOUS_DEPLOY_COMMIT" \
+            -F force=true
       - name: Verify public stable asset, signature, and digest
         run: |
           stable_url="https://github.com/HQBase/hqbase/releases/latest/download/stable.json"
@@ -310,6 +376,21 @@ jobs:
             test "$attempt" -lt 30
             sleep 2
           done
+          tag_name="v${HQBASE_RELEASE_VERSION}"
+          read -r tag_type tag_commit < <(
+            gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$tag_name" \
+              --jq '[.object.type, .object.sha] | @tsv'
+          )
+          while test "$tag_type" = "tag"; do
+            read -r tag_type tag_commit < <(
+              gh api "repos/$GITHUB_REPOSITORY/git/tags/$tag_commit" \
+                --jq '[.object.type, .object.sha] | @tsv'
+            )
+          done
+          test "$tag_type" = "commit"
+          test "$tag_commit" = "$RELEASE_COMMIT"
+          deploy_commit="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/deploy" --jq .object.sha)"
+          test "$deploy_commit" = "$RELEASE_COMMIT"
           node --input-type=module -e '
             import { createHash, createPublicKey, verify } from "node:crypto";
             import { readFileSync, statSync } from "node:fs";

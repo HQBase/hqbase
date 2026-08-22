@@ -9,6 +9,7 @@ const releaseWorkflow = readFileSync(
   new URL("../../../.github/workflows/release.yml", import.meta.url),
   "utf8"
 );
+const readme = readFileSync(new URL("../../../README.md", import.meta.url), "utf8");
 
 describe("staging workflow lifecycle record", () => {
   it("tests a populated SQL migration upgrade before deployment", () => {
@@ -67,5 +68,36 @@ describe("staging workflow lifecycle record", () => {
     expect(waitStep).toContain('jq -e --arg version "$CANDIDATE_VERSION"');
     expect(waitStep).toContain(".version == $version");
     expect(waitStep).toContain("candidate=$CANDIDATE_VERSION&attempt=$attempt");
+  });
+
+  it("moves the Deploy Button source before publication and verifies the exact commit", () => {
+    const readSource = releaseWorkflow.indexOf("Read current Deploy Button source");
+    const verifyTag = releaseWorkflow.indexOf("Verify any existing release tag source");
+    const advance = releaseWorkflow.indexOf("Advance Deploy Button source to validated candidate");
+    const publish = releaseWorkflow.indexOf("Publish the validated draft");
+    const restore = releaseWorkflow.indexOf(
+      "Restore Deploy Button source after publication failure"
+    );
+    const verify = releaseWorkflow.indexOf("Verify public stable asset, signature, and digest");
+
+    expect(readSource).toBeGreaterThan(-1);
+    expect(verifyTag).toBeGreaterThan(readSource);
+    expect(advance).toBeGreaterThan(verifyTag);
+    expect(publish).toBeGreaterThan(advance);
+    expect(restore).toBeGreaterThan(publish);
+    expect(verify).toBeGreaterThan(restore);
+    expect(releaseWorkflow).toContain("RELEASE_COMMIT: \u0024{{ needs.candidate.outputs.commit }}");
+    expect(releaseWorkflow).toContain("git/refs/heads/deploy");
+    expect(releaseWorkflow).toContain("git/matching-refs/tags/$tag_name");
+    expect(releaseWorkflow).toContain("git/tags/$tag_commit");
+    expect(releaseWorkflow).toContain("steps.publish_release.outcome == 'failure'");
+    expect(releaseWorkflow).toContain("--json isDraft --jq .isDraft");
+    expect(releaseWorkflow).toContain("release_lookup_succeeded=false");
+    expect(releaseWorkflow).toContain('test "$release_lookup_succeeded" != "true"');
+    expect(releaseWorkflow).toContain('test "$release_is_draft" = "false"');
+    expect(releaseWorkflow).toContain("-F force=true");
+    expect(releaseWorkflow).toContain('test "$tag_commit" = "$RELEASE_COMMIT"');
+    expect(releaseWorkflow).toContain('test "$deploy_commit" = "$RELEASE_COMMIT"');
+    expect(readme).toContain("HQBase%2Fhqbase%2Ftree%2Fdeploy");
   });
 });
