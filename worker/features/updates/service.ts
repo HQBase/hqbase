@@ -5,8 +5,6 @@ import { AppError } from "../../lib/errors";
 import { hqbaseProductConfig } from "../../lib/product-config";
 import type { ReleaseManifest, UpdateStatus } from "./types";
 
-const product = "hqbase" as const;
-const installedSchemaVersion = 2;
 const expectedReleaseVariable = "HQBASE_EXPECTED_RELEASE_VERSION";
 const forceSourceDeployVariable = "HQBASE_FORCE_SOURCE_DEPLOY";
 const managedDeployCommands = new Set(["pnpm deploy", "pnpm run deploy"]);
@@ -48,16 +46,16 @@ export async function getUpdateStatus(
   )
     throw new AppError("UPDATE_SIGNATURE_INVALID", "Release signature verification failed.", 503);
   const release = manifestSchema.parse(JSON.parse(decodeBase64Url(envelope.payload)));
-  if (release.product !== product)
+  if (release.product !== "hqbase")
     throw new AppError(
       "UPDATE_PRODUCT_INVALID",
       "Release product does not match this installation.",
       503
     );
   return {
-    product,
+    product: "hqbase",
     installedVersion,
-    installedSchemaVersion,
+    installedSchemaVersion: 2,
     channel: "stable",
     checkedAt: new Date().toISOString(),
     available: compareVersions(release.version, installedVersion) > 0,
@@ -191,7 +189,9 @@ export async function triggerUpdate(
       );
     return { buildId, status: build.result.status ?? "queued" };
   } catch (error) {
-    await restoreBuildVersionPin(variablesUrl, previousPin, headers, fetcher);
+    await restoreBuildVersionPin(variablesUrl, previousPin, headers, fetcher).catch(
+      () => undefined
+    );
     throw error;
   }
 }

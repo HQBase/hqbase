@@ -124,6 +124,44 @@ describe("HQBase updates", () => {
       )
     ).toBe(false);
   });
+  it("rejects a secret release pin", async () => {
+    const fetcher = cloudflareUpdateFetcher({
+      variables: {
+        HQBASE_EXPECTED_RELEASE_VERSION: { is_secret: true }
+      }
+    });
+
+    await expect(
+      triggerUpdate(
+        updateEnvironment(),
+        "temporary-token-that-is-long-enough",
+        "0.1.0",
+        fetcher as typeof fetch
+      )
+    ).rejects.toThrow("plain build variable");
+    expect(
+      fetcher.mock.calls.some(
+        ([input, init]) => String(input).endsWith("/builds") && init?.method === "POST"
+      )
+    ).toBe(false);
+  });
+  it("rejects a trigger that does not include main", async () => {
+    const fetcher = cloudflareUpdateFetcher({ branchIncludes: ["production"] });
+
+    await expect(
+      triggerUpdate(
+        updateEnvironment(),
+        "temporary-token-that-is-long-enough",
+        "0.1.0",
+        fetcher as typeof fetch
+      )
+    ).rejects.toThrow("Connect this Worker to Workers Builds");
+    expect(
+      fetcher.mock.calls.some(
+        ([input, init]) => String(input).endsWith("/builds") && init?.method === "POST"
+      )
+    ).toBe(false);
+  });
   it("requires the build to use the release reviewed by the user", async () => {
     await expect(
       triggerUpdate(
@@ -179,6 +217,24 @@ describe("HQBase updates", () => {
       )
     ).toBe(true);
   });
+  it("preserves the build error when release pin rollback fails", async () => {
+    const fetcher = cloudflareUpdateFetcher({
+      buildFails: true,
+      rollbackFails: true,
+      variables: {
+        HQBASE_EXPECTED_RELEASE_VERSION: { is_secret: false, value: "0.0.8" }
+      }
+    });
+
+    await expect(
+      triggerUpdate(
+        updateEnvironment(),
+        "temporary-token-that-is-long-enough",
+        "0.1.0",
+        fetcher as typeof fetch
+      )
+    ).rejects.toThrow("Build could not start");
+  });
 });
 
 function updateEnvironment(): WorkerEnv {
@@ -196,12 +252,15 @@ function updateEnvironment(): WorkerEnv {
 
 function cloudflareUpdateFetcher(
   options: {
+    branchIncludes?: string[];
     buildFails?: boolean;
     deployCommand?: string;
+    rollbackFails?: boolean;
     rootDirectory?: string;
     variables?: Record<string, { is_secret: boolean; value?: string | null }>;
   } = {}
 ) {
+  let pinPatches = 0;
   return vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input);
     if (url.includes("github.com/HQBase/hqbase/releases")) return Response.json(envelope);
@@ -220,7 +279,7 @@ function cloudflareUpdateFetcher(
         result: [
           {
             id: "trigger",
-            branch_includes: ["main"],
+            branch_includes: options.branchIncludes ?? ["main"],
             deploy_command: options.deployCommand ?? "pnpm deploy",
             root_directory: options.rootDirectory ?? "/"
           }
@@ -228,6 +287,13 @@ function cloudflareUpdateFetcher(
       });
     }
     if (url.endsWith("/environment_variables")) {
+      if (init?.method === "PATCH") pinPatches += 1;
+      if (options.rollbackFails && pinPatches > 1) {
+        return Response.json(
+          { success: false, errors: [{ message: "Pin rollback failed." }] },
+          { status: 502 }
+        );
+      }
       return Response.json({
         success: true,
         result: init?.method === "PATCH" ? {} : (options.variables ?? {})

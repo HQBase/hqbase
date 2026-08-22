@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { z } from "zod";
 import {
   isRecentSession,
@@ -7,8 +8,10 @@ import {
   requireRole
 } from "../../auth/session";
 import type { HonoApp } from "../../lib/env";
+import { errorBody, toAppError } from "../../lib/errors";
 import { readJson } from "../../lib/json";
 import { parseWith } from "../../lib/validation";
+import { operationalLog } from "../../observability/log";
 import {
   clearRuntimeCloudflareGrantCookie,
   finishRuntimeCloudflareOAuth,
@@ -50,15 +53,25 @@ updateRoutes.post("/apply", async (c) => {
   requireRecentSession(auth);
   const input = parseWith(applyUpdateSchema, await readJson(c.req.raw));
   const grant = await resolveRuntimeCloudflareGrant(c.req.raw, c.env);
-  let result: Awaited<ReturnType<typeof triggerUpdate>>;
+  const outcome = await triggerUpdate(c.env, grant, input.expectedVersion).then(
+    (result) => ({ ok: true, result }) as const,
+    (error: unknown) => ({ error, ok: false }) as const
+  );
   try {
-    result = await triggerUpdate(c.env, grant, input.expectedVersion);
+    await revokeRuntimeCloudflareGrant(grant, c.env);
+  } catch (error) {
+    operationalLog("warn", "cloudflare_grant_revocation_failed", {
+      errorCode: toAppError(error).code
+    });
   } finally {
-    try {
-      await revokeRuntimeCloudflareGrant(grant, c.env);
-    } finally {
-      c.header("set-cookie", clearRuntimeCloudflareGrantCookie());
-    }
+    c.header("set-cookie", clearRuntimeCloudflareGrantCookie());
   }
-  return c.json(result, 202);
+  if (!outcome.ok) {
+    const appError = toAppError(outcome.error);
+    return c.json(
+      errorBody(appError.code, appError.message),
+      appError.status as ContentfulStatusCode
+    );
+  }
+  return c.json(outcome.result, 202);
 });
