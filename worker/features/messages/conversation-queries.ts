@@ -9,6 +9,7 @@ import { AppError } from "../../lib/errors";
 
 import type { MessageAction } from "./actions";
 import { decodeKeysetCursor, encodeKeysetCursor, type KeysetCursor } from "./keyset-cursor";
+import { literalSearchPattern } from "./search";
 import type {
   ConversationFolder,
   ConversationPage,
@@ -67,11 +68,13 @@ export async function listConversationPage(
     eligibilityWhere.push(sql`accessible.folder = ${filters.folder}`);
   }
   if (filters.search) {
-    const like = `%${filters.search}%`;
+    const like = literalSearchPattern(filters.search);
     eligibilityWhere.push(
-      sql`(accessible.subject LIKE ${like} OR accessible.from_address LIKE ${like}
-           OR accessible.to_json LIKE ${like} OR accessible.snippet LIKE ${like}
-           OR accessible.text_body LIKE ${like})`
+      sql`(accessible.subject LIKE ${like} ESCAPE '\\'
+           OR accessible.from_address LIKE ${like} ESCAPE '\\'
+           OR accessible.to_json LIKE ${like} ESCAPE '\\'
+           OR accessible.snippet LIKE ${like} ESCAPE '\\'
+           OR accessible.text_body LIKE ${like} ESCAPE '\\')`
     );
   }
 

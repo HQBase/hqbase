@@ -335,7 +335,7 @@
               "type": "string",
               "maxLength": 200
             },
-            "description": "Search subject, sender, recipient, and message text."
+            "description": "Search one literal substring in the subject, sender, To recipients, snippet, and plain-text body. The characters %, _, and \\ are ordinary text."
           },
           {
             "in": "query",
@@ -1142,7 +1142,7 @@
               "type": "string",
               "maxLength": 200
             },
-            "description": "Search subject, sender, recipient, and message text."
+            "description": "Search one literal substring in the subject, sender, To recipients, snippet, and plain-text body. The characters %, _, and \\ are ordinary text."
           },
           {
             "in": "query",
