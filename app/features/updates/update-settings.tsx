@@ -9,6 +9,8 @@ import { applyUpdate, getUpdateStatus } from "./api";
 import type { UpdateStatus } from "./types";
 import type { UpdateProgress } from "./update-progress";
 
+const reviewedVersionKey = "hqb_update_expected_version";
+
 export function UpdateSettings({
   initialStatus,
   progress,
@@ -48,13 +50,20 @@ export function UpdateSettings({
     url.searchParams.delete("settings");
     window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
 
+    const expectedVersion = window.sessionStorage.getItem(reviewedVersionKey);
+    window.sessionStorage.removeItem(reviewedVersionKey);
+
     if (oauthResult !== "connected") {
       setApplyError(oauthErrorMessage(oauthResult));
       return;
     }
+    if (!expectedVersion) {
+      setApplyError("The reviewed release is no longer available. Check for updates again.");
+      return;
+    }
 
     setPendingAction("apply");
-    void applyUpdate()
+    void applyUpdate(expectedVersion)
       .then((result) => onUpdateStarted(result.buildId))
       .catch((nextError: unknown) => {
         setApplyError(nextError instanceof Error ? nextError.message : "Update could not start.");
@@ -194,6 +203,11 @@ export function UpdateSettings({
         authorizeHref="/api/updates/cloudflare/oauth/start"
         description="To install this update, HQBase needs temporary access to your Cloudflare account. You’ll return to Updates automatically, and HQBase will start the update."
         open={authorizationOpen}
+        onAuthorize={() => {
+          if (status?.release.version) {
+            window.sessionStorage.setItem(reviewedVersionKey, status.release.version);
+          }
+        }}
         onOpenChange={setAuthorizationOpen}
       />
     </SettingsSection>
