@@ -87,7 +87,8 @@ function findPlainTextQuoteStart(value: string): number | null {
       while (wrappedStart > 0 && (lines[wrappedStart - 1] ?? "").trim()) {
         wrappedStart -= 1;
       }
-      if (wrappedStart > 0) attributionStart = wrappedStart;
+      if (wrappedStart === 0) continue;
+      attributionStart = wrappedStart;
     }
     return offsets[attributionStart] ?? 0;
   }

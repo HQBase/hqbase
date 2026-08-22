@@ -215,6 +215,12 @@ describe("message HTML view", () => {
     });
   });
 
+  it("keeps a leading wrapped attribution visible when its boundary is ambiguous", () => {
+    const value = "On Thu, Aug 20, 2026 at 10:00 AM\nPat <pat@example.com> wrote:\n> Earlier reply";
+
+    expect(splitQuotedText(value)).toEqual({ afterQuote: null, body: value, quote: null });
+  });
+
   it("keeps an authored plain-text quotation visible without a sender attribution", () => {
     const value = "Design note\n\nExample:\n\n> Authored quotation";
     expect(splitQuotedText(value)).toEqual({ afterQuote: null, body: value, quote: null });
