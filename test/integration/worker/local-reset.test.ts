@@ -16,6 +16,7 @@ import latestPasswordResetTokenMigration from "../../../migrations/0011_latest_p
 import messageActivityIndexMigration from "../../../migrations/0012_message_activity_index.sql?raw";
 import messageChangesMigration from "../../../migrations/0013_message_changes.sql?raw";
 import unassignedMessagesMigration from "../../../migrations/0014_unassigned_messages.sql?raw";
+import personalAccessTokensMigration from "../../../migrations/0015_personal_access_tokens.sql?raw";
 import resetSql from "../../../scripts/hqbase/reset-d1.sql?raw";
 import { buildSeedSql } from "../../../scripts/local-seed-fixture.mjs";
 import { migrationStatements } from "./migration-statements";
@@ -35,7 +36,8 @@ const migrations = [
   latestPasswordResetTokenMigration,
   messageActivityIndexMigration,
   messageChangesMigration,
-  unassignedMessagesMigration
+  unassignedMessagesMigration,
+  personalAccessTokensMigration
 ];
 
 describe("local database reset", () => {
@@ -47,6 +49,17 @@ describe("local database reset", () => {
   }, 60_000);
 
   it("removes current data and supports a fresh migration", async () => {
+    await env.DB.prepare(
+      `INSERT INTO personal_access_tokens
+       (id, user_id, name, token_hash, token_suffix, created_at, expires_at, revoked_at)
+       VALUES (
+         'pat_before_local_reset', 'usr_local_owner', 'Reset fixture', ?, 'a1B2',
+         '2026-08-14T18:00:00.000Z', NULL, NULL
+       )`
+    )
+      .bind("R".repeat(43))
+      .run();
+
     await applyStatements(resetSql);
     await applyMigrations();
 
@@ -104,6 +117,35 @@ describe("local database reset", () => {
       name: string;
     }>();
     expect(messageColumns.results.map((column) => column.name)).toContain("is_unassigned");
+
+    const personalAccessTokens = await env.DB.prepare(
+      "SELECT COUNT(*) AS count FROM personal_access_tokens"
+    ).first<{ count: number }>();
+    expect(personalAccessTokens?.count).toBe(0);
+
+    const stamp = "2026-08-20T18:00:00.000Z";
+    await env.DB.prepare(
+      `INSERT INTO "user"
+       (id, name, email, emailVerified, createdAt, updatedAt, role, banned)
+       VALUES ('usr_after_local_reset', 'Reset Owner', 'reset@example.com', 1, ?, ?, 'owner', 0)`
+    )
+      .bind(stamp, stamp)
+      .run();
+    await env.DB.prepare(
+      `INSERT INTO personal_access_tokens
+       (id, user_id, name, token_hash, token_suffix, created_at, expires_at, revoked_at)
+       VALUES (
+         'pat_after_local_reset', 'usr_after_local_reset', 'Fresh reset token', ?, 'c3D4',
+         ?, NULL, NULL
+       )`
+    )
+      .bind("S".repeat(43), stamp)
+      .run();
+
+    const freshPat = await env.DB.prepare(
+      "SELECT id FROM personal_access_tokens WHERE id = 'pat_after_local_reset'"
+    ).first<{ id: string }>();
+    expect(freshPat?.id).toBe("pat_after_local_reset");
   });
 });
 

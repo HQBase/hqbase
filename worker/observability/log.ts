@@ -11,7 +11,14 @@ const forbiddenKeys = new Set([
   "recipient",
   "secret",
   "subject",
-  "token"
+  "token",
+  "tokenhash",
+  "accesstoken",
+  "refreshtoken",
+  "authorization",
+  "authorizationheader",
+  "requestbody",
+  "responsebody"
 ]);
 
 export type LogFields = Record<string, boolean | number | string | null>;
@@ -22,7 +29,8 @@ export function operationalLog(
   fields: LogFields = {}
 ): void {
   for (const key of Object.keys(fields)) {
-    if (forbiddenKeys.has(key.toLowerCase())) {
+    const normalizedKey = key.toLowerCase().replace(/[^a-z0-9]/gu, "");
+    if (forbiddenKeys.has(normalizedKey)) {
       throw new Error(`Sensitive operational log field rejected: ${key}`);
     }
   }

@@ -6,6 +6,7 @@ import type { Mailbox } from "@/features/mailboxes/types";
 import { McpSettings } from "@/features/mcp/mcp-settings";
 import { NotificationSettings } from "@/features/notifications/notification-settings";
 import type { NotificationController } from "@/features/notifications/types";
+import { PersonalAccessTokenSettings } from "@/features/personal-access-tokens/personal-access-token-settings";
 import { DebugSettings } from "@/features/settings/debug-settings";
 import { InterfaceSettings } from "@/features/settings/interface-settings";
 import { SettingsSection } from "@/features/settings/settings-section";
@@ -81,6 +82,7 @@ export function SettingsPage({
           <NotificationSettings notifications={notifications} />
         ) : null}
         {activeTab === "interface" ? <InterfaceSettings /> : null}
+        {activeTab === "api" ? <PersonalAccessTokenSettings userRole={currentUser.role} /> : null}
         {activeTab === "mcp" ? <McpSettings user={currentUser} /> : null}
         {activeTab === "updates" && canManage ? (
           <UpdateSettings

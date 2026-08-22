@@ -6,6 +6,7 @@ import {
   PiEnvelopeSimple,
   PiGear,
   PiGlobe,
+  PiKey,
   PiNotePencil,
   PiPalette,
   PiPaperPlaneTilt,
@@ -51,6 +52,7 @@ export const settingsTabIcons: Record<
   domains: PiGlobe,
   notifications: PiBell,
   interface: PiPalette,
+  api: PiKey,
   mcp: PiPlug,
   updates: PiArrowsClockwise,
   debug: PiBug
@@ -62,6 +64,7 @@ export const settingsTabLabels: Record<SettingsTabId, string> = {
   domains: "Domains",
   notifications: "Notifications",
   interface: "Interface",
+  api: "API",
   mcp: "MCP",
   updates: "Updates",
   debug: "Debug"

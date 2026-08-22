@@ -1,5 +1,6 @@
 import { disableCurrentDeviceNotificationsBeforeSignOut } from "@/features/notifications/sign-out";
 import { apiGet, apiPatch, apiPost } from "@/lib/api-client";
+import { notifySignOutStarted } from "./sign-out-lifecycle";
 import type { CurrentUser } from "./types";
 
 export async function getCurrentUser(): Promise<CurrentUser> {
@@ -35,6 +36,7 @@ export async function signIn(email: string, password: string): Promise<string | 
 }
 
 export async function signOut(): Promise<void> {
+  notifySignOutStarted();
   const cleanup = disableCurrentDeviceNotificationsBeforeSignOut().catch(() => {});
   await Promise.race([cleanup, new Promise<void>((resolve) => setTimeout(resolve, 1500))]);
   try {

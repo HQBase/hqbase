@@ -20,6 +20,10 @@ describe("local D1 reset", () => {
     expect(resetTables).toContain("d1_migrations");
   });
 
+  it("drops personal access tokens explicitly", () => {
+    expect(resetSql).toMatch(/DROP TABLE IF EXISTS personal_access_tokens;/u);
+  });
+
   it("keeps the destructive workflow local for both reset and migration", () => {
     const command = packageJson.scripts["db:reset:local"];
     expect(command.match(/--local/g)).toHaveLength(2);

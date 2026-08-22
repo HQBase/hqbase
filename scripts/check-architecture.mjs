@@ -6,6 +6,11 @@ const hardLimit = 400;
 const reviewLimit = 300;
 const failures = [];
 const warnings = [];
+const patPrincipalReference = /["'][^"'\n]*personal-access-token-principal(?:\.[^"'\n]*)?["']/u;
+const patPrincipalReferenceFiles = new Set([
+  path.normalize("worker/auth/mail-api.ts"),
+  path.join("worker", "auth", ["personal-access-token", "principal.ts"].join("-"))
+]);
 
 for (const root of roots) {
   for (const file of await sourceFiles(root)) {
@@ -26,6 +31,11 @@ for (const root of roots) {
     }
     if (file.startsWith(`worker${path.sep}`) && /from\s+["']node:/.test(contents)) {
       failures.push(`${file}: Worker code must prefer Web Platform APIs over Node built-ins`);
+    }
+    if (patPrincipalReference.test(contents) && !patPrincipalReferenceFiles.has(file)) {
+      failures.push(
+        `${file}: only worker/auth/mail-api.ts may reference personal-access-token-principal`
+      );
     }
   }
 }

@@ -1,14 +1,27 @@
 import type { WorkerEnv } from "../lib/env";
 import { AppError } from "../lib/errors";
+import type { WorkspaceRole } from "../lib/validation";
 
 import { authOrigin, mailApiResource } from "./auth";
 import { authenticateOAuthBearer, OAuthBearerError } from "./oauth-principal";
+import {
+  authenticatePersonalAccessToken,
+  PersonalAccessTokenError
+} from "./personal-access-token-principal";
 import { type AuthContext, requireAuthContext } from "./session";
 
 export const mailApiScopes = ["mail:read", "mail:write", "mail:send"] as const;
 export type MailApiScope = (typeof mailApiScopes)[number];
 export const mailApiMetadataPath = "/.well-known/oauth-protected-resource/api/v1";
 const agentSkillPath = "/skills/hqbase-mail/SKILL.md";
+
+export type MailApiContext = {
+  authentication:
+    | { kind: "session"; id: string }
+    | { kind: "oauth"; clientId: string }
+    | { kind: "pat"; tokenId: string };
+  user: { id: string; email: string; name: string; role: WorkspaceRole };
+};
 
 export class MailApiAuthError extends AppError {
   readonly authError: "invalid_token" | "insufficient_scope" | null;
@@ -32,14 +45,14 @@ export async function requireMailApiContext(
   env: WorkerEnv,
   request: Request,
   requiredScope: MailApiScope
-): Promise<AuthContext> {
+): Promise<MailApiContext> {
   if (!isVersionedMailApiRequest(request)) {
-    return requireAuthContext(env, request);
+    return sessionMailApiContext(await requireAuthContext(env, request));
   }
 
   if (!request.headers.has("authorization")) {
     try {
-      return await requireAuthContext(env, request);
+      return sessionMailApiContext(await requireAuthContext(env, request));
     } catch (error) {
       if (error instanceof AppError && error.status === 401) {
         throw new MailApiAuthError(
@@ -48,6 +61,28 @@ export async function requireMailApiContext(
           401,
           requiredScope,
           null
+        );
+      }
+      throw error;
+    }
+  }
+
+  const bearer = readMailApiBearerValue(request);
+  if (bearer?.startsWith("hqb_pat_")) {
+    try {
+      const principal = await authenticatePersonalAccessToken(env.DB, bearer);
+      return {
+        authentication: { kind: "pat", tokenId: principal.tokenId },
+        user: principal.user
+      };
+    } catch (error) {
+      if (error instanceof PersonalAccessTokenError) {
+        throw new MailApiAuthError(
+          "INVALID_PERSONAL_ACCESS_TOKEN",
+          "Bearer token is invalid or inactive.",
+          401,
+          requiredScope,
+          "invalid_token"
         );
       }
       throw error;
@@ -68,7 +103,10 @@ export async function requireMailApiContext(
         "insufficient_scope"
       );
     }
-    return { session: principal.session, user: principal.user };
+    return {
+      authentication: { kind: "oauth", clientId: principal.clientId },
+      user: principal.user
+    };
   } catch (error) {
     if (error instanceof MailApiAuthError) throw error;
     if (error instanceof OAuthBearerError) {
@@ -82,6 +120,22 @@ export async function requireMailApiContext(
     }
     throw error;
   }
+}
+
+export function readMailApiBearerValue(request: Request): string | null {
+  const authorization = request.headers.get("authorization");
+  return authorization?.match(/^Bearer\s+(.+)$/iu)?.[1]?.trim() ?? null;
+}
+
+export function mailApiAuditMetadata(
+  context: MailApiContext
+): { authenticationKind: "pat"; personalAccessTokenId: string } | undefined {
+  return context.authentication.kind === "pat"
+    ? {
+        authenticationKind: "pat",
+        personalAccessTokenId: context.authentication.tokenId
+      }
+    : undefined;
 }
 
 export function isVersionedMailApiRequest(request: Request): boolean {
@@ -122,4 +176,11 @@ export function handleMailApiMetadata(request: Request, env: WorkerEnv): Respons
       }
     }
   );
+}
+
+function sessionMailApiContext(auth: AuthContext): MailApiContext {
+  return {
+    authentication: { kind: "session", id: auth.session.id },
+    user: auth.user
+  };
 }

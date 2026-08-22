@@ -29,6 +29,47 @@ export const users = sqliteTable("user", {
   banExpires: authDateText("banExpires")
 });
 
+export const personalAccessTokens = sqliteTable(
+  "personal_access_tokens",
+  {
+    id: text("id").primaryKey().notNull(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    tokenHash: text("token_hash").notNull().unique(),
+    tokenSuffix: text("token_suffix").notNull(),
+    createdAt: text("created_at").notNull(),
+    expiresAt: text("expires_at"),
+    revokedAt: text("revoked_at")
+  },
+  (table) => [
+    check("personal_access_tokens_name_check", sql`length(trim(${table.name})) BETWEEN 1 AND 80`),
+    check(
+      "personal_access_tokens_token_hash_check",
+      sql`length(${table.tokenHash}) = 43 AND ${table.tokenHash} NOT GLOB '*[^A-Za-z0-9_-]*'`
+    ),
+    check(
+      "personal_access_tokens_token_suffix_check",
+      sql`length(${table.tokenSuffix}) = 4 AND ${table.tokenSuffix} NOT GLOB '*[^A-Za-z0-9_-]*'`
+    ),
+    check(
+      "personal_access_tokens_created_at_check",
+      sql`length(${table.createdAt}) = 24 AND substr(${table.createdAt}, 24, 1) = 'Z'`
+    ),
+    check(
+      "personal_access_tokens_expires_at_check",
+      sql`${table.expiresAt} IS NULL OR (length(${table.expiresAt}) = 24 AND substr(${table.expiresAt}, 24, 1) = 'Z')`
+    ),
+    check(
+      "personal_access_tokens_revoked_at_check",
+      sql`${table.revokedAt} IS NULL OR (length(${table.revokedAt}) = 24 AND substr(${table.revokedAt}, 24, 1) = 'Z')`
+    ),
+    index("personal_access_tokens_user_idx").on(table.userId, sql`${table.createdAt} DESC`),
+    index("personal_access_tokens_list_idx").on(sql`${table.createdAt} DESC`, sql`${table.id} DESC`)
+  ]
+);
+
 export const sessions = sqliteTable(
   "session",
   {

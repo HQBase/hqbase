@@ -21,6 +21,7 @@ export const settingsTabs = [
   "domains",
   "notifications",
   "interface",
+  "api",
   "mcp",
   "updates",
   "debug"

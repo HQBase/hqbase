@@ -84,11 +84,15 @@ describe("PWA build contract", () => {
       cacheName: "hqbase-pwa-test-1",
       precacheUrls: ["/assets/app-abc.js", "/offline.html"]
     });
+    const apiBypass = worker.indexOf(
+      'if (url.pathname === "/api" || url.pathname.startsWith("/api/")) return;'
+    );
+    expect(apiBypass).toBeGreaterThan(-1);
+    expect(apiBypass).toBeLessThan(worker.indexOf('request.mode === "navigate"'));
     expect(worker).toContain('request.mode === "navigate"');
     expect(worker).toContain('caches.match("/offline.html")');
     expect(worker).toContain('badge: "/icons/notification-badge.png"');
     expect(worker).toContain('event.data?.type === "SKIP_WAITING"');
-    expect(worker).not.toContain("/api/");
   });
 
   it("generates visible push notifications, unread badging, and safe message navigation", () => {

@@ -1,5 +1,6 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
+import { SettingsNav } from "@/components/layout/sidebar/sidebar-nav";
 import { DomainSettings } from "@/features/domains/domain-settings";
 import { DomainTable } from "@/features/domains/domain-table";
 import type { MailDomain } from "@/features/domains/types";
@@ -81,6 +82,32 @@ const notifications = {
 };
 
 describe("settings presentation", () => {
+  it.each(["owner", "admin", "member"] as const)("shows API navigation to a %s", (role) => {
+    const user = {
+      id: `user-${role}`,
+      name: role,
+      email: `${role}@example.com`,
+      role,
+      passwordSetupRequired: false,
+      defaultFromMailboxId: null
+    };
+    const html = renderToStaticMarkup(
+      <SettingsNav
+        activeSettingsTab="api"
+        canManage={role !== "member"}
+        isDrawer={false}
+        user={user}
+        onCompose={undefined}
+        onFolderChange={() => undefined}
+        onSettingsTabChange={() => undefined}
+        onSignedOut={() => undefined}
+      />
+    );
+
+    expect(html).toContain('href="/settings/api"');
+    expect(html).toContain(">API<");
+  });
+
   it("offers MCP and the deployment-local Agent Skill on the MCP page", () => {
     const html = renderToStaticMarkup(
       <McpSettings

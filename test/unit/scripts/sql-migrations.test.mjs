@@ -19,7 +19,8 @@ const expectedMigrationNames = [
   "0011_latest_password_reset_token.sql",
   "0012_message_activity_index.sql",
   "0013_message_changes.sql",
-  "0014_unassigned_messages.sql"
+  "0014_unassigned_messages.sql",
+  "0015_personal_access_tokens.sql"
 ];
 const databases = [];
 
@@ -88,19 +89,21 @@ function insertRepresentativeData(database) {
   const insertMessage = database.prepare(
     `INSERT INTO messages
        (id, thread_id, mailbox_id, direction, folder, from_address, to_json, cc_json,
-        bcc_json, subject, snippet, text_body, references_json, created_at, updated_at)
+        bcc_json, subject, snippet, text_body, references_json, created_at, updated_at,
+        is_unassigned)
      VALUES (?, 'thr_upgrade', ?, 'inbound', ?, 'sender@example.com',
        '["mailbox@example.com"]', '[]', '[]', ?, 'Upgrade message', 'Upgrade message',
-       '[]', ?, ?)`
+       '[]', ?, ?, ?)`
   );
-  insertMessage.run("msg_upgrade", "mbx_upgrade", "inbox", "Upgrade", timestamp, timestamp);
+  insertMessage.run("msg_upgrade", "mbx_upgrade", "inbox", "Upgrade", timestamp, timestamp, 0);
   insertMessage.run(
     "msg_unassigned_upgrade",
     null,
     "catchall",
     "Unassigned upgrade",
     timestamp,
-    timestamp
+    timestamp,
+    1
   );
   database
     .prepare(
@@ -132,7 +135,7 @@ describe("SQL migration contract", () => {
     const tables = database
       .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'")
       .all();
-    expect(tables).toHaveLength(39);
+    expect(tables).toHaveLength(40);
   });
 
   it("preserves populated data through the latest upgrade and skips it on retry", async () => {
@@ -164,7 +167,7 @@ describe("SQL migration contract", () => {
 
     expect(applyMigration(database, migrations.at(-1))).toBe(false);
     expect(database.prepare("SELECT count(*) AS count FROM d1_migrations").get()).toEqual({
-      count: 14
+      count: 15
     });
   });
 });

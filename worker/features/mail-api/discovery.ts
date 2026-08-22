@@ -13,7 +13,7 @@ const apiMethods = ["get", "post", "patch", "delete"] as const;
 
 type ApiMethod = (typeof apiMethods)[number];
 type OpenApiOperation = {
-  security?: Array<{ oauth2?: string[] }>;
+  security?: Array<{ oauth2?: string[]; personalAccessToken?: never[] }>;
   summary?: string;
   tags?: string[];
 };
@@ -98,7 +98,9 @@ The OpenAPI document is authoritative for query parameters, request bodies, resp
 
 ## Authentication
 
-External agents must use an OAuth bearer token. Do not copy or reuse an HQBase browser session cookie.
+External agents can use OAuth Device Authorization for delegated or interactive connections, or a personal access token (PAT) for trusted automation when a user intentionally provides it. Do not copy or reuse an HQBase browser session cookie.
+
+### OAuth Device Authorization
 
 1. Fetch the OAuth protected-resource metadata.
 2. Fetch the advertised authorization-server metadata.
@@ -114,6 +116,12 @@ Prefer Device Authorization for agents, command-line tools, and other clients th
 Native desktop and mobile clients that use Authorization Code with PKCE must register with \`application_type\` set to \`native\`. HQBase accepts the native redirect forms defined by RFC 8252: app-claimed HTTPS, loopback HTTP, and private-use schemes. A private-use redirect must use a reverse-domain scheme with no authority component, for example \`com.example.mail:/oauth/callback\`.
 
 Use this exact OAuth resource and token audience: \`${apiBase}\`. MCP uses separate audiences at \`${origin}/mcp\` and \`${origin}/mcp/full\`; an MCP token cannot be used with the Mail API.
+
+### Personal access token
+
+Use a PAT only for trusted automation when a user intentionally provides one. Send it as \`Authorization: Bearer <personal-access-token>\`. Bearer values that start with \`hqb_pat_\` use PAT authentication; other bearer values use OAuth. An invalid Authorization header does not fall back to a browser session cookie.
+
+A PAT has every Mail API capability, subject to its owner's current role and mailbox grants. It does not use OAuth scopes. A PAT is valid only at the issuing origin, does not authenticate administration or MCP, and must never be logged or sent to another origin, service, chat, or tool.
 
 ## Permissions
 
@@ -147,7 +155,7 @@ The method index is an orientation aid. Consult ${openApiUrl} for exact paramete
 
 ## Errors
 
-JSON errors contain a stable \`error.code\` and human-readable \`error.message\`. A missing or invalid token returns \`401\`; insufficient OAuth scope or mailbox access returns \`403\`. Responses include \`X-Request-Id\`. Retain that identifier when reporting a failure, but never include credentials or private mail content.
+JSON errors contain a stable \`error.code\` and human-readable \`error.message\`. A missing or invalid token returns \`401\`; insufficient OAuth scope or mailbox access returns \`403\`. \`INVALID_PERSONAL_ACCESS_TOKEN\` with the message \`Bearer token is invalid or inactive.\` means the PAT is inactive. Do not retry the same rejected PAT. Obtain a new PAT or ask the user to restore the existing PAT. Responses include \`X-Request-Id\`. Retain that identifier when reporting a failure, but never include credentials or private mail content.
 
 ## API boundary and stability
 

@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- Let every user create and revoke personal access tokens for trusted Mail API automation. Workspace
+  owners can also inspect and revoke every active token for incident response. These
+  high-privilege credentials can call every Mail API operation subject to the token owner's current
+  role and mailbox grants, never access workspace administration or MCP, and appear only once when
+  created.
+
 ## 1.2.0
 
 ### New
