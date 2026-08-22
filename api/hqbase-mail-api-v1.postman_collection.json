@@ -34,7 +34,7 @@
     {
       "key": "access_token",
       "value": "",
-      "type": "secret"
+      "type": "string"
     },
     {
       "key": "id",

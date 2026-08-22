@@ -2078,6 +2078,9 @@
           },
           {
             "cookieSession": []
+          },
+          {
+            "personalAccessToken": []
           }
         ],
         "responses": {
@@ -2102,14 +2105,7 @@
             }
           },
           "401": {
-            "description": "Missing or invalid authentication",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
+            "$ref": "#/components/responses/MailApiUnauthorized"
           },
           "403": {
             "description": "Insufficient OAuth scope or mailbox access",

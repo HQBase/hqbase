@@ -65,7 +65,7 @@ function buildCollection(document) {
       { key: "base_url", value: "https://mail.example.com", type: "string" },
       { key: "api_resource", value: "{{base_url}}/api/v1", type: "string" },
       { key: "client_id", value: "", type: "string" },
-      { key: "access_token", value: "", type: "secret" },
+      { key: "access_token", value: "", type: "string" },
       { key: "id", value: "msg_example", type: "string" },
       { key: "attachmentId", value: "att_example", type: "string" },
       { key: "draftId", value: "drf_example", type: "string" },

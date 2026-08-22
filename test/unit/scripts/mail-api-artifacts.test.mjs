@@ -32,7 +32,8 @@ const expectedOauthScopes = {
   "/api/v1/drafts/{id}/attachments": { post: ["mail:send"] },
   "/api/v1/drafts/{draftId}/attachments/{id}": { delete: ["mail:send"] },
   "/api/v1/send": { post: ["mail:send"] },
-  "/api/v1/reply": { post: ["mail:send"] }
+  "/api/v1/reply": { post: ["mail:send"] },
+  "/api/v1/forward": { post: ["mail:send"] }
 };
 
 describe("Mail API public artifacts", () => {
@@ -86,6 +87,18 @@ describe("Mail API public artifacts", () => {
         });
       }
     }
+    for (const [path, pathItem] of Object.entries(openApi.paths)) {
+      for (const method of ["get", "post", "patch", "delete"]) {
+        const operation = pathItem[method];
+        if (!operation) continue;
+        expect(operation.security, `${method.toUpperCase()} ${path}`).toContainEqual({
+          personalAccessToken: []
+        });
+        expect(operation.responses["401"], `${method.toUpperCase()} ${path}`).toEqual({
+          $ref: "#/components/responses/MailApiUnauthorized"
+        });
+      }
+    }
     expect(openApi.components.securitySchemes.personalAccessToken).toEqual({
       type: "http",
       scheme: "bearer",
@@ -131,10 +144,22 @@ describe("Mail API public artifacts", () => {
     assertPatArtifactSecretSafe(postman);
     assertPatArtifactSecretSafe(postmanEnvironment);
 
-    const accessToken = postmanEnvironment.values.find(
+    const collectionAccessToken = postman.variable.find(
       (variable) => variable.key === "access_token"
     );
-    expect(accessToken).toMatchObject({ key: "access_token", value: "", type: "secret" });
+    const environmentAccessToken = postmanEnvironment.values.find(
+      (variable) => variable.key === "access_token"
+    );
+    expect(collectionAccessToken).toMatchObject({
+      key: "access_token",
+      value: "",
+      type: "string"
+    });
+    expect(environmentAccessToken).toMatchObject({
+      key: "access_token",
+      value: "",
+      type: "secret"
+    });
   });
 
   it.each([
