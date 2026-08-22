@@ -25,8 +25,7 @@ describe("email HTML sanitizer", () => {
       html: `<table style="width: 100%; color: #222; position: fixed">
         <tr><td><strong>Hello</strong></td></tr>
       </table><img src="cid:signature-logo%40example.com" onerror="alert(1)">`,
-      messageId: "msg-1",
-      subject: "Hello"
+      messageId: "msg-1"
     });
 
     expect(result.hasRemoteImages).toBe(false);
@@ -45,8 +44,7 @@ describe("email HTML sanitizer", () => {
       origin: "https://mail.example.com",
       html: '<img src="cid:signature-logo@example.com">',
       inlineBasePath: "/api/v1/messages",
-      messageId: "msg-1",
-      subject: "Hello"
+      messageId: "msg-1"
     });
 
     expect(result.html).toContain("https://mail.example.com/api/v1/messages/msg-1/inline/att-logo");
@@ -64,8 +62,7 @@ describe("email HTML sanitizer", () => {
         <a href="javascript:alert(1)" onclick="alert(1)">unsafe</a>
         <a href="https://example.com/path">safe</a>
         <p style="background-image:url(https://evil.example/pixel); color: red">Text</p>`,
-      messageId: "msg-1",
-      subject: "Hello"
+      messageId: "msg-1"
     });
 
     expect(result.hasRemoteImages).toBe(true);
@@ -84,16 +81,14 @@ describe("email HTML sanitizer", () => {
       attachments: [],
       origin: "https://mail.example.com",
       html: '<img src="https://images.example.com/open.gif" srcset="https://images.example.com/2x.png 2x">',
-      messageId: "msg-1",
-      subject: "Hello"
+      messageId: "msg-1"
     });
     const loaded = sanitizeMessageHtml({
       allowRemoteImages: true,
       attachments: [],
       origin: "https://mail.example.com",
       html: '<img src="//images.example.com/open.gif">',
-      messageId: "msg-1",
-      subject: "Hello"
+      messageId: "msg-1"
     });
 
     expect(blocked.hasRemoteImages).toBe(true);
@@ -109,8 +104,7 @@ describe("email HTML sanitizer", () => {
       attachments: [],
       origin: "https://mail.example.com",
       html: '<img srcset="https://images.example.com/open.gif 1x">',
-      messageId: "msg-1",
-      subject: "Hello"
+      messageId: "msg-1"
     });
 
     expect(result.hasRemoteImages).toBe(true);
@@ -123,13 +117,26 @@ describe("email HTML sanitizer", () => {
       attachments: [],
       origin: "https://mail.example.com",
       html: `<p>New reply</p><div class="gmail_quote"><div class="gmail_attr">On Tuesday, Pat wrote:</div><blockquote><strong>Earlier reply</strong></blockquote></div>`,
-      messageId: "msg-1",
-      subject: "Re: Hello"
+      messageId: "msg-1"
     });
 
     expect(result.html).toBe("<p>New reply</p>");
     expect(result.quotedHtml).toContain("<strong>Earlier reply</strong>");
     expect(result.quotedHtml).not.toContain("gmail_quote");
+  });
+
+  it("collapses the complete Gmail reply container including its attribution", () => {
+    const result = sanitizeMessageHtml({
+      allowRemoteImages: false,
+      attachments: [],
+      origin: "https://mail.example.com",
+      html: `<p>New reply</p><div class="gmail_quote gmail_quote_container"><div class="gmail_attr"><br>On Tuesday, Pat &lt;pat@example.com&gt; wrote:<br></div><blockquote class="gmail_quote"><strong>Earlier reply</strong></blockquote></div>`,
+      messageId: "msg-1"
+    });
+
+    expect(result.html).toBe("<p>New reply</p>");
+    expect(result.quotedHtml).toContain("On Tuesday");
+    expect(result.quotedHtml).toContain("Earlier reply");
   });
 
   it.each([
@@ -141,8 +148,7 @@ describe("email HTML sanitizer", () => {
       attachments: [],
       origin: "https://mail.example.com",
       html: `${introduction}<div class="gmail_quote gmail_quote_container"><div class="gmail_attr">---------- Forwarded message ---------<br>From: The Google Workspace Team &lt;workspace-noreply@google.com&gt;<br>Subject: Promotional access</div><table><tbody><tr><td><strong>Forwarded promotion</strong></td></tr></tbody></table></div>`,
-      messageId: "msg-1",
-      subject: "Fwd: Promotional access"
+      messageId: "msg-1"
     });
 
     expect(result.html).toContain("---------- Forwarded message ---------");
@@ -156,13 +162,13 @@ describe("email HTML sanitizer", () => {
       allowRemoteImages: false,
       attachments: [],
       origin: "https://mail.example.com",
-      html: '<p>For your information</p><div class="gmail_quote gmail_quote_container"><div class="gmail_attr">---------- Forwarded message ---------<br>From: Pat &lt;pat@example.com&gt;</div><p>Forwarded report</p></div>',
-      messageId: "msg-1",
-      subject: "Promotional access"
+      html: '<p>For your information</p><div class="gmail_quote gmail_quote_container"><div class="gmail_attr">---------- Forwarded message ---------<br>From: Pat &lt;pat@example.com&gt;</div><p>Forwarded report</p><blockquote class="gmail_quote">Forwarded quoted history</blockquote></div>',
+      messageId: "msg-1"
     });
 
     expect(result.html).toContain("For your information");
     expect(result.html).toContain("Forwarded report");
+    expect(result.html).toContain("Forwarded quoted history");
     expect(result.quotedHtml).toBeNull();
   });
 
@@ -172,8 +178,7 @@ describe("email HTML sanitizer", () => {
       attachments: [],
       origin: "https://mail.example.com",
       html: `<p>New reply</p><div class="gmail_quote"><div class="gmail_attr">---------- Forwarded message ---------</div><strong>Earlier forward</strong></div>`,
-      messageId: "msg-1",
-      subject: "Re: Promotional access"
+      messageId: "msg-1"
     });
 
     expect(result.html).toBe("<p>New reply</p>");
@@ -186,8 +191,7 @@ describe("email HTML sanitizer", () => {
       attachments: [],
       origin: "https://mail.example.com",
       html: '<p>Forward note</p><div class="gmail_quote"><strong>Earlier message</strong></div>',
-      messageId: "msg-1",
-      subject: "Fwd: Hello"
+      messageId: "msg-1"
     });
 
     expect(result.html).toBe("<p>Forward note</p>");
@@ -207,8 +211,7 @@ describe("email HTML sanitizer", () => {
       attachments: [],
       origin: "https://mail.example.com",
       html: `<p>New reply</p>${quote}`,
-      messageId: "msg-1",
-      subject: "Re: Hello"
+      messageId: "msg-1"
     });
 
     expect(result.html).toBe("<p>New reply</p>");
@@ -226,8 +229,7 @@ describe("email HTML sanitizer", () => {
       attachments: [],
       origin: "https://mail.example.com",
       html,
-      messageId: "msg-1",
-      subject: "Re: Hello"
+      messageId: "msg-1"
     });
 
     expect(result.html).toContain(currentText);
@@ -242,8 +244,7 @@ describe("email HTML sanitizer", () => {
       attachments: [],
       origin: "https://mail.example.com",
       html: `<p>Answer above</p><div class="gmail_quote"><p>Earlier reply</p><div class="gmail_signature">Older signature</div></div><p>Inline answer below</p><div class="gmail_signature">Current signature</div>`,
-      messageId: "msg-1",
-      subject: "Re: Hello"
+      messageId: "msg-1"
     });
 
     expect(result.html).toContain("Answer above");
@@ -259,8 +260,7 @@ describe("email HTML sanitizer", () => {
       attachments: [],
       origin: "https://mail.example.com",
       html: `<p>New reply</p><div class="gmail_signature">Current signature</div><div class="gmail_quote"><p>Earlier reply</p><div class="gmail_signature">Older signature</div></div>`,
-      messageId: "msg-1",
-      subject: "Re: Hello"
+      messageId: "msg-1"
     });
 
     expect(result.html).toContain("Current signature");
@@ -274,8 +274,7 @@ describe("email HTML sanitizer", () => {
       attachments: [],
       origin: "https://mail.example.com",
       html: '<blockquote type="cite"><p>Only visible content</p></blockquote>',
-      messageId: "msg-1",
-      subject: "Re: Hello"
+      messageId: "msg-1"
     });
 
     expect(result.html).toBe("");
@@ -289,8 +288,7 @@ describe("email HTML sanitizer", () => {
       attachments: [],
       origin: "https://mail.example.com",
       html: "<p>New reply</p><blockquote>A quotation in the new message</blockquote>",
-      messageId: "msg-1",
-      subject: "Hello"
+      messageId: "msg-1"
     });
 
     expect(result.html).toContain("A quotation in the new message");
@@ -303,16 +301,14 @@ describe("email HTML sanitizer", () => {
       attachments: [],
       origin: "https://mail.example.com",
       html: '<p>New reply</p><div style="border:none;border-top:solid #E1E1E1 1.0pt;padding:3.0pt 0in 0in 0in"></div><div>From: Pat &lt;pat@example.com&gt;<br>Sent: Tuesday<br>Subject: Earlier</div><p>Earlier reply</p>',
-      messageId: "msg-1",
-      subject: "Re: Hello"
+      messageId: "msg-1"
     });
     const authoredDivider = sanitizeMessageHtml({
       allowRemoteImages: false,
       attachments: [],
       origin: "https://mail.example.com",
       html: '<p>New reply</p><div style="border:none;border-top:solid #E1E1E1 1.0pt;padding:3.0pt 0in 0in 0in"></div><p>Design note</p>',
-      messageId: "msg-1",
-      subject: "Hello"
+      messageId: "msg-1"
     });
 
     expect(reply.html).toBe("<p>New reply</p>");
@@ -327,13 +323,39 @@ describe("email HTML sanitizer", () => {
       attachments: [],
       origin: "https://mail.example.com",
       html: '<p>New reply</p><hr id="replySplit"><div>From: Pat &lt;pat@example.com&gt;</div><p>Earlier reply</p>',
-      messageId: "msg-1",
-      subject: "Re: Hello"
+      messageId: "msg-1"
     });
 
     expect(result.html).toBe("<p>New reply</p>");
     expect(result.quotedHtml).toContain("Earlier reply");
     expect(result.afterQuotedHtml).toBeNull();
+  });
+
+  it("recognizes the quoted-printable Outlook reply id", () => {
+    const result = sanitizeMessageHtml({
+      allowRemoteImages: false,
+      attachments: [],
+      origin: "https://mail.example.com",
+      html: `<p>New reply</p><div id='3D"divRplyFwdMsg"'>From: Pat &lt;pat@example.com&gt;</div><p>Earlier reply</p>`,
+      messageId: "msg-1"
+    });
+
+    expect(result.html).toBe("<p>New reply</p>");
+    expect(result.quotedHtml).toContain("Earlier reply");
+  });
+
+  it("keeps authored wrapper text before an Outlook marker visible", () => {
+    const result = sanitizeMessageHtml({
+      allowRemoteImages: false,
+      attachments: [],
+      origin: "https://mail.example.com",
+      html: '<div>Authored reply<div id="divRplyFwdMsg">From: Pat &lt;pat@example.com&gt;</div><p>Earlier reply</p></div>',
+      messageId: "msg-1"
+    });
+
+    expect(result.html).toContain("Authored reply");
+    expect(result.html).not.toContain("Earlier reply");
+    expect(result.quotedHtml).toContain("Earlier reply");
   });
 
   it("uses the final recognized quote block when several sibling markers exist", () => {
@@ -342,8 +364,7 @@ describe("email HTML sanitizer", () => {
       attachments: [],
       origin: "https://mail.example.com",
       html: '<p>New reply</p><div class="protonmail_quote">Earlier marker</div><p>Still current</p><div class="protonmail_quote">Actual history</div><p>Footer</p>',
-      messageId: "msg-1",
-      subject: "Re: Hello"
+      messageId: "msg-1"
     });
 
     expect(result.html).toContain("Earlier marker");
@@ -357,9 +378,8 @@ describe("email HTML sanitizer", () => {
       allowRemoteImages: false,
       attachments: [],
       origin: "https://mail.example.com",
-      html: "<p>New reply</p><div>------- Original Message -------</div><p>Earlier reply</p>",
-      messageId: "msg-1",
-      subject: "Hello"
+      html: "<p>New reply</p><div>\n  ------- Original Message -------  \n</div><p>Earlier reply</p>",
+      messageId: "msg-1"
     });
 
     expect(result.html).toBe("<p>New reply</p>");
@@ -374,8 +394,7 @@ describe("email HTML sanitizer", () => {
       attachments: [],
       origin: "https://mail.example.com",
       html: '<p>New reply</p><div class="gmail_quote">Earlier reply</div><img src="https://images.example.com/signature.png">',
-      messageId: "msg-1",
-      subject: "Re: Hello"
+      messageId: "msg-1"
     });
 
     expect(result.hasRemoteImages).toBe(true);

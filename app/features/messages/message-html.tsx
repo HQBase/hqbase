@@ -169,7 +169,9 @@ export function MessageHtmlFrames({
 
   return (
     <div className="contents" data-message-html-frames>
-      {body ? <EmailFrame srcDoc={body} title={`Message body: ${subject}`} /> : null}
+      {body && bodyHasContent ? (
+        <EmailFrame srcDoc={body} title={`Message body: ${subject}`} />
+      ) : null}
       {quote ? (
         <>
           {showQuoteControl ? (

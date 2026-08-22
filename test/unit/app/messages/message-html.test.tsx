@@ -138,6 +138,23 @@ describe("message HTML view", () => {
     expect(html).toContain("Message content after quote: Hello");
   });
 
+  it("does not render an empty body frame before quoted history", () => {
+    const html = renderToStaticMarkup(
+      <MessageHtmlFrames
+        afterQuote={null}
+        body="<html><body><br></body></html>"
+        bodyHasContent={false}
+        onToggleQuote={() => undefined}
+        quote="<p>Earlier reply</p>"
+        quoteExpanded={false}
+        subject="Hello"
+      />
+    );
+
+    expect(html).not.toContain("Message body: Hello");
+    expect(html).toContain("Quoted message history: Hello");
+  });
+
   it("separates conventional plain-text reply history", () => {
     expect(
       splitQuotedText(
@@ -159,6 +176,18 @@ describe("message HTML view", () => {
       afterQuote: null,
       body: "Neue Antwort",
       quote: "Am Donnerstag schrieb Pat <pat@example.com>:\n\n> Frühere Antwort"
+    });
+  });
+
+  it("separates a wrapped plain-text attribution block", () => {
+    expect(
+      splitQuotedText(
+        "New reply\n\nOn Thu, Aug 20, 2026 at 10:00 AM Pat <pat@example.com>\nwrote:\n> Earlier reply"
+      )
+    ).toEqual({
+      afterQuote: null,
+      body: "New reply",
+      quote: "On Thu, Aug 20, 2026 at 10:00 AM Pat <pat@example.com>\nwrote:\n> Earlier reply"
     });
   });
 

@@ -63,6 +63,9 @@ const fromHeaderPatterns = [
 ];
 
 const originalMessageMarker = "------- Original Message -------";
+const gmailForwardedMessageMarker = "---------- Forwarded message ---------";
+const headerProbeCharacters = 512;
+const quotedPrintableOutlookReplyId = '3D"divRplyFwdMsg"';
 
 /**
  * Split message HTML with the structural marker model used by Proton Mail's
@@ -90,6 +93,7 @@ export function splitQuotedHtml(html: string): QuotedHtmlParts {
     selectLastQuoteRange(ranges) ??
     selectLastQuoteRange(
       elements
+        .filter((element) => !isInsideVisibleGmailForward(element))
         .filter(hasOriginalMessageTextNode)
         .map(quoteTailRange)
         .filter((candidate): candidate is QuoteRange => candidate !== null)
@@ -127,6 +131,7 @@ function isNonEmptyElement(element: Element): boolean {
 }
 
 function isSelectableQuoteElement(element: Element): boolean {
+  if (isInsideVisibleGmailForward(element)) return false;
   return (
     isRecognizedQuoteElement(element) && (isNonEmptyElement(element) || isQuoteTailMarker(element))
   );
@@ -149,19 +154,23 @@ function isQuoteTailMarker(element: Element): boolean {
   return (
     classes.includes("moz-cite-prefix") ||
     id === "divRplyFwdMsg" ||
-    id === '3D\\"divRplyFwdMsg\\"' ||
+    id === quotedPrintableOutlookReplyId ||
     (element.name === "hr" && id === "replySplit")
   );
 }
 
 function hasOriginalMessageTextNode(element: Element): boolean {
-  return element.children.some((child) => isText(child) && child.data === originalMessageMarker);
+  return element.children.some(
+    (child) => isText(child) && child.data.trim() === originalMessageMarker
+  );
 }
 
 function isRecognizedQuoteElement(element: Element): boolean {
   const classes = classNames(element);
   if (classes.some((className) => quoteClassNames.has(className))) return true;
-  if (classes.includes("gmail_quote") && !classes.includes("gmail_quote_container")) return true;
+  if (classes.includes("gmail_quote")) {
+    return !classes.includes("gmail_quote_container") || isGmailReplyContainer(element);
+  }
   if (element.name === "div" && classes.includes("gmail_extra")) return true;
   if (element.name === "div" && classes.includes("yahoo_quoted")) return true;
   if (element.name === "blockquote" && classes.includes("iosymail")) return true;
@@ -171,7 +180,7 @@ function isRecognizedQuoteElement(element: Element): boolean {
   const id = element.attribs.id;
   if (id === "divRplyFwdMsg") return true;
   if (element.name === "div" && id === "mail-editor-reference-message-container") return true;
-  if (element.name === "div" && id === '3D\\"divRplyFwdMsg\\"') return true;
+  if (element.name === "div" && id === quotedPrintableOutlookReplyId) return true;
   if (element.name === "hr" && id === "replySplit") return true;
   if (element.name === "div" && id === "isForwardContent") return true;
   if (element.name === "blockquote" && id === "isReplyContent") return true;
@@ -186,6 +195,7 @@ function isRecognizedQuoteElement(element: Element): boolean {
 function findOutlookQuoteRange(elements: Element[], html: string): QuoteRange | null {
   for (const element of elements) {
     if (element.name !== "div" || !hasOutlookSeparatorStyle(element)) continue;
+    if (isInsideVisibleGmailForward(element)) continue;
     if (hasQuoteAncestor(element)) continue;
     if (!startsWithFromHeader(followingText(element, html))) continue;
 
@@ -238,7 +248,11 @@ function followingText(element: Element, html: string): string {
 function firstElementChildOfParent(element: Element): boolean {
   const parent = element.parent;
   if (!parent || !isTag(parent)) return false;
-  return parent.children.find(isTag) === element;
+  for (const child of parent.children) {
+    if (child === element) return true;
+    if (isTag(child) || (isText(child) && child.data.trim())) return false;
+  }
+  return false;
 }
 
 function rangeThroughFollowingSiblings(element: Element): QuoteRange | null {
@@ -265,11 +279,47 @@ function elementRange(element: Element): QuoteRange | null {
 
 function visibleTextForNode(node: ChildNode, html: string): string {
   if (node.startIndex === null || node.endIndex === null) return "";
-  return visibleText(html.slice(node.startIndex, node.endIndex + 1));
+  const end = Math.min(node.endIndex + 1, node.startIndex + headerProbeCharacters);
+  return visibleText(html.slice(node.startIndex, end));
 }
 
 function classNames(element: Element): string[] {
   return (element.attribs.class ?? "").split(/\s+/u).filter(Boolean);
+}
+
+function isGmailReplyContainer(element: Element): boolean {
+  const attribution = gmailAttribution(element);
+  return attribution !== null && !elementText(attribution).includes(gmailForwardedMessageMarker);
+}
+
+function isInsideVisibleGmailForward(element: Element): boolean {
+  let current: Element | null = element;
+  while (current) {
+    if (isGmailForwardContainer(current)) return true;
+    current = current.parent && isTag(current.parent) ? current.parent : null;
+  }
+  return false;
+}
+
+function isGmailForwardContainer(element: Element): boolean {
+  const attribution = gmailAttribution(element);
+  return attribution !== null && elementText(attribution).includes(gmailForwardedMessageMarker);
+}
+
+function gmailAttribution(element: Element): Element | null {
+  const classes = classNames(element);
+  if (!classes.includes("gmail_quote") || !classes.includes("gmail_quote_container")) return null;
+  return (
+    element.children.find(
+      (child): child is Element => isTag(child) && classNames(child).includes("gmail_attr")
+    ) ?? null
+  );
+}
+
+function elementText(element: Element): string {
+  return element.children
+    .map((child) => (isText(child) ? child.data : isTag(child) ? elementText(child) : ""))
+    .join("");
 }
 
 function visibleText(html: string): string {

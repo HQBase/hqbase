@@ -51,17 +51,31 @@ const plainTextEmailAddress = /[a-z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-z0-9-]+(?:\.[a-z
 
 function findPlainTextQuoteStart(value: string): number | null {
   const lines = value.split("\n");
+  const offsets: number[] = [];
   let offset = 0;
 
-  for (let index = 0; index < lines.length; index += 1) {
-    const line = lines[index] ?? "";
-    const attribution = line.trim();
-    if (attribution.endsWith(":") && plainTextEmailAddress.test(attribution)) {
-      let quoteLine = index + 1;
-      while (quoteLine < lines.length && !(lines[quoteLine] ?? "").trim()) quoteLine += 1;
-      if ((lines[quoteLine] ?? "").trimStart().startsWith(">")) return offset;
-    }
+  for (const line of lines) {
+    offsets.push(offset);
     offset += line.length + 1;
+  }
+
+  for (let quoteLine = 0; quoteLine < lines.length; quoteLine += 1) {
+    if (!(lines[quoteLine] ?? "").trimStart().startsWith(">")) continue;
+
+    let attributionEnd = quoteLine - 1;
+    while (attributionEnd >= 0 && !(lines[attributionEnd] ?? "").trim()) {
+      attributionEnd -= 1;
+    }
+    if (attributionEnd < 0 || !(lines[attributionEnd] ?? "").trimEnd().endsWith(":")) {
+      continue;
+    }
+
+    let attributionStart = attributionEnd;
+    while (attributionStart > 0 && (lines[attributionStart - 1] ?? "").trim()) {
+      attributionStart -= 1;
+    }
+    const attribution = lines.slice(attributionStart, attributionEnd + 1).join(" ");
+    if (plainTextEmailAddress.test(attribution)) return offsets[attributionStart] ?? 0;
   }
 
   return null;

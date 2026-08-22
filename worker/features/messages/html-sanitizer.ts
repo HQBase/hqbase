@@ -150,7 +150,6 @@ export function sanitizeMessageHtml(input: {
   inlineBasePath?: string;
   messageId: string;
   origin: string;
-  subject: string;
 }): SanitizedMessageHtml {
   const parts = splitQuotedHtml(input.html);
   const body = sanitizeDisplayHtml({ ...input, html: parts.body });

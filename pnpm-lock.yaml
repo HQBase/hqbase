@@ -78,8 +78,8 @@ importers:
         specifier: ^2.1.1
         version: 2.1.1
       domhandler:
-        specifier: ^5.0.3
-        version: 5.0.3
+        specifier: ^6.0.1
+        version: 6.0.1
       drizzle-orm:
         specifier: 0.45.2
         version: 0.45.2(kysely@0.29.2)
