@@ -7,6 +7,9 @@ import type { ReleaseManifest, UpdateStatus } from "./types";
 
 const product = "hqbase" as const;
 const installedSchemaVersion = 2;
+const expectedReleaseVariable = "HQBASE_EXPECTED_RELEASE_VERSION";
+const forceSourceDeployVariable = "HQBASE_FORCE_SOURCE_DEPLOY";
+const managedDeployCommands = new Set(["pnpm deploy", "pnpm run deploy"]);
 const envelopeSchema = z.object({ payload: z.string().min(1), signature: z.string().min(1) });
 const manifestSchema = z.object({
   format: z.literal("hqbase-release-v1"),
@@ -66,8 +69,27 @@ export async function getUpdateStatus(
 export async function triggerUpdate(
   env: WorkerEnv,
   apiToken: string,
+  expectedVersion: string,
   fetcher: typeof fetch = fetch
 ): Promise<{ buildId: string; status: string }> {
+  const update = await getUpdateStatus(env, fetcher);
+  if (update.release.version !== expectedVersion) {
+    throw new AppError(
+      "UPDATE_RELEASE_CHANGED",
+      "The signed release changed after you reviewed it. Check for updates again.",
+      409
+    );
+  }
+  if (!update.available) {
+    throw new AppError("UPDATE_NOT_AVAILABLE", "This release is already installed.", 409);
+  }
+  if (!update.compatible) {
+    throw new AppError(
+      "UPDATE_INCOMPATIBLE",
+      "This release cannot update directly from the installed version.",
+      409
+    );
+  }
   const domain =
     (await getSetting(env.DB, "portal_host", z.string())) ??
     (await getSetting(env.DB, "primary_domain", z.string()));
@@ -104,33 +126,121 @@ export async function triggerUpdate(
       404
     );
   const triggers = await cloudflare<{
-    result: Array<{ id?: string; trigger_uuid?: string; branch_includes?: string[] }>;
+    result: Array<{
+      id?: string;
+      trigger_uuid?: string;
+      branch_includes?: string[];
+      deploy_command?: string | null;
+      root_directory?: string | null;
+    }>;
   }>(
     `https://api.cloudflare.com/client/v4/accounts/${accountId}/builds/workers/${script.tag}/triggers`,
     { headers },
     fetcher
   );
-  const trigger =
-    triggers.result.find((item) => item.branch_includes?.includes("main")) ?? triggers.result[0];
+  const trigger = triggers.result.find((item) => item.branch_includes?.includes("main"));
   if (!trigger)
     throw new AppError(
       "UPDATE_TRIGGER_NOT_FOUND",
       "Connect this Worker to Workers Builds before updating.",
       409
     );
-  const build = await cloudflare<{ result: { build_uuid?: string; id?: string; status?: string } }>(
-    `https://api.cloudflare.com/client/v4/accounts/${accountId}/builds/triggers/${trigger.trigger_uuid ?? trigger.id}/builds`,
-    { method: "POST", headers, body: JSON.stringify({ branch: "main" }) },
-    fetcher
-  );
-  const buildId = build.result.build_uuid ?? build.result.id;
-  if (!buildId)
+  assertManagedTrigger(trigger);
+  const triggerId = trigger.trigger_uuid ?? trigger.id;
+  if (!triggerId)
     throw new AppError(
-      "UPDATE_TRIGGER_FAILED",
-      "Cloudflare did not return a build identifier.",
+      "UPDATE_TRIGGER_INVALID",
+      "Cloudflare returned an invalid production build trigger.",
       502
     );
-  return { buildId, status: build.result.status ?? "queued" };
+  const variablesUrl = `https://api.cloudflare.com/client/v4/accounts/${accountId}/builds/triggers/${triggerId}/environment_variables`;
+  const variables = await cloudflare<{
+    result: Record<string, { is_secret: boolean; value?: string | null }>;
+  }>(variablesUrl, { headers }, fetcher);
+  const sourceDeploy = variables.result[forceSourceDeployVariable];
+  if (sourceDeploy?.is_secret || sourceDeploy?.value?.trim() === "1") {
+    throw new AppError(
+      "UPDATE_TRIGGER_USES_SOURCE",
+      "Signed updates are disabled because this build trigger uses custom source. Use the custom-source deployment process instead.",
+      409
+    );
+  }
+  const previousPin = variables.result[expectedReleaseVariable];
+  if (previousPin?.is_secret) {
+    throw new AppError(
+      "UPDATE_TRIGGER_UNMANAGED",
+      "Signed updates require HQBASE_EXPECTED_RELEASE_VERSION to be a plain build variable.",
+      409
+    );
+  }
+  await setBuildVersionPin(variablesUrl, expectedVersion, headers, fetcher);
+  try {
+    const build = await cloudflare<{
+      result: { build_uuid?: string; id?: string; status?: string };
+    }>(
+      `https://api.cloudflare.com/client/v4/accounts/${accountId}/builds/triggers/${triggerId}/builds`,
+      { method: "POST", headers, body: JSON.stringify({ branch: "main" }) },
+      fetcher
+    );
+    const buildId = build.result.build_uuid ?? build.result.id;
+    if (!buildId)
+      throw new AppError(
+        "UPDATE_TRIGGER_FAILED",
+        "Cloudflare did not return a build identifier.",
+        502
+      );
+    return { buildId, status: build.result.status ?? "queued" };
+  } catch (error) {
+    await restoreBuildVersionPin(variablesUrl, previousPin, headers, fetcher);
+    throw error;
+  }
+}
+
+function assertManagedTrigger(trigger: {
+  deploy_command?: string | null;
+  root_directory?: string | null;
+}): void {
+  const command = trigger.deploy_command?.trim().replace(/\s+/g, " ") ?? "";
+  const root = trigger.root_directory?.trim() ?? "";
+  if (!managedDeployCommands.has(command) || !["", "/", ".", "./"].includes(root)) {
+    throw new AppError(
+      "UPDATE_TRIGGER_UNMANAGED",
+      "Signed updates require a repository-root Workers Builds trigger that runs pnpm deploy. Use the custom-source deployment process instead.",
+      409
+    );
+  }
+}
+
+async function setBuildVersionPin(
+  url: string,
+  version: string,
+  headers: Record<string, string>,
+  fetcher: typeof fetch
+): Promise<void> {
+  await cloudflare(
+    url,
+    {
+      method: "PATCH",
+      headers,
+      body: JSON.stringify({
+        [expectedReleaseVariable]: { is_secret: false, value: version }
+      })
+    },
+    fetcher
+  );
+}
+
+async function restoreBuildVersionPin(
+  url: string,
+  previous: { is_secret: boolean; value?: string | null } | undefined,
+  headers: Record<string, string>,
+  fetcher: typeof fetch
+): Promise<void> {
+  if (typeof previous?.value === "string") {
+    await setBuildVersionPin(url, previous.value, headers, fetcher);
+    return;
+  }
+  await cloudflare(`${url}/${expectedReleaseVariable}`, { method: "DELETE", headers }, fetcher);
 }
 
 async function verifyEnvelope(

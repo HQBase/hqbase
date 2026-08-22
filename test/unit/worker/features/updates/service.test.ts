@@ -12,7 +12,7 @@ const payload = Buffer.from(
     channel: "stable",
     version: "0.1.0",
     schemaVersion: 2,
-    minVersion: "0.1.0",
+    minVersion: "0.0.1",
     publishedAt: "2026-07-12T00:00:00.000Z",
     notesUrl: "https://github.com/HQBase/hqbase/releases/tag/v0.1.0",
     artifact: {
@@ -51,29 +51,197 @@ describe("HQBase updates", () => {
     ).rejects.toThrow("signature");
   });
   it("triggers the production Workers Build", async () => {
-    const raw = vi.fn().mockResolvedValue([[JSON.stringify("mail.example.com")]]);
-    const db = {
-      prepare: vi.fn(() => ({ bind: vi.fn(() => ({ raw })) }))
-    } as unknown as D1Database;
-    const fetcher = vi.fn(async (input: RequestInfo | URL) => {
-      const url = String(input);
-      if (url.includes("/zones?"))
-        return Response.json({
-          success: true,
-          result: [{ name: "example.com", account: { id: "account" } }]
-        });
-      if (url.endsWith("/workers/scripts"))
-        return Response.json({ success: true, result: [{ id: "hqbase", tag: "worker-tag" }] });
-      if (url.endsWith("/triggers"))
-        return Response.json({ success: true, result: [{ id: "trigger" }] });
-      return Response.json({ success: true, result: { build_uuid: "build-id", status: "queued" } });
-    });
+    const fetcher = cloudflareUpdateFetcher();
     await expect(
       triggerUpdate(
-        { DB: db, HQBASE_WORKER_NAME: "hqbase" } as WorkerEnv,
+        updateEnvironment(),
         "temporary-token-that-is-long-enough",
+        "0.1.0",
         fetcher as typeof fetch
       )
     ).resolves.toEqual({ buildId: "build-id", status: "queued" });
+    const pinRequests = fetcher.mock.calls.filter(
+      ([input, init]) =>
+        String(input).endsWith("/environment_variables") && init?.method === "PATCH"
+    );
+    expect(pinRequests.map(([, init]) => init?.body)).toEqual([
+      JSON.stringify({ HQBASE_EXPECTED_RELEASE_VERSION: { is_secret: false, value: "0.1.0" } })
+    ]);
+    expect(fetcher.mock.calls.some(([, init]) => init?.method === "DELETE")).toBe(false);
+  });
+  it("rejects a custom-source production trigger", async () => {
+    const fetcher = cloudflareUpdateFetcher({ deployCommand: "npx wrangler deploy" });
+
+    await expect(
+      triggerUpdate(
+        updateEnvironment(),
+        "temporary-token-that-is-long-enough",
+        "0.1.0",
+        fetcher as typeof fetch
+      )
+    ).rejects.toThrow("custom-source deployment process");
+    expect(
+      fetcher.mock.calls.some(
+        ([input, init]) => String(input).endsWith("/builds") && init?.method === "POST"
+      )
+    ).toBe(false);
+  });
+  it("rejects a production trigger outside the repository root", async () => {
+    const fetcher = cloudflareUpdateFetcher({ rootDirectory: "packages/hqbase" });
+
+    await expect(
+      triggerUpdate(
+        updateEnvironment(),
+        "temporary-token-that-is-long-enough",
+        "0.1.0",
+        fetcher as typeof fetch
+      )
+    ).rejects.toThrow("repository-root Workers Builds trigger");
+    expect(
+      fetcher.mock.calls.some(
+        ([input, init]) => String(input).endsWith("/builds") && init?.method === "POST"
+      )
+    ).toBe(false);
+  });
+  it("rejects explicit source-deploy mode", async () => {
+    const fetcher = cloudflareUpdateFetcher({
+      variables: {
+        HQBASE_FORCE_SOURCE_DEPLOY: { is_secret: false, value: "1" }
+      }
+    });
+
+    await expect(
+      triggerUpdate(
+        updateEnvironment(),
+        "temporary-token-that-is-long-enough",
+        "0.1.0",
+        fetcher as typeof fetch
+      )
+    ).rejects.toThrow("uses custom source");
+    expect(
+      fetcher.mock.calls.some(
+        ([input, init]) => String(input).endsWith("/builds") && init?.method === "POST"
+      )
+    ).toBe(false);
+  });
+  it("requires the build to use the release reviewed by the user", async () => {
+    await expect(
+      triggerUpdate(
+        updateEnvironment(),
+        "temporary-token-that-is-long-enough",
+        "0.2.0",
+        (async () => Response.json(envelope)) as typeof fetch
+      )
+    ).rejects.toThrow("changed after you reviewed it");
+  });
+  it("restores the previous release pin when the build does not start", async () => {
+    const fetcher = cloudflareUpdateFetcher({
+      buildFails: true,
+      variables: {
+        HQBASE_EXPECTED_RELEASE_VERSION: { is_secret: false, value: "0.0.8" }
+      }
+    });
+
+    await expect(
+      triggerUpdate(
+        updateEnvironment(),
+        "temporary-token-that-is-long-enough",
+        "0.1.0",
+        fetcher as typeof fetch
+      )
+    ).rejects.toThrow("Build could not start");
+
+    const pinRequests = fetcher.mock.calls.filter(
+      ([input, init]) =>
+        String(input).endsWith("/environment_variables") && init?.method === "PATCH"
+    );
+    expect(pinRequests.map(([, init]) => init?.body)).toEqual([
+      JSON.stringify({ HQBASE_EXPECTED_RELEASE_VERSION: { is_secret: false, value: "0.1.0" } }),
+      JSON.stringify({ HQBASE_EXPECTED_RELEASE_VERSION: { is_secret: false, value: "0.0.8" } })
+    ]);
+  });
+  it("removes a new release pin when the build does not start", async () => {
+    const fetcher = cloudflareUpdateFetcher({ buildFails: true });
+
+    await expect(
+      triggerUpdate(
+        updateEnvironment(),
+        "temporary-token-that-is-long-enough",
+        "0.1.0",
+        fetcher as typeof fetch
+      )
+    ).rejects.toThrow("Build could not start");
+    expect(
+      fetcher.mock.calls.some(
+        ([input, init]) =>
+          String(input).endsWith("/environment_variables/HQBASE_EXPECTED_RELEASE_VERSION") &&
+          init?.method === "DELETE"
+      )
+    ).toBe(true);
   });
 });
+
+function updateEnvironment(): WorkerEnv {
+  const raw = vi.fn().mockResolvedValue([[JSON.stringify("mail.example.com")]]);
+  const db = {
+    prepare: vi.fn(() => ({ bind: vi.fn(() => ({ raw })) }))
+  } as unknown as D1Database;
+  return {
+    DB: db,
+    HQBASE_APP_VERSION: "0.0.9",
+    HQBASE_RELEASE_PUBLIC_KEY: publicKeyBase64,
+    HQBASE_WORKER_NAME: "hqbase"
+  } as WorkerEnv;
+}
+
+function cloudflareUpdateFetcher(
+  options: {
+    buildFails?: boolean;
+    deployCommand?: string;
+    rootDirectory?: string;
+    variables?: Record<string, { is_secret: boolean; value?: string | null }>;
+  } = {}
+) {
+  return vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input);
+    if (url.includes("github.com/HQBase/hqbase/releases")) return Response.json(envelope);
+    if (url.includes("/zones?")) {
+      return Response.json({
+        success: true,
+        result: [{ name: "example.com", account: { id: "account" } }]
+      });
+    }
+    if (url.endsWith("/workers/scripts")) {
+      return Response.json({ success: true, result: [{ id: "hqbase", tag: "worker-tag" }] });
+    }
+    if (url.endsWith("/triggers")) {
+      return Response.json({
+        success: true,
+        result: [
+          {
+            id: "trigger",
+            branch_includes: ["main"],
+            deploy_command: options.deployCommand ?? "pnpm deploy",
+            root_directory: options.rootDirectory ?? "/"
+          }
+        ]
+      });
+    }
+    if (url.endsWith("/environment_variables")) {
+      return Response.json({
+        success: true,
+        result: init?.method === "PATCH" ? {} : (options.variables ?? {})
+      });
+    }
+    if (url.endsWith("/builds") && options.buildFails) {
+      return Response.json(
+        { success: false, errors: [{ message: "Build could not start." }] },
+        { status: 502 }
+      );
+    }
+    return Response.json({
+      success: true,
+      result: { build_uuid: "build-id", status: "queued" }
+    });
+  });
+}

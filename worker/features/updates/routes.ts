@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { z } from "zod";
 import {
   isRecentSession,
   requireAuthContext,
@@ -6,6 +7,8 @@ import {
   requireRole
 } from "../../auth/session";
 import type { HonoApp } from "../../lib/env";
+import { readJson } from "../../lib/json";
+import { parseWith } from "../../lib/validation";
 import {
   clearRuntimeCloudflareGrantCookie,
   finishRuntimeCloudflareOAuth,
@@ -22,6 +25,9 @@ const updateOAuthFlow = {
   operation: "updates",
   settingsTab: "updates"
 } as const;
+const applyUpdateSchema = z.object({
+  expectedVersion: z.string().regex(/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/)
+});
 updateRoutes.get("/", async (c) => {
   const auth = await requireAuthContext(c.env, c.req.raw);
   requireRole(auth, ["owner", "admin"]);
@@ -42,9 +48,17 @@ updateRoutes.post("/apply", async (c) => {
   const auth = await requireAuthContext(c.env, c.req.raw);
   requireRole(auth, ["owner", "admin"]);
   requireRecentSession(auth);
+  const input = parseWith(applyUpdateSchema, await readJson(c.req.raw));
   const grant = await resolveRuntimeCloudflareGrant(c.req.raw, c.env);
-  const result = await triggerUpdate(c.env, grant);
-  await revokeRuntimeCloudflareGrant(grant, c.env);
-  c.header("set-cookie", clearRuntimeCloudflareGrantCookie());
+  let result: Awaited<ReturnType<typeof triggerUpdate>>;
+  try {
+    result = await triggerUpdate(c.env, grant, input.expectedVersion);
+  } finally {
+    try {
+      await revokeRuntimeCloudflareGrant(grant, c.env);
+    } finally {
+      c.header("set-cookie", clearRuntimeCloudflareGrantCookie());
+    }
+  }
   return c.json(result, 202);
 });
