@@ -74,7 +74,7 @@ jobs:
           legacy_dir=".hqbase/deployments/$DEPLOYMENT_NAME/migrations-before-0014"
           mkdir -p "$legacy_dir"
           for migration in migrations/00*.sql; do
-            if [[ "$(basename "$migration")" != "0014_unassigned_messages.sql" ]]; then
+            if [[ "$(basename "$migration")" < "0014_" ]]; then
               cp "$migration" "$legacy_dir/"
             fi
           done
@@ -98,7 +98,7 @@ jobs:
           pnpm exec wrangler d1 migrations apply DB --remote --config "$config"
           result=$(pnpm exec wrangler d1 execute DB --remote --config "$config" --json \
             --command "SELECT (SELECT value_json FROM app_settings WHERE key = 'sql-upgrade-probe') AS value_json, (SELECT is_unassigned FROM messages WHERE id = 'msg_sql_upgrade') AS is_unassigned, (SELECT is_unassigned FROM message_changes WHERE message_id = 'msg_sql_upgrade' LIMIT 1) AS change_is_unassigned, (SELECT COUNT(*) FROM d1_migrations) AS migration_count")
-          jq -e '.[0].results[0] == {"value_json":"{\"state\":\"preserved\"}","is_unassigned":1,"change_is_unassigned":1,"migration_count":14}' <<<"$result"
+          jq -e '.[0].results[0] == {"value_json":"{\"state\":\"preserved\"}","is_unassigned":1,"change_is_unassigned":1,"migration_count":15}' <<<"$result"
       - name: Deploy reviewed source candidate
         run: |
           config=".hqbase/deployments/$DEPLOYMENT_NAME/wrangler.jsonc"
