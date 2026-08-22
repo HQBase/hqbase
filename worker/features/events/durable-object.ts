@@ -110,6 +110,7 @@ export class MailEvents extends DurableObject<WorkerEnv> {
   private liveConnections(now: number): WebSocket[] {
     const live: WebSocket[] = [];
     for (const socket of this.ctx.getWebSockets()) {
+      if (socket.readyState !== WebSocket.OPEN) continue;
       const connection = readConnection(socket);
       if (!connection || connection.expiresAt <= now) {
         socket.close(1008, "Reconnect to renew authentication.");

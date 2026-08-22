@@ -344,6 +344,24 @@ describe("HQBase Mail API v1", () => {
       headers: { cookie, origin: "https://other.example", upgrade: "websocket" }
     });
     expect(invalidOrigin.status).toBe(403);
+    await expect(invalidOrigin.json()).resolves.toMatchObject({
+      error: { code: "ORIGIN_FORBIDDEN" }
+    });
+
+    const missingOrigin = await SELF.fetch(`${origin}/api/v1/events`, {
+      headers: { cookie, upgrade: "websocket" }
+    });
+    expect(missingOrigin.status).toBe(403);
+    await expect(missingOrigin.json()).resolves.toMatchObject({
+      error: { code: "ORIGIN_FORBIDDEN" }
+    });
+
+    const sessionSocket = await openEventSocket({
+      cookie,
+      origin,
+      upgrade: "websocket"
+    });
+    sessionSocket.close(1000, "Test complete.");
 
     const messageSocket = await openEventSocket({
       authorization: `Bearer ${readToken}`,
@@ -371,6 +389,33 @@ describe("HQBase Mail API v1", () => {
     });
     await expect(draftFrame).resolves.toEqual({ type: "changed", topic: "drafts" });
     draftSocket.close(1000, "Test complete.");
+  });
+
+  it("does not count a closing event socket toward the per-user limit", async () => {
+    const headers = {
+      authorization: `Bearer ${readToken}`,
+      upgrade: "websocket"
+    };
+    const firstSocket = await openEventSocket(headers);
+    const secondSocket = await openEventSocket(headers);
+    const closingSocket = await openEventSocket(headers);
+    closingSocket.close(1000, "Reconnect test.");
+
+    const replacementSocket = await openEventSocket(headers);
+    const firstFrame = nextSocketFrame(firstSocket);
+    const secondFrame = nextSocketFrame(secondSocket);
+    const replacementFrame = nextSocketFrame(replacementSocket);
+    await env.MAIL_EVENTS.getByName("workspace").publish({
+      topic: "messages",
+      userIds: [userId]
+    });
+
+    await expect(firstFrame).resolves.toEqual({ type: "changed", topic: "messages" });
+    await expect(secondFrame).resolves.toEqual({ type: "changed", topic: "messages" });
+    await expect(replacementFrame).resolves.toEqual({ type: "changed", topic: "messages" });
+    firstSocket.close(1000, "Test complete.");
+    secondSocket.close(1000, "Test complete.");
+    replacementSocket.close(1000, "Test complete.");
   });
 
   it("closes an event socket when its authorization lease expires", async () => {

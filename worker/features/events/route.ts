@@ -61,7 +61,7 @@ export async function handleMailEventRoute(
 function validateSessionOrigin(request: Request, authentication: "bearer" | "session"): void {
   if (authentication !== "session") return;
   const origin = request.headers.get("origin");
-  if (origin !== null && origin !== new URL(request.url).origin) {
+  if (origin !== new URL(request.url).origin) {
     throw new AppError("ORIGIN_FORBIDDEN", "WebSocket origin is not allowed.", 403);
   }
 }
