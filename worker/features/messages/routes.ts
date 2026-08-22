@@ -101,8 +101,7 @@ messageRoutes.get("/:id/html", async (c) => {
     html: await object.text(),
     inlineBasePath: isVersionedMailApiRequest(c.req.raw) ? "/api/v1/messages" : "/api/messages",
     messageId: message.id,
-    origin: new URL(c.req.url).origin,
-    subject: message.subject
+    origin: new URL(c.req.url).origin
   });
   return c.json({ ...rendered, remoteMediaTrusted: trusted });
 });

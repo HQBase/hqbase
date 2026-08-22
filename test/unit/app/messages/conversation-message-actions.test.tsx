@@ -72,7 +72,7 @@ describe("conversation message actions", () => {
     await view.unmount();
   });
 
-  it("switches the counted thread control between outward and inward arrows", async () => {
+  it("removes the counted thread control after it reveals the hidden messages", async () => {
     const messages = Array.from({ length: 4 }, (_, index) => ({
       ...firstMessage,
       id: `msg_${index + 1}`,
@@ -90,12 +90,53 @@ describe("conversation message actions", () => {
 
     await flushHookEffects(() => control?.click());
 
-    expect(control?.getAttribute("aria-label")).toBe("Collapse 2 earlier messages");
-    expect(control?.getAttribute("data-thread-disclosure-state")).toBe("expanded");
-    expect(control?.querySelector('[data-thread-arrow="top-inward"]')).not.toBeNull();
-    expect(control?.querySelector('[data-thread-arrow="bottom-inward"]')).not.toBeNull();
+    expect(view.container.querySelector("[data-thread-messages-control]")).toBeNull();
     expect(view.container.textContent).toContain("Message body 2");
     expect(view.container.textContent).toContain("Message body 3");
+
+    const newMessage = {
+      ...firstMessage,
+      id: "msg_5",
+      textBody: "Message body 5"
+    };
+    await view.rerender(<ConversationMessages messages={[...messages, newMessage]} />);
+
+    expect(view.container.querySelector("[data-thread-messages-control]")).toBeNull();
+    expect(view.container.textContent).toContain("Message body 2");
+    expect(view.container.textContent).toContain("Message body 4");
+
+    await view.rerender(
+      <ConversationMessages
+        messages={[...messages, newMessage].map((message) => ({
+          ...message,
+          threadId: "thr_2"
+        }))}
+      />
+    );
+
+    expect(view.container.querySelector("[data-thread-messages-control]")).not.toBeNull();
+
+    await view.unmount();
+  });
+
+  it("shows quoted-history disclosure on a revealed second-to-last message", async () => {
+    const messages = Array.from({ length: 4 }, (_, index) => ({
+      ...firstMessage,
+      id: `msg_${index + 1}`,
+      textBody:
+        index === 2
+          ? "Current reply\n\nOn Aug 20, 2026, Pat <pat@example.com> wrote:\n\n> Earlier reply"
+          : `Message body ${index + 1}`
+    }));
+    const view = await renderComponent(<ConversationMessages messages={messages} />);
+    const threadControl = view.container.querySelector<HTMLButtonElement>(
+      "[data-thread-disclosure-state]"
+    );
+
+    await flushHookEffects(() => threadControl?.click());
+
+    const secondToLast = view.container.querySelector('[data-thread-message-id="msg_3"]');
+    expect(secondToLast?.querySelector("[data-quoted-content-control]")).not.toBeNull();
 
     await view.unmount();
   });

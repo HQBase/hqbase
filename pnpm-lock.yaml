@@ -77,12 +77,18 @@ importers:
       clsx:
         specifier: ^2.1.1
         version: 2.1.1
+      domhandler:
+        specifier: ^6.0.1
+        version: 6.0.1
       drizzle-orm:
         specifier: 0.45.2
         version: 0.45.2(kysely@0.29.2)
       hono:
         specifier: ^4.13.2
         version: 4.13.2
+      htmlparser2:
+        specifier: ^12.0.0
+        version: 12.0.0
       postal-mime:
         specifier: ^2.5.2
         version: 2.7.5

@@ -2696,8 +2696,25 @@
       },
       "MessageHtml": {
         "type": "object",
-        "required": ["hasRemoteImages", "html", "quotedHtml", "remoteMediaTrusted"],
+        "required": [
+          "afterQuotedHtml",
+          "hasRemoteImages",
+          "html",
+          "quotedHtml",
+          "remoteMediaTrusted"
+        ],
         "properties": {
+          "afterQuotedHtml": {
+            "description": "Sanitized authored content that follows quoted reply history, or null when absent.",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "hasRemoteImages": {
             "type": "boolean"
           },
