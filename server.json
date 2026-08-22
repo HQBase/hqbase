@@ -1,6 +1,6 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
-  "name": "io.github.hqbase/hqbase",
+  "name": "io.github.HQBase/hqbase",
   "title": "HQBase",
   "description": "Connect AI agents to your self-hosted HQBase shared email workspace.",
   "repository": {
