@@ -143,4 +143,27 @@ describe("setup UI", () => {
     expect(html).not.toContain(">Review<");
     expect(html).not.toContain(">Mailbox 1<");
   });
+
+  it("shows receive-only guidance without a default From control", () => {
+    const html = renderToStaticMarkup(
+      <MailboxStep
+        defaultFromMailboxAddress=""
+        errors={{ rows: [{}] }}
+        isPending={false}
+        mailboxes={[{ address: "support@northstar.example", displayName: "Support" }]}
+        sendingEnabled={false}
+        onAdd={() => undefined}
+        onBack={() => undefined}
+        onComplete={() => undefined}
+        onRemove={() => undefined}
+        onSetDefaultFromMailboxAddress={() => undefined}
+        onUpdate={() => undefined}
+        submitError={null}
+      />
+    );
+
+    expect(html).not.toContain("Default From mailbox");
+    expect(html).toContain("These mailboxes can receive mail");
+    expect(html).toContain("Enable sending later in Settings");
+  });
 });

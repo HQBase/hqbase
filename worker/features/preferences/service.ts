@@ -20,7 +20,7 @@ export async function updateDefaultFromMailbox(
   if (!mailbox?.isActive || !primaryCanSend) {
     throw new AppError(
       "MAILBOX_NOT_SENDABLE",
-      "Choose an active mailbox with a send-enabled primary address.",
+      "Choose an active mailbox with a primary address that can send.",
       400
     );
   }

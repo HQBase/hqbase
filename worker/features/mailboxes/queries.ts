@@ -37,7 +37,8 @@ export function mapMailboxAddress(row: MailboxAddressRow): MailboxAddress {
     displayName: row.display_name,
     receiveEnabled: row.receive_enabled === 1,
     sendEnabled: row.send_enabled === 1,
-    sendAvailable: row.send_enabled === 1 && row.sending_status === "ready",
+    sendAvailable:
+      row.send_enabled === 1 && row.domain_is_enabled === 1 && row.sending_status === "ready",
     isPrimary: row.is_primary === 1
   };
 }
@@ -51,7 +52,8 @@ export async function addressMap(
   const rows = await getRows<MailboxAddressRow>(
     db,
     sql`SELECT a.id, a.mailbox_id, a.mail_domain_id, a.address, a.display_name,
-     a.receive_enabled, a.send_enabled, a.is_primary, d.sending_status
+     a.receive_enabled, a.send_enabled, a.is_primary, d.sending_status,
+     d.is_enabled AS domain_is_enabled
      FROM mailbox_addresses a
      JOIN mail_domains d ON d.id = a.mail_domain_id
      WHERE mailbox_id IN (${sql.join(

@@ -55,6 +55,29 @@ export async function bootstrapSetup(
     { name: input.primaryDomain ?? "", sendingStatus: "ready" as const }
   ];
   if (!domains[0]?.name) throw new AppError("DOMAIN_REQUIRED", "Choose an email domain.", 400);
+  const sendingDomains = new Set(
+    domains.filter((domain) => domain.sendingStatus === "ready").map((domain) => domain.name)
+  );
+  const defaultFromDomain = input.defaultFromMailboxAddress?.split("@")[1];
+  if (
+    sendingDomains.size > 0 &&
+    (!input.defaultFromMailboxAddress ||
+      !defaultFromDomain ||
+      !sendingDomains.has(defaultFromDomain))
+  ) {
+    throw new AppError(
+      "DEFAULT_FROM_MAILBOX_REQUIRED",
+      "Choose one of the setup mailboxes on a send-enabled domain as the default From mailbox.",
+      400
+    );
+  }
+  if (sendingDomains.size === 0 && input.defaultFromMailboxAddress !== null) {
+    throw new AppError(
+      "DEFAULT_FROM_MAILBOX_NOT_ALLOWED",
+      "Receive-only setup must not choose a default From mailbox.",
+      400
+    );
+  }
   assertLoginEmailOutsideDomains(
     input.ownerEmail,
     domains.map((domain) => domain.name)

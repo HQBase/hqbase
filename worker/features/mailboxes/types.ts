@@ -29,6 +29,7 @@ export type MailboxAddressRow = {
   receive_enabled: number;
   send_enabled: number;
   sending_status: "pending" | "ready" | "degraded" | "disabled";
+  domain_is_enabled: number;
   is_primary: number;
 };
 

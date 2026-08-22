@@ -1,7 +1,10 @@
 import { env } from "cloudflare:test";
 import { beforeAll, beforeEach, describe, expect, it } from "vitest";
 
-import { upsertMailDomain } from "../../../worker/features/domains/queries";
+import {
+  updateMailDomainSettings,
+  upsertMailDomain
+} from "../../../worker/features/domains/queries";
 import { findAddressIdentity } from "../../../worker/features/mailboxes/address-queries";
 import { listMailboxes } from "../../../worker/features/mailboxes/queries";
 import { createMailbox } from "../../../worker/features/mailboxes/service";
@@ -21,7 +24,7 @@ describe("receive-only mailbox identities", () => {
   });
 
   it("keeps receiving available while hiding sending until the domain is ready", async () => {
-    await upsertMailDomain(env.DB, {
+    const domain = await upsertMailDomain(env.DB, {
       name: "example.com",
       receivingStatus: "ready",
       sendingStatus: "disabled",
@@ -53,5 +56,10 @@ describe("receive-only mailbox identities", () => {
     await expect(
       findAddressIdentity(env.DB, "support@example.com", "send")
     ).resolves.not.toBeNull();
+
+    await updateMailDomainSettings(env.DB, domain.id, { isEnabled: false });
+
+    expect((await listMailboxes(env.DB))[0]?.addresses[0]?.sendAvailable).toBe(false);
+    await expect(findAddressIdentity(env.DB, "support@example.com", "send")).resolves.toBeNull();
   });
 });
