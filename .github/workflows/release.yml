@@ -305,6 +305,23 @@ jobs:
           previous_commit="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/deploy" --jq .object.sha)"
           test -n "$previous_commit"
           echo "previous_commit=$previous_commit" >> "$GITHUB_OUTPUT"
+      - name: Verify any existing release tag source
+        run: |
+          tag_name="v${HQBASE_RELEASE_VERSION}"
+          tag_ref="$(gh api "repos/$GITHUB_REPOSITORY/git/matching-refs/tags/$tag_name" \
+            --jq ".[] | select(.ref == \"refs/tags/$tag_name\") | [.object.type, .object.sha] | @tsv")"
+          if test -z "$tag_ref"; then
+            exit 0
+          fi
+          read -r tag_type tag_commit <<< "$tag_ref"
+          while test "$tag_type" = "tag"; do
+            read -r tag_type tag_commit < <(
+              gh api "repos/$GITHUB_REPOSITORY/git/tags/$tag_commit" \
+                --jq '[.object.type, .object.sha] | @tsv'
+            )
+          done
+          test "$tag_type" = "commit"
+          test "$tag_commit" = "$RELEASE_COMMIT"
       - name: Advance Deploy Button source to validated candidate
         id: advance_deploy
         run: >-
@@ -342,6 +359,19 @@ jobs:
             test "$attempt" -lt 30
             sleep 2
           done
+          tag_name="v${HQBASE_RELEASE_VERSION}"
+          read -r tag_type tag_commit < <(
+            gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$tag_name" \
+              --jq '[.object.type, .object.sha] | @tsv'
+          )
+          while test "$tag_type" = "tag"; do
+            read -r tag_type tag_commit < <(
+              gh api "repos/$GITHUB_REPOSITORY/git/tags/$tag_commit" \
+                --jq '[.object.type, .object.sha] | @tsv'
+            )
+          done
+          test "$tag_type" = "commit"
+          test "$tag_commit" = "$RELEASE_COMMIT"
           deploy_commit="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/deploy" --jq .object.sha)"
           test "$deploy_commit" = "$RELEASE_COMMIT"
           node --input-type=module -e '
