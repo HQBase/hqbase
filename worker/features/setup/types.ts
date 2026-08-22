@@ -70,6 +70,7 @@ export type CloudflareSendingStatus = {
 export type CloudflareDomainStatus = {
   zone: CloudflareZone;
   workerName: string;
+  sendingRequired: boolean;
   routing: CloudflareRoutingStatus;
   catchAll: CloudflareCatchAllStatus;
   sending: CloudflareSendingStatus;

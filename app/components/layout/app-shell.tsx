@@ -25,7 +25,7 @@ type AppShellProps = {
   updateStatus: UpdateStatus | null;
   unread: UnreadCounts;
   draftCount: number;
-  onCompose: () => void;
+  onCompose?: (() => void) | undefined;
   onFolderChange: (folder: FolderId) => void;
   onSettingsTabChange?: ((tab: import("@/lib/routes").SettingsTabId) => void) | undefined;
   onMailboxChange: (mailboxId: string) => void;
@@ -60,7 +60,7 @@ export function AppShell(props: AppShellProps): React.ReactElement {
               sidebarCollapsed={sidebarCollapsed}
               unread={props.unread}
               user={props.user}
-              onCompose={props.onCompose}
+              {...(props.onCompose ? { onCompose: props.onCompose } : {})}
               onFolderChange={props.onFolderChange}
               onSettingsTabChange={props.onSettingsTabChange}
               onSignedOut={props.onSignedOut}
@@ -88,7 +88,7 @@ export function AppShell(props: AppShellProps): React.ReactElement {
             mailboxId={props.mailboxId}
             unread={props.unread}
             user={props.user}
-            onCompose={props.onCompose}
+            {...(props.onCompose ? { onCompose: props.onCompose } : {})}
             onFolderChange={props.onFolderChange}
             onSettingsTabChange={props.onSettingsTabChange}
             onSignedOut={props.onSignedOut}
@@ -157,7 +157,7 @@ function ShellContent({
         unread={unread}
         user={user}
         sidebarCollapsed={sidebarCollapsed}
-        onCompose={onCompose}
+        {...(onCompose ? { onCompose } : {})}
         onFolderChange={onFolderChange}
         onMailboxChange={onMailboxChange}
         onSearchChange={onSearchChange}

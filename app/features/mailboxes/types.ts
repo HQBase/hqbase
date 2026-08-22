@@ -9,6 +9,7 @@ export type Mailbox = {
     displayName: string;
     receiveEnabled: boolean;
     sendEnabled: boolean;
+    sendAvailable: boolean;
     isPrimary: boolean;
   }>;
   displayName: string;

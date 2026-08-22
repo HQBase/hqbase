@@ -121,6 +121,7 @@ describe("setup UI", () => {
         errors={{ rows: mailboxes.map(() => ({})) }}
         isPending={false}
         mailboxes={mailboxes}
+        sendingEnabled
         onAdd={() => undefined}
         onBack={() => undefined}
         onComplete={() => undefined}

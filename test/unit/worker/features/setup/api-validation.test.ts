@@ -54,7 +54,10 @@ describe("setup API validation", () => {
         ownerName: "Owner",
         ownerEmail: "owner@example.com",
         ownerPassword: "password123",
-        emailDomains: [{ name: "support.example" }, { name: "example.com" }],
+        emailDomains: [
+          { name: "support.example", sendingStatus: "ready" },
+          { name: "example.com", sendingStatus: "ready" }
+        ],
         checklistAcknowledged: true,
         defaultFromMailboxAddress: "hello@example.com",
         mailboxes: [{ address: "hello@example.com", displayName: "Hello" }]
@@ -90,7 +93,41 @@ describe("setup API validation", () => {
         defaultFromMailboxAddress: "privacy@example.com",
         mailboxes: [{ address: "hello@example.com", displayName: "Hello" }]
       })
-    ).toThrow("Choose one of the setup mailboxes as the default From mailbox.");
+    ).toThrow("Choose a mailbox on a send-enabled domain as the default From mailbox.");
+  });
+
+  it("accepts receive-only setup without a default From mailbox", () => {
+    expect(
+      bootstrapSetupSchema.parse({
+        ownerName: "Owner",
+        ownerEmail: "owner@gmail.com",
+        ownerPassword: "password123",
+        emailDomains: [{ name: "example.com", sendingStatus: "disabled" }],
+        checklistAcknowledged: true,
+        defaultFromMailboxAddress: null,
+        mailboxes: [{ address: "hello@example.com", displayName: "Hello" }]
+      })
+    ).toMatchObject({ defaultFromMailboxAddress: null });
+  });
+
+  it("requires a send-enabled default From mailbox when any domain can send", () => {
+    expect(() =>
+      bootstrapSetupSchema.parse({
+        ownerName: "Owner",
+        ownerEmail: "owner@gmail.com",
+        ownerPassword: "password123",
+        emailDomains: [
+          { name: "receive.example", sendingStatus: "disabled" },
+          { name: "send.example", sendingStatus: "ready" }
+        ],
+        checklistAcknowledged: true,
+        defaultFromMailboxAddress: "hello@receive.example",
+        mailboxes: [
+          { address: "hello@receive.example", displayName: "Hello" },
+          { address: "support@send.example", displayName: "Support" }
+        ]
+      })
+    ).toThrow("Choose a mailbox on a send-enabled domain as the default From mailbox.");
   });
 
   it("rejects credentials in Cloudflare zone listing input", () => {

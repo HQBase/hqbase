@@ -226,8 +226,9 @@ describe("Better Auth schema", () => {
     const timestamp = new Date().toISOString();
     await env.DB.batch([
       env.DB.prepare(
-        `INSERT INTO mail_domains (id, name, created_at, updated_at)
-         VALUES ('domain_preferences', 'preferences.example', ?, ?)`
+        `INSERT INTO mail_domains
+         (id, name, receiving_status, sending_status, dns_status, created_at, updated_at)
+         VALUES ('domain_preferences', 'preferences.example', 'ready', 'ready', 'ready', ?, ?)`
       ).bind(timestamp, timestamp),
       env.DB.prepare(
         `INSERT INTO mailboxes

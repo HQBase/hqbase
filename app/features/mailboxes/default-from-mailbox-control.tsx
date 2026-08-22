@@ -79,7 +79,6 @@ function defaultFromMailboxOptions(mailboxes: Mailbox[]): Mailbox[] {
     (mailbox) =>
       mailbox.isActive &&
       (mailbox.accessLevel === "agent" || mailbox.accessLevel === "manager") &&
-      (mailbox.addresses.length === 0 ||
-        mailbox.addresses.some((address) => address.isPrimary && address.sendEnabled))
+      mailbox.addresses.some((address) => address.isPrimary && address.sendAvailable)
   );
 }

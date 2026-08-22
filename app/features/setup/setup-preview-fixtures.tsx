@@ -115,6 +115,7 @@ export function renderPreviewFixture(input: FixtureInput): React.ReactNode {
         connectionError={
           readinessError ? "Cloudflare needs attention on one or more checks below." : null
         }
+        enableSending
         errors={{}}
         isLoading={false}
         onBack={() => undefined}
@@ -130,6 +131,7 @@ export function renderPreviewFixture(input: FixtureInput): React.ReactNode {
         selectedZoneIds={input.selectedZoneIds}
         selectedZones={input.selectedZones}
         setAppSubdomain={input.setAppSubdomain}
+        setEnableSending={() => undefined}
         setPortalZoneId={input.setPortalZoneId}
         zones={zones}
       />
@@ -164,6 +166,7 @@ export function renderPreviewFixture(input: FixtureInput): React.ReactNode {
       errors={{ rows: input.mailboxes.map(() => ({})) }}
       isPending={input.state === "submitting"}
       mailboxes={input.mailboxes}
+      sendingEnabled
       onAdd={() => input.setMailboxes((current) => [...current, { address: "", displayName: "" }])}
       onBack={() => undefined}
       onComplete={() => undefined}
@@ -227,6 +230,7 @@ function readinessFailureFixture(): ConfiguredDomain[] {
         status: {
           zone,
           workerName: "hqbase-preview",
+          sendingRequired: true,
           routing: {
             enabled: true,
             status: "active",

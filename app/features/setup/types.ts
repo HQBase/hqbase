@@ -14,9 +14,14 @@ export type BootstrapSetupInput = {
   ownerPassword: string;
   primaryDomain: string;
   portalHostname: string;
-  emailDomains: Array<{ name: string; zoneId: string; accountId: string | null }>;
+  emailDomains: Array<{
+    name: string;
+    zoneId: string;
+    accountId: string | null;
+    sendingStatus: "ready" | "disabled";
+  }>;
   checklistAcknowledged: boolean;
-  defaultFromMailboxAddress: string;
+  defaultFromMailboxAddress: string | null;
   mailboxes: Array<{
     address: string;
     displayName: string;
@@ -41,6 +46,7 @@ export type CloudflareAccessStatus = {
 export type CloudflareDomainStatus = {
   zone: CloudflareZone;
   workerName: string;
+  sendingRequired: boolean;
   routing: {
     enabled: boolean;
     status: string | null;

@@ -18,6 +18,7 @@ type CloudflareInput = { apiToken: string };
 type CloudflareZoneInput = CloudflareInput & {
   zoneId: string;
   workerName?: string | undefined;
+  requireSending?: boolean | undefined;
 };
 
 type CloudflareConfigureInput = CloudflareZoneInput & {
@@ -114,6 +115,7 @@ export async function inspectCloudflareDomain(
   input: CloudflareZoneInput
 ): Promise<CloudflareDomainStatus> {
   const workerName = normalizeWorkerName(input.workerName);
+  const sendingRequired = input.requireSending ?? true;
   const zone = mapZone(
     await cloudflareRequestResult(input.apiToken, `/zones/${input.zoneId}`, cloudflareZoneSchema)
   );
@@ -130,13 +132,14 @@ export async function inspectCloudflareDomain(
     routing.dnsReady &&
     catchAll.enabled &&
     catchAll.configuredForWorker &&
-    sending.enabled;
+    (!sendingRequired || sending.enabled);
 
   return {
     catchAll,
     ready,
     routing,
     sending,
+    sendingRequired,
     workerName,
     zone
   };
@@ -229,7 +232,7 @@ export async function configureCloudflareDomain(
     steps.push({
       id: "sending",
       label: "Enable Email Sending",
-      message: "Skipped by setup option.",
+      message: "Skipped. This workspace receives mail but cannot send it.",
       status: "skipped"
     });
   }
@@ -237,6 +240,7 @@ export async function configureCloudflareDomain(
   return {
     status: await inspectCloudflareDomain({
       apiToken: input.apiToken,
+      requireSending: input.enableSending,
       workerName,
       zoneId: zone.id
     }),

@@ -2,6 +2,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
 import { InboxPage } from "@/features/inbox/inbox-page";
+import type { Mailbox } from "@/features/mailboxes/types";
 import { ConversationMessages } from "@/features/messages/conversation-messages";
 import { MessageDetail } from "@/features/messages/message-detail";
 import { MessageListItem } from "@/features/messages/message-list-item";
@@ -63,12 +64,35 @@ const conversation: ConversationSummary = {
   unreadCount: 1
 };
 
+const sendableMailbox: Mailbox = {
+  id: "mbx_1",
+  address: "support@example.com",
+  addresses: [
+    {
+      id: "addr_1",
+      mailboxId: "mbx_1",
+      mailDomainId: "dom_1",
+      address: "support@example.com",
+      displayName: "Support",
+      receiveEnabled: true,
+      sendEnabled: true,
+      sendAvailable: true,
+      isPrimary: true
+    }
+  ],
+  displayName: "Support",
+  isActive: true,
+  accessLevel: "manager",
+  createdAt: "2026-07-27T14:00:00.000Z",
+  updatedAt: "2026-07-27T14:00:00.000Z"
+};
+
 describe("conversation reader", () => {
   it("renders Reply and Forward under the last message", () => {
     const html = renderToStaticMarkup(
       <MessageDetail
         defaultFromMailboxId="mbx_1"
-        mailboxes={[]}
+        mailboxes={[sendableMailbox]}
         messages={[firstMessage, secondMessage]}
         selectedId={secondMessage.id}
         onAction={() => undefined}

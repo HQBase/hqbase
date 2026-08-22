@@ -126,7 +126,11 @@ export function useSetupFlow(onComplete: () => void) {
 
     const input: BootstrapSetupInput = {
       checklistAcknowledged: true,
-      defaultFromMailboxAddress,
+      defaultFromMailboxAddress: cloudflare.emailDomains.some(
+        (domain) => domain.sendingStatus === "ready"
+      )
+        ? defaultFromMailboxAddress
+        : null,
       mailboxes,
       ownerEmail,
       ownerName,
@@ -192,6 +196,7 @@ export function useSetupFlow(onComplete: () => void) {
       errors: mailboxErrors,
       isPending,
       mailboxes,
+      sendingEnabled: cloudflare.emailDomains.some((domain) => domain.sendingStatus === "ready"),
       submitError,
       onAdd: addMailbox,
       onBack: () => setActiveStep(OWNER_STEP),

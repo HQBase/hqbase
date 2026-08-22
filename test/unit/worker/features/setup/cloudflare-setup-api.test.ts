@@ -234,6 +234,38 @@ describe("Cloudflare setup API", () => {
     ).toBe(false);
   });
 
+  it("finishes receive-only setup without changing Email Sending", async () => {
+    const fetchMock = vi.fn<typeof fetch>((input, init) => {
+      const url = fetchInputUrl(input);
+      const method = init?.method ?? "GET";
+      if (url === `${API_BASE}/zones/zone-1/email/sending/subdomains`) {
+        return Promise.resolve(jsonResponse({ result: [] }));
+      }
+      return Promise.resolve(cloudflareSetupResponse(url, method));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await configureCloudflareDomain({
+      apiToken: "token-123",
+      enableSending: false,
+      workerName: "hqbase",
+      zoneId: "zone-1"
+    });
+
+    expect(result.status).toMatchObject({ ready: true, sendingRequired: false });
+    expect(result.steps.find((step) => step.id === "sending")).toMatchObject({
+      message: "Skipped. This workspace receives mail but cannot send it.",
+      status: "skipped"
+    });
+    expect(
+      fetchMock.mock.calls.some(
+        ([input, init]) =>
+          fetchInputUrl(input) === `${API_BASE}/zones/zone-1/email/sending/subdomains` &&
+          init?.method === "POST"
+      )
+    ).toBe(false);
+  });
+
   it("accepts the current Email Routing DNS record response", async () => {
     const fetchMock = vi.fn<typeof fetch>((input, init) => {
       const url = fetchInputUrl(input);

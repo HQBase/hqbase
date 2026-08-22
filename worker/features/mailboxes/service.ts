@@ -29,7 +29,7 @@ export async function createMailbox(db: D1Database, input: CreateMailboxInput): 
     throw new AppError("MAILBOX_EXISTS", "A mailbox with this address already exists.", 409);
   }
 
-  return insertMailbox(db, input, domain.id);
+  return insertMailbox(db, input, domain.id, domain.sendingStatus === "ready");
 }
 
 export async function createMailboxAddress(
@@ -46,7 +46,7 @@ export async function createMailboxAddress(
   if (await findMailboxByAddress(db, input.address)) {
     throw new AppError("MAILBOX_ADDRESS_EXISTS", "This email address is already in use.", 409);
   }
-  return insertMailboxAddress(db, mailboxId, domain.id, input);
+  return insertMailboxAddress(db, mailboxId, domain.id, input, domain.sendingStatus === "ready");
 }
 
 export async function removeMailboxAddress(

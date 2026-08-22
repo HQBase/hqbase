@@ -81,8 +81,8 @@ export function defaultSendingIdentity(
 ): SendingIdentity | null {
   const mailbox = mailboxes.find((candidate) => candidate.id === defaultFromMailboxId);
   const primaryAddress =
-    mailbox?.addresses.find((address) => address.isPrimary && address.sendEnabled)?.address ??
-    (mailbox?.addresses.length === 0 ? mailbox.address : null);
+    mailbox?.addresses.find((address) => address.isPrimary && address.sendAvailable)?.address ??
+    null;
   return (
     identities.find(
       (identity) =>
@@ -100,11 +100,9 @@ export function sendingIdentities(mailboxes: Mailbox[]): SendingIdentity[] {
         mailbox.isActive && (mailbox.accessLevel === "agent" || mailbox.accessLevel === "manager")
     )
     .flatMap((mailbox) =>
-      mailbox.addresses?.length
-        ? mailbox.addresses
-            .filter((address) => address.sendEnabled)
-            .map((address) => ({ mailboxId: mailbox.id, address: address.address }))
-        : [{ mailboxId: mailbox.id, address: mailbox.address }]
+      mailbox.addresses
+        .filter((address) => address.sendAvailable)
+        .map((address) => ({ mailboxId: mailbox.id, address: address.address }))
     );
 }
 

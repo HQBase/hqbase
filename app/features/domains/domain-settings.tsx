@@ -6,7 +6,13 @@ import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { CloudflareAuthorizationDialog } from "@/features/settings/cloudflare-authorization-dialog";
 import { SettingsSection } from "@/features/settings/settings-section";
-import { changePortal, listDomains, revokeCloudflareAuthorization, updateDomain } from "./api";
+import {
+  changePortal,
+  listDomains,
+  provisionDomain,
+  revokeCloudflareAuthorization,
+  updateDomain
+} from "./api";
 import { ConnectDomainDialog } from "./connect-domain-dialog";
 import { DomainTable } from "./domain-table";
 import type { MailDomain } from "./types";
@@ -15,7 +21,8 @@ const PENDING_OPERATION_KEY = "hqb_cloudflare_operation_v1";
 
 type PendingCloudflareOperation =
   | { action: "connect" }
-  | { action: "portal"; hostname: string; zoneId: string };
+  | { action: "portal"; hostname: string; zoneId: string }
+  | { action: "sending"; domainId: string; name: string; zoneId: string };
 
 export function DomainSettings({
   portalHostname,
@@ -55,7 +62,7 @@ export function DomainSettings({
       const pending = readPendingOperation();
       if (pending?.action === "connect") {
         setConnectOpen(true);
-      } else if (pending?.action === "portal") {
+      } else if (pending?.action === "portal" || pending?.action === "sending") {
         setAuthorizationOperation(pending);
       } else {
         toast.error("Sign in again, then restart the Cloudflare change.");
@@ -87,6 +94,28 @@ export function DomainSettings({
     }
 
     setChangePending(true);
+    if (pending.action === "sending") {
+      setPendingDomainId(pending.domainId);
+      void provisionDomain({ zoneId: pending.zoneId, name: pending.name, enableSending: true })
+        .then(({ domain }) => {
+          if (domain.sendingStatus !== "ready") {
+            throw new Error("Cloudflare has not reported Email Sending as ready.");
+          }
+          refresh();
+          onChanged();
+          toast.success(`Sending enabled for ${domain.name}.`);
+        })
+        .catch((error: unknown) => {
+          toast.error(error instanceof Error ? error.message : "Cloudflare change failed.");
+        })
+        .finally(() => {
+          sessionStorage.removeItem(PENDING_OPERATION_KEY);
+          setChangePending(false);
+          setPendingDomainId(null);
+        });
+      return;
+    }
+
     void changePortal({ zoneId: pending.zoneId, hostname: pending.hostname })
       .then(() => {
         onChanged();
@@ -99,7 +128,7 @@ export function DomainSettings({
         sessionStorage.removeItem(PENDING_OPERATION_KEY);
         setChangePending(false);
       });
-  }, [onChanged]);
+  }, [onChanged, refresh]);
 
   function portal(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -122,6 +151,19 @@ export function DomainSettings({
     } finally {
       setPendingDomainId(null);
     }
+  }
+
+  function enableSending(domain: MailDomain) {
+    if (!domain.zoneId) {
+      toast.error("Reconnect this domain to its Cloudflare zone before enabling sending.");
+      return;
+    }
+    setAuthorizationOperation({
+      action: "sending",
+      domainId: domain.id,
+      name: domain.name,
+      zoneId: domain.zoneId
+    });
   }
 
   return (
@@ -155,6 +197,7 @@ export function DomainSettings({
       <DomainTable
         domains={domains}
         pendingDomainId={pendingDomainId}
+        onEnableSending={enableSending}
         onToggle={(domain) => void toggleDomain(domain)}
       />
 
@@ -187,8 +230,15 @@ export function DomainSettings({
       </div>
       <CloudflareAuthorizationDialog
         authorizeHref="/api/domains/cloudflare/oauth/start"
-        description="To save this change, HQBase needs temporary access to your Cloudflare account. You’ll return to Domains automatically, and HQBase will update the workspace portal."
-        open={authorizationOperation?.action === "portal"}
+        description={
+          authorizationOperation?.action === "sending"
+            ? "HQBase needs temporary Cloudflare access to enable Email Sending. You will return to Domains automatically."
+            : "To save this change, HQBase needs temporary access to your Cloudflare account. You’ll return to Domains automatically, and HQBase will update the workspace portal."
+        }
+        open={
+          authorizationOperation?.action === "portal" ||
+          authorizationOperation?.action === "sending"
+        }
         onAuthorize={() => {
           if (authorizationOperation) {
             sessionStorage.setItem(PENDING_OPERATION_KEY, JSON.stringify(authorizationOperation));
@@ -214,6 +264,19 @@ function readPendingOperation(): PendingCloudflareOperation | null {
       typeof value.zoneId === "string"
     ) {
       return { action: "portal", hostname: value.hostname, zoneId: value.zoneId };
+    }
+    if (
+      value?.action === "sending" &&
+      typeof value.domainId === "string" &&
+      typeof value.name === "string" &&
+      typeof value.zoneId === "string"
+    ) {
+      return {
+        action: "sending",
+        domainId: value.domainId,
+        name: value.name,
+        zoneId: value.zoneId
+      };
     }
   } catch {
     // Ignore malformed, non-secret browser draft state.

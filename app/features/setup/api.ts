@@ -26,6 +26,7 @@ export async function listCloudflareZones(): Promise<CloudflareZone[]> {
 }
 
 export async function inspectCloudflareDomain(input: {
+  requireSending?: boolean;
   workerName: string;
   zoneId: string;
 }): Promise<CloudflareDomainStatus> {

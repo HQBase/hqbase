@@ -123,7 +123,11 @@ domainRoutes.post("/provision", async (c) => {
     accountId: result.status.zone.accountId,
     receivingStatus:
       result.status.routing.enabled && result.status.catchAll.enabled ? "ready" : "degraded",
-    sendingStatus: result.status.sending.enabled ? "ready" : "degraded",
+    sendingStatus: input.enableSending
+      ? result.status.sending.enabled
+        ? "ready"
+        : "degraded"
+      : "disabled",
     dnsStatus: result.status.routing.dnsReady ? "ready" : "degraded"
   });
   await recordAudit(c.env.DB, {
