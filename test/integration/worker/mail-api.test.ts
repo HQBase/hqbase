@@ -427,6 +427,48 @@ describe("HQBase Mail API v1", () => {
     });
   });
 
+  it("sends a web forward draft with its original attachments", async () => {
+    const created = await apiFetch("/api/v1/drafts", fullToken, {
+      body: JSON.stringify({
+        mailboxId: "mbx_api",
+        forwardOfMessageId: "msg_api",
+        from: "support@example.com",
+        to: ["person@example.net"],
+        subject: "Fwd: API message",
+        text: "---------- Forwarded message ---------\n\nBody",
+        html: "<blockquote>Body</blockquote>"
+      }),
+      headers: { "content-type": "application/json" },
+      method: "POST"
+    });
+    expect(created.status, await created.clone().text()).toBe(201);
+    const draft = (await created.json()) as { id: string };
+
+    const response = await apiFetch("/api/v1/send", fullToken, {
+      body: JSON.stringify({
+        from: "support@example.com",
+        to: ["person@example.net"],
+        subject: "Fwd: API message",
+        text: "---------- Forwarded message ---------\n\nBody",
+        html: "<blockquote>Body</blockquote>",
+        draftId: draft.id
+      }),
+      headers: { "content-type": "application/json" },
+      method: "POST"
+    });
+    expect(response.status, await response.clone().text()).toBe(201);
+    const forwarded = (await response.json()) as { id: string };
+    const detail = await apiFetch(`/api/v1/messages/${forwarded.id}`, readToken);
+    await expect(detail.json()).resolves.toMatchObject({
+      attachments: [{ contentType: "text/plain", filename: "hello.txt", sizeBytes: 5 }],
+      folder: "sent",
+      hasAttachments: true,
+      subject: "Fwd: API message"
+    });
+    const deletedDraft = await apiFetch(`/api/v1/drafts/${draft.id}`, fullToken);
+    expect(deletedDraft.status).toBe(404);
+  });
+
   it("limits unassigned mail to authenticated owners", async () => {
     try {
       for (const role of ["member", "admin"] as const) {

@@ -7,11 +7,15 @@ import { readJson } from "../../lib/json";
 import { parseWith } from "../../lib/validation";
 import { enforceRateLimit } from "../../security/rate-limit";
 import { recordAudit } from "../audit/service";
-import { requireDraftAttachmentIdsAccess, requireDraftIdAccess } from "../drafts/access";
+import {
+  getAccessibleDraft,
+  requireDraftAttachmentIdsAccess,
+  requireDraftIdAccess
+} from "../drafts/access";
 import { findMailboxForSending } from "../mailboxes/queries";
 import { requireMessageAccess } from "../messages/access";
 
-import { forwardMessage } from "./forward";
+import { forwardMessage, sendForwardDraft } from "./forward";
 import { replyToMessage, sendNewMessage } from "./service";
 import { forwardMessageSchema, replyMessageSchema, sendMessageSchema } from "./validation";
 
@@ -36,9 +40,11 @@ sendRoutes.post("/send", async (c) => {
     "agent"
   );
   const principal = { role: authContext.user.role, userId: authContext.user.id };
-  await requireDraftIdAccess(c.env, principal, input.draftId);
+  const draft = input.draftId ? await getAccessibleDraft(c.env, principal, input.draftId) : null;
   await requireDraftAttachmentIdsAccess(c.env, principal, input.attachmentIds);
-  const sent = await sendNewMessage(c.env, input, authContext.user.id);
+  const sent = draft?.forwardOfMessageId
+    ? await sendForwardDraft(c.env, input, draft.id, draft.forwardOfMessageId, authContext.user.id)
+    : await sendNewMessage(c.env, input, authContext.user.id);
   await recordAudit(c.env.DB, {
     correlationId: c.get("correlationId"),
     actorType: "user",

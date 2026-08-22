@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("@worker/features/drafts/queries", () => ({
   addDraftAttachment: vi.fn(),
   deleteDraft: vi.fn(),
+  removeDraftAttachment: vi.fn(),
   saveDraft: vi.fn()
 }));
 vi.mock("@worker/features/mailboxes/queries", () => ({
@@ -15,10 +16,15 @@ vi.mock("@worker/features/send/service", () => ({
   sendNewMessage: vi.fn()
 }));
 
-import { addDraftAttachment, deleteDraft, saveDraft } from "@worker/features/drafts/queries";
+import {
+  addDraftAttachment,
+  deleteDraft,
+  removeDraftAttachment,
+  saveDraft
+} from "@worker/features/drafts/queries";
 import { findMailboxForSending } from "@worker/features/mailboxes/queries";
 import { getMessageDetail } from "@worker/features/messages/queries";
-import { forwardMessage } from "@worker/features/send/forward";
+import { forwardMessage, sendForwardDraft } from "@worker/features/send/forward";
 import { sendNewMessage } from "@worker/features/send/service";
 import type { WorkerEnv } from "@worker/lib/env";
 
@@ -196,5 +202,124 @@ describe("forward service", () => {
       "user-1"
     );
     expect(deleteDraft).not.toHaveBeenCalled();
+  });
+
+  it("adds original attachments when the web UI sends a forward draft", async () => {
+    vi.mocked(getMessageDetail).mockResolvedValue({
+      ...original,
+      attachments: [
+        {
+          id: "attachment-1",
+          messageId: original.id,
+          filename: "original.txt",
+          contentType: "text/plain",
+          sizeBytes: 8,
+          contentId: null,
+          r2Key: "mail/original.txt",
+          createdAt: original.createdAt
+        }
+      ],
+      hasAttachments: true
+    });
+    get.mockResolvedValue({
+      arrayBuffer: async () => new TextEncoder().encode("original").buffer
+    });
+    vi.mocked(addDraftAttachment).mockResolvedValue({
+      attachment: {
+        id: "attachment-copy",
+        filename: "original.txt",
+        contentType: "text/plain",
+        sizeBytes: 8
+      },
+      r2Key: "drafts/user-1/draft-web/attachment-copy"
+    });
+
+    await sendForwardDraft(
+      env,
+      {
+        from: mailbox.address,
+        to: ["recipient@example.com"],
+        cc: [],
+        bcc: [],
+        subject: "Fwd: Original",
+        text: "---------- Forwarded message ---------",
+        attachmentIds: ["attachment-added"],
+        draftId: "draft-web"
+      },
+      "draft-web",
+      original.id,
+      "user-1"
+    );
+
+    expect(sendNewMessage).toHaveBeenCalledWith(
+      env,
+      expect.objectContaining({
+        attachmentIds: ["attachment-added", "attachment-copy"],
+        draftId: "draft-web",
+        text: "---------- Forwarded message ---------"
+      }),
+      "user-1"
+    );
+    expect(saveDraft).not.toHaveBeenCalled();
+    expect(removeDraftAttachment).not.toHaveBeenCalled();
+  });
+
+  it("removes copied attachments when a web forward draft is not sent", async () => {
+    vi.mocked(getMessageDetail).mockResolvedValue({
+      ...original,
+      attachments: [
+        {
+          id: "attachment-1",
+          messageId: original.id,
+          filename: "original.txt",
+          contentType: "text/plain",
+          sizeBytes: 8,
+          contentId: null,
+          r2Key: "mail/original.txt",
+          createdAt: original.createdAt
+        }
+      ],
+      hasAttachments: true
+    });
+    get.mockResolvedValue({
+      arrayBuffer: async () => new TextEncoder().encode("original").buffer
+    });
+    vi.mocked(addDraftAttachment).mockResolvedValue({
+      attachment: {
+        id: "attachment-copy",
+        filename: "original.txt",
+        contentType: "text/plain",
+        sizeBytes: 8
+      },
+      r2Key: "drafts/user-1/draft-web/attachment-copy"
+    });
+    vi.mocked(sendNewMessage).mockRejectedValueOnce(new Error("Delivery failed."));
+
+    await expect(
+      sendForwardDraft(
+        env,
+        {
+          from: mailbox.address,
+          to: ["recipient@example.com"],
+          cc: [],
+          bcc: [],
+          subject: "Fwd: Original",
+          text: "---------- Forwarded message ---------",
+          attachmentIds: [],
+          draftId: "draft-web"
+        },
+        "draft-web",
+        original.id,
+        "user-1"
+      )
+    ).rejects.toThrow("Delivery failed.");
+
+    expect(removeDraftAttachment).toHaveBeenCalledWith(
+      env.DB,
+      env.MAIL_OBJECTS,
+      "user-1",
+      "draft-web",
+      "attachment-copy"
+    );
   });
 });
