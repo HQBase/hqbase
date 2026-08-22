@@ -80,7 +80,16 @@ function findPlainTextQuoteStart(value: string): number | null {
       attributionStart -= 1;
       attribution = `${lines[attributionStart] ?? ""} ${attribution}`;
     }
-    if (plainTextEmailAddress.test(attribution)) return offsets[attributionStart] ?? 0;
+    if (!plainTextEmailAddress.test(attribution)) continue;
+
+    if (attributionStart === attributionEnd) {
+      let wrappedStart = attributionStart;
+      while (wrappedStart > 0 && (lines[wrappedStart - 1] ?? "").trim()) {
+        wrappedStart -= 1;
+      }
+      if (wrappedStart > 0) attributionStart = wrappedStart;
+    }
+    return offsets[attributionStart] ?? 0;
   }
 
   return null;
