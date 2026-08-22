@@ -335,9 +335,26 @@ jobs:
         env:
           PREVIOUS_DEPLOY_COMMIT: ${{ steps.deploy_source.outputs.previous_commit }}
         run: |
-          if test "$(gh release view "v${HQBASE_RELEASE_VERSION}" --json isDraft --jq .isDraft)" != "true"; then
+          release_lookup_succeeded=false
+          release_is_draft=""
+          for attempt in $(seq 1 5); do
+            if release_is_draft="$(gh release view "v${HQBASE_RELEASE_VERSION}" --json isDraft --jq .isDraft)"; then
+              release_lookup_succeeded=true
+              break
+            fi
+            sleep 2
+          done
+          if test "$release_lookup_succeeded" != "true"; then
+            echo "Could not determine whether the release is public; refusing to change the Deploy branch." >&2
+            exit 1
+          fi
+          if test "$release_is_draft" = "false"; then
             echo "::warning title=Deploy branch retained::The release is public, so the validated Deploy Button source was not rolled back."
             exit 0
+          fi
+          if test "$release_is_draft" != "true"; then
+            echo "GitHub returned an invalid release draft state: $release_is_draft" >&2
+            exit 1
           fi
           current_commit="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/deploy" --jq .object.sha)"
           if test "$current_commit" != "$RELEASE_COMMIT"; then

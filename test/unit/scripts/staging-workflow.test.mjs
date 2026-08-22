@@ -92,6 +92,9 @@ describe("staging workflow lifecycle record", () => {
     expect(releaseWorkflow).toContain("git/tags/$tag_commit");
     expect(releaseWorkflow).toContain("steps.publish_release.outcome == 'failure'");
     expect(releaseWorkflow).toContain("--json isDraft --jq .isDraft");
+    expect(releaseWorkflow).toContain("release_lookup_succeeded=false");
+    expect(releaseWorkflow).toContain('test "$release_lookup_succeeded" != "true"');
+    expect(releaseWorkflow).toContain('test "$release_is_draft" = "false"');
     expect(releaseWorkflow).toContain("-F force=true");
     expect(releaseWorkflow).toContain('test "$tag_commit" = "$RELEASE_COMMIT"');
     expect(releaseWorkflow).toContain('test "$deploy_commit" = "$RELEASE_COMMIT"');
