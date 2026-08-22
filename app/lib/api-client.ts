@@ -5,8 +5,8 @@ export type ApiError = {
   };
 };
 
-export async function apiGet<T>(path: string): Promise<T> {
-  return apiRequest<T>(path, { method: "GET" });
+export async function apiGet<T>(path: string, options: { signal?: AbortSignal } = {}): Promise<T> {
+  return apiRequest<T>(path, { method: "GET", ...options });
 }
 
 export async function apiPost<T>(path: string, body?: unknown): Promise<T> {

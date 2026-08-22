@@ -14,6 +14,9 @@ import {
 } from "@/features/auth/recent-authentication-state";
 import { getRecentAuthentication, reauthenticate } from "./recent-authentication-api";
 
+const recentAuthenticationCheckTimeoutMs = 10_000;
+const recentAuthenticationTimeoutMessage = "Your sign-in could not be confirmed. Try again.";
+
 export type RecentAuthenticationGateProps = {
   active: boolean;
   description: string;
@@ -38,8 +41,14 @@ export function RecentAuthenticationGate({
   React.useEffect(() => {
     if (!active) return;
     let cancelled = false;
+    let timedOut = false;
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => {
+      timedOut = true;
+      controller.abort();
+    }, recentAuthenticationCheckTimeoutMs);
     dispatch({ type: "check-started" });
-    void getRecentAuthentication()
+    void getRecentAuthentication(controller.signal)
       .then((recent) => {
         if (!cancelled) dispatch({ type: "check-finished", recent });
       })
@@ -47,12 +56,18 @@ export function RecentAuthenticationGate({
         if (cancelled) return;
         dispatch({
           type: "check-failed",
-          message:
-            nextError instanceof Error ? nextError.message : "Your sign-in could not be confirmed."
+          message: timedOut
+            ? recentAuthenticationTimeoutMessage
+            : nextError instanceof Error
+              ? nextError.message
+              : "Your sign-in could not be confirmed."
         });
-      });
+      })
+      .finally(() => window.clearTimeout(timeout));
     return () => {
       cancelled = true;
+      window.clearTimeout(timeout);
+      controller.abort();
     };
   }, [active]);
 

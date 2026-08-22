@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import * as React from "react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   getRecentAuthentication: vi.fn(),
@@ -17,6 +17,10 @@ import { flushHookEffects, renderComponent } from "../render-hook";
 
 beforeEach(() => {
   vi.clearAllMocks();
+});
+
+afterEach(() => {
+  vi.useRealTimers();
 });
 
 describe("RecentAuthenticationGate", () => {
@@ -36,6 +40,31 @@ describe("RecentAuthenticationGate", () => {
     expect(staleView.container.textContent).toContain("Confirm your HQBase password to continue.");
     expect(staleView.container.querySelector('input[type="password"]')).not.toBeNull();
     await staleView.unmount();
+  });
+
+  it("stops a stalled check after ten seconds", async () => {
+    vi.useFakeTimers();
+    let checkSignal: AbortSignal | undefined;
+    mocks.getRecentAuthentication.mockImplementationOnce((signal?: AbortSignal) => {
+      checkSignal = signal;
+      return new Promise<boolean>((_resolve, reject) => {
+        signal?.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError")), {
+          once: true
+        });
+      });
+    });
+    const view = await renderGate();
+
+    await flushHookEffects(() => vi.advanceTimersByTime(9_999));
+    expect(view.container.textContent).toContain("Checking sign-in…");
+
+    await flushHookEffects(() => vi.advanceTimersByTime(1));
+    expect(checkSignal?.aborted).toBe(true);
+    expect(view.container.querySelector('input[type="password"]')).not.toBeNull();
+    expect(view.container.querySelector('[role="alert"]')?.textContent).toContain(
+      "Your sign-in could not be confirmed. Try again."
+    );
+    await view.unmount();
   });
 
   it("shows a wrong-password error", async () => {
@@ -128,8 +157,12 @@ describe("RecentAuthenticationGate", () => {
 
   it("cancels an old check and checks again when reactivated", async () => {
     const firstCheck = deferred<boolean>();
+    let firstSignal: AbortSignal | undefined;
     mocks.getRecentAuthentication
-      .mockReturnValueOnce(firstCheck.promise)
+      .mockImplementationOnce((signal?: AbortSignal) => {
+        firstSignal = signal;
+        return firstCheck.promise;
+      })
       .mockResolvedValueOnce(true);
     let setActive: React.Dispatch<React.SetStateAction<boolean>> = () => undefined;
 
@@ -148,6 +181,7 @@ describe("RecentAuthenticationGate", () => {
 
     const view = await renderComponent(<Harness />);
     await flushHookEffects(() => setActive(false));
+    expect(firstSignal?.aborted).toBe(true);
     firstCheck.resolve(true);
     await flushHookEffects();
     expect(view.container.querySelector("[data-ready]")).toBeNull();
