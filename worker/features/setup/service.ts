@@ -7,7 +7,11 @@ import { createMailbox } from "../mailboxes/service";
 import type { Mailbox } from "../mailboxes/types";
 import { setDefaultFromMailboxId } from "../preferences/queries";
 
-import { claimBootstrapLock, releaseBootstrapLock } from "./bootstrap-lock";
+import {
+  claimBootstrapLock,
+  releaseBootstrapLock,
+  startBootstrapLockHeartbeat
+} from "./bootstrap-lock";
 import {
   getSetupStatus,
   setChecklistAcknowledged,
@@ -43,16 +47,17 @@ export async function bootstrapSetup(
   request: Request,
   input: BootstrapInput
 ): Promise<BootstrapResult> {
-  const existing = await getSetupStatus(env.DB);
-  if (existing.isComplete) {
-    throw new AppError("SETUP_ALREADY_COMPLETE", "Setup is already complete.", 409);
-  }
-  if (existing.userCount > 0) {
-    throw new AppError("SETUP_OWNER_EXISTS", "An owner user already exists.", 409);
-  }
-
   const lock = await claimBootstrapLock(env.DB);
+  const heartbeat = startBootstrapLockHeartbeat(env.DB, lock);
   try {
+    const existing = await getSetupStatus(env.DB);
+    if (existing.isComplete) {
+      throw new AppError("SETUP_ALREADY_COMPLETE", "Setup is already complete.", 409);
+    }
+    if (existing.userCount > 0) {
+      throw new AppError("SETUP_OWNER_EXISTS", "An owner user already exists.", 409);
+    }
+
     const domains = input.emailDomains ?? [{ name: input.primaryDomain ?? "" }];
     if (!domains[0]?.name) throw new AppError("DOMAIN_REQUIRED", "Choose an email domain.", 400);
     assertLoginEmailOutsideDomains(
@@ -69,12 +74,14 @@ export async function bootstrapSetup(
       });
     }
 
+    await heartbeat.renew();
     const owner = await signUpOwnerUser(env, request, {
       email: input.ownerEmail,
       name: input.ownerName,
       password: input.ownerPassword,
       role: "owner"
     });
+    await heartbeat.renew();
 
     await setPrimaryDomain(env.DB, domains[0].name);
     if (input.portalHostname) {
@@ -105,6 +112,7 @@ export async function bootstrapSetup(
     }
     await setDefaultFromMailboxId(env.DB, owner.id, defaultFromMailbox.id);
 
+    await heartbeat.renew();
     await completeSetupIfReady(env.DB);
 
     return {
@@ -113,6 +121,7 @@ export async function bootstrapSetup(
       setup: await getSetupStatus(env.DB)
     };
   } finally {
+    await heartbeat.stop().catch(() => undefined);
     await releaseBootstrapLock(env.DB, lock).catch(() => undefined);
   }
 }

@@ -3,7 +3,8 @@ import { beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import {
   claimBootstrapLock,
-  releaseBootstrapLock
+  releaseBootstrapLock,
+  renewBootstrapLock
 } from "../../../worker/features/setup/bootstrap-lock";
 import { applyCurrentMigrations } from "./current-migrations";
 
@@ -39,9 +40,9 @@ describe("setup bootstrap lock", () => {
     await expect(claimBootstrapLock(env.DB)).resolves.toBeDefined();
   });
 
-  it("reclaims an expired lock without letting its old owner release the new claim", async () => {
+  it("reclaims a lock at the lease boundary without letting its old owner release the new claim", async () => {
     const first = await claimBootstrapLock(env.DB, new Date("2026-08-22T12:00:00.000Z"));
-    const replacement = await claimBootstrapLock(env.DB, new Date("2026-08-22T12:06:00.000Z"));
+    const replacement = await claimBootstrapLock(env.DB, new Date("2026-08-22T12:05:00.000Z"));
 
     await releaseBootstrapLock(env.DB, first);
     await expect(
@@ -52,5 +53,19 @@ describe("setup bootstrap lock", () => {
     await expect(
       claimBootstrapLock(env.DB, new Date("2026-08-22T12:06:02.000Z"))
     ).resolves.toBeDefined();
+  });
+
+  it("keeps an active bootstrap claim beyond one lease through renewal", async () => {
+    const first = await claimBootstrapLock(env.DB, new Date("2026-08-22T12:00:00.000Z"));
+    await renewBootstrapLock(env.DB, first, new Date("2026-08-22T12:04:30.000Z"));
+
+    await expect(
+      claimBootstrapLock(env.DB, new Date("2026-08-22T12:05:01.000Z"))
+    ).rejects.toMatchObject({ code: "SETUP_IN_PROGRESS", status: 409 });
+
+    await renewBootstrapLock(env.DB, first, new Date("2026-08-22T12:09:00.000Z"));
+    await expect(
+      claimBootstrapLock(env.DB, new Date("2026-08-22T12:10:00.000Z"))
+    ).rejects.toMatchObject({ code: "SETUP_IN_PROGRESS", status: 409 });
   });
 });

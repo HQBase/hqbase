@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import type { HonoApp } from "../../lib/env";
+import { AppError } from "../../lib/errors";
 import { readJson } from "../../lib/json";
 import { parseWith } from "../../lib/validation";
 import { enforceRateLimit } from "../../security/rate-limit";
@@ -89,7 +90,7 @@ setupRoutes.post("/cloudflare/configure", async (c) => {
 });
 
 setupRoutes.post("/bootstrap", async (c) => {
-  const ip = c.req.header("cf-connecting-ip") ?? "unknown";
+  const ip = requireDirectBootstrapClientIp(c.req.raw);
   await enforceRateLimit(c.env.DB, c.env.BETTER_AUTH_SECRET, {
     scope: "setup.bootstrap.ip",
     subject: ip,
@@ -103,3 +104,22 @@ setupRoutes.post("/bootstrap", async (c) => {
   c.header("set-cookie", clearRuntimeCloudflareGrantCookie());
   return c.json(result, 201);
 });
+
+export function requireDirectBootstrapClientIp(request: Request): string {
+  if (request.headers.get("cf-worker")?.trim()) {
+    throw new AppError(
+      "SETUP_DIRECT_REQUEST_REQUIRED",
+      "Complete setup directly in a browser.",
+      403
+    );
+  }
+  const ip = request.headers.get("cf-connecting-ip")?.trim();
+  if (!ip) {
+    throw new AppError(
+      "SETUP_CLIENT_IP_REQUIRED",
+      "Cloudflare client IP information is required to complete setup.",
+      403
+    );
+  }
+  return ip;
+}
