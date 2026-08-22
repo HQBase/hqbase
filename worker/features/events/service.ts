@@ -6,6 +6,8 @@ import type { WorkerEnv } from "../../lib/env";
 import type { MailEventTopic } from "./types";
 
 const workspaceHubName = "workspace";
+const publishAttempts = 3;
+const publishRetryBaseDelayMs = 100;
 
 export type MailEventScheduler = (promise: Promise<void>) => void;
 
@@ -83,6 +85,21 @@ export function scheduleSentMailEvents(
   }
 }
 
+export async function retryMailEventPublish(
+  publish: () => Promise<void>,
+  wait: (delayMs: number) => Promise<void> = (delayMs) => scheduler.wait(delayMs)
+): Promise<void> {
+  for (let attempt = 0; attempt < publishAttempts; attempt += 1) {
+    try {
+      await publish();
+      return;
+    } catch (error) {
+      if (attempt === publishAttempts - 1) throw error;
+      await wait(publishRetryBaseDelayMs * 2 ** attempt);
+    }
+  }
+}
+
 async function publishMailEvent(
   env: WorkerEnv,
   userIds: readonly string[],
@@ -90,7 +107,12 @@ async function publishMailEvent(
 ): Promise<void> {
   const recipients = [...new Set(userIds)];
   if (recipients.length === 0) return;
-  await env.MAIL_EVENTS.getByName(workspaceHubName).publish({ topic, userIds: recipients });
+  await retryMailEventPublish(() =>
+    env.MAIL_EVENTS.getByName(workspaceHubName).publish({
+      topic,
+      userIds: recipients
+    })
+  );
 }
 
 async function messageEventUserIds(

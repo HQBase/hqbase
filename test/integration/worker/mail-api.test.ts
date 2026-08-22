@@ -2,6 +2,7 @@ import { env, runDurableObjectAlarm, runInDurableObject, SELF } from "cloudflare
 import { beforeAll, describe, expect, it, vi } from "vitest";
 import mailApiOpenApi from "../../../api/hqbase-mail-api-v1.openapi.json";
 import { createAuth } from "../../../worker/auth/auth";
+import { mailEventInternalHeaders } from "../../../worker/features/events/durable-object";
 import { applyCurrentMigrations } from "./current-migrations";
 import { tokenRow } from "./mail-api-token-fixture";
 
@@ -361,7 +362,7 @@ describe("HQBase Mail API v1", () => {
       origin,
       upgrade: "websocket"
     });
-    sessionSocket.close(1000, "Test complete.");
+    await closeEventSocket(sessionSocket);
 
     const messageSocket = await openEventSocket({
       authorization: `Bearer ${readToken}`,
@@ -376,7 +377,7 @@ describe("HQBase Mail API v1", () => {
       userIds: [userId]
     });
     await expect(messageFrame).resolves.toEqual({ type: "changed", topic: "messages" });
-    messageSocket.close(1000, "Test complete.");
+    await closeEventSocket(messageSocket);
 
     const draftSocket = await openEventSocket({
       authorization: `Bearer ${fullToken}`,
@@ -388,7 +389,7 @@ describe("HQBase Mail API v1", () => {
       userIds: [userId]
     });
     await expect(draftFrame).resolves.toEqual({ type: "changed", topic: "drafts" });
-    draftSocket.close(1000, "Test complete.");
+    await closeEventSocket(draftSocket);
   });
 
   it("does not count a closing event socket toward the per-user limit", async () => {
@@ -398,24 +399,49 @@ describe("HQBase Mail API v1", () => {
     };
     const firstSocket = await openEventSocket(headers);
     const secondSocket = await openEventSocket(headers);
-    const closingSocket = await openEventSocket(headers);
-    closingSocket.close(1000, "Reconnect test.");
+    const thirdSocket = await openEventSocket(headers);
+    const clientCloses = [firstSocket, secondSocket, thirdSocket].map(nextSocketClose);
+    const stub = env.MAIL_EVENTS.getByName("workspace");
 
-    const replacementSocket = await openEventSocket(headers);
-    const firstFrame = nextSocketFrame(firstSocket);
-    const secondFrame = nextSocketFrame(secondSocket);
-    const replacementFrame = nextSocketFrame(replacementSocket);
-    await env.MAIL_EVENTS.getByName("workspace").publish({
-      topic: "messages",
-      userIds: [userId]
+    const state = await runInDurableObject(stub, async (instance, durableState) => {
+      const initialSockets = durableState
+        .getWebSockets()
+        .filter((socket) => socket.readyState === WebSocket.OPEN);
+      const closingSocket = initialSockets.at(-1);
+      if (!closingSocket) throw new Error("Expected an open event socket.");
+      closingSocket.close(1000, "Reconnect test.");
+      const closingReadyState = closingSocket.readyState;
+
+      const response = await instance.fetch(
+        new Request(`${origin}/api/v1/events`, {
+          headers: {
+            [mailEventInternalHeaders.requestId]: "request_reconnect_test",
+            [mailEventInternalHeaders.topics]: "messages,mailboxes",
+            [mailEventInternalHeaders.user]: userId,
+            upgrade: "websocket"
+          }
+        })
+      );
+      const replacementSocket = response.webSocket;
+      if (!replacementSocket) throw new Error("Expected a replacement event socket.");
+      replacementSocket.accept();
+      const openSocketCount = durableState
+        .getWebSockets()
+        .filter((socket) => socket.readyState === WebSocket.OPEN).length;
+
+      for (const socket of durableState.getWebSockets()) {
+        if (socket.readyState === WebSocket.OPEN) socket.close(1000, "Test complete.");
+      }
+      return { closingReadyState, openSocketCount, status: response.status };
     });
 
-    await expect(firstFrame).resolves.toEqual({ type: "changed", topic: "messages" });
-    await expect(secondFrame).resolves.toEqual({ type: "changed", topic: "messages" });
-    await expect(replacementFrame).resolves.toEqual({ type: "changed", topic: "messages" });
-    firstSocket.close(1000, "Test complete.");
-    secondSocket.close(1000, "Test complete.");
-    replacementSocket.close(1000, "Test complete.");
+    expect(state).toEqual({
+      closingReadyState: WebSocket.CLOSING,
+      openSocketCount: 3,
+      status: 101
+    });
+    await Promise.all(clientCloses);
+    await expectOpenEventSocketCount(0);
   });
 
   it("closes an event socket when its authorization lease expires", async () => {
@@ -491,7 +517,7 @@ describe("HQBase Mail API v1", () => {
     expect(archived.status, await archived.clone().text()).toBe(200);
     await expect(archived.json()).resolves.toMatchObject({ folder: "archived" });
     await expect(changed).resolves.toEqual({ type: "changed", topic: "messages" });
-    socket.close(1000, "Test complete.");
+    await closeEventSocket(socket);
 
     const unarchived = await apiFetch("/api/v1/messages/msg_api/unarchive", writeToken, {
       method: "POST"
@@ -1047,4 +1073,29 @@ function nextSocketClose(socket: WebSocket): Promise<{ code: number; reason: str
       { once: true }
     );
   });
+}
+
+async function closeEventSocket(socket: WebSocket): Promise<void> {
+  const closed = nextSocketClose(socket);
+  const stub = env.MAIL_EVENTS.getByName("workspace");
+  await runInDurableObject(stub, (_instance, state) => {
+    const openSockets = state
+      .getWebSockets()
+      .filter((serverSocket) => serverSocket.readyState === WebSocket.OPEN);
+    if (openSockets.length !== 1) {
+      throw new Error(`Expected one open event socket, found ${openSockets.length}.`);
+    }
+    openSockets[0]?.close(1000, "Test complete.");
+  });
+  await closed;
+}
+
+async function expectOpenEventSocketCount(expected: number): Promise<void> {
+  const stub = env.MAIL_EVENTS.getByName("workspace");
+  const count = await runInDurableObject(
+    stub,
+    (_instance, state) =>
+      state.getWebSockets().filter((socket) => socket.readyState === WebSocket.OPEN).length
+  );
+  expect(count).toBe(expected);
 }
