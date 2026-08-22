@@ -123,7 +123,7 @@
     "/api/v1/events": {
       "get": {
         "summary": "Open change event WebSocket",
-        "description": "Opens an authenticated wake-only WebSocket. The server sends `changed` frames for messages, mailboxes, and permitted drafts. Frames contain no mail data or cursors. After a frame or reconnect, read the authoritative REST resources and change journals. OAuth tokens require `mail:read`; draft frames also require `mail:send`.",
+        "description": "Opens an authenticated wake-only WebSocket. The server sends `changed` frames for messages, mailboxes, and permitted drafts. Frames contain no mail data or cursors. After a frame or reconnect, read the authoritative REST resources and change journals. OAuth tokens require `mail:read`; draft frames also require `mail:send`. The authorization decision at upgrade is an event-delivery lease for 10 minutes. Credential or session revocation does not close the current socket immediately. The server closes the socket when the lease ends, and reconnection must use current credentials and permissions.",
         "security": [
           {
             "oauth2": ["mail:read"]

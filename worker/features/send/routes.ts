@@ -12,6 +12,7 @@ import {
   requireDraftAttachmentIdsAccess,
   requireDraftIdAccess
 } from "../drafts/access";
+import { scheduleSentMailEvents } from "../events/service";
 import { findMailboxForSending } from "../mailboxes/queries";
 import { requireMessageAccess } from "../messages/access";
 
@@ -45,6 +46,11 @@ sendRoutes.post("/send", async (c) => {
   const sent = draft?.forwardOfMessageId
     ? await sendForwardDraft(c.env, input, draft.id, draft.forwardOfMessageId, authContext.user.id)
     : await sendNewMessage(c.env, input, authContext.user.id);
+  scheduleSentMailEvents(c.env, (promise) => c.executionCtx.waitUntil(promise), {
+    draftId: input.draftId,
+    mailboxId: mailbox.id,
+    userId: authContext.user.id
+  });
   await recordAudit(c.env.DB, {
     correlationId: c.get("correlationId"),
     actorType: "user",
@@ -86,6 +92,11 @@ sendRoutes.post("/reply", async (c) => {
   await requireDraftIdAccess(c.env, principal, input.draftId);
   await requireDraftAttachmentIdsAccess(c.env, principal, input.attachmentIds);
   const sent = await replyToMessage(c.env, input, authContext.user.id);
+  scheduleSentMailEvents(c.env, (promise) => c.executionCtx.waitUntil(promise), {
+    draftId: input.draftId,
+    mailboxId: mailbox.id,
+    userId: authContext.user.id
+  });
   await recordAudit(c.env.DB, {
     correlationId: c.get("correlationId"),
     actorType: "user",
@@ -126,6 +137,10 @@ sendRoutes.post("/forward", async (c) => {
   const principal = { role: authContext.user.role, userId: authContext.user.id };
   await requireDraftAttachmentIdsAccess(c.env, principal, input.attachmentIds);
   const sent = await forwardMessage(c.env, input, authContext.user.id);
+  scheduleSentMailEvents(c.env, (promise) => c.executionCtx.waitUntil(promise), {
+    mailboxId: mailbox.id,
+    userId: authContext.user.id
+  });
   await recordAudit(c.env.DB, {
     correlationId: c.get("correlationId"),
     actorType: "user",

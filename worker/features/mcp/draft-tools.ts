@@ -13,7 +13,11 @@ import {
   saveDraft
 } from "../drafts/queries";
 import { draftSchema } from "../drafts/validation";
-import { ignoreMailEventFailure, publishUserMailEvent } from "../events/service";
+import {
+  type MailEventScheduler,
+  publishUserMailEvent,
+  scheduleMailEvent
+} from "../events/service";
 
 import type { McpPrincipal } from "./route";
 import { base64File, maxMcpAttachmentBase64Length, toolResult } from "./tool-result";
@@ -35,7 +39,8 @@ const createDraftShape = {
 export function registerDraftTools(
   server: McpServer,
   env: WorkerEnv,
-  principal: McpPrincipal
+  principal: McpPrincipal,
+  schedule: MailEventScheduler
 ): void {
   if (!principal.scopes.has("mail:send")) return;
 
@@ -74,7 +79,7 @@ export function registerDraftTools(
         await requireDraftAccess(env, principal, parsed);
         const draft = await saveDraft(env.DB, principal.userId, parsed);
         await recordDraftMutation(env, principal, "mcp.draft.create", draft.id);
-        await notifyDraftChange(env, principal.userId);
+        notifyDraftChange(env, principal.userId, schedule);
         return draft;
       })
   );
@@ -112,7 +117,7 @@ export function registerDraftTools(
         await requireDraftAccess(env, principal, parsed);
         const draft = await saveDraft(env.DB, principal.userId, parsed);
         await recordDraftMutation(env, principal, "mcp.draft.update", draft.id);
-        await notifyDraftChange(env, principal.userId);
+        notifyDraftChange(env, principal.userId, schedule);
         return draft;
       })
   );
@@ -129,18 +134,19 @@ export function registerDraftTools(
         await getAccessibleDraft(env, principal, draftId);
         await deleteDraft(env.DB, env.MAIL_OBJECTS, principal.userId, draftId);
         await recordDraftMutation(env, principal, "mcp.draft.delete", draftId);
-        await notifyDraftChange(env, principal.userId);
+        notifyDraftChange(env, principal.userId, schedule);
         return { deleted: true, draftId };
       })
   );
 
-  registerDraftAttachmentTools(server, env, principal);
+  registerDraftAttachmentTools(server, env, principal, schedule);
 }
 
 function registerDraftAttachmentTools(
   server: McpServer,
   env: WorkerEnv,
-  principal: McpPrincipal
+  principal: McpPrincipal,
+  schedule: MailEventScheduler
 ): void {
   server.registerTool(
     "add_draft_attachment",
@@ -177,7 +183,7 @@ function registerDraftAttachmentTools(
           httpMetadata: { contentType: added.attachment.contentType }
         });
         await recordDraftMutation(env, principal, "mcp.draft.attachment.add", added.attachment.id);
-        await notifyDraftChange(env, principal.userId);
+        notifyDraftChange(env, principal.userId, schedule);
         return added.attachment;
       })
   );
@@ -207,7 +213,7 @@ function registerDraftAttachmentTools(
           throw new AppError("ATTACHMENT_NOT_FOUND", "Attachment not found.", 404);
         }
         await recordDraftMutation(env, principal, "mcp.draft.attachment.remove", attachmentId);
-        await notifyDraftChange(env, principal.userId);
+        notifyDraftChange(env, principal.userId, schedule);
         return { deleted: true, attachmentId, draftId };
       })
   );
@@ -230,6 +236,6 @@ function recordDraftMutation(
   });
 }
 
-function notifyDraftChange(env: WorkerEnv, userId: string): Promise<void> {
-  return ignoreMailEventFailure(publishUserMailEvent(env, userId, "drafts"));
+function notifyDraftChange(env: WorkerEnv, userId: string, schedule: MailEventScheduler): void {
+  scheduleMailEvent(schedule, publishUserMailEvent(env, userId, "drafts"));
 }

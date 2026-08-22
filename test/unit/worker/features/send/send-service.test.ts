@@ -11,12 +11,6 @@ vi.mock("@worker/features/mailboxes/queries", () => ({
 vi.mock("@worker/features/mailboxes/address-queries", () => ({
   findAddressIdentity: vi.fn().mockResolvedValue(null)
 }));
-vi.mock("@worker/features/events/service", () => ({
-  ignoreMailEventFailure: (promise: Promise<void>) => promise.catch(() => undefined),
-  publishMessageMailEvent: () => Promise.resolve(),
-  publishUserMailEvent: () => Promise.resolve()
-}));
-
 vi.mock("@worker/features/messages/queries", () => ({
   getMessageDetail: vi.fn(),
   getMessageHtmlKey: vi.fn(),

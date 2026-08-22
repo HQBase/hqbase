@@ -39,6 +39,9 @@ if (process.argv.includes("--write")) {
 function buildCollection(document) {
   const folders = new Map();
   for (const [route, pathItem] of Object.entries(document.paths)) {
+    // Postman v2.1 HTTP collections cannot contain a real WebSocket request.
+    // Keep the socket in OpenAPI and provide manual connection details below.
+    if (route === "/api/v1/events") continue;
     for (const method of ["get", "post", "patch", "delete"]) {
       const operation = pathItem[method];
       if (!operation) continue;
@@ -54,7 +57,7 @@ function buildCollection(document) {
       _postman_id: "62c6dbf4-835d-4a3f-87df-77b7ddcf2db1",
       name: "HQBase Mail API v1",
       description:
-        "Generated from api/hqbase-mail-api-v1.openapi.json. Set base_url, run Register public client, and use Postman's OAuth 2.0 Authorization Code flow with PKCE (S256). Auth URL: {{base_url}}/api/auth/oauth2/authorize. Token URL: {{base_url}}/api/auth/oauth2/token. Client ID: {{client_id}}. Scope: mail:read mail:write mail:send offline_access. Add authorization request parameter resource={{api_resource}}, then store the resulting token only in your local environment as access_token. Sending, replying, and forwarding are not idempotent.",
+        "Generated from api/hqbase-mail-api-v1.openapi.json. Set base_url, run Register public client, and use Postman's OAuth 2.0 Authorization Code flow with PKCE (S256). Auth URL: {{base_url}}/api/auth/oauth2/authorize. Token URL: {{base_url}}/api/auth/oauth2/token. Client ID: {{client_id}}. Scope: mail:read mail:write mail:send offline_access. Add authorization request parameter resource={{api_resource}}, then store the resulting token only in your local environment as access_token. Postman v2.1 HTTP collections cannot contain WebSocket requests. To receive change wakes, create a separate WebSocket request to {{ws_base_url}}/api/v1/events and add Authorization: Bearer {{access_token}}. Sending, replying, and forwarding are not idempotent.",
       schema: "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
     },
     auth: {
@@ -63,6 +66,7 @@ function buildCollection(document) {
     },
     variable: [
       { key: "base_url", value: "https://mail.example.com", type: "string" },
+      { key: "ws_base_url", value: "wss://mail.example.com", type: "string" },
       { key: "api_resource", value: "{{base_url}}/api/v1", type: "string" },
       { key: "client_id", value: "", type: "string" },
       { key: "access_token", value: "", type: "string" },
@@ -218,6 +222,7 @@ function buildEnvironment() {
     name: "HQBase Mail API v1 - local secrets",
     values: [
       { key: "base_url", value: "https://mail.example.com", enabled: true, type: "default" },
+      { key: "ws_base_url", value: "wss://mail.example.com", enabled: true, type: "default" },
       { key: "api_resource", value: "{{base_url}}/api/v1", enabled: true, type: "default" },
       { key: "client_id", value: "", enabled: true, type: "default" },
       { key: "access_token", value: "", enabled: true, type: "secret" }

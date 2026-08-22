@@ -19,7 +19,10 @@ type MailEvent = {
 
 export function useMailEvents(userId: string | null, handlers: MailEventHandlers): void {
   const currentHandlers = React.useRef(handlers);
-  currentHandlers.current = handlers;
+
+  React.useLayoutEffect(() => {
+    currentHandlers.current = handlers;
+  }, [handlers]);
 
   React.useEffect(() => {
     if (!userId) return;

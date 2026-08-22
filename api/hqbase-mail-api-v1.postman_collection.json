@@ -2,7 +2,7 @@
   "info": {
     "_postman_id": "62c6dbf4-835d-4a3f-87df-77b7ddcf2db1",
     "name": "HQBase Mail API v1",
-    "description": "Generated from api/hqbase-mail-api-v1.openapi.json. Set base_url, run Register public client, and use Postman's OAuth 2.0 Authorization Code flow with PKCE (S256). Auth URL: {{base_url}}/api/auth/oauth2/authorize. Token URL: {{base_url}}/api/auth/oauth2/token. Client ID: {{client_id}}. Scope: mail:read mail:write mail:send offline_access. Add authorization request parameter resource={{api_resource}}, then store the resulting token only in your local environment as access_token. Sending, replying, and forwarding are not idempotent.",
+    "description": "Generated from api/hqbase-mail-api-v1.openapi.json. Set base_url, run Register public client, and use Postman's OAuth 2.0 Authorization Code flow with PKCE (S256). Auth URL: {{base_url}}/api/auth/oauth2/authorize. Token URL: {{base_url}}/api/auth/oauth2/token. Client ID: {{client_id}}. Scope: mail:read mail:write mail:send offline_access. Add authorization request parameter resource={{api_resource}}, then store the resulting token only in your local environment as access_token. Postman v2.1 HTTP collections cannot contain WebSocket requests. To receive change wakes, create a separate WebSocket request to {{ws_base_url}}/api/v1/events and add Authorization: Bearer {{access_token}}. Sending, replying, and forwarding are not idempotent.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "auth": {
@@ -19,6 +19,11 @@
     {
       "key": "base_url",
       "value": "https://mail.example.com",
+      "type": "string"
+    },
+    {
+      "key": "ws_base_url",
+      "value": "wss://mail.example.com",
       "type": "string"
     },
     {
@@ -145,31 +150,6 @@
               "variable": []
             },
             "description": "List mailboxes"
-          },
-          "response": []
-        }
-      ]
-    },
-    {
-      "name": "Events",
-      "item": [
-        {
-          "name": "Open change event WebSocket",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Upgrade",
-                "value": "websocket",
-                "disabled": false,
-                "description": "WebSocket upgrade request."
-              }
-            ],
-            "url": {
-              "raw": "{{base_url}}/api/v1/events",
-              "variable": []
-            },
-            "description": "Opens an authenticated wake-only WebSocket. The server sends `changed` frames for messages, mailboxes, and permitted drafts. Frames contain no mail data or cursors. After a frame or reconnect, read the authoritative REST resources and change journals. OAuth tokens require `mail:read`; draft frames also require `mail:send`."
           },
           "response": []
         }

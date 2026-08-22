@@ -27,19 +27,20 @@ export class MailEvents extends DurableObject<WorkerEnv> {
     if (!userId || topics.length === 0) {
       return new Response("Authenticated event context required.", { status: 403 });
     }
-    if (this.ctx.getWebSockets().length >= maxWorkspaceConnections) {
-      return new Response("Event connection capacity reached.", { status: 503 });
-    }
 
+    let connections = this.liveConnections(Date.now());
     const userTag = `user:${userId}`;
-    const existing = this.ctx.getWebSockets(userTag);
+    const existing = connections.filter((socket) => readConnection(socket)?.userId === userId);
     if (existing.length >= maxConnectionsPerUser) {
-      existing
-        .sort(
-          (left, right) =>
-            (readConnection(left)?.expiresAt ?? 0) - (readConnection(right)?.expiresAt ?? 0)
-        )[0]
-        ?.close(1008, "A newer connection replaced this one.");
+      const replaced = existing.sort(
+        (left, right) =>
+          (readConnection(left)?.expiresAt ?? 0) - (readConnection(right)?.expiresAt ?? 0)
+      )[0];
+      replaced?.close(1008, "A newer connection replaced this one.");
+      if (replaced) connections = connections.filter((socket) => socket !== replaced);
+    }
+    if (connections.length >= maxWorkspaceConnections) {
+      return new Response("Event connection capacity reached.", { status: 503 });
     }
 
     const pair = new WebSocketPair();
@@ -52,6 +53,7 @@ export class MailEvents extends DurableObject<WorkerEnv> {
     };
     this.ctx.acceptWebSocket(server, [...topics, userTag]);
     server.serializeAttachment(connection);
+    await this.scheduleExpiryAlarm(connection.expiresAt);
 
     return new Response(null, {
       status: 101,
@@ -88,6 +90,34 @@ export class MailEvents extends DurableObject<WorkerEnv> {
 
   override async webSocketMessage(socket: WebSocket): Promise<void> {
     socket.close(1008, "Client messages are not supported.");
+  }
+
+  override async alarm(): Promise<void> {
+    const connections = this.liveConnections(Date.now());
+    const nextExpiry = connections.reduce<number | null>((earliest, socket) => {
+      const expiresAt = readConnection(socket)?.expiresAt;
+      if (expiresAt === undefined) return earliest;
+      return earliest === null ? expiresAt : Math.min(earliest, expiresAt);
+    }, null);
+    if (nextExpiry !== null) await this.ctx.storage.setAlarm(nextExpiry);
+  }
+
+  private liveConnections(now: number): WebSocket[] {
+    const live: WebSocket[] = [];
+    for (const socket of this.ctx.getWebSockets()) {
+      const connection = readConnection(socket);
+      if (!connection || connection.expiresAt <= now) {
+        socket.close(1008, "Reconnect to renew authentication.");
+        continue;
+      }
+      live.push(socket);
+    }
+    return live;
+  }
+
+  private async scheduleExpiryAlarm(expiresAt: number): Promise<void> {
+    const current = await this.ctx.storage.getAlarm();
+    if (current === null || expiresAt < current) await this.ctx.storage.setAlarm(expiresAt);
   }
 }
 

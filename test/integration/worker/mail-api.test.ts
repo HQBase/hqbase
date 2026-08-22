@@ -1,5 +1,5 @@
-import { env, SELF } from "cloudflare:test";
-import { beforeAll, describe, expect, it } from "vitest";
+import { env, runDurableObjectAlarm, runInDurableObject, SELF } from "cloudflare:test";
+import { beforeAll, describe, expect, it, vi } from "vitest";
 import mailApiOpenApi from "../../../api/hqbase-mail-api-v1.openapi.json";
 import { createAuth } from "../../../worker/auth/auth";
 import { applyCurrentMigrations } from "./current-migrations";
@@ -368,6 +368,34 @@ describe("HQBase Mail API v1", () => {
     });
     await expect(draftFrame).resolves.toEqual({ type: "changed", topic: "drafts" });
     draftSocket.close(1000, "Test complete.");
+  });
+
+  it("closes an event socket when its authorization lease expires", async () => {
+    const socket = await openEventSocket({
+      authorization: `Bearer ${readToken}`,
+      upgrade: "websocket"
+    });
+    const stub = env.MAIL_EVENTS.getByName("workspace");
+
+    // Consume any older scheduled alarm and let the object schedule this live socket's expiry.
+    expect(await runDurableObjectAlarm(stub)).toBe(true);
+    const expiresAt = await runInDurableObject(stub, (_instance, state) =>
+      state.storage.getAlarm()
+    );
+    expect(expiresAt).not.toBeNull();
+
+    const closed = nextSocketClose(socket);
+    const now = vi.spyOn(Date, "now").mockReturnValue((expiresAt ?? 0) + 1);
+    try {
+      expect(await runDurableObjectAlarm(stub)).toBe(true);
+      await expect(closed).resolves.toMatchObject({
+        code: 1008,
+        reason: "Reconnect to renew authentication."
+      });
+    } finally {
+      now.mockRestore();
+      socket.close(1000, "Test complete.");
+    }
   });
 
   it("reads mail with an audience-bound bearer token without exposing storage keys", async () => {
@@ -952,6 +980,16 @@ function nextSocketFrame(socket: WebSocket): Promise<unknown> {
           reject(error);
         }
       },
+      { once: true }
+    );
+  });
+}
+
+function nextSocketClose(socket: WebSocket): Promise<{ code: number; reason: string }> {
+  return new Promise((resolve) => {
+    socket.addEventListener(
+      "close",
+      (event) => resolve({ code: event.code, reason: event.reason }),
       { once: true }
     );
   });

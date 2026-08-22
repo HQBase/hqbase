@@ -7,6 +7,8 @@ import type { MailEventTopic } from "./types";
 
 const workspaceHubName = "workspace";
 
+export type MailEventScheduler = (promise: Promise<void>) => void;
+
 export type MessageEventTarget = {
   isUnassigned: boolean;
   mailboxId: string | null;
@@ -63,6 +65,24 @@ export function ignoreMailEventFailure(promise: Promise<void>): Promise<void> {
   return promise.catch(() => undefined);
 }
 
+export function scheduleMailEvent(schedule: MailEventScheduler, promise: Promise<void>): void {
+  schedule(ignoreMailEventFailure(promise));
+}
+
+export function scheduleSentMailEvents(
+  env: WorkerEnv,
+  schedule: MailEventScheduler,
+  input: { draftId?: string | null | undefined; mailboxId: string; userId: string }
+): void {
+  scheduleMailEvent(
+    schedule,
+    publishMessageMailEvent(env, [{ isUnassigned: false, mailboxId: input.mailboxId }])
+  );
+  if (input.draftId) {
+    scheduleMailEvent(schedule, publishUserMailEvent(env, input.userId, "drafts"));
+  }
+}
+
 async function publishMailEvent(
   env: WorkerEnv,
   userIds: readonly string[],
@@ -88,6 +108,7 @@ async function messageEventUserIds(
   const visibility: SQL[] = [];
   if (includeUnassigned) visibility.push(sql`user_row.role = 'owner'`);
   if (mailboxIds.length > 0) {
+    // Admins can manage mailbox metadata, but mail content still requires a mailbox grant.
     visibility.push(sql`user_row.role = 'owner' OR EXISTS (
       SELECT 1 FROM mailbox_grants grant_row
       WHERE grant_row.user_id = user_row.id

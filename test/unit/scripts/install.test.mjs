@@ -13,6 +13,14 @@ import { updateOAuthManifest } from "../../../scripts/hqbase/oauth.mjs";
 const repositoryWranglerConfig = JSON.parse(
   readFileSync(resolve(import.meta.dirname, "../../../wrangler.jsonc"), "utf8")
 );
+const mailEventsMigration = [{ tag: "mail-events-v1", new_sqlite_classes: ["MailEvents"] }];
+
+function expectMailEventsConfiguration(config) {
+  expect(config.durable_objects).toEqual({
+    bindings: [{ name: "MAIL_EVENTS", class_name: "MailEvents" }]
+  });
+  expect(config.migrations).toEqual(mailEventsMigration);
+}
 
 describe("HQBase installation resources", () => {
   it("creates a fresh manifest with independent unclaimed resources", () => {
@@ -68,7 +76,7 @@ describe("HQBase installation resources", () => {
     }
   });
 
-  it("pins generated Wrangler configuration to the recorded Cloudflare account", () => {
+  it("configures the MailEvents migration for a fresh installation", () => {
     const manifest = createManifest("qa", {});
     manifest.accountId = "a".repeat(32);
 
@@ -87,12 +95,17 @@ describe("HQBase installation resources", () => {
         }
       ]
     });
-    expect(config.durable_objects).toEqual({
-      bindings: [{ name: "MAIL_EVENTS", class_name: "MailEvents" }]
-    });
-    expect(config.migrations).toEqual([
-      { tag: "mail-events-v1", new_sqlite_classes: ["MailEvents"] }
-    ]);
+    expectMailEventsConfiguration(config);
+  });
+
+  it("keeps the MailEvents migration when an installed deployment is updated", () => {
+    const manifest = createManifest("existing", {});
+    manifest.accountId = "b".repeat(32);
+    manifest.d1.id = "d1-existing";
+    manifest.d1.ownership = "owned";
+    manifest.worker.deployed = true;
+
+    expectMailEventsConfiguration(createWranglerConfig(manifest));
   });
 
   it("records customer-managed OAuth as non-secret deployment configuration", () => {

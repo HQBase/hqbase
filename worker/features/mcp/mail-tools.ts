@@ -6,9 +6,10 @@ import type { WorkerEnv } from "../../lib/env";
 import { AppError } from "../../lib/errors";
 import { recordAudit } from "../audit/service";
 import {
-  ignoreMailEventFailure,
+  type MailEventScheduler,
   messageEventTarget,
-  publishMessageMailEvent
+  publishMessageMailEvent,
+  scheduleMailEvent
 } from "../events/service";
 import { listMailboxesForUser } from "../mailboxes/queries";
 import { requireAttachmentAccess, requireMessageAccess } from "../messages/access";
@@ -41,10 +42,11 @@ const conversationFolderSchema = z.enum(conversationFolders);
 export function registerMailTools(
   server: McpServer,
   env: WorkerEnv,
-  principal: McpPrincipal
+  principal: McpPrincipal,
+  schedule: MailEventScheduler
 ): void {
   if (principal.scopes.has("mail:read")) registerReadTools(server, env, principal);
-  if (principal.scopes.has("mail:write")) registerWriteTools(server, env, principal);
+  if (principal.scopes.has("mail:write")) registerWriteTools(server, env, principal, schedule);
 }
 
 function registerReadTools(server: McpServer, env: WorkerEnv, principal: McpPrincipal): void {
@@ -182,7 +184,12 @@ function registerReadTools(server: McpServer, env: WorkerEnv, principal: McpPrin
   );
 }
 
-function registerWriteTools(server: McpServer, env: WorkerEnv, principal: McpPrincipal): void {
+function registerWriteTools(
+  server: McpServer,
+  env: WorkerEnv,
+  principal: McpPrincipal,
+  schedule: MailEventScheduler
+): void {
   server.registerTool(
     "update_message",
     {
@@ -200,7 +207,7 @@ function registerWriteTools(server: McpServer, env: WorkerEnv, principal: McpPri
         const message = await updateMessageAction(env.DB, messageId, action);
         const target = await messageEventTarget(env.DB, message.id);
         if (target) {
-          await ignoreMailEventFailure(publishMessageMailEvent(env, [target]));
+          scheduleMailEvent(schedule, publishMessageMailEvent(env, [target]));
         }
         await recordMutation(env, principal, `mcp.message.${action}`, "message", messageId);
         return message;
@@ -235,7 +242,7 @@ function registerWriteTools(server: McpServer, env: WorkerEnv, principal: McpPri
           scope
         });
         if (eventTargets.length > 0) {
-          await ignoreMailEventFailure(publishMessageMailEvent(env, eventTargets));
+          scheduleMailEvent(schedule, publishMessageMailEvent(env, eventTargets));
         }
         await recordMutation(
           env,
