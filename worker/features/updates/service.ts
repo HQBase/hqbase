@@ -4,6 +4,7 @@ import type { WorkerEnv } from "../../lib/env";
 import { AppError } from "../../lib/errors";
 import { hqbaseProductConfig } from "../../lib/product-config";
 import { withUpdateBuildLock } from "./build-lock";
+import { cloudflare } from "./cloudflare";
 import type { ReleaseManifest, UpdateStatus } from "./types";
 
 const expectedReleaseVariable = "HQBASE_EXPECTED_RELEASE_VERSION";
@@ -258,20 +259,6 @@ async function verifyEnvelope(
     decodeBase64UrlBytes(envelope.signature),
     decodeBase64UrlBytes(envelope.payload)
   );
-}
-async function cloudflare<T>(url: string, init: RequestInit, fetcher: typeof fetch): Promise<T> {
-  const response = await fetcher(url, init);
-  const body = (await response.json()) as {
-    success?: boolean;
-    errors?: Array<{ message?: string }>;
-  };
-  if (!response.ok || body.success === false)
-    throw new AppError(
-      "UPDATE_CLOUDFLARE_ERROR",
-      body.errors?.[0]?.message ?? "Cloudflare rejected the update request.",
-      response.status === 401 || response.status === 403 ? 403 : 502
-    );
-  return body as T;
 }
 export function compareVersions(left: string, right: string): number {
   const a = (left.split("-")[0] ?? "0").split(".").map(Number);

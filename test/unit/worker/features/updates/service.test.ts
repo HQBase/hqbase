@@ -114,6 +114,48 @@ describe("HQBase updates", () => {
     }
     await expect(first).resolves.toEqual({ buildId: "build-id", status: "queued" });
   });
+  it("times out Cloudflare work before the update-build lease can expire", async () => {
+    const originalTimeout = AbortSignal.timeout;
+    const controller = new AbortController();
+    const timeout = vi
+      .spyOn(AbortSignal, "timeout")
+      .mockImplementation((delay) =>
+        delay === 30_000 ? controller.signal : originalTimeout(delay)
+      );
+    const baseFetcher = cloudflareUpdateFetcher();
+    const fetcher = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (String(input).endsWith("/environment_variables") && !init?.method) {
+        const signal = init?.signal;
+        expect(signal).toBe(controller.signal);
+        controller.abort(new DOMException("Timed out", "TimeoutError"));
+        throw signal?.reason;
+      }
+      return baseFetcher(input, init);
+    });
+    const environment = updateEnvironment();
+
+    try {
+      await expect(
+        triggerUpdate(
+          environment,
+          "temporary-token-that-is-long-enough",
+          "0.1.0",
+          fetcher as typeof fetch
+        )
+      ).rejects.toMatchObject({ code: "UPDATE_CLOUDFLARE_TIMEOUT", status: 504 });
+    } finally {
+      timeout.mockRestore();
+    }
+
+    await expect(
+      triggerUpdate(
+        environment,
+        "temporary-token-that-is-long-enough",
+        "0.1.0",
+        cloudflareUpdateFetcher() as typeof fetch
+      )
+    ).resolves.toEqual({ buildId: "build-id", status: "queued" });
+  });
   it("rejects a custom-source production trigger", async () => {
     const fetcher = cloudflareUpdateFetcher({ deployCommand: "npx wrangler deploy" });
 
