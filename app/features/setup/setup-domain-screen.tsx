@@ -1,5 +1,5 @@
-import { CheckCircle2, Circle, CircleAlert } from "lucide-react";
 import type * as React from "react";
+import { PiCheckCircle, PiCircle, PiWarningCircle } from "react-icons/pi";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -61,7 +61,7 @@ export function DomainStep(props: {
     >
       {props.connectionError ? (
         <Alert variant="destructive">
-          <CircleAlert />
+          <PiWarningCircle />
           <AlertTitle>Could not connect every domain</AlertTitle>
           <AlertDescription>{props.connectionError}</AlertDescription>
         </Alert>
@@ -80,7 +80,7 @@ export function DomainStep(props: {
             return (
               <div className="border-b py-1.5 last:border-b-0" key={zone.id}>
                 <label
-                  className="flex cursor-pointer items-center gap-2.5 rounded-md px-1 py-1 hover:bg-muted/50"
+                  className="flex cursor-pointer items-center gap-2.5 rounded-md px-1 py-1 [@media(hover:hover)]:hover:bg-muted/50"
                   htmlFor={`domain-${zone.id}`}
                 >
                   <Checkbox
@@ -194,11 +194,11 @@ function CompactDomainChecks({ result }: { result: CloudflareConfigureResult }) 
       {checks.map((check) => (
         <div className="flex items-start gap-2 text-xs" key={check.label}>
           {check.status === "failed" ? (
-            <CircleAlert className="mt-0.5 size-3.5 shrink-0 text-destructive" />
+            <PiWarningCircle className="mt-0.5 size-3.5 shrink-0 text-destructive" />
           ) : check.status === "skipped" ? (
-            <Circle className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
+            <PiCircle className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
           ) : (
-            <CheckCircle2 className="mt-0.5 size-3.5 shrink-0 text-primary" />
+            <PiCheckCircle className="mt-0.5 size-3.5 shrink-0 text-primary" />
           )}
           <div className="min-w-0">
             <p

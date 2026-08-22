@@ -234,6 +234,50 @@ describe("HQBase Mail API message changes", () => {
     expect(newChange.changes.map(upsertId)).toEqual(["msg_changes_after_grant"]);
   });
 
+  it("includes unassigned changes only for owners", async () => {
+    const stamp = "2026-08-17T00:05:00.000Z";
+    try {
+      for (const role of ["member", "admin"] as const) {
+        await setChangesUserRole(role);
+        const cursor = await checkpoint();
+        const suffix = role;
+        await env.DB.batch([
+          threadRow(`thr_changes_unassigned_${suffix}`, stamp),
+          unassignedMessageRow(
+            `msg_changes_unassigned_${suffix}`,
+            `thr_changes_unassigned_${suffix}`,
+            stamp
+          )
+        ]);
+        const page = await changePage(
+          await apiFetch(`/api/v1/changes?cursor=${cursor}`, readToken)
+        );
+        expect(page.changes).toEqual([]);
+      }
+
+      await setChangesUserRole("owner");
+      const cursor = await checkpoint();
+      await env.DB.batch([
+        threadRow("thr_changes_unassigned_owner", stamp),
+        unassignedMessageRow("msg_changes_unassigned_owner", "thr_changes_unassigned_owner", stamp)
+      ]);
+      const upsertPage = await changePage(
+        await apiFetch(`/api/v1/changes?cursor=${cursor}`, readToken)
+      );
+      expect(upsertPage.changes.map(upsertId)).toEqual(["msg_changes_unassigned_owner"]);
+
+      await env.DB.prepare("DELETE FROM messages WHERE id = 'msg_changes_unassigned_owner'").run();
+      const deletePage = await changePage(
+        await apiFetch(`/api/v1/changes?cursor=${upsertPage.nextCursor}`, readToken)
+      );
+      expect(deletePage.changes).toEqual([
+        { type: "delete", messageId: "msg_changes_unassigned_owner", mailboxId: null }
+      ]);
+    } finally {
+      await setChangesUserRole("member");
+    }
+  });
+
   it("validates scope, filters, limits, and opaque cursor bounds", async () => {
     const noRead = await apiFetch("/api/v1/changes", writeToken);
     expect(noRead.status).toBe(403);
@@ -274,7 +318,7 @@ type ChangePage = {
     type: "upsert" | "delete";
     message?: { id: string };
     messageId?: string;
-    mailboxId?: string;
+    mailboxId?: string | null;
   }>;
   nextCursor: string;
   hasMore: boolean;
@@ -329,6 +373,21 @@ function messageRow(
      VALUES (?, ?, ?, 'inbound', 'inbox', 'sender@example.net', '[]', '[]', '[]', ?, '', '',
              NULL, ?, NULL, '[]', ?, NULL, NULL, 0, ?, ?)`
   ).bind(id, threadId, mailboxId, id, `dedupe-${id}`, stamp, stamp, stamp);
+}
+
+function unassignedMessageRow(id: string, threadId: string, stamp: string): D1PreparedStatement {
+  return env.DB.prepare(
+    `INSERT INTO messages
+     (id, thread_id, mailbox_id, is_unassigned, direction, folder, from_address,
+      to_json, cc_json, bcc_json, subject, snippet, text_body, references_json,
+      received_at, has_attachments, created_at, updated_at)
+     VALUES (?, ?, NULL, 1, 'inbound', 'catchall', 'sender@example.net', '[]', '[]', '[]',
+             ?, '', '', '[]', ?, 0, ?, ?)`
+  ).bind(id, threadId, id, stamp, stamp, stamp);
+}
+
+async function setChangesUserRole(role: "admin" | "member" | "owner"): Promise<void> {
+  await env.DB.prepare(`UPDATE "user" SET role = ? WHERE id = ?`).bind(role, userId).run();
 }
 
 function apiFetch(path: string, token: string): Promise<Response> {

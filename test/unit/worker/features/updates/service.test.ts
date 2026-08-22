@@ -51,9 +51,9 @@ describe("HQBase updates", () => {
     ).rejects.toThrow("signature");
   });
   it("triggers the production Workers Build", async () => {
-    const first = vi.fn().mockResolvedValue({ value_json: JSON.stringify("mail.example.com") });
+    const raw = vi.fn().mockResolvedValue([[JSON.stringify("mail.example.com")]]);
     const db = {
-      prepare: vi.fn(() => ({ bind: vi.fn(() => ({ first })) }))
+      prepare: vi.fn(() => ({ bind: vi.fn(() => ({ raw })) }))
     } as unknown as D1Database;
     const fetcher = vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input);

@@ -1,12 +1,16 @@
+import { and, eq, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import { getSetting, setSetting } from "../../db/client";
+import { createDatabase, getRow } from "../../db/drizzle";
+import { workspaceHosts } from "../../db/schema";
 import { listMailDomains } from "../domains/queries";
 import { countMailboxes } from "../mailboxes/queries";
 
 import type { SetupStatus } from "./types";
 
 export async function getSetupStatus(db: D1Database): Promise<SetupStatus> {
+  const database = createDatabase(db);
   const [
     primaryDomain,
     isComplete,
@@ -22,18 +26,16 @@ export async function getSetupStatus(db: D1Database): Promise<SetupStatus> {
     countUsers(db),
     countMailboxes(db),
     listMailDomains(db),
-    db
-      .prepare(
-        `SELECT hostname, kind FROM workspace_hosts
-         WHERE kind = 'portal' AND is_canonical = 1`
-      )
-      .all<{ hostname: string; kind: "portal" }>()
+    database
+      .select({ hostname: workspaceHosts.hostname, kind: workspaceHosts.kind })
+      .from(workspaceHosts)
+      .where(and(eq(workspaceHosts.kind, "portal"), eq(workspaceHosts.isCanonical, true)))
   ]);
 
   return {
     isComplete: isComplete ?? false,
     primaryDomain,
-    portalHostname: hosts.results.find((host) => host.kind === "portal")?.hostname ?? null,
+    portalHostname: hosts.find((host) => host.kind === "portal")?.hostname ?? null,
     domains,
     userCount,
     mailboxCount,
@@ -51,33 +53,47 @@ export async function upsertWorkspaceHost(
   }
 ): Promise<void> {
   const timestamp = new Date().toISOString();
-  if (input.kind === "portal" && input.canonical !== false) {
-    await db.prepare("UPDATE workspace_hosts SET is_canonical = 0 WHERE kind = 'portal'").run();
+  const database = createDatabase(db);
+  const isCanonical = input.kind === "portal" && input.canonical !== false;
+  const upsert = database
+    .insert(workspaceHosts)
+    .values({
+      id: `host_${crypto.randomUUID()}`,
+      hostname: input.hostname,
+      zoneId: input.zoneId ?? null,
+      kind: input.kind,
+      isCanonical,
+      status: "ready",
+      verifiedAt: timestamp,
+      createdAt: timestamp,
+      updatedAt: timestamp
+    })
+    .onConflictDoUpdate({
+      target: workspaceHosts.hostname,
+      set: {
+        zoneId: input.zoneId ?? null,
+        kind: input.kind,
+        isCanonical,
+        status: "ready",
+        verifiedAt: timestamp,
+        updatedAt: timestamp
+      }
+    });
+  if (isCanonical) {
+    await database.batch([
+      database
+        .update(workspaceHosts)
+        .set({ isCanonical: false })
+        .where(eq(workspaceHosts.kind, "portal")),
+      upsert
+    ]);
+    return;
   }
-  await db
-    .prepare(
-      `INSERT INTO workspace_hosts
-     (id, hostname, zone_id, kind, is_canonical, status, verified_at, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, 'ready', ?, ?, ?)
-     ON CONFLICT(hostname) DO UPDATE SET zone_id = excluded.zone_id, kind = excluded.kind,
-       is_canonical = excluded.is_canonical, status = 'ready', verified_at = excluded.verified_at,
-       updated_at = excluded.updated_at`
-    )
-    .bind(
-      `host_${crypto.randomUUID()}`,
-      input.hostname,
-      input.zoneId ?? null,
-      input.kind,
-      input.kind === "portal" && input.canonical !== false ? 1 : 0,
-      timestamp,
-      timestamp,
-      timestamp
-    )
-    .run();
+  await upsert.run();
 }
 
 export async function countUsers(db: D1Database): Promise<number> {
-  const row = await db.prepare('SELECT COUNT(*) AS count FROM "user"').first<{ count: number }>();
+  const row = await getRow<{ count: number }>(db, sql`SELECT COUNT(*) AS count FROM "user"`);
   return row?.count ?? 0;
 }
 

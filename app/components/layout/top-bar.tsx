@@ -1,5 +1,5 @@
-import { MailPlus, PanelLeftClose, PanelLeftOpen, Search } from "lucide-react";
 import type * as React from "react";
+import { PiMagnifyingGlass, PiSidebarSimple } from "react-icons/pi";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,16 +11,17 @@ import {
   SelectTrigger,
   SelectValue
 } from "@/components/ui/select";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import type { CurrentUser } from "@/features/auth/types";
 import type { Mailbox } from "@/features/mailboxes/types";
 import type { UnreadCounts } from "@/features/notifications/types";
 import { mailboxUnreadLabel } from "@/features/notifications/unread";
-import type { FolderId } from "@/lib/routes";
+import type { FolderId, SettingsTabId } from "@/lib/routes";
 import { MobileNavigation } from "./mobile-navigation";
 
 type TopBarProps = {
   activeFolder: FolderId;
+  activeSettingsTab?: SettingsTabId | undefined;
+  canManage?: boolean | undefined;
   draftCount: number;
   user: CurrentUser;
   mailboxes: Mailbox[];
@@ -31,13 +32,16 @@ type TopBarProps = {
   onFolderChange: (folder: FolderId) => void;
   onMailboxChange: (mailboxId: string) => void;
   onSearchChange: (search: string) => void;
+  onSettingsTabChange?: ((tab: SettingsTabId) => void) | undefined;
   onSignedOut: () => void;
-  onToggleSidebar?: () => void;
   sidebarCollapsed?: boolean;
+  onToggleSidebar?: () => void;
 };
 
 export function TopBar({
   activeFolder,
+  activeSettingsTab,
+  canManage,
   draftCount,
   user,
   mailboxes,
@@ -48,50 +52,49 @@ export function TopBar({
   onFolderChange,
   onMailboxChange,
   onSearchChange,
+  onSettingsTabChange,
   onSignedOut,
-  onToggleSidebar,
-  sidebarCollapsed = false
+  sidebarCollapsed,
+  onToggleSidebar
 }: TopBarProps): React.ReactElement {
   return (
-    <header className="flex h-14 w-full shrink-0 touch-none items-center gap-2 border-b bg-background px-3 md:px-4">
-      {onToggleSidebar ? (
-        <TooltipProvider delayDuration={250}>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                aria-label={sidebarCollapsed ? "Show sidebar" : "Hide sidebar"}
-                className="size-8 shrink-0"
-                onClick={onToggleSidebar}
-                size="icon"
-                title={sidebarCollapsed ? "Show sidebar" : "Hide sidebar"}
-                type="button"
-                variant="ghost"
-              >
-                {sidebarCollapsed ? <PanelLeftOpen /> : <PanelLeftClose />}
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="bottom">
-              {sidebarCollapsed ? "Show sidebar" : "Hide sidebar"}
-            </TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
+    <header className="flex h-12 w-full shrink-0 touch-none items-center gap-2 border-b border-divider bg-toolbar px-3 lg:px-4">
+      {sidebarCollapsed && onToggleSidebar ? (
+        <Button
+          aria-label="Show sidebar"
+          className="size-9 shrink-0 text-muted-foreground"
+          onClick={onToggleSidebar}
+          size="icon"
+          title="Show sidebar"
+          type="button"
+          variant="ghost"
+        >
+          <PiSidebarSimple />
+        </Button>
       ) : null}
       <MobileNavigation
         activeFolder={activeFolder}
+        activeSettingsTab={activeSettingsTab}
+        canManage={canManage}
         draftCount={draftCount}
         mailboxId={mailboxId}
         mailboxes={mailboxes}
         unread={unread}
         user={user}
+        onCompose={onCompose}
         onFolderChange={onFolderChange}
         onMailboxChange={onMailboxChange}
+        onSettingsTabChange={onSettingsTabChange}
         onSignedOut={onSignedOut}
       />
       <div className="relative min-w-0 max-w-xl flex-1">
-        <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+        <PiMagnifyingGlass
+          aria-hidden="true"
+          className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground"
+        />
         <Input
           aria-label="Search mail"
-          className="h-8 border-transparent bg-muted/70 pl-8 shadow-none focus-visible:border-input focus-visible:ring-1"
+          className="h-8 border-transparent bg-muted/70 pl-8 text-xs shadow-none focus-visible:border-input focus-visible:ring-1"
           placeholder="Search mail"
           value={search}
           onChange={(event) => onSearchChange(event.target.value)}
@@ -118,10 +121,6 @@ export function TopBar({
             </SelectGroup>
           </SelectContent>
         </Select>
-        <Button aria-label="New email" className="h-8 px-3" onClick={onCompose} type="button">
-          <MailPlus />
-          <span className="hidden sm:inline">Compose</span>
-        </Button>
       </div>
     </header>
   );

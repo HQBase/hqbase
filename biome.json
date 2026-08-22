@@ -116,6 +116,12 @@
       "includes": ["app/styles.css"],
       "linter": {
         "rules": {
+          "complexity": {
+            "noImportantStyles": "off"
+          },
+          "style": {
+            "noDescendingSpecificity": "off"
+          },
           "suspicious": {
             "noUnknownAtRules": "off"
           }

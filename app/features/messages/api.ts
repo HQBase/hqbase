@@ -53,7 +53,7 @@ export async function trustRemoteMediaSender(id: string): Promise<void> {
 
 export async function runMessageAction(
   id: string,
-  action: "read" | "unread" | "star" | "unstar" | "archive" | "trash"
+  action: "read" | "unread" | "star" | "unstar" | "archive" | "unarchive" | "trash" | "restore"
 ): Promise<MessageSummary> {
   return apiPost<MessageSummary>(`/api/v1/messages/${id}/${action}`);
 }

@@ -1,5 +1,5 @@
-import { Bell, BellOff } from "lucide-react";
 import type * as React from "react";
+import { PiBell, PiBellSlash } from "react-icons/pi";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -23,7 +23,7 @@ export function NotificationSettings({
             variant="outline"
             onClick={() => void notifications.disable()}
           >
-            <BellOff />
+            <PiBellSlash />
             {notifications.isBusy ? "Disabling…" : "Disable on this device"}
           </Button>
         ) : (
@@ -39,7 +39,7 @@ export function NotificationSettings({
             type="button"
             onClick={() => void notifications.enable()}
           >
-            <Bell />
+            <PiBell />
             {notifications.isBusy ? "Enabling…" : "Enable notifications"}
           </Button>
         )

@@ -3,12 +3,12 @@ import { describe, expect, it } from "vitest";
 import { MobileNavigation } from "@/components/layout/mobile-navigation";
 import { Sidebar } from "@/components/layout/sidebar";
 import { TopBar } from "@/components/layout/top-bar";
-import { AgentConnectionDetails, AgentSkillDetails } from "@/features/agents/connection-dialog";
 import { LoginPage } from "@/features/auth/login-page";
 import { ComposeWindow } from "@/features/compose/compose-window";
 import { DraftsPage } from "@/features/drafts/drafts-page";
 import { InboxPage } from "@/features/inbox/inbox-page";
 import type { Mailbox } from "@/features/mailboxes/types";
+import { McpConnectionDetails } from "@/features/mcp/connection-dialog";
 import { mailboxUnreadLabel } from "@/features/notifications/unread";
 
 const user = {
@@ -37,7 +37,7 @@ const mailbox: Mailbox = {
 };
 
 describe("mail shell", () => {
-  it("uses the full header width and keeps primary mail actions in a right-aligned group", () => {
+  it("uses the full header width and keeps mail actions in a right-aligned group", () => {
     const html = renderToStaticMarkup(
       <TopBar
         activeFolder="inbox"
@@ -55,52 +55,35 @@ describe("mail shell", () => {
       />
     );
 
-    expect(html).toContain("h-14 w-full");
+    expect(html).toContain("h-12 w-full");
     expect(html).toContain("relative min-w-0 max-w-xl flex-1");
-    expect(html).toContain("ml-auto flex shrink-0 items-center gap-2");
     expect(html).toContain("Search mail");
-    expect(html).toContain("Compose");
-    expect(html).toContain('aria-label="New email"');
-    expect(html).not.toContain("Connect AI agent");
+    expect(html).not.toContain("Connect MCP");
     expect(html).toContain("Open navigation");
     expect(html.indexOf("Open navigation")).toBeLessThan(html.indexOf("Search mail"));
-    expect(html).not.toContain("Open profile menu");
-    expect(html).not.toContain("OB");
   });
 
-  it("exposes the desktop sidebar state from the leading header control", () => {
+  it("exposes the desktop sidebar state from the sidebar header control", () => {
     const visibleHtml = renderToStaticMarkup(
-      <TopBar
+      <Sidebar
         activeFolder="inbox"
-        draftCount={0}
         mailboxId="all"
-        mailboxes={[]}
-        search=""
         sidebarCollapsed={false}
         unread={unread}
         user={user}
-        onCompose={() => undefined}
         onFolderChange={() => undefined}
-        onMailboxChange={() => undefined}
-        onSearchChange={() => undefined}
         onSignedOut={() => undefined}
         onToggleSidebar={() => undefined}
       />
     );
     const collapsedHtml = renderToStaticMarkup(
-      <TopBar
+      <Sidebar
         activeFolder="inbox"
-        draftCount={0}
         mailboxId="all"
-        mailboxes={[]}
-        search=""
         sidebarCollapsed
         unread={unread}
         user={user}
-        onCompose={() => undefined}
         onFolderChange={() => undefined}
-        onMailboxChange={() => undefined}
-        onSearchChange={() => undefined}
         onSignedOut={() => undefined}
         onToggleSidebar={() => undefined}
       />
@@ -108,6 +91,25 @@ describe("mail shell", () => {
 
     expect(visibleHtml).toContain('aria-label="Hide sidebar"');
     expect(collapsedHtml).toContain('aria-label="Show sidebar"');
+    expect(visibleHtml).toContain("justify-between");
+    const topBarHtml = renderToStaticMarkup(
+      <TopBar
+        activeFolder="inbox"
+        draftCount={0}
+        mailboxId="all"
+        mailboxes={[]}
+        search=""
+        unread={unread}
+        user={user}
+        onCompose={() => undefined}
+        onFolderChange={() => undefined}
+        onMailboxChange={() => undefined}
+        onSearchChange={() => undefined}
+        onSignedOut={() => undefined}
+      />
+    );
+    expect(topBarHtml).not.toContain('aria-label="Show sidebar"');
+    expect(topBarHtml).not.toContain('aria-label="Hide sidebar"');
   });
 
   it("renders the canonical logo instead of the HQ placeholder", () => {
@@ -117,38 +119,25 @@ describe("mail shell", () => {
         mailboxId="all"
         unread={unread}
         user={user}
-        utilityAction={<button type="button">Connect AI agent</button>}
         onFolderChange={() => undefined}
         onSignedOut={() => undefined}
       />
     );
 
     expect(html).toContain('src="/logo.svg"');
-    expect(html).toContain('href="/inbox"');
-    expect(html).toContain('href="/catch-all"');
+    expect(html).toContain('href="/mail/inbox"');
+    expect(html).toContain('href="/mail/catch-all"');
     expect(html).toContain('href="/settings/mailboxes"');
+    expect(html).not.toContain("Connect MCP");
     expect(html).toContain("7 unread");
     expect(html).toContain("2 unread");
-    expect(html).toContain("Open profile menu");
-    expect(html).toContain("OB");
-    expect(html.indexOf("Connect AI agent")).toBeLessThan(html.indexOf("Settings"));
-    expect(html.indexOf("Settings")).toBeLessThan(html.indexOf("Open profile menu"));
-    expect(html).toContain("Dark mode");
-    expect(html).toContain('aria-label="Switch to light mode"');
-    expect(html.indexOf("Settings")).toBeLessThan(html.indexOf("Dark mode"));
-    expect(html.indexOf("Dark mode")).toBeLessThan(html.indexOf("Open profile menu"));
-    expect(html.match(/border-t pt-2/g)).toHaveLength(2);
-    expect(html).toContain('stroke-width="1.5"');
     expect(html).not.toContain(">HQ<");
-    expect(html).not.toContain(">Mail</div>");
   });
 
   it("uses the canonical logo on the signed-out surface", () => {
     const html = renderToStaticMarkup(<LoginPage onLogin={() => undefined} />);
 
     expect(html).toContain('src="/logo.svg"');
-    expect(html).toContain('href="/forgot-password"');
-    expect(html).toContain("Forgot password?");
     expect(html).not.toContain(">HQ</span>");
   });
 
@@ -170,7 +159,7 @@ describe("mail shell", () => {
     expect(html).toContain('aria-label="Open navigation"');
     expect(html).toContain('title="Open navigation"');
     expect(html).toContain("size-11");
-    expect(html).toContain("md:hidden");
+    expect(html).toContain("lg:hidden");
     expect(html).not.toContain('role="combobox"');
     expect(html).not.toContain("Catch-all");
   });
@@ -185,7 +174,6 @@ describe("mail shell", () => {
           value: "all",
           onChange: () => undefined
         }}
-        utilityAction={<button type="button">Connect AI agent</button>}
         unread={unread}
         user={user}
         onFolderChange={() => undefined}
@@ -195,16 +183,37 @@ describe("mail shell", () => {
     );
 
     expect(html).toContain("flex h-full w-full");
-    expect(html).toContain("h-11 text-sm");
     expect(html).toContain('aria-label="Mailbox filter"');
     expect(html).toContain('id="drawer-mailbox-filter"');
     expect(html).toContain('for="drawer-mailbox-filter">Mailbox</label>');
     expect(html.indexOf(">Mailbox</label>")).toBeLessThan(html.indexOf(">Inbox</span>"));
     expect(html).toContain('aria-current="page"');
-    expect(html).toContain("Connect AI agent");
-    expect(html.indexOf("Connect AI agent")).toBeLessThan(html.indexOf("Settings"));
-    expect(html.indexOf("Settings")).toBeLessThan(html.indexOf("Open profile menu"));
-    expect(html.match(/border-t pt-2/g)).toHaveLength(2);
+    expect(html).not.toContain("Connect MCP");
+    expect(html).toContain("border-t border-divider pt-2");
+  });
+
+  it("shows settings tabs in the left navigation instead of a top tab bar", () => {
+    const html = renderToStaticMarkup(
+      <Sidebar
+        activeFolder="settings"
+        activeSettingsTab="notifications"
+        canManage
+        mailboxId="all"
+        unread={unread}
+        user={user}
+        onFolderChange={() => undefined}
+        onSettingsTabChange={() => undefined}
+        onSignedOut={() => undefined}
+      />
+    );
+
+    expect(html).toContain('aria-label="Settings navigation"');
+    expect(html).toContain("Mailboxes");
+    expect(html).toContain("Notifications");
+    expect(html).toContain("Debug");
+    expect(html).toContain('href="/settings/notifications"');
+    expect(html).toContain('aria-current="page"');
+    expect(html).not.toContain("Your mail");
   });
 
   it("shows per-mailbox unread labels and scopes the Inbox count to the selection", () => {
@@ -266,10 +275,10 @@ describe("mail shell", () => {
       />
     );
 
-    expect(withoutDrafts).not.toContain('href="/drafts"');
-    expect(withDrafts).toContain('href="/drafts"');
+    expect(withoutDrafts).not.toContain('href="/mail/drafts"');
+    expect(withDrafts).toContain('href="/mail/drafts"');
     expect(withDrafts).toContain("3 drafts");
-    expect(activeEmptyDrafts).toContain('href="/drafts"');
+    expect(activeEmptyDrafts).toContain('href="/mail/drafts"');
     expect(activeEmptyDrafts).toContain('aria-current="page"');
   });
 
@@ -314,7 +323,7 @@ describe("mail shell", () => {
     expect(html).toContain("support@example.com");
     expect(html).toContain("Quarterly follow-up");
     expect(html).toContain("Here is the requested summary.");
-    expect(html).toContain('href="/drafts/draft%2Fone"');
+    expect(html).toContain('href="/mail/drafts/draft%2Fone"');
     expect(html).toContain("1 attachment");
   });
 
@@ -338,20 +347,18 @@ describe("mail shell", () => {
       />
     );
 
-    expect(html).toContain('<span class="md:hidden">Inbox</span>');
-    expect(html).toContain('<span class="hidden md:inline">Conversations</span>');
+    expect(html).toContain(">Inbox</span>");
+    expect(html).toContain("0 conversations");
     expect(html).not.toContain("Navigation");
   });
 
-  it("defaults to MCP and its read-only profile while exposing both connection methods", () => {
+  it("defaults to the read-only MCP profile and exposes the server switcher", () => {
     const html = renderToStaticMarkup(
-      <AgentConnectionDetails
+      <McpConnectionDetails
         fullEndpoint="https://mail.example.com/mcp/full"
         fullEndpointId="mcp-full-endpoint"
         readOnlyEndpoint="https://mail.example.com/mcp"
         readOnlyEndpointId="mcp-read-endpoint"
-        skillUrl="https://mail.example.com/skills/hqbase-mail/SKILL.md"
-        skillUrlId="agent-skill-url"
         user={user}
       />
     );
@@ -360,8 +367,6 @@ describe("mail shell", () => {
     expect(html).not.toContain("https://mail.example.com/mcp/full");
     expect(html).toContain("Read only");
     expect(html).toContain("Mail actions");
-    expect(html).toContain("Agent Skill");
-    expect(html).not.toContain("https://mail.example.com/skills/hqbase-mail/SKILL.md");
     expect(html).toContain('role="tablist"');
     expect(html).toContain('data-state="active"');
     expect(html).toContain('data-state="inactive"');
@@ -372,24 +377,6 @@ describe("mail shell", () => {
     expect(html).toContain("live mailbox grants");
     expect(html).not.toContain("Community");
     expect(html).not.toContain("Pro");
-  });
-
-  it("offers the deployment-local Agent Skill as a copyable or downloadable file", () => {
-    const html = renderToStaticMarkup(
-      <AgentSkillDetails
-        skillUrl="https://mail.example.com/skills/hqbase-mail/SKILL.md"
-        skillUrlId="agent-skill-url"
-      />
-    );
-
-    expect(html).toContain("https://mail.example.com/skills/hqbase-mail/SKILL.md");
-    expect(html).toContain("Copy Agent Skill URL");
-    expect(html).toContain("Copy URL");
-    expect(html).toContain("Download Skill");
-    expect(html).toContain('download="SKILL.md"');
-    expect(html).not.toContain("Ready-made prompt");
-    expect(html).not.toContain("Copy prompt");
-    expect(html).toContain("contains no account or mail data");
   });
 
   it("renders Compose as a non-modal responsive work surface", () => {

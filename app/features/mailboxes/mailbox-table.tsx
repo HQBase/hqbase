@@ -76,7 +76,7 @@ export function MailboxTable({
   return (
     <Table containerClassName="rounded-lg border">
       <TableHeader className="bg-muted/40">
-        <TableRow className="hover:bg-transparent">
+        <TableRow className="[@media(hover:hover)]:hover:bg-transparent">
           {canManage ? (
             <TableHead className="w-10">
               <Checkbox
@@ -123,7 +123,7 @@ export function MailboxTable({
               ) : null}
               <TableCell className="max-w-52">
                 <button
-                  className="block max-w-full truncate rounded-sm text-left font-medium underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  className="block max-w-full truncate rounded-sm text-left font-medium underline-offset-4 [@media(hover:hover)]:hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   type="button"
                   onClick={() => onOpenDetails(mailbox)}
                 >
@@ -155,7 +155,7 @@ export function MailboxTable({
                   />
                 ) : (
                   <button
-                    className="min-h-10 rounded-sm text-left text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    className="min-h-10 rounded-sm text-left text-xs text-muted-foreground underline-offset-4 [@media(hover:hover)]:hover:text-foreground [@media(hover:hover)]:hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     type="button"
                     onClick={() => onOpenDetails(mailbox)}
                   >

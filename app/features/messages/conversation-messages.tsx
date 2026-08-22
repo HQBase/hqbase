@@ -1,5 +1,11 @@
-import { ArrowDown, ArrowUp, Download, Forward, Reply } from "lucide-react";
 import * as React from "react";
+import {
+  PiArrowBendUpLeft,
+  PiArrowBendUpRight,
+  PiArrowDown,
+  PiArrowUp,
+  PiDownloadSimple
+} from "react-icons/pi";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -22,9 +28,15 @@ export function ConversationMessages({
   const threadFingerprint = messages.map((message) => message.id).join(":");
   const [expandedThread, setExpandedThread] = React.useState<string | null>(null);
   const showMiddle = expandedThread === threadFingerprint;
+  const replyTarget =
+    [...messages].reverse().find((message) => message.direction === "inbound") ?? messages.at(-1);
 
   if (hiddenCount === 0) {
-    return <div className="divide-y divide-border">{messages.map(renderMessage)}</div>;
+    return (
+      <div className="divide-y divide-border">
+        {messages.map((message, index) => renderMessage(message, index === messages.length - 1))}
+      </div>
+    );
   }
 
   const first = messages[0];
@@ -32,7 +44,7 @@ export function ConversationMessages({
   const final = messages.at(-1);
   return (
     <div className="divide-y divide-border">
-      {first ? renderMessage(first) : null}
+      {first ? renderMessage(first, false) : null}
       <ThreadMessagesDivider
         count={hiddenCount}
         expanded={showMiddle}
@@ -40,12 +52,12 @@ export function ConversationMessages({
           setExpandedThread((current) => (current === threadFingerprint ? null : threadFingerprint))
         }
       />
-      {showMiddle ? middle.map(renderMessage) : null}
-      {final ? renderMessage(final) : null}
+      {showMiddle ? middle.map((message) => renderMessage(message, false)) : null}
+      {final ? renderMessage(final, true) : null}
     </div>
   );
 
-  function renderMessage(message: MessageDetail): React.ReactElement {
+  function renderMessage(message: MessageDetail, isLast: boolean): React.ReactElement {
     const timestamp = message.receivedAt ?? message.sentAt ?? message.createdAt;
     return (
       <article
@@ -55,7 +67,9 @@ export function ConversationMessages({
       >
         <header className="mb-5 flex flex-wrap items-start justify-between gap-2">
           <div className="min-w-0">
-            <div className="break-words text-sm font-medium">{message.fromAddress}</div>
+            <div className="break-words text-sm font-medium text-balance [text-wrap:balance]">
+              {message.fromAddress}
+            </div>
             <div className="mt-1 break-words text-xs text-muted-foreground">
               to {message.to.join(", ")}
               {message.cc.length > 0 ? ` · cc ${message.cc.join(", ")}` : ""}
@@ -67,7 +81,7 @@ export function ConversationMessages({
                 Sent
               </Badge>
             ) : null}
-            <time className="font-mono text-[10px] text-muted-foreground">
+            <time className="font-mono text-[10px] tabular-nums text-muted-foreground">
               {formatDateTime(timestamp)}
             </time>
           </div>
@@ -85,11 +99,11 @@ export function ConversationMessages({
                 <div className="text-xs font-medium text-muted-foreground">Attachments</div>
                 {message.attachments.map((attachment) => (
                   <a
-                    className="flex w-fit max-w-full items-center gap-2 rounded-md border bg-card px-3 py-2 text-xs hover:bg-muted"
+                    className="flex w-fit max-w-full items-center gap-2 rounded-md border bg-card px-3 py-2 text-xs [@media(hover:hover)]:hover:bg-muted"
                     href={`/api/v1/attachments/${attachment.id}`}
                     key={attachment.id}
                   >
-                    <Download className="size-3.5" />
+                    <PiDownloadSimple className="size-3.5" />
                     <span className="truncate">{attachment.filename}</span>
                   </a>
                 ))}
@@ -97,19 +111,19 @@ export function ConversationMessages({
             </>
           ) : null}
         </div>
-        {onCompose ? (
+        {onCompose && isLast ? (
           <footer className="mt-5 flex flex-wrap items-center gap-2">
             <Button
-              aria-label={`Reply to message from ${message.fromAddress}`}
+              aria-label={`Reply to message from ${replyTarget?.fromAddress ?? message.fromAddress}`}
               className="h-9 min-w-24 rounded-full px-4"
               data-compose-action="reply"
-              data-compose-message-id={message.id}
-              onClick={() => onCompose(message, "reply")}
+              data-compose-message-id={replyTarget?.id ?? message.id}
+              onClick={() => onCompose(replyTarget ?? message, "reply")}
               size="sm"
               type="button"
               variant="outline"
             >
-              <Reply />
+              <PiArrowBendUpLeft />
               Reply
             </Button>
             <Button
@@ -122,7 +136,7 @@ export function ConversationMessages({
               type="button"
               variant="outline"
             >
-              <Forward />
+              <PiArrowBendUpRight />
               Forward
             </Button>
           </footer>
@@ -162,17 +176,17 @@ function ThreadMessagesDivider({
           className="grid grid-rows-[0.875rem_0.875rem_0.875rem] place-items-center"
         >
           {expanded ? (
-            <ArrowDown data-thread-arrow="top-inward" />
+            <PiArrowDown data-thread-arrow="top-inward" />
           ) : (
-            <ArrowUp data-thread-arrow="top-outward" />
+            <PiArrowUp data-thread-arrow="top-outward" />
           )}
           <span className="min-w-4 text-center font-mono text-[10px] font-semibold leading-none tabular-nums">
             {count}
           </span>
           {expanded ? (
-            <ArrowUp data-thread-arrow="bottom-inward" />
+            <PiArrowUp data-thread-arrow="bottom-inward" />
           ) : (
-            <ArrowDown data-thread-arrow="bottom-outward" />
+            <PiArrowDown data-thread-arrow="bottom-outward" />
           )}
         </span>
       </Button>

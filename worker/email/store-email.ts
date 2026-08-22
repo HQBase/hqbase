@@ -1,4 +1,7 @@
+import { sql } from "drizzle-orm";
+
 import { newId, nowIso } from "../db/client";
+import { getRow } from "../db/drizzle";
 import { findAddressIdentity } from "../features/mailboxes/address-queries";
 import { findMailboxByAddress } from "../features/mailboxes/queries";
 import { getMessageDetail, insertAttachment, insertMessage } from "../features/messages/queries";
@@ -15,10 +18,9 @@ export type StoreInboundInput = {
   parsed: ParsedEmail;
 };
 
-export type StoreInboundResult = {
-  inserted: boolean;
-  message: MessageDetail | MessageSummary;
-};
+export type StoreInboundResult =
+  | { inserted: false; message: MessageDetail | MessageSummary }
+  | { inserted: true; isUnassigned: boolean; message: MessageDetail | MessageSummary };
 
 export async function storeInboundEmail(
   db: D1Database,
@@ -67,6 +69,7 @@ export async function storeInboundEmail(
   });
   const message = await insertMessage(db, {
     threadId,
+    isUnassigned: plan.isUnassigned,
     mailboxId: plan.mailboxId,
     direction: "inbound",
     folder: plan.folder,
@@ -107,15 +110,16 @@ export async function storeInboundEmail(
 
   return {
     inserted: true,
+    isUnassigned: plan.isUnassigned,
     message: (await getMessageDetail(db, message.id)) ?? message
   };
 }
 
 async function findDuplicate(db: D1Database, dedupeKey: string): Promise<MessageSummary | null> {
-  const row = await db
-    .prepare("SELECT id FROM messages WHERE dedupe_key = ?")
-    .bind(dedupeKey)
-    .first<{ id: string }>();
+  const row = await getRow<{ id: string }>(
+    db,
+    sql`SELECT id FROM messages WHERE dedupe_key = ${dedupeKey}`
+  );
 
   if (!row) {
     return null;

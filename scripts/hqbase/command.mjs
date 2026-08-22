@@ -35,7 +35,7 @@ export function run(command, args = [], options = {}) {
     throw new Error(`Command failed (${result.status ?? "no exit code"}): ${label}${detail}`);
   }
 
-  return `${stdout}${stderr}`;
+  return options.stdoutOnly ? stdout : `${stdout}${stderr}`;
 }
 
 export function parseD1DatabaseId(output) {

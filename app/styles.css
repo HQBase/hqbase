@@ -1,48 +1,40 @@
 @font-face {
-  font-family: "Geist Sans";
-  src: url("/fonts/Geist-Light.woff2") format("woff2");
+  font-family: Inter;
+  src: url("/fonts/Inter-Light.woff2") format("woff2");
   font-style: normal;
   font-weight: 300;
   font-display: swap;
 }
 
 @font-face {
-  font-family: "Geist Sans";
-  src: url("/fonts/Geist-Regular.woff2") format("woff2");
+  font-family: Inter;
+  src: url("/fonts/Inter-Regular.woff2") format("woff2");
   font-style: normal;
   font-weight: 400;
   font-display: swap;
 }
 
 @font-face {
-  font-family: "Geist Sans";
-  src: url("/fonts/Geist-Medium.woff2") format("woff2");
+  font-family: Inter;
+  src: url("/fonts/Inter-Medium.woff2") format("woff2");
   font-style: normal;
   font-weight: 500;
   font-display: swap;
 }
 
 @font-face {
-  font-family: "Geist Sans";
-  src: url("/fonts/Geist-SemiBold.woff2") format("woff2");
+  font-family: Inter;
+  src: url("/fonts/Inter-SemiBold.woff2") format("woff2");
   font-style: normal;
   font-weight: 600;
   font-display: swap;
 }
 
 @font-face {
-  font-family: "Geist Sans";
-  src: url("/fonts/Geist-Bold.woff2") format("woff2");
+  font-family: Inter;
+  src: url("/fonts/Inter-Bold.woff2") format("woff2");
   font-style: normal;
   font-weight: 700;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: "Geist Mono";
-  src: url("/fonts/GeistMono-Regular.woff2") format("woff2");
-  font-style: normal;
-  font-weight: 400;
   font-display: swap;
 }
 
@@ -53,6 +45,8 @@
 @layer base {
   :root {
     color-scheme: light;
+    --star: 42 96% 50%;
+    --star-foreground: 42 96% 50%;
     --background: 0 0% 100%;
     --foreground: 0 0% 9%;
     --card: 0 0% 99%;
@@ -72,11 +66,22 @@
     --border: 0 0% 88%;
     --input: 0 0% 82%;
     --ring: 0 0% 35%;
+    --surface-rail: 240 4% 96%;
+    --surface-sidebar: 240 5% 99%;
+    --surface-toolbar: 240 5% 100%;
+    --surface-list: 240 5% 98%;
+    --surface-reader: 240 5% 100%;
+    --surface-selected: 240 5% 90%;
+    --surface-hover: 240 5% 92%;
+    --divider-subtle: 240 5% 90%;
+    --text-tertiary: 240 3% 56%;
     --radius: 0.5rem;
   }
 
   .dark {
     color-scheme: dark;
+    --star: 42 96% 58%;
+    --star-foreground: 42 96% 58%;
     --background: 0 0% 3%;
     --foreground: 0 0% 96%;
     --card: 0 0% 5%;
@@ -96,11 +101,30 @@
     --border: 0 0% 15%;
     --input: 0 0% 18%;
     --ring: 0 0% 55%;
+    --surface-rail: 240 5% 4%;
+    --surface-sidebar: 240 5% 7%;
+    --surface-toolbar: 240 5% 8%;
+    --surface-list: 240 5% 6%;
+    --surface-reader: 240 5% 4%;
+    --surface-selected: 240 4% 16%;
+    --surface-hover: 240 4% 13%;
+    --divider-subtle: 240 4% 15%;
+    --text-tertiary: 240 3% 50%;
   }
 
   html {
     background-color: hsl(var(--background));
     overscroll-behavior: none;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  html.disable-transitions *,
+  html.disable-transitions *::before,
+  html.disable-transitions *::after {
+    transition-duration: 0s;
+    animation-duration: 0s;
+    animation-delay: 0s;
   }
 
   * {
@@ -108,25 +132,93 @@
   }
 
   body {
-    @apply bg-background text-foreground antialiased;
+    @apply bg-background text-foreground;
     min-width: 320px;
     min-height: 100dvh;
     overscroll-behavior: none;
     font-feature-settings:
       "rlig" 1,
-      "calt" 1;
+      "calt" 1,
+      "ss01" 1,
+      "ss03" 1;
+    font-optical-sizing: auto;
+    text-rendering: optimizeLegibility;
+    text-underline-position: from-font;
+    text-decoration-skip-ink: auto;
+  }
+
+  img {
+    outline: 1px solid rgb(0 0 0 / 8%);
+    outline-offset: -1px;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    text-wrap: balance;
+  }
+
+  p {
+    text-wrap: pretty;
+  }
+
+  a,
+  button {
+    text-underline-position: from-font;
+    text-decoration-skip-ink: auto;
   }
 
   #root {
     min-height: 100dvh;
   }
+
+  [id] {
+    scroll-margin-top: 2rem;
+  }
+
+  .btn-liquid-glass {
+    background-color: rgba(255, 255, 255, 0.72);
+    backdrop-filter: blur(12px) saturate(1.4);
+    -webkit-backdrop-filter: blur(12px) saturate(1.4);
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    box-shadow:
+      0 1px 3px rgba(0, 0, 0, 0.05),
+      0 1px 0 rgba(255, 255, 255, 0.85) inset;
+    color: #1c1917;
+  }
+
+  .dark .btn-liquid-glass {
+    background-color: rgba(255, 255, 255, 0.08);
+    backdrop-filter: blur(12px) saturate(1.2);
+    -webkit-backdrop-filter: blur(12px) saturate(1.2);
+    border-color: rgba(255, 255, 255, 0.12);
+    box-shadow: 0 1px 0 rgba(255, 255, 255, 0.08) inset;
+    color: hsl(var(--foreground));
+  }
+
+  @media (hover: hover) {
+    .btn-liquid-glass:hover {
+      background-color: rgba(255, 255, 255, 0.84);
+      border-color: rgba(0, 0, 0, 0.1);
+      box-shadow:
+        0 2px 8px rgba(0, 0, 0, 0.06),
+        0 1px 0 rgba(255, 255, 255, 0.95) inset;
+    }
+
+    .dark .btn-liquid-glass:hover {
+      background-color: rgba(255, 255, 255, 0.12);
+      box-shadow: 0 1px 0 rgba(255, 255, 255, 0.1) inset;
+    }
+  }
 }
 
-@media (hover: hover) and (pointer: fine) and (max-width: 1023px),
-  (hover: hover) and (pointer: fine) and (max-height: 599px) {
-  .desktop-window-guard {
-    display: flex;
-  }
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+.prose-measure {
+  max-width: 65ch;
 }
 
 @media (max-width: 767px) {
@@ -134,5 +226,15 @@
   textarea[class],
   [contenteditable="true"][class] {
     font-size: 16px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
   }
 }

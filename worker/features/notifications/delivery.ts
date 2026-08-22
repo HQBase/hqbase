@@ -1,24 +1,33 @@
 import webpush from "web-push";
 
-import { accessibleMailboxIds } from "../../auth/mailbox-access";
+import { accessibleMessageScope } from "../../auth/mailbox-access";
 import type { WorkerEnv } from "../../lib/env";
 import type { WorkspaceRole } from "../../lib/validation";
 import type { MessageSummary } from "../messages/types";
 import {
   countUnreadMessages,
   listPushSubscriptionsForMailbox,
+  listPushSubscriptionsForUnassigned,
   markPushSubscriptionSuccessful,
   removePushSubscriptionsById
 } from "./queries";
 import type { PushSubscriptionRow } from "./types";
 
-export async function notifyInboundMessage(env: WorkerEnv, message: MessageSummary): Promise<void> {
+export async function notifyInboundMessage(
+  env: WorkerEnv,
+  message: MessageSummary,
+  isUnassigned: boolean
+): Promise<void> {
   const mailboxId = message.mailboxId;
-  if (!mailboxId || !env.VAPID_PUBLIC_KEY || !env.VAPID_PRIVATE_KEY) {
+  if (!env.VAPID_PUBLIC_KEY || !env.VAPID_PRIVATE_KEY) {
     return;
   }
 
-  const subscriptions = await listPushSubscriptionsForMailbox(env.DB, mailboxId);
+  const subscriptions = isUnassigned
+    ? await listPushSubscriptionsForUnassigned(env.DB)
+    : mailboxId
+      ? await listPushSubscriptionsForMailbox(env.DB, mailboxId)
+      : [];
   if (subscriptions.length === 0) return;
 
   webpush.setVapidDetails(
@@ -33,13 +42,18 @@ export async function notifyInboundMessage(env: WorkerEnv, message: MessageSumma
     [...byUser.entries()].map(async ([userId, userSubscriptions]) => {
       const role = workspaceRole(userSubscriptions[0]?.role);
       if (!role) return;
-      const mailboxIds = await accessibleMailboxIds(env.DB, userId, role, "read");
-      if (!mailboxIds.includes(mailboxId)) return;
-      const unread = await countUnreadMessages(env.DB, mailboxIds);
+      const scope = await accessibleMessageScope(env.DB, userId, role, "read");
+      const allowed = isUnassigned
+        ? scope.includeUnassigned
+        : mailboxId
+          ? scope.mailboxIds.includes(mailboxId)
+          : false;
+      if (!allowed) return;
+      const unread = await countUnreadMessages(env.DB, scope);
       const payload = JSON.stringify({
         tag: `hqbase-thread-${message.threadId}`,
         unreadCount: unread.total,
-        url: message.folder === "catchall" ? `/catch-all/${message.id}` : `/inbox/${message.id}`
+        url: isUnassigned ? `/catch-all/${message.id}` : `/inbox/${message.id}`
       });
 
       await Promise.all(

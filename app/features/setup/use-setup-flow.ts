@@ -1,4 +1,4 @@
-import { Globe2, Inbox, UserRound } from "lucide-react";
+import { PiGlobe, PiTray, PiUserCircle } from "react-icons/pi";
 import * as React from "react";
 import { toast } from "sonner";
 
@@ -77,15 +77,15 @@ export function useSetupFlow(onComplete: () => void) {
 
   const steps = [
     {
-      icon: Globe2,
+      icon: PiGlobe,
       title: "Domain"
     },
     {
-      icon: UserRound,
+      icon: PiUserCircle,
       title: "Owner account"
     },
     {
-      icon: Inbox,
+      icon: PiTray,
       title: "Mailboxes"
     }
   ];

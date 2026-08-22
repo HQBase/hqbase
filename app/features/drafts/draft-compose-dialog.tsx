@@ -1,12 +1,13 @@
 import * as React from "react";
+import { PiArrowLeft } from "react-icons/pi";
 
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { ComposeDialog } from "@/features/compose/compose-dialog";
 import type { ComposeMode } from "@/features/compose/compose-state";
-import { ComposeWindow } from "@/features/compose/compose-window";
 import type { Mailbox } from "@/features/mailboxes/types";
-import { getMessage } from "@/features/messages/api";
+import { getMessageThread } from "@/features/messages/api";
+import { ConversationMessages } from "@/features/messages/conversation-messages";
 import type { MessageDetail } from "@/features/messages/types";
 
 import { deleteDraft } from "./api";
@@ -33,23 +34,26 @@ export function DraftComposeDialog({
       ? "forward"
       : "new";
   const contextMessageId = draft.replyToMessageId ?? draft.forwardOfMessageId;
-  const [message, setMessage] = React.useState<MessageDetail | null>(null);
+  const [messages, setMessages] = React.useState<MessageDetail[]>([]);
   const [error, setError] = React.useState<string | null>(null);
   const [isDiscarding, setIsDiscarding] = React.useState(false);
 
   React.useEffect(() => {
     if (!contextMessageId) {
-      setMessage(null);
+      setMessages([]);
       setError(null);
       return;
     }
 
     let active = true;
-    setMessage(null);
+    setMessages([]);
     setError(null);
-    void getMessage(contextMessageId)
-      .then((nextMessage) => {
-        if (active) setMessage(nextMessage);
+    void getMessageThread(contextMessageId)
+      .then((nextMessages) => {
+        if (!nextMessages.some((message) => message.id === contextMessageId)) {
+          throw new Error("The message this draft targets is unavailable.");
+        }
+        if (active) setMessages(nextMessages);
       })
       .catch((reason: unknown) => {
         if (active) {
@@ -61,22 +65,120 @@ export function DraftComposeDialog({
     };
   }, [contextMessageId]);
 
-  if (contextMessageId && !message) {
+  if (!contextMessageId) {
     return (
-      <ComposeWindow
+      <ComposeDialog
+        draftId={draft.id}
+        mailboxes={mailboxes}
+        mode="new"
         open
-        status={error ? "Draft unavailable" : "Loading draft"}
-        title={mode === "reply" ? "Reply" : "Forward"}
+        onDraftsChange={onDraftsChange}
         onOpenChange={onOpenChange}
-      >
-        <div className="flex flex-1 flex-col items-center justify-center gap-4 p-8 text-center">
-          {error ? (
-            <>
-              <div className="space-y-1">
-                <h2 className="text-sm font-medium">Draft context is unavailable</h2>
-                <p className="max-w-sm text-xs text-muted-foreground">{error}</p>
-              </div>
-              <Button size="sm" type="button" variant="outline" onClick={() => onOpenChange(false)}>
+        onSent={onSent}
+      />
+    );
+  }
+
+  const message = messages.find((candidate) => candidate.id === contextMessageId) ?? null;
+  if (!message) {
+    return (
+      <DraftContextStatus
+        error={error}
+        isDiscarding={isDiscarding}
+        subject={draft.subject}
+        onBack={() => onOpenChange(false)}
+        onDiscard={() => {
+          setIsDiscarding(true);
+          void deleteDraft(draft.id)
+            .then(() => {
+              onOpenChange(false);
+              onDraftsChange();
+            })
+            .catch((reason: unknown) => {
+              setError(reason instanceof Error ? reason.message : "Draft could not be discarded.");
+              setIsDiscarding(false);
+            });
+        }}
+      />
+    );
+  }
+
+  return (
+    <article className="flex h-full flex-col bg-reader">
+      <DraftThreadHeader subject={message.subject} onBack={() => onOpenChange(false)} />
+      <div className="min-h-0 flex-1 overflow-auto overscroll-contain">
+        <ConversationMessages messages={messages} />
+        <div className="px-4 pb-8 pt-2 sm:px-6">
+          <ComposeDialog
+            draftId={draft.id}
+            key={`${mode}:${message.id}:${draft.id}`}
+            mailboxes={mailboxes}
+            message={message}
+            mode={mode}
+            open
+            presentation="thread"
+            threadContext={<ConversationMessages compact messages={messages} />}
+            onDraftsChange={onDraftsChange}
+            onOpenChange={onOpenChange}
+            onSent={onSent}
+          />
+        </div>
+      </div>
+    </article>
+  );
+}
+
+function DraftThreadHeader({
+  subject,
+  onBack
+}: {
+  subject: string;
+  onBack: () => void;
+}): React.ReactElement {
+  return (
+    <div className="shrink-0 border-b border-divider bg-toolbar px-3 sm:px-5">
+      <div className="flex h-11 items-center gap-2 py-2">
+        <Button
+          aria-label="Back to drafts"
+          className="size-10 min-h-10 min-w-10 shrink-0 bg-transparent text-tertiary [@media(hover:hover)]:hover:bg-selected [@media(hover:hover)]:hover:text-foreground"
+          size="icon"
+          type="button"
+          variant="ghost"
+          onClick={onBack}
+        >
+          <PiArrowLeft aria-hidden="true" className="pointer-events-none size-3.5" />
+        </Button>
+        <h1 className="min-w-0 flex-1 truncate text-sm font-medium">{subject}</h1>
+      </div>
+    </div>
+  );
+}
+
+function DraftContextStatus({
+  error,
+  isDiscarding,
+  subject,
+  onBack,
+  onDiscard
+}: {
+  error: string | null;
+  isDiscarding: boolean;
+  subject: string;
+  onBack: () => void;
+  onDiscard: () => void;
+}): React.ReactElement {
+  return (
+    <article aria-busy={!error} className="flex h-full flex-col bg-reader">
+      <DraftThreadHeader subject={subject || "Draft"} onBack={onBack} />
+      <div className="flex flex-1 flex-col items-center justify-center gap-4 p-8 text-center">
+        {error ? (
+          <>
+            <div className="space-y-1">
+              <h2 className="text-sm font-medium">Draft context is unavailable</h2>
+              <p className="max-w-sm text-xs text-muted-foreground">{error}</p>
+            </div>
+            <div className="flex flex-wrap justify-center gap-2">
+              <Button size="sm" type="button" variant="outline" onClick={onBack}>
                 Back to drafts
               </Button>
               <Button
@@ -84,45 +186,19 @@ export function DraftComposeDialog({
                 size="sm"
                 type="button"
                 variant="destructive"
-                onClick={() => {
-                  setIsDiscarding(true);
-                  void deleteDraft(draft.id)
-                    .then(() => {
-                      onOpenChange(false);
-                      onDraftsChange();
-                    })
-                    .catch((reason: unknown) => {
-                      setError(
-                        reason instanceof Error ? reason.message : "Draft could not be discarded."
-                      );
-                      setIsDiscarding(false);
-                    });
-                }}
+                onClick={onDiscard}
               >
                 {isDiscarding ? "Discarding…" : "Discard draft"}
               </Button>
-            </>
-          ) : (
-            <>
-              <Spinner />
-              <span className="text-xs text-muted-foreground">Loading draft…</span>
-            </>
-          )}
-        </div>
-      </ComposeWindow>
-    );
-  }
-
-  return (
-    <ComposeDialog
-      draftId={draft.id}
-      mailboxes={mailboxes}
-      message={message}
-      mode={mode}
-      open
-      onDraftsChange={onDraftsChange}
-      onOpenChange={onOpenChange}
-      onSent={onSent}
-    />
+            </div>
+          </>
+        ) : (
+          <>
+            <Spinner />
+            <span className="text-xs text-muted-foreground">Loading conversation…</span>
+          </>
+        )}
+      </div>
+    </article>
   );
 }

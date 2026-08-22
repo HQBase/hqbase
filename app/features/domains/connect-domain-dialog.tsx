@@ -1,5 +1,5 @@
-import { Plus } from "lucide-react";
 import * as React from "react";
+import { PiPlus } from "react-icons/pi";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -109,7 +109,7 @@ export function ConnectDomainDialog({
     >
       <DialogTrigger asChild>
         <Button type="button">
-          <Plus data-icon="inline-start" />
+          <PiPlus data-icon="inline-start" />
           Connect domain
         </Button>
       </DialogTrigger>

@@ -159,8 +159,17 @@ describe("HQBase MCP server", () => {
       ),
       env.DB.prepare(
         `INSERT INTO threads (id, subject_normalized, last_message_at, created_at, updated_at)
-         VALUES ('thr_mcp_allowed', 'mcp allowed', ?, ?, ?)`
-      ).bind(now.toISOString(), now.toISOString(), now.toISOString()),
+         VALUES
+           ('thr_mcp_allowed', 'mcp allowed', ?, ?, ?),
+           ('thr_mcp_unassigned', 'mcp unassigned', ?, ?, ?)`
+      ).bind(
+        now.toISOString(),
+        now.toISOString(),
+        now.toISOString(),
+        now.toISOString(),
+        now.toISOString(),
+        now.toISOString()
+      ),
       env.DB.prepare(
         `INSERT INTO messages (
           id, thread_id, mailbox_id, direction, folder, from_address, to_json, cc_json, bcc_json,
@@ -178,6 +187,17 @@ describe("HQBase MCP server", () => {
         now.toISOString(),
         now.toISOString()
       ),
+      env.DB.prepare(
+        `INSERT INTO messages (
+          id, thread_id, mailbox_id, is_unassigned, direction, folder, from_address,
+          to_json, cc_json, bcc_json, subject, snippet, text_body, references_json,
+          received_at, has_attachments, created_at, updated_at
+        ) VALUES (
+          'msg_mcp_unassigned', 'thr_mcp_unassigned', NULL, 1, 'inbound', 'catchall',
+          'sender@example.com', '[]', '[]', '[]', 'MCP unassigned', 'Body', 'Body', '[]',
+          ?, 0, ?, ?
+        )`
+      ).bind(now.toISOString(), now.toISOString(), now.toISOString()),
       env.DB.prepare(
         `INSERT INTO message_attachments
          (id, message_id, filename, content_type, size_bytes, content_id, r2_key, created_at)
@@ -374,6 +394,30 @@ describe("HQBase MCP server", () => {
     });
   });
 
+  it("limits unassigned mail to the connected owner role", async () => {
+    try {
+      for (const role of ["member", "admin"] as const) {
+        await setMcpUserRole(role);
+        await expect(
+          callTool("search_messages", { folder: "catchall" }, readToken)
+        ).resolves.toEqual([]);
+      }
+
+      await setMcpUserRole("owner");
+      await expect(
+        callTool("search_messages", { folder: "catchall" }, readToken)
+      ).resolves.toMatchObject([{ id: "msg_mcp_unassigned" }]);
+      await expect(
+        callTool("get_message", { messageId: "msg_mcp_unassigned" }, readToken)
+      ).resolves.toMatchObject({ id: "msg_mcp_unassigned" });
+      await expect(callTool("get_message", { messageId: "missing" }, readToken)).rejects.toThrow(
+        "Message not found."
+      );
+    } finally {
+      await setMcpUserRole("member");
+    }
+  });
+
   it("creates revisioned drafts and stages base64 attachments with full consent", async () => {
     const created = (await callTool(
       "create_draft",
@@ -439,6 +483,30 @@ describe("HQBase MCP server", () => {
         "/mcp/full"
       )
     ).resolves.toMatchObject({ affected: 1, threadId: "thr_mcp_allowed" });
+    await expect(
+      callTool(
+        "update_conversation",
+        {
+          action: "archive",
+          activeFolder: "inbox",
+          messageId: "msg_mcp_allowed"
+        },
+        fullToken,
+        "/mcp/full"
+      )
+    ).resolves.toMatchObject({ affected: 1, threadId: "thr_mcp_allowed" });
+    await expect(
+      callTool(
+        "update_conversation",
+        {
+          action: "unarchive",
+          activeFolder: "archived",
+          messageId: "msg_mcp_allowed"
+        },
+        fullToken,
+        "/mcp/full"
+      )
+    ).resolves.toMatchObject({ affected: 1, threadId: "thr_mcp_allowed" });
   });
 });
 
@@ -491,4 +559,8 @@ function mcpRequest(body: unknown, accessToken?: string, endpoint = "/mcp"): Pro
     headers,
     method: "POST"
   });
+}
+
+async function setMcpUserRole(role: "admin" | "member" | "owner"): Promise<void> {
+  await env.DB.prepare(`UPDATE "user" SET role = ? WHERE id = ?`).bind(role, userId).run();
 }

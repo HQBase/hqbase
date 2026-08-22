@@ -27,7 +27,7 @@ describe("application route normalization", () => {
 
     const hook = await renderHook(() => useAppRoute(true), undefined);
 
-    expect(`${window.location.pathname}${window.location.search}`).toBe("/inbox?source=test");
+    expect(`${window.location.pathname}${window.location.search}`).toBe("/mail/inbox?source=test");
     await hook.unmount();
   });
 });

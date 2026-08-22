@@ -12,8 +12,9 @@ describe("select", () => {
     expect(source).toContain("className={cn(selectContentClasses, className)}");
   });
 
-  it("uses restrained Lucide indicators", () => {
+  it("uses restrained indicators", () => {
     expect(source).toContain('className="size-3.5 shrink-0 text-muted-foreground"');
-    expect(source.match(/strokeWidth=\{1\.5\}/g)).toHaveLength(2);
+    expect(source).toContain("PiCaretDown");
+    expect(source).toContain("PiCheck");
   });
 });

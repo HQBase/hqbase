@@ -9,10 +9,10 @@ import { resolveInboundThread } from "@worker/features/messages/threading";
 
 describe("message threading", () => {
   it("reuses the thread referenced by In-Reply-To before subject matching", async () => {
-    const first = vi.fn(async () => ({ thread_id: "thr_existing" }));
+    const all = vi.fn(async () => ({ results: [{ thread_id: "thr_existing" }] }));
     const run = vi.fn(async () => ({ success: true }));
-    const prepare = vi.fn((sql: string) => ({
-      bind: vi.fn(() => (sql.includes("WITH candidates") ? { first } : { run }))
+    const prepare = vi.fn((_sql: string) => ({
+      bind: vi.fn(() => ({ all, run }))
     }));
     const db = { prepare } as unknown as D1Database;
 
@@ -26,15 +26,14 @@ describe("message threading", () => {
 
     expect(threadId).toBe("thr_existing");
     expect(prepare.mock.calls[0]?.[0]).toContain("messages.message_id = candidates.value");
-    expect(first).toHaveBeenCalledOnce();
+    expect(all).toHaveBeenCalledOnce();
     expect(run).toHaveBeenCalledOnce();
   });
 
   it("creates a new thread when headers do not reference a stored message", async () => {
-    const first = vi.fn(async () => null);
     const run = vi.fn(async () => ({ success: true }));
-    const prepare = vi.fn((sql: string) => ({
-      bind: vi.fn(() => (sql.includes("WITH candidates") ? { first } : { run }))
+    const prepare = vi.fn((_sql: string) => ({
+      bind: vi.fn(() => ({ run }))
     }));
     const db = { prepare } as unknown as D1Database;
 
@@ -48,6 +47,6 @@ describe("message threading", () => {
 
     expect(threadId).toBe("thr_new");
     expect(prepare).toHaveBeenCalledOnce();
-    expect(prepare.mock.calls[0]?.[0]).toContain("INSERT INTO threads");
+    expect(prepare.mock.calls[0]?.[0]).toMatch(/insert into "threads"/i);
   });
 });

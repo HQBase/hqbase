@@ -40,7 +40,11 @@ describe("inbound notification scheduling", () => {
   });
 
   it("schedules push after a newly stored inbound message", async () => {
-    mocks.handleInboundEmail.mockResolvedValue({ inserted: true, message: storedMessage });
+    mocks.handleInboundEmail.mockResolvedValue({
+      inserted: true,
+      isUnassigned: true,
+      message: storedMessage
+    });
     const waitUntil = vi.fn();
 
     await worker.email(
@@ -49,7 +53,7 @@ describe("inbound notification scheduling", () => {
       { waitUntil } as unknown as ExecutionContext
     );
 
-    expect(mocks.notifyInboundMessage).toHaveBeenCalledWith({}, storedMessage);
+    expect(mocks.notifyInboundMessage).toHaveBeenCalledWith({}, storedMessage, true);
     expect(waitUntil).toHaveBeenCalledOnce();
     await expect(waitUntil.mock.calls[0]?.[0]).resolves.toBeUndefined();
   });

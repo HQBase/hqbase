@@ -1,4 +1,10 @@
+import { and, eq, inArray, isNotNull, type SQL, sql } from "drizzle-orm";
+
+import type { MessageScope } from "../../auth/mailbox-access";
+import { messageScopeCondition } from "../../auth/mailbox-access";
 import { nowIso } from "../../db/client";
+import { createDatabase, getRow, getRows } from "../../db/drizzle";
+import { messages } from "../../db/schema";
 import { AppError } from "../../lib/errors";
 
 import type { MessageAction } from "./actions";
@@ -7,7 +13,8 @@ import type {
   ConversationFolder,
   ConversationPage,
   ConversationRow,
-  ConversationSummary
+  ConversationSummary,
+  MessageFolder
 } from "./types";
 
 /** Conversation cursors keep version 1. Message cursors use a different version tag. */
@@ -18,7 +25,7 @@ export type ListConversationFilters = {
   folder?: ConversationFolder | undefined;
   limit?: number | undefined;
   mailboxId?: string | undefined;
-  mailboxIds: string[];
+  scope: MessageScope;
   search?: string | undefined;
 };
 
@@ -37,7 +44,12 @@ export async function listConversationPage(
   db: D1Database,
   filters: ListConversationFilters
 ): Promise<ConversationPage> {
-  if (filters.mailboxIds.length === 0) {
+  const scope = messageScopeCondition(
+    filters.scope,
+    "messages.mailbox_id",
+    "messages.is_unassigned"
+  );
+  if (!scope) {
     return {
       conversations: [],
       nextCursor: null,
@@ -45,47 +57,46 @@ export async function listConversationPage(
     };
   }
 
-  const accessibleWhere = `messages.mailbox_id IN (${filters.mailboxIds.map(() => "?").join(", ")})`;
-  const params: Array<string | number> = [...filters.mailboxIds];
-
-  const eligibilityWhere: string[] = [];
+  const eligibilityWhere: SQL[] = [];
   if (filters.mailboxId) {
-    eligibilityWhere.push("accessible.mailbox_id = ?");
-    params.push(filters.mailboxId);
+    eligibilityWhere.push(sql`accessible.mailbox_id = ${filters.mailboxId}`);
   }
   if (filters.folder === "starred") {
-    eligibilityWhere.push("accessible.starred_at IS NOT NULL");
+    eligibilityWhere.push(sql`accessible.starred_at IS NOT NULL`);
   } else if (filters.folder) {
-    eligibilityWhere.push("accessible.folder = ?");
-    params.push(filters.folder);
+    eligibilityWhere.push(sql`accessible.folder = ${filters.folder}`);
   }
   if (filters.search) {
-    eligibilityWhere.push(
-      `(accessible.subject LIKE ? OR accessible.from_address LIKE ?
-        OR accessible.to_json LIKE ? OR accessible.snippet LIKE ? OR accessible.text_body LIKE ?)`
-    );
     const like = `%${filters.search}%`;
-    params.push(like, like, like, like, like);
+    eligibilityWhere.push(
+      sql`(accessible.subject LIKE ${like} OR accessible.from_address LIKE ${like}
+           OR accessible.to_json LIKE ${like} OR accessible.snippet LIKE ${like}
+           OR accessible.text_body LIKE ${like})`
+    );
   }
 
   const cursor = filters.cursor ? decodeConversationCursor(filters.cursor) : null;
-  if (cursor) {
-    params.push(cursor.activityAt, cursor.activityAt, cursor.id);
-  }
   const limit = Math.min(Math.max(filters.limit ?? 50, 1), 100);
-  params.push(limit + 1);
-  const result = await db
-    .prepare(
-      `WITH accessible AS (
+  const eligibilityCondition =
+    eligibilityWhere.length > 0 ? sql`WHERE ${sql.join(eligibilityWhere, sql` AND `)}` : sql``;
+  const cursorCondition = cursor
+    ? sql`AND (
+        ranked.activity_at < ${cursor.activityAt}
+        OR (ranked.activity_at = ${cursor.activityAt} AND ranked.id < ${cursor.id})
+      )`
+    : sql``;
+  const rows = await getRows<ConversationRow>(
+    db,
+    sql`WITH accessible AS (
          SELECT messages.*,
            COALESCE(messages.received_at, messages.sent_at, messages.created_at) AS activity_at
          FROM messages
-         WHERE ${accessibleWhere}
+         WHERE ${scope}
        ),
        eligible_threads AS (
          SELECT DISTINCT accessible.thread_id
          FROM accessible
-         ${eligibilityWhere.length ? `WHERE ${eligibilityWhere.join(" AND ")}` : ""}
+         ${eligibilityCondition}
        ),
        ranked AS (
          SELECT accessible.*,
@@ -111,30 +122,21 @@ export async function listConversationPage(
        )
        SELECT ranked.*, aggregates.message_count, aggregates.unread_count,
          aggregates.is_starred, aggregates.has_thread_attachments,
-         ${cursor ? "NULL" : "COUNT(*) OVER ()"} AS total_count
+         ${cursor ? sql`NULL` : sql`COUNT(*) OVER ()`} AS total_count
        FROM ranked
        JOIN aggregates ON aggregates.thread_id = ranked.thread_id
        WHERE ranked.thread_position = 1
-       ${
-         cursor
-           ? `AND (
-             ranked.activity_at < ?
-             OR (ranked.activity_at = ? AND ranked.id < ?)
-           )`
-           : ""
-}
+       ${cursorCondition}
        ORDER BY ranked.activity_at DESC, ranked.id DESC
-       LIMIT ?`
-    )
-    .bind(...params)
-    .all<ConversationRow>();
+       LIMIT ${limit + 1}`
+  );
 
-  const pageRows = result.results.slice(0, limit);
+  const pageRows = rows.slice(0, limit);
   const finalRow = pageRows.at(-1);
   return {
     conversations: pageRows.map(mapConversationSummary),
     nextCursor:
-      result.results.length > limit && finalRow
+      rows.length > limit && finalRow
         ? encodeConversationCursor({ activityAt: finalRow.activity_at, id: finalRow.id })
         : null,
     totalCount: cursor ? null : (pageRows[0]?.total_count ?? 0)
@@ -146,68 +148,89 @@ export async function updateConversationAction(
   input: {
     action: MessageAction;
     activeFolder: ConversationFolder;
-    mailboxIds: string[];
     messageId: string;
+    scope: MessageScope;
   }
 ): Promise<{ affected: number; threadId: string }> {
-  const selected = await db
-    .prepare("SELECT thread_id FROM messages WHERE id = ?")
-    .bind(input.messageId)
-    .first<{ thread_id: string }>();
+  const scope = messageScopeCondition(input.scope, "mailbox_id", "is_unassigned");
+  if (!scope) {
+    throw new AppError("MAILBOX_FORBIDDEN", "You do not have access to this mailbox.", 403);
+  }
+  const selected = await getRow<{ thread_id: string }>(
+    db,
+    sql`SELECT thread_id FROM messages WHERE id = ${input.messageId} AND ${scope}`
+  );
   if (!selected) {
     throw new AppError("MESSAGE_NOT_FOUND", "Message not found.", 404);
   }
-  if (input.mailboxIds.length === 0) {
-    throw new AppError("MAILBOX_FORBIDDEN", "You do not have access to this mailbox.", 403);
-  }
 
   const timestamp = nowIso();
-  const mailboxPlaceholders = input.mailboxIds.map(() => "?").join(", ");
-  const where = [`thread_id = ?`, `mailbox_id IN (${mailboxPlaceholders})`];
-  const bindings: Array<string | null> = [selected.thread_id, ...input.mailboxIds];
-  let set: string;
+  const conditions: SQL[] = [eq(messages.threadId, selected.thread_id), scope];
+  const restoredFolder = sql.raw(`CASE
+    WHEN mailbox_id IS NULL THEN 'catchall'
+    WHEN direction = 'outbound' THEN 'sent'
+    ELSE 'inbox'
+  END`);
+  const set: {
+    archivedAt?: string | null;
+    folder?: MessageFolder | SQL;
+    readAt?: string | null;
+    starredAt?: string | null;
+    trashedAt?: string | null;
+    updatedAt: string;
+  } = { updatedAt: timestamp };
 
   switch (input.action) {
     case "read":
-      set = "read_at = ?, updated_at = ?";
-      bindings.unshift(timestamp, timestamp);
-      where.push("direction = 'inbound'");
+      set.readAt = timestamp;
+      conditions.push(eq(messages.direction, "inbound"));
       break;
     case "unread":
-      set = "read_at = NULL, updated_at = ?";
-      bindings.unshift(timestamp);
-      where.push("direction = 'inbound'");
+      set.readAt = null;
+      conditions.push(eq(messages.direction, "inbound"));
       break;
     case "star":
-      set = "starred_at = ?, updated_at = ?";
-      bindings.unshift(timestamp, timestamp);
+      set.starredAt = timestamp;
       break;
     case "unstar":
-      set = "starred_at = NULL, updated_at = ?";
-      bindings.unshift(timestamp);
+      set.starredAt = null;
       break;
     case "archive":
-      set = "folder = 'archived', archived_at = ?, updated_at = ?";
-      bindings.unshift(timestamp, timestamp);
-      where.push("folder IN ('inbox', 'catchall')");
+      set.folder = "archived";
+      set.archivedAt = timestamp;
+      conditions.push(inArray(messages.folder, ["inbox", "catchall"]));
+      break;
+    case "unarchive":
+      set.folder = restoredFolder;
+      set.archivedAt = null;
+      set.trashedAt = null;
+      conditions.push(eq(messages.folder, "archived"));
+      if (input.activeFolder !== "archived") conditions.push(sql`1 = 0`);
       break;
     case "trash":
-      set = "folder = 'trash', trashed_at = ?, updated_at = ?";
-      bindings.unshift(timestamp, timestamp);
+      set.folder = "trash";
+      set.trashedAt = timestamp;
       if (input.activeFolder === "starred") {
-        where.push("starred_at IS NOT NULL");
+        conditions.push(isNotNull(messages.starredAt));
       } else {
-        where.push("folder = ?");
-        bindings.push(input.activeFolder);
+        conditions.push(eq(messages.folder, input.activeFolder));
       }
+      break;
+    case "restore":
+      set.folder = restoredFolder;
+      set.archivedAt = null;
+      set.trashedAt = null;
+      conditions.push(eq(messages.folder, "trash"));
+      if (input.activeFolder !== "trash") conditions.push(sql`1 = 0`);
       break;
   }
 
-  const result = await db
-    .prepare(`UPDATE messages SET ${set} WHERE ${where.join(" AND ")} RETURNING id`)
-    .bind(...bindings)
-    .all<{ id: string }>();
-  return { affected: result.results.length, threadId: selected.thread_id };
+  const result = await createDatabase(db)
+    .update(messages)
+    .set(set)
+    .where(and(...conditions))
+    .returning({ id: messages.id });
+  return { affected: result.length, threadId: selected.thread_id };
 }
 
 function mapConversationSummary(row: ConversationRow): ConversationSummary {

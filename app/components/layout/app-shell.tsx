@@ -1,9 +1,4 @@
-import { AppWindow, Sparkles } from "lucide-react";
 import * as React from "react";
-import { usePanelRef } from "react-resizable-panels";
-import { Button } from "@/components/ui/button";
-import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
-import { AgentConnectionDialog } from "@/features/agents/connection-dialog";
 import type { CurrentUser } from "@/features/auth/types";
 import type { Mailbox } from "@/features/mailboxes/types";
 import type { UnreadCounts } from "@/features/notifications/types";
@@ -12,23 +7,14 @@ import { UpdateBanner } from "@/features/updates/update-banner";
 import { useDesktopShell } from "@/hooks/use-desktop-shell";
 import { scrollActiveMobileMailSurfaceToTop } from "@/lib/mobile-scroll";
 import type { FolderId } from "@/lib/routes";
-import {
-  defaultSidebarWidth,
-  desktopMinimumHeight,
-  desktopMinimumWidth,
-  maximumSidebarWidth,
-  minimumSidebarWidth,
-  readStoredBoolean,
-  readStoredWidth,
-  sidebarCollapsedStorageKey,
-  sidebarWidthStorageKey,
-  storeLayoutValue
-} from "./desktop-layout";
+import { readStoredBoolean, sidebarCollapsedStorageKey, storeLayoutValue } from "./desktop-layout";
 import { Sidebar } from "./sidebar";
 import { TopBar } from "./top-bar";
 
 type AppShellProps = {
   activeFolder: FolderId;
+  activeSettingsTab?: import("@/lib/routes").SettingsTabId | undefined;
+  canManage?: boolean | undefined;
   children: React.ReactNode;
   mailboxId: string;
   mailboxes: Mailbox[];
@@ -41,6 +27,7 @@ type AppShellProps = {
   draftCount: number;
   onCompose: () => void;
   onFolderChange: (folder: FolderId) => void;
+  onSettingsTabChange?: ((tab: import("@/lib/routes").SettingsTabId) => void) | undefined;
   onMailboxChange: (mailboxId: string) => void;
   onSearchChange: (search: string) => void;
   onSignedOut: () => void;
@@ -49,114 +36,73 @@ type AppShellProps = {
 
 export function AppShell(props: AppShellProps): React.ReactElement {
   const desktopShell = useDesktopShell();
-  const sidebarPanelRef = usePanelRef();
-  const [agentConnectionOpen, setAgentConnectionOpen] = React.useState(false);
-  const agentConnectionTriggerRef = React.useRef<HTMLButtonElement>(null);
   const [sidebarCollapsed, setSidebarCollapsed] = React.useState(() =>
     readStoredBoolean(sidebarCollapsedStorageKey, false)
   );
-  const [initialSidebarWidth] = React.useState(() =>
-    readStoredWidth(
-      sidebarWidthStorageKey,
-      defaultSidebarWidth,
-      minimumSidebarWidth,
-      maximumSidebarWidth
-    )
-  );
 
   const toggleSidebar = React.useCallback((): void => {
-    if (sidebarCollapsed) {
-      sidebarPanelRef.current?.expand();
-      setSidebarCollapsed(false);
-      storeLayoutValue(sidebarCollapsedStorageKey, false);
-      return;
-    }
-    sidebarPanelRef.current?.collapse();
-    setSidebarCollapsed(true);
-    storeLayoutValue(sidebarCollapsedStorageKey, true);
-  }, [sidebarCollapsed, sidebarPanelRef]);
-
-  const content = (
-    <ShellContent
-      {...props}
-      sidebarCollapsed={sidebarCollapsed}
-      {...(desktopShell ? { onToggleSidebar: toggleSidebar } : {})}
-    />
-  );
-  const agentConnectionAction = (
-    <Button
-      className="h-8 w-full justify-start gap-2.5 px-2.5 text-[13px] font-normal text-muted-foreground"
-      onClick={() => setAgentConnectionOpen(true)}
-      ref={agentConnectionTriggerRef}
-      type="button"
-      variant="ghost"
-    >
-      <Sparkles data-icon="inline-start" />
-      Connect AI agent
-    </Button>
-  );
+    const next = !sidebarCollapsed;
+    setSidebarCollapsed(next);
+    storeLayoutValue(sidebarCollapsedStorageKey, next);
+  }, [sidebarCollapsed]);
 
   return (
-    <div className="relative flex h-screen h-[100dvh] touch-manipulation overflow-hidden bg-background pt-[env(safe-area-inset-top)] text-foreground">
+    <div className="relative flex h-screen h-[100dvh] touch-manipulation overflow-hidden bg-rail pt-[env(safe-area-inset-top)] text-foreground lg:p-2">
       {desktopShell ? (
-        <ResizablePanelGroup
-          id="hqbase-desktop-shell"
-          onLayoutChanged={() => {
-            const size = sidebarPanelRef.current?.getSize();
-            if (!size) return;
-            const collapsed = size.inPixels < 1;
-            setSidebarCollapsed(collapsed);
-            storeLayoutValue(sidebarCollapsedStorageKey, collapsed);
-            if (!collapsed) storeLayoutValue(sidebarWidthStorageKey, Math.round(size.inPixels));
-          }}
-          orientation="horizontal"
-        >
-          <ResizablePanel
-            collapsedSize={0}
-            collapsible
-            defaultSize={sidebarCollapsed ? 0 : initialSidebarWidth}
-            groupResizeBehavior="preserve-pixel-size"
-            id="desktop-sidebar"
-            maxSize={maximumSidebarWidth}
-            minSize={minimumSidebarWidth}
-            onResize={(size) => setSidebarCollapsed(size.inPixels < 1)}
-            panelRef={sidebarPanelRef}
-          >
+        <div className="flex h-full w-full gap-2" id="hqbase-desktop-shell">
+          <div className={sidebarCollapsed ? "hidden" : "w-[20rem] shrink-0"} id="desktop-sidebar">
             <Sidebar
               activeFolder={props.activeFolder}
+              activeSettingsTab={props.activeSettingsTab}
+              canManage={props.canManage}
               draftCount={props.draftCount}
               mailboxId={props.mailboxId}
-              resizable
+              sidebarCollapsed={sidebarCollapsed}
               unread={props.unread}
               user={props.user}
-              utilityAction={agentConnectionAction}
+              onCompose={props.onCompose}
               onFolderChange={props.onFolderChange}
+              onSettingsTabChange={props.onSettingsTabChange}
               onSignedOut={props.onSignedOut}
+              onToggleSidebar={toggleSidebar}
             />
-          </ResizablePanel>
-          <ResizableHandle
-            aria-label="Resize sidebar"
-            className={sidebarCollapsed ? "pointer-events-none opacity-0" : undefined}
-            disabled={sidebarCollapsed}
-            id="desktop-sidebar-divider"
-          />
-          <ResizablePanel id="desktop-content" minSize={700}>
-            {content}
-          </ResizablePanel>
-        </ResizablePanelGroup>
+          </div>
+          <div className="relative min-w-0 flex-1" id="desktop-content">
+            <div className="h-full w-full overflow-hidden rounded-[24px] border border-divider bg-reader shadow-sm">
+              <ShellContent
+                {...props}
+                desktopShell={desktopShell}
+                sidebarCollapsed={sidebarCollapsed}
+                onToggleSidebar={toggleSidebar}
+              />
+            </div>
+          </div>
+        </div>
       ) : (
         <>
           <Sidebar
             activeFolder={props.activeFolder}
+            activeSettingsTab={props.activeSettingsTab}
+            canManage={props.canManage}
             draftCount={props.draftCount}
             mailboxId={props.mailboxId}
             unread={props.unread}
             user={props.user}
-            utilityAction={agentConnectionAction}
+            onCompose={props.onCompose}
             onFolderChange={props.onFolderChange}
+            onSettingsTabChange={props.onSettingsTabChange}
             onSignedOut={props.onSignedOut}
           />
-          {content}
+          <div className="relative min-w-0 flex-1">
+            <div className="h-full w-full overflow-hidden rounded-[24px] border border-divider bg-reader shadow-sm">
+              <ShellContent
+                {...props}
+                desktopShell={false}
+                sidebarCollapsed={false}
+                onToggleSidebar={toggleSidebar}
+              />
+            </div>
+          </div>
         </>
       )}
       <button
@@ -166,25 +112,19 @@ export function AppShell(props: AppShellProps): React.ReactElement {
         type="button"
         onClick={scrollActiveMobileMailSurfaceToTop}
       />
-      <DesktopWindowGuard />
-      <AgentConnectionDialog
-        open={agentConnectionOpen}
-        restoreFocusRef={agentConnectionTriggerRef}
-        user={props.user}
-        onOpenChange={setAgentConnectionOpen}
-      />
     </div>
   );
 }
 
 function ShellContent({
   activeFolder,
+  activeSettingsTab,
+  canManage,
   children,
   draftCount,
   mailboxId,
   mailboxes,
   search,
-  sidebarCollapsed,
   unread,
   updateInProgress,
   updateReady,
@@ -195,29 +135,35 @@ function ShellContent({
   onMailboxChange,
   onOpenUpdates,
   onSearchChange,
+  onSettingsTabChange,
   onSignedOut,
+  sidebarCollapsed,
   onToggleSidebar
 }: AppShellProps & {
+  desktopShell: boolean;
   sidebarCollapsed: boolean;
-  onToggleSidebar?: () => void;
+  onToggleSidebar: () => void;
 }): React.ReactElement {
   return (
     <div className="flex h-full min-w-0 flex-1 flex-col">
       <TopBar
         activeFolder={activeFolder}
+        activeSettingsTab={activeSettingsTab}
+        canManage={canManage}
         draftCount={draftCount}
         mailboxId={mailboxId}
         mailboxes={mailboxes}
         search={search}
-        sidebarCollapsed={sidebarCollapsed}
         unread={unread}
         user={user}
+        sidebarCollapsed={sidebarCollapsed}
         onCompose={onCompose}
         onFolderChange={onFolderChange}
         onMailboxChange={onMailboxChange}
         onSearchChange={onSearchChange}
+        onSettingsTabChange={onSettingsTabChange}
         onSignedOut={onSignedOut}
-        {...(onToggleSidebar ? { onToggleSidebar } : {})}
+        onToggleSidebar={onToggleSidebar}
       />
       <UpdateBanner
         inProgress={updateInProgress}
@@ -226,25 +172,6 @@ function ShellContent({
         onOpen={onOpenUpdates}
       />
       <main className="min-h-0 flex-1 overflow-hidden bg-card/30">{children}</main>
-    </div>
-  );
-}
-
-function DesktopWindowGuard(): React.ReactElement {
-  return (
-    <div className="desktop-window-guard absolute inset-0 z-50 hidden touch-none items-center justify-center bg-background p-8 text-center">
-      <div className="flex max-w-sm flex-col items-center gap-4">
-        <div className="flex size-10 items-center justify-center rounded-md border bg-card">
-          <AppWindow className="size-4" />
-        </div>
-        <div className="flex flex-col gap-1.5">
-          <h1 className="text-sm font-medium">Make the HQBase window a little larger</h1>
-          <p className="text-xs leading-5 text-muted-foreground">
-            The desktop workspace needs at least {desktopMinimumWidth} × {desktopMinimumHeight}{" "}
-            pixels to keep navigation, conversations, and the reader together.
-          </p>
-        </div>
-      </div>
     </div>
   );
 }

@@ -1,4 +1,8 @@
+import { and, eq } from "drizzle-orm";
+
 import { newId, nowIso } from "../../db/client";
+import { createDatabase } from "../../db/drizzle";
+import { drafts } from "../../db/schema";
 import type { WorkerEnv } from "../../lib/env";
 import { AppError } from "../../lib/errors";
 import { draftAttachmentObjects } from "../drafts/queries";
@@ -168,6 +172,7 @@ async function storeSentMessage(
   const sendingIdentity = await findAddressIdentity(env.DB, input.from, "send");
   const message = await insertMessage(env.DB, {
     threadId: input.threadId,
+    isUnassigned: false,
     mailboxId: mailbox.id,
     direction: "outbound",
     folder: "sent",
@@ -201,8 +206,9 @@ async function storeSentMessage(
     });
   }
   if (input.draftId && input.userId) {
-    await env.DB.prepare("DELETE FROM drafts WHERE id = ? AND user_id = ?")
-      .bind(input.draftId, input.userId)
+    await createDatabase(env.DB)
+      .delete(drafts)
+      .where(and(eq(drafts.id, input.draftId), eq(drafts.userId, input.userId)))
       .run();
   }
   return message;

@@ -70,6 +70,7 @@ export type MessageRow = {
   id: string;
   thread_id: string;
   mailbox_id: string | null;
+  is_unassigned: number;
   direction: MessageDirection;
   folder: MessageFolder;
   from_address: string;
@@ -120,6 +121,7 @@ export type AttachmentRow = {
 export type InsertMessageInput = {
   threadId: string;
   mailboxId: string | null;
+  isUnassigned: boolean;
   direction: MessageDirection;
   folder: MessageFolder;
   fromAddress: string;

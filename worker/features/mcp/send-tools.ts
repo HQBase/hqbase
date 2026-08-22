@@ -9,7 +9,7 @@ import { enforceRateLimit } from "../../security/rate-limit";
 import { recordAudit } from "../audit/service";
 import { requireDraftAttachmentIdsAccess, requireDraftIdAccess } from "../drafts/access";
 import { findMailboxForSending } from "../mailboxes/queries";
-import { getMessageMailboxId } from "../messages/queries";
+import { requireMessageAccess } from "../messages/access";
 import { forwardMessage } from "../send/forward";
 import { replyToMessage, sendNewMessage } from "../send/service";
 import { forwardMessageSchema, replyMessageSchema, sendMessageSchema } from "../send/validation";
@@ -139,13 +139,7 @@ async function requireSourceAccess(
   principal: McpPrincipal,
   messageId: string
 ): Promise<void> {
-  await requireMailboxAccess(
-    env.DB,
-    principal.userId,
-    principal.role,
-    await getMessageMailboxId(env.DB, messageId),
-    "agent"
-  );
+  await requireMessageAccess(env.DB, principal.userId, principal.role, messageId, "agent");
 }
 
 function enforceSendRateLimit(env: WorkerEnv, userId: string): Promise<void> {

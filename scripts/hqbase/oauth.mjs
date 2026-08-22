@@ -31,7 +31,7 @@ export function updateOAuthManifest(manifest, input) {
   const authUrl = input.authUrl ?? manifest.authUrl;
   return {
     ...manifest,
-    version: 2,
+    version: Math.max(manifest.version ?? 0, 2),
     authUrl,
     cloudflareOAuth: cloudflareOAuthConfig({
       authUrl,

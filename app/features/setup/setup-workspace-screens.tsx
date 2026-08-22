@@ -1,5 +1,5 @@
-import { CircleAlert, Eye, EyeOff, Plus, Trash2 } from "lucide-react";
 import * as React from "react";
+import { PiEye, PiEyeSlash, PiPlus, PiTrash, PiWarningCircle } from "react-icons/pi";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
@@ -117,16 +117,16 @@ export function OwnerStep({
             <Button
               aria-label={passwordVisible ? "Hide password" : "Show password"}
               aria-pressed={passwordVisible}
-              className="absolute right-1 top-1/2 size-7 -translate-y-1/2"
+              className="absolute right-1 top-1/2 size-10 min-h-10 min-w-10 -translate-y-1/2"
               size="icon"
               type="button"
               variant="ghost"
               onClick={() => setPasswordVisible((visible) => !visible)}
             >
               {passwordVisible ? (
-                <EyeOff aria-hidden="true" className="size-4" />
+                <PiEyeSlash aria-hidden="true" className="size-4" />
               ) : (
-                <Eye aria-hidden="true" className="size-4" />
+                <PiEye aria-hidden="true" className="size-4" />
               )}
             </Button>
           </div>
@@ -180,7 +180,7 @@ export function MailboxStep({
       <div className="overflow-hidden rounded-md border">
         <Table aria-label="Mailboxes" className="table-fixed">
           <TableHeader className="bg-muted/35">
-            <TableRow className="hover:bg-transparent">
+            <TableRow className="[@media(hover:hover)]:hover:bg-transparent">
               <TableHead className="h-8 w-10 px-2 text-center text-xs">#</TableHead>
               <TableHead className="h-8 px-2 text-xs">Email address</TableHead>
               <TableHead className="h-8 w-[34%] px-2 text-xs">Display name</TableHead>
@@ -226,14 +226,14 @@ export function MailboxStep({
                   <TableCell className="px-1 py-1.5 text-center">
                     <Button
                       aria-label={`Remove mailbox ${index + 1}`}
-                      className="size-8"
+                      className="size-10 min-h-10 min-w-10"
                       disabled={mailboxes.length <= 1}
                       size="icon"
                       type="button"
                       variant="ghost"
                       onClick={() => onRemove(index)}
                     >
-                      <Trash2 aria-hidden="true" />
+                      <PiTrash aria-hidden="true" />
                     </Button>
                   </TableCell>
                 </TableRow>
@@ -244,7 +244,7 @@ export function MailboxStep({
       </div>
 
       <Button className="w-fit" size="sm" type="button" variant="outline" onClick={onAdd}>
-        <Plus data-icon="inline-start" />
+        <PiPlus data-icon="inline-start" />
         Add mailbox
       </Button>
 
@@ -275,7 +275,7 @@ export function MailboxStep({
       {errors.form ? <FieldError>{errors.form}</FieldError> : null}
       {submitError ? (
         <Alert variant="destructive">
-          <CircleAlert />
+          <PiWarningCircle />
           <AlertTitle>Workspace was not created</AlertTitle>
           <AlertDescription>{submitError}</AlertDescription>
         </Alert>

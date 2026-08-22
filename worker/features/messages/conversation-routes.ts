@@ -1,25 +1,33 @@
 import { Hono } from "hono";
 import { z } from "zod";
 import { requireMailApiContext } from "../../auth/mail-api";
-import { accessibleMailboxIds, requireMailboxAccess } from "../../auth/mailbox-access";
+import { accessibleMessageScope } from "../../auth/mailbox-access";
 import type { HonoApp } from "../../lib/env";
 import { parseWith } from "../../lib/validation";
-
+import { requireMessageAccess } from "./access";
 import type { MessageAction } from "./actions";
 import { listConversationPage, updateConversationAction } from "./conversation-queries";
-import { getMessageMailboxId } from "./queries";
 import { conversationFolders } from "./types";
 
 export const conversationRoutes = new Hono<HonoApp>();
 
-const actions: readonly MessageAction[] = ["read", "unread", "star", "unstar", "archive", "trash"];
+const actions: readonly MessageAction[] = [
+  "read",
+  "unread",
+  "star",
+  "unstar",
+  "archive",
+  "unarchive",
+  "trash",
+  "restore"
+];
 const folderSchema = z.enum(conversationFolders);
 const cursorSchema = z.string().min(1).max(512).optional();
 const actionBodySchema = z.object({ folder: folderSchema });
 
 conversationRoutes.get("/", async (c) => {
   const auth = await requireMailApiContext(c.env, c.req.raw, "mail:read");
-  const mailboxIds = await accessibleMailboxIds(c.env.DB, auth.user.id, auth.user.role, "read");
+  const scope = await accessibleMessageScope(c.env.DB, auth.user.id, auth.user.role, "read");
   const folder = parseWith(folderSchema.optional(), c.req.query("folder"));
   return c.json(
     await listConversationPage(c.env.DB, {
@@ -27,7 +35,7 @@ conversationRoutes.get("/", async (c) => {
       folder,
       mailboxId: c.req.query("mailboxId"),
       search: c.req.query("search"),
-      mailboxIds
+      scope
     })
   );
 });
@@ -36,14 +44,14 @@ for (const action of actions) {
   conversationRoutes.post(`/:id/${action}`, async (c) => {
     const auth = await requireMailApiContext(c.env, c.req.raw, "mail:write");
     const requiredAccess = action === "read" || action === "unread" ? "read" : "agent";
-    await requireMailboxAccess(
+    await requireMessageAccess(
       c.env.DB,
       auth.user.id,
       auth.user.role,
-      await getMessageMailboxId(c.env.DB, c.req.param("id")),
+      c.req.param("id"),
       requiredAccess
     );
-    const mailboxIds = await accessibleMailboxIds(
+    const scope = await accessibleMessageScope(
       c.env.DB,
       auth.user.id,
       auth.user.role,
@@ -54,8 +62,8 @@ for (const action of actions) {
       await updateConversationAction(c.env.DB, {
         action,
         activeFolder: body.folder,
-        mailboxIds,
-        messageId: c.req.param("id")
+        messageId: c.req.param("id"),
+        scope
       })
     );
   });

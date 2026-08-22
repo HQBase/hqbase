@@ -1,10 +1,19 @@
-import { Archive, ArrowLeft, Forward, MailOpen, Reply, Star, Trash2 } from "lucide-react";
 import * as React from "react";
+import {
+  PiArchive,
+  PiArrowCounterClockwise,
+  PiArrowLeft,
+  PiEnvelopeOpen,
+  PiStar,
+  PiTrash
+} from "react-icons/pi";
+import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { PullToRefresh } from "@/components/ui/pull-to-refresh";
 import type { ComposeMode } from "@/features/compose/compose-state";
 import type { Mailbox } from "@/features/mailboxes/types";
+import type { MailFolderId } from "@/lib/routes";
 import { ConversationMessages } from "./conversation-messages";
 import type { MessageDetail as MessageDetailType } from "./types";
 
@@ -13,6 +22,7 @@ const ComposeDialog = React.lazy(() =>
 );
 
 type MessageDetailProps = {
+  activeFolder?: MailFolderId;
   defaultFromMailboxId: string | null;
   error?: string | null;
   isLoading?: boolean;
@@ -20,12 +30,22 @@ type MessageDetailProps = {
   messages: MessageDetailType[];
   selectedId: string | null;
   showBack?: boolean;
-  onAction: (action: "read" | "unread" | "star" | "unstar" | "archive" | "trash") => void;
+  onAction: (action: MessageAction) => Promise<void> | void;
   onBack: () => void;
   onDraftsChange?: () => void;
   onRefresh: () => Promise<void> | void;
   onSent: () => void;
 };
+
+type MessageAction =
+  | "read"
+  | "unread"
+  | "star"
+  | "unstar"
+  | "archive"
+  | "unarchive"
+  | "trash"
+  | "restore";
 
 type ThreadComposeMode = Extract<ComposeMode, "reply" | "forward">;
 
@@ -35,6 +55,7 @@ type ThreadComposeState = {
 };
 
 export function MessageDetail({
+  activeFolder,
   defaultFromMailboxId,
   error = null,
   isLoading = false,
@@ -62,53 +83,98 @@ export function MessageDetail({
   if (!selected) {
     return <MessageReaderStatus label="Select a message" />;
   }
-  const replyTarget =
-    selected.direction === "inbound"
-      ? selected
-      : ([...messages].reverse().find((message) => message.direction === "inbound") ?? selected);
   const isUnread = messages.some(
     (message) => message.direction === "inbound" && message.readAt === null
   );
+
   const isStarred = messages.some((message) => message.starredAt !== null);
+  const isArchived = activeFolder === "archived";
+  const isTrash = activeFolder === "trash";
+
+  async function applyAction(action: MessageAction, successMessage?: string): Promise<void> {
+    try {
+      await onAction(action);
+      if (successMessage) toast.success(successMessage);
+    } catch {
+      toast.error("The conversation could not be updated. Try again.");
+    }
+  }
 
   return (
-    <article className="flex h-full flex-col bg-background">
-      <div className="shrink-0 border-b bg-background px-3 py-3 sm:px-5">
-        <div className="flex items-start gap-2">
+    <article className="flex h-full flex-col bg-reader">
+      <div className="shrink-0 border-b border-divider bg-toolbar px-3 sm:px-5">
+        <div className="flex h-11 items-center gap-2 py-2">
           {showBack ? (
             <Button
               aria-label="Back to messages"
-              className="size-10 shrink-0"
+              className="size-10 min-h-10 min-w-10 shrink-0 bg-transparent text-tertiary [@media(hover:hover)]:hover:bg-selected [@media(hover:hover)]:hover:text-foreground"
               size="icon"
               type="button"
               variant="ghost"
               onClick={onBack}
             >
-              <ArrowLeft />
+              <PiArrowLeft aria-hidden="true" className="pointer-events-none size-3.5" />
             </Button>
           ) : null}
-          <h1 className="min-w-0 flex-1 break-words pt-2 text-lg font-medium tracking-tight sm:text-xl lg:pt-1">
+          <h1 className="min-w-0 flex-1 break-words text-balance text-sm font-medium leading-none tracking-tight [text-wrap:balance] sm:text-sm">
             {selected.subject}
           </h1>
-          <div className="flex shrink-0 flex-wrap gap-0.5 rounded-md border bg-card p-0.5">
+          <div className="flex shrink-0 flex-wrap items-center gap-0.5">
             <IconButton
               label={isUnread ? "Mark conversation read" : "Mark conversation unread"}
-              onClick={() => onAction(isUnread ? "read" : "unread")}
+              onClick={() => {
+                const action = isUnread ? "read" : "unread";
+                void applyAction(
+                  action,
+                  action === "read" ? "Marked as read." : "Marked as unread."
+                );
+              }}
             >
-              <MailOpen />
+              <PiEnvelopeOpen aria-hidden="true" className="pointer-events-none" />
             </IconButton>
             <IconButton
+              active={isStarred}
+              activeClassName="text-star [@media(hover:hover)]:hover:text-star"
               label={isStarred ? "Unstar conversation" : "Star conversation"}
-              onClick={() => onAction(isStarred ? "unstar" : "star")}
+              onClick={() => void applyAction(isStarred ? "unstar" : "star")}
             >
-              <Star />
+              <PiStar
+                aria-hidden="true"
+                className={`pointer-events-none ${isStarred ? "fill-star" : ""}`}
+              />
             </IconButton>
-            <IconButton label="Archive conversation" onClick={() => onAction("archive")}>
-              <Archive />
-            </IconButton>
-            <IconButton label="Trash conversation" onClick={() => onAction("trash")}>
-              <Trash2 />
-            </IconButton>
+            {isTrash ? (
+              <IconButton
+                label="Restore conversation"
+                onClick={() => void applyAction("restore", "Conversation restored.")}
+              >
+                <PiArrowCounterClockwise aria-hidden="true" className="pointer-events-none" />
+              </IconButton>
+            ) : (
+              <>
+                <IconButton
+                  label={isArchived ? "Unarchive conversation" : "Archive conversation"}
+                  onClick={() =>
+                    void applyAction(
+                      isArchived ? "unarchive" : "archive",
+                      isArchived ? "Conversation unarchived." : "Conversation archived."
+                    )
+                  }
+                >
+                  {isArchived ? (
+                    <PiArrowCounterClockwise aria-hidden="true" className="pointer-events-none" />
+                  ) : (
+                    <PiArchive aria-hidden="true" className="pointer-events-none" />
+                  )}
+                </IconButton>
+                <IconButton
+                  label="Trash conversation"
+                  onClick={() => void applyAction("trash", "Conversation moved to Trash.")}
+                >
+                  <PiTrash aria-hidden="true" className="pointer-events-none" />
+                </IconButton>
+              </>
+            )}
           </div>
         </div>
       </div>
@@ -117,8 +183,8 @@ export function MessageDetail({
           messages={messages}
           onCompose={(message, mode) => setComposeState({ message, mode })}
         />
-        <div className="px-4 pb-8 pt-2 sm:px-6">
-          {composeState ? (
+        {composeState ? (
+          <div className="px-4 pb-8 pt-2 sm:px-6">
             <React.Suspense
               fallback={
                 <div className="grid min-h-60 place-items-center text-sm text-muted-foreground">
@@ -142,31 +208,8 @@ export function MessageDetail({
                 onSent={onSent}
               />
             </React.Suspense>
-          ) : (
-            <div className="grid grid-cols-2 gap-3 lg:flex">
-              <Button
-                className="h-11 justify-center gap-2 px-5 lg:min-w-32"
-                size="lg"
-                type="button"
-                variant="outline"
-                onClick={() => setComposeState({ message: replyTarget, mode: "reply" })}
-              >
-                <Reply />
-                Reply
-              </Button>
-              <Button
-                className="h-11 justify-center gap-2 px-5 lg:min-w-32"
-                size="lg"
-                type="button"
-                variant="outline"
-                onClick={() => setComposeState({ message: selected, mode: "forward" })}
-              >
-                <Forward />
-                Forward
-              </Button>
-            </div>
-          )}
-        </div>
+          </div>
+        ) : null}
       </PullToRefresh>
     </article>
   );
@@ -182,7 +225,7 @@ function MessageReaderStatus({
   return (
     <div className="flex h-full flex-col items-center justify-center gap-3 p-8 text-center text-muted-foreground">
       <div className="flex size-9 items-center justify-center rounded-md border bg-card">
-        <MailOpen className="size-4" />
+        <PiEnvelopeOpen aria-hidden="true" className="pointer-events-none size-4" />
       </div>
       <div className="grid max-w-sm gap-1">
         <span className="text-xs">{label}</span>
@@ -193,18 +236,25 @@ function MessageReaderStatus({
 }
 
 function IconButton({
+  active = false,
+  activeClassName = "",
   children,
   label,
   onClick
 }: {
+  active?: boolean;
+  activeClassName?: string;
   children: React.ReactNode;
   label: string;
   onClick: () => void;
 }): React.ReactElement {
+  const base =
+    "size-10 min-h-10 min-w-10 text-muted-foreground [@media(hover:hover)]:hover:text-foreground";
   return (
     <Button
       aria-label={label}
-      className="size-9 text-muted-foreground hover:text-foreground"
+      aria-pressed={active || undefined}
+      className={active ? `${base} ${activeClassName}` : base}
       onClick={onClick}
       size="icon"
       title={label}

@@ -26,6 +26,19 @@ describe("Mail API public artifacts", () => {
     expect(openApi.paths["/api/v1/send"].post.security).toContainEqual({
       oauth2: ["mail:send"]
     });
+    expect(openApi.paths["/api/v1/forward"].post.security).toContainEqual({
+      oauth2: ["mail:send"]
+    });
+    expect(
+      openApi.paths["/api/v1/messages/{id}/{action}"].post.parameters.find(
+        (parameter) => parameter.name === "action"
+      ).schema.enum
+    ).toEqual(expect.arrayContaining(["restore", "unarchive"]));
+    expect(
+      openApi.paths["/api/v1/drafts/{id}/attachments"].post.requestBody.content[
+        "multipart/form-data"
+      ].encoding.file.contentType
+    ).toBe("*/*");
     expect(openApi.paths["/api/v1/users"]).toBeUndefined();
     expect(JSON.stringify(openApi)).not.toContain("r2Key");
   });

@@ -1,0 +1,155 @@
+import { mailboxes, owner, users } from "./local-seed-data.mjs";
+import { insert } from "./local-seed-sql.mjs";
+
+export function buildDraftSeedLines(timeline) {
+  return [
+    insert(
+      "drafts",
+      [
+        "id",
+        "user_id",
+        "mailbox_id",
+        "reply_to_message_id",
+        "from_address",
+        "to_json",
+        "cc_json",
+        "bcc_json",
+        "subject",
+        "text_body",
+        "html_body",
+        "version",
+        "created_at",
+        "updated_at",
+        "forward_of_message_id"
+      ],
+      [
+        "drf_local_followup",
+        owner.id,
+        mailboxes[0].id,
+        null,
+        mailboxes[0].address,
+        ["alex@customer.test"],
+        [],
+        [],
+        "Project follow-up",
+        "I wanted to follow up on the final notes.",
+        "",
+        1,
+        timeline.draftCreated,
+        timeline.draftUpdated,
+        null
+      ]
+    ),
+    insert(
+      "drafts",
+      [
+        "id",
+        "user_id",
+        "mailbox_id",
+        "reply_to_message_id",
+        "from_address",
+        "to_json",
+        "cc_json",
+        "bcc_json",
+        "subject",
+        "text_body",
+        "html_body",
+        "version",
+        "created_at",
+        "updated_at",
+        "forward_of_message_id"
+      ],
+      [
+        "drf_local_hiring_reply",
+        users[2].id,
+        mailboxes[3].id,
+        "msg_local_hiring_inbound",
+        mailboxes[3].address,
+        ["talent@agency.test"],
+        [mailboxes[0].address],
+        [],
+        "Re: Hiring plan",
+        "Draft reply to the hiring plan. Still waiting on headcount confirmation.",
+        "",
+        1,
+        timeline.draftHiringCreated,
+        timeline.draftHiringUpdated,
+        null
+      ]
+    ),
+    insert(
+      "drafts",
+      [
+        "id",
+        "user_id",
+        "mailbox_id",
+        "reply_to_message_id",
+        "from_address",
+        "to_json",
+        "cc_json",
+        "bcc_json",
+        "subject",
+        "text_body",
+        "html_body",
+        "version",
+        "created_at",
+        "updated_at",
+        "forward_of_message_id"
+      ],
+      [
+        "drf_local_forward",
+        owner.id,
+        mailboxes[0].id,
+        null,
+        mailboxes[0].address,
+        ["leadership@example.test"],
+        [],
+        [mailboxes[1].address],
+        "Fwd: Partnership proposal",
+        "Forwarding the partnership proposal for review.",
+        "",
+        1,
+        timeline.draftProposalCreated,
+        timeline.draftProposalUpdated,
+        "msg_local_partnership"
+      ]
+    ),
+    insert(
+      "drafts",
+      [
+        "id",
+        "user_id",
+        "mailbox_id",
+        "reply_to_message_id",
+        "from_address",
+        "to_json",
+        "cc_json",
+        "bcc_json",
+        "subject",
+        "text_body",
+        "html_body",
+        "version",
+        "created_at",
+        "updated_at",
+        "forward_of_message_id"
+      ],
+      [
+        "drf_local_proposal",
+        users[1].id,
+        mailboxes[1].id,
+        null,
+        mailboxes[1].address,
+        ["partner@business.test"],
+        ["founder@partner.test"],
+        [],
+        "Re: Partnership proposal",
+        "Thanks for the proposal. Drafting our response with next steps.",
+        "",
+        1,
+        timeline.draftProposalCreated,
+        timeline.draftProposalUpdated,
+        null
+      ]
+    )
+  ];
+}

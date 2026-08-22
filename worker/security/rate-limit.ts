@@ -1,3 +1,6 @@
+import { sql } from "drizzle-orm";
+
+import { getRow } from "../db/drizzle";
 import { AppError } from "../lib/errors";
 
 const encoder = new TextEncoder();
@@ -26,18 +29,16 @@ export async function enforceRateLimit(
   const now = Math.floor(Date.now() / 1000);
   const windowStart = now - (now % input.windowSeconds);
   const hash = await subjectHash(secret, input.scope, input.subject);
-  const row = await db
-    .prepare(
-      `INSERT INTO rate_limits
+  const row = await getRow<{ request_count: number }>(
+    db,
+    sql`INSERT INTO rate_limits
        (scope, subject_hash, window_start, request_count, expires_at)
-       VALUES (?, ?, ?, 1, ?)
+       VALUES (${input.scope}, ${hash}, ${windowStart}, 1, ${windowStart + input.windowSeconds * 2})
        ON CONFLICT(scope, subject_hash, window_start) DO UPDATE SET
          request_count = request_count + 1
        RETURNING request_count`
-    )
-    .bind(input.scope, hash, windowStart, windowStart + input.windowSeconds * 2)
-    .first<{ request_count: number }>();
-  if ((row?.request_count ?? 1) > input.limit) {
+  );
+  if (!row || row.request_count > input.limit) {
     throw new AppError("RATE_LIMITED", "Too many requests. Try again later.", 429);
   }
 }

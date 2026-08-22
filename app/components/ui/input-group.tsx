@@ -7,7 +7,7 @@ export const InputGroup = React.forwardRef<HTMLDivElement, React.HTMLAttributes<
   ({ className, ...props }, ref) => (
     <div
       className={cn(
-        "flex h-9 min-w-0 w-full items-center rounded-md border border-input bg-background shadow-sm transition-colors focus-within:ring-2 focus-within:ring-ring data-[invalid=true]:border-destructive",
+        "flex h-10 min-w-0 w-full items-center rounded-[calc(var(--radius)+2px)] border border-input bg-background shadow-sm transition-[color,background-color,border-color,box-shadow] duration-200 focus-within:ring-2 focus-within:ring-ring data-[invalid=true]:border-destructive motion-reduce:transition-none [&_input]:rounded-[calc(var(--radius)-2px)]",
         className
       )}
       data-slot="input-group"

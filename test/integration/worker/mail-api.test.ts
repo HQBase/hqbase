@@ -168,8 +168,21 @@ describe("HQBase Mail API v1", () => {
       ...tokenRows,
       env.DB.prepare(
         `INSERT INTO threads (id, subject_normalized, last_message_at, created_at, updated_at)
-         VALUES ('thr_api', 'api message', ?, ?, ?)`
-      ).bind(now.toISOString(), now.toISOString(), now.toISOString()),
+         VALUES
+           ('thr_api', 'api message', ?, ?, ?),
+           ('thr_api_unassigned', 'api unassigned', ?, ?, ?),
+           ('thr_api_orphan', 'api orphan', ?, ?, ?)`
+      ).bind(
+        now.toISOString(),
+        now.toISOString(),
+        now.toISOString(),
+        now.toISOString(),
+        now.toISOString(),
+        now.toISOString(),
+        now.toISOString(),
+        now.toISOString(),
+        now.toISOString()
+      ),
       env.DB.prepare(
         `INSERT INTO messages
          (id, thread_id, mailbox_id, direction, folder, from_address, to_json, cc_json, bcc_json,
@@ -180,6 +193,24 @@ describe("HQBase Mail API v1", () => {
                  NULL, '[]', ?, NULL, NULL, 1, ?, ?)`
       ).bind(
         JSON.stringify(["support@example.com"]),
+        now.toISOString(),
+        now.toISOString(),
+        now.toISOString()
+      ),
+      env.DB.prepare(
+        `INSERT INTO messages
+         (id, thread_id, mailbox_id, is_unassigned, direction, folder, from_address,
+          to_json, cc_json, bcc_json, subject, snippet, text_body, references_json,
+          received_at, has_attachments, created_at, updated_at)
+         VALUES
+           ('msg_api_unassigned', 'thr_api_unassigned', NULL, 1, 'inbound', 'catchall',
+            'sender@example.net', '[]', '[]', '[]', 'Unassigned', 'Body', 'Body', '[]', ?, 0, ?, ?),
+           ('msg_api_orphan', 'thr_api_orphan', NULL, 0, 'inbound', 'inbox',
+            'sender@example.net', '[]', '[]', '[]', 'Orphan', 'Body', 'Body', '[]', ?, 0, ?, ?)`
+      ).bind(
+        now.toISOString(),
+        now.toISOString(),
+        now.toISOString(),
         now.toISOString(),
         now.toISOString(),
         now.toISOString()
@@ -236,7 +267,7 @@ describe("HQBase Mail API v1", () => {
       "Do not open, navigate to, or interact with the verification URL in Cloud Browser"
     );
     expect(instructions).toContain("The person must open it themselves in a browser they control");
-    expect(instructions).toContain("Sending and replying are not idempotent");
+    expect(instructions).toContain("Sending, replying, and forwarding are not idempotent");
     expect(instructions).toContain(
       "get a checkpoint from `GET https://hqbase.test/api/v1/changes`"
     );
@@ -306,6 +337,122 @@ describe("HQBase Mail API v1", () => {
     const attachment = await apiFetch("/api/v1/attachments/att_api", readToken);
     expect(attachment.status).toBe(200);
     expect(await attachment.text()).toBe("hello");
+  });
+
+  it("unarchives and restores mail through the versioned action route", async () => {
+    const archived = await apiFetch("/api/v1/messages/msg_api/archive", writeToken, {
+      method: "POST"
+    });
+    expect(archived.status, await archived.clone().text()).toBe(200);
+    await expect(archived.json()).resolves.toMatchObject({ folder: "archived" });
+
+    const unarchived = await apiFetch("/api/v1/messages/msg_api/unarchive", writeToken, {
+      method: "POST"
+    });
+    expect(unarchived.status, await unarchived.clone().text()).toBe(200);
+    await expect(unarchived.json()).resolves.toMatchObject({ folder: "inbox" });
+    await expect(
+      env.DB.prepare("SELECT archived_at, trashed_at FROM messages WHERE id = 'msg_api'").first()
+    ).resolves.toEqual({ archived_at: null, trashed_at: null });
+
+    const trashed = await apiFetch("/api/v1/messages/msg_api/trash", writeToken, {
+      method: "POST"
+    });
+    expect(trashed.status, await trashed.clone().text()).toBe(200);
+    await expect(trashed.json()).resolves.toMatchObject({ folder: "trash" });
+
+    const restored = await apiFetch("/api/v1/messages/msg_api/restore", writeToken, {
+      method: "POST"
+    });
+    expect(restored.status, await restored.clone().text()).toBe(200);
+    await expect(restored.json()).resolves.toMatchObject({ folder: "inbox" });
+    await expect(
+      env.DB.prepare("SELECT archived_at, trashed_at FROM messages WHERE id = 'msg_api'").first()
+    ).resolves.toEqual({ archived_at: null, trashed_at: null });
+  });
+
+  it("keeps a draft attachment's multipart MIME type", async () => {
+    const created = await apiFetch("/api/v1/drafts", fullToken, {
+      body: JSON.stringify({ mailboxId: "mbx_api", from: "support@example.com" }),
+      headers: { "content-type": "application/json" },
+      method: "POST"
+    });
+    expect(created.status, await created.clone().text()).toBe(201);
+    const draft = (await created.json()) as { id: string };
+    const form = new FormData();
+    form.set(
+      "file",
+      new File([new Uint8Array([137, 80, 78, 71])], "pixel.png", {
+        type: "image/png"
+      })
+    );
+
+    const uploaded = await apiFetch(`/api/v1/drafts/${draft.id}/attachments`, fullToken, {
+      body: form,
+      method: "POST"
+    });
+    expect(uploaded.status, await uploaded.clone().text()).toBe(201);
+    await expect(uploaded.json()).resolves.toMatchObject({
+      contentType: "image/png",
+      filename: "pixel.png",
+      sizeBytes: 4
+    });
+
+    const stored = await apiFetch(`/api/v1/drafts/${draft.id}`, fullToken);
+    await expect(stored.json()).resolves.toMatchObject({
+      attachments: [{ contentType: "image/png", filename: "pixel.png", sizeBytes: 4 }]
+    });
+  });
+
+  it("forwards an accessible message with its original attachments", async () => {
+    const response = await apiFetch("/api/v1/forward", fullToken, {
+      body: JSON.stringify({
+        messageId: "msg_api",
+        from: "support@example.com",
+        to: ["person@example.net"],
+        text: "Please review.",
+        includeOriginalAttachments: true
+      }),
+      headers: { "content-type": "application/json" },
+      method: "POST"
+    });
+    expect(response.status, await response.clone().text()).toBe(201);
+    const forwarded = (await response.json()) as { id: string };
+    const detail = await apiFetch(`/api/v1/messages/${forwarded.id}`, readToken);
+    await expect(detail.json()).resolves.toMatchObject({
+      attachments: [{ contentType: "text/plain", filename: "hello.txt", sizeBytes: 5 }],
+      folder: "sent",
+      hasAttachments: true,
+      subject: "Fwd: API message"
+    });
+  });
+
+  it("limits unassigned mail to authenticated owners", async () => {
+    try {
+      for (const role of ["member", "admin"] as const) {
+        await setUserRole(role);
+        const list = await apiFetch("/api/v1/messages?folder=catchall", readToken);
+        await expect(list.json()).resolves.toEqual([]);
+        await expect(
+          apiFetch("/api/v1/messages/msg_api_unassigned", readToken)
+        ).resolves.toMatchObject({ status: 403 });
+      }
+
+      await setUserRole("owner");
+      const list = await apiFetch("/api/v1/messages?folder=catchall", readToken);
+      await expect(list.json()).resolves.toMatchObject([{ id: "msg_api_unassigned" }]);
+      await expect(
+        apiFetch("/api/v1/messages/msg_api_unassigned", readToken)
+      ).resolves.toMatchObject({ status: 200 });
+      await expect(apiFetch("/api/v1/messages/msg_api_orphan", readToken)).resolves.toMatchObject({
+        status: 404
+      });
+      await expect(apiFetch("/api/v1/messages/missing", readToken)).resolves.toMatchObject({
+        status: 404
+      });
+    } finally {
+      await setUserRole("member");
+    }
   });
 
   it("rejects wrong audiences, revoked tokens, and invalid bearer precedence", async () => {
@@ -658,6 +805,10 @@ function apiFetch(path: string, token: string, init: RequestInit = {}): Promise<
   const headers = new Headers(init.headers);
   headers.set("authorization", `Bearer ${token}`);
   return SELF.fetch(`${origin}${path}`, { ...init, headers });
+}
+
+async function setUserRole(role: "admin" | "member" | "owner"): Promise<void> {
+  await env.DB.prepare(`UPDATE "user" SET role = ? WHERE id = ?`).bind(role, userId).run();
 }
 
 function extractSessionCookie(response: Response): string {

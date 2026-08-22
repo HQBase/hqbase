@@ -1023,7 +1023,16 @@
             "required": true,
             "schema": {
               "type": "string",
-              "enum": ["read", "unread", "star", "unstar", "archive", "trash"]
+              "enum": [
+                "read",
+                "unread",
+                "star",
+                "unstar",
+                "archive",
+                "unarchive",
+                "trash",
+                "restore"
+              ]
             }
           }
         ]
@@ -1242,7 +1251,16 @@
             "required": true,
             "schema": {
               "type": "string",
-              "enum": ["read", "unread", "star", "unstar", "archive", "trash"]
+              "enum": [
+                "read",
+                "unread",
+                "star",
+                "unstar",
+                "archive",
+                "unarchive",
+                "trash",
+                "restore"
+              ]
             }
           }
         ],
@@ -1730,6 +1748,7 @@
     "/api/v1/drafts/{id}/attachments": {
       "post": {
         "summary": "Add a draft attachment",
+        "description": "Records the file part's Content-Type, or application/octet-stream when no type is present. One file and all files in one draft can each total at most 25 MiB; larger uploads return 413 ATTACHMENTS_TOO_LARGE.",
         "security": [
           {
             "oauth2": ["mail:send"]
@@ -1789,6 +1808,16 @@
               }
             }
           },
+          "413": {
+            "description": "File or draft attachment total exceeds 25 MiB",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
           "429": {
             "description": "Rate limit exceeded",
             "content": {
@@ -1824,8 +1853,14 @@
                 "properties": {
                   "file": {
                     "type": "string",
+                    "format": "binary",
                     "contentEncoding": "binary"
                   }
+                }
+              },
+              "encoding": {
+                "file": {
+                  "contentType": "*/*"
                 }
               }
             }
@@ -2117,6 +2152,104 @@
           }
         }
       }
+    },
+    "/api/v1/forward": {
+      "post": {
+        "summary": "Forward a message",
+        "security": [
+          {
+            "oauth2": ["mail:send"]
+          },
+          {
+            "cookieSession": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Sent forward",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessageSummary"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid authentication",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient OAuth scope or mailbox access",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found or not visible",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "tags": ["Sending"],
+        "operationId": "forwardMessage",
+        "description": "Not idempotent. Do not retry blindly. Set includeOriginalAttachments to false to omit the source message's attachments.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ForwardInput"
+              },
+              "example": {
+                "messageId": "msg_example",
+                "from": "support@example.com",
+                "to": ["person@example.net"],
+                "cc": [],
+                "bcc": [],
+                "text": "Please review this message.",
+                "attachmentIds": [],
+                "includeOriginalAttachments": true
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -2395,7 +2528,15 @@
             "type": "string"
           },
           "mailboxId": {
-            "type": "string"
+            "description": "The mailbox at deletion, or null for owner-only unassigned mail.",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         }
       },
@@ -2901,6 +3042,76 @@
           },
           "draftId": {
             "type": "string"
+          }
+        }
+      },
+      "ForwardInput": {
+        "type": "object",
+        "required": ["messageId", "from", "to"],
+        "properties": {
+          "messageId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "from": {
+            "type": "string",
+            "format": "email"
+          },
+          "to": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "email"
+            },
+            "minItems": 1,
+            "maxItems": 50
+          },
+          "cc": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "email"
+            },
+            "maxItems": 50,
+            "default": []
+          },
+          "bcc": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "email"
+            },
+            "maxItems": 50,
+            "default": []
+          },
+          "subject": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "text": {
+            "type": "string",
+            "maxLength": 100000,
+            "default": ""
+          },
+          "html": {
+            "type": "string",
+            "maxLength": 200000
+          },
+          "attachmentIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100
+            },
+            "maxItems": 20,
+            "default": []
+          },
+          "includeOriginalAttachments": {
+            "type": "boolean",
+            "default": true
           }
         }
       }

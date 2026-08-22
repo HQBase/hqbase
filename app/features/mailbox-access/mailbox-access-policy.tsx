@@ -47,7 +47,7 @@ export function MailboxAccessCell({
   return (
     <Button
       aria-label={`View access for ${mailbox.address}`}
-      className="h-auto min-h-10 max-w-full justify-start whitespace-normal px-0 py-1 text-left text-xs font-normal text-muted-foreground hover:bg-transparent hover:text-foreground"
+      className="h-auto min-h-10 max-w-full justify-start whitespace-normal px-0 py-1 text-left text-xs font-normal text-muted-foreground [@media(hover:hover)]:hover:bg-transparent [@media(hover:hover)]:hover:text-foreground"
       type="button"
       variant="ghost"
       onClick={onManage}
@@ -83,7 +83,7 @@ export function MailboxAccessPolicyDialog({
         </DialogHeader>
         <Table containerClassName="rounded-lg border">
           <TableHeader className="bg-muted/40">
-            <TableRow className="hover:bg-transparent">
+            <TableRow className="[@media(hover:hover)]:hover:bg-transparent">
               <TableHead>User</TableHead>
               <TableHead className="w-40">Access</TableHead>
             </TableRow>

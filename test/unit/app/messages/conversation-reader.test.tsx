@@ -64,7 +64,7 @@ const conversation: ConversationSummary = {
 };
 
 describe("conversation reader", () => {
-  it("renders Reply and Forward for every message and keeps the large final actions", () => {
+  it("renders Reply and Forward under the last message", () => {
     const html = renderToStaticMarkup(
       <MessageDetail
         defaultFromMailboxId="mbx_1"
@@ -80,12 +80,53 @@ describe("conversation reader", () => {
 
     expect(html.indexOf("I cannot sign in.")).toBeLessThan(html.indexOf("We can help."));
     expect(html.indexOf("We can help.")).toBeLessThan(html.lastIndexOf(">Reply<"));
-    expect(html.match(/>Reply</g)).toHaveLength(3);
-    expect(html.match(/>Forward</g)).toHaveLength(3);
+    expect(html.match(/>Reply</g)).toHaveLength(1);
+    expect(html.match(/>Forward</g)).toHaveLength(1);
     expect(html).toContain('data-compose-message-id="msg_1"');
     expect(html).toContain('data-compose-message-id="msg_2"');
     expect(html).toContain('aria-label="Back to messages"');
     expect(html).toContain('aria-label="Archive conversation"');
+  });
+
+  it("offers restore instead of archive and trash in Trash", () => {
+    const html = renderToStaticMarkup(
+      <MessageDetail
+        activeFolder="trash"
+        defaultFromMailboxId="mbx_1"
+        mailboxes={[]}
+        messages={[{ ...firstMessage, folder: "trash" }]}
+        selectedId={firstMessage.id}
+        onAction={() => undefined}
+        onBack={() => undefined}
+        onRefresh={() => undefined}
+        onSent={() => undefined}
+      />
+    );
+
+    expect(html).toContain('aria-label="Restore conversation"');
+    expect(html).not.toContain('aria-label="Archive conversation"');
+    expect(html).not.toContain('aria-label="Trash conversation"');
+  });
+
+  it("offers unarchive and trash in Archived", () => {
+    const html = renderToStaticMarkup(
+      <MessageDetail
+        activeFolder="archived"
+        defaultFromMailboxId="mbx_1"
+        mailboxes={[]}
+        messages={[{ ...firstMessage, folder: "archived" }]}
+        selectedId={firstMessage.id}
+        onAction={() => undefined}
+        onBack={() => undefined}
+        onRefresh={() => undefined}
+        onSent={() => undefined}
+      />
+    );
+
+    expect(html).toContain('aria-label="Unarchive conversation"');
+    expect(html).toContain('aria-label="Trash conversation"');
+    expect(html).not.toContain('aria-label="Archive conversation"');
+    expect(html).not.toContain('aria-label="Restore conversation"');
   });
 
   it("uses list-only and conversation-only compact states", () => {
@@ -127,10 +168,9 @@ describe("conversation reader", () => {
     );
 
     expect(listHtml).toContain('data-mobile-view="message-list"');
-    expect(listHtml).toContain('data-mobile-view="conversation"');
-    expect(listHtml).toContain("h-full min-h-0 bg-background hidden");
-    expect(conversationHtml).toContain("h-full min-h-0 flex-col bg-card/35 hidden");
-    expect(conversationHtml).toContain("h-full min-h-0 bg-background block");
+    expect(conversationHtml).not.toContain('data-mobile-view="message-list"');
+    expect(conversationHtml).toContain("bg-reader");
+    expect(conversationHtml).toContain('aria-label="Back to messages"');
     expect(listHtml).toContain("Pull to refresh");
   });
 
@@ -154,8 +194,7 @@ describe("conversation reader", () => {
       />
     );
 
-    expect(html).toContain('class="ml-auto font-mono text-[11px] text-muted-foreground"');
-    expect(html).toContain(">237 conversations<");
+    expect(html).toContain("237 conversations");
     expect(html).not.toContain(">1+<");
     expect(html).toContain("Load more conversations");
   });
@@ -165,25 +204,27 @@ describe("conversation reader", () => {
       <MessageListItem
         activeFolder="inbox"
         conversation={conversation}
-        href="/inbox/msg_1"
+        href="/mail/inbox/msg_1"
         isActive={false}
         onSelect={() => undefined}
+        onToggleStar={() => undefined}
       />
     );
     const readHtml = renderToStaticMarkup(
       <MessageListItem
         activeFolder="inbox"
         conversation={{ ...conversation, unreadCount: 0 }}
-        href="/inbox/msg_1"
+        href="/mail/inbox/msg_1"
         isActive={false}
         onSelect={() => undefined}
+        onToggleStar={() => undefined}
       />
     );
 
-    expect(unreadHtml).toContain('aria-label="Unread"');
+    expect(unreadHtml).toContain('aria-label="Star conversation"');
     expect(unreadHtml).toContain('title="2 messages"');
-    expect(unreadHtml).toContain("2 messages</span>");
-    expect(readHtml).not.toContain('aria-label="Unread"');
+    expect(unreadHtml).toContain(">2<");
+    expect(readHtml).toContain('aria-label="Star conversation"');
   });
 
   it("collapses messages between the first and final message behind a counted divider", () => {

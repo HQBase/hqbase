@@ -1,9 +1,18 @@
 import { optionalBoolean, optionalString, requireString } from "./args.mjs";
-import { parseD1DatabaseId, run } from "./command.mjs";
+import { run } from "./command.mjs";
 import { writeWranglerConfig } from "./config.mjs";
-import { configPath, ensureDeploymentDir, manifestExists, writeManifest } from "./manifest.mjs";
+import { assertCurrentManifest, assertUnambiguousManifest } from "./lifecycle-manifest.mjs";
+import {
+  configPath,
+  ensureDeploymentDir,
+  loadManifest,
+  manifestExists,
+  writeManifest
+} from "./manifest.mjs";
+import { provisionResources } from "./provision.mjs";
+import { prepareManifest, resolveCloudflareAccount, wrangler } from "./resources.mjs";
 
-export function install(flags) {
+export function install(flags, options = {}) {
   const name = requireString(flags, "name");
   const dryRun = optionalBoolean(flags, "dry-run");
   const force = optionalBoolean(flags, "force");
@@ -11,60 +20,68 @@ export function install(flags) {
   const noEmail = flags.email === false;
   const skipDeploy = optionalBoolean(flags, "skip-deploy");
   const skipBuild = optionalBoolean(flags, "skip-build");
+  const runCommand = options.runCommand ?? run;
+  const checkpoint = options.checkpoint ?? writeManifest;
+  const exists = manifestExists(name);
 
-  if (manifestExists(name) && !force) {
-    throw new Error(`Deployment "${name}" already exists. Use --force to overwrite metadata.`);
+  if (force) {
+    throw new Error(
+      "--force is not supported because overwriting lifecycle metadata can lose resource ownership. Existing verified manifests resume automatically."
+    );
   }
 
-  const manifest = createManifest(name, {
-    appDomain: optionalString(flags, "app-domain"),
-    authUrl: optionalString(flags, "auth-url"),
-    oauthClientId: optionalString(flags, "oauth-client-id"),
-    oauthMode: optionalString(flags, "oauth-mode"),
-    domain,
-    workerName: optionalString(flags, "worker-name"),
-    d1Name: optionalString(flags, "d1-name"),
-    r2Bucket: optionalString(flags, "r2-bucket"),
-    queueName: optionalString(flags, "queue-name")
-  });
+  let manifest;
+  if (exists) {
+    manifest = loadManifest(name);
+    assertMatchingInstallFlags(manifest, flags);
+    if (dryRun) {
+      assertCurrentManifest(manifest);
+      assertUnambiguousManifest(manifest);
+    }
+  } else {
+    manifest = createManifest(name, {
+      appDomain: optionalString(flags, "app-domain"),
+      authUrl: optionalString(flags, "auth-url"),
+      oauthClientId: optionalString(flags, "oauth-client-id"),
+      oauthMode: optionalString(flags, "oauth-mode"),
+      domain,
+      workerName: optionalString(flags, "worker-name"),
+      d1Name: optionalString(flags, "d1-name"),
+      r2Bucket: optionalString(flags, "r2-bucket"),
+      queueName: optionalString(flags, "queue-name")
+    });
+  }
 
   if (!dryRun) {
+    const accountId = resolveCloudflareAccount(
+      manifest.version === 3 ? (manifest.accountId ?? undefined) : undefined,
+      {
+        environment: options.environment ?? process.env,
+        runCommand
+      }
+    );
+    if (exists) {
+      manifest = prepareManifest(manifest, accountId, { checkpoint, runCommand });
+    } else {
+      manifest.accountId = accountId;
+      checkpoint(manifest);
+    }
     ensureDeploymentDir(name);
   }
-  writeManifest(manifest, { dryRun });
 
   if (!skipBuild) {
-    run("pnpm", ["build"], { dryRun });
+    runCommand("pnpm", ["build"], { dryRun });
   }
 
-  const d1Output = run("pnpm", ["exec", "wrangler", "d1", "create", manifest.d1.name], {
-    dryRun
-  });
-  if (!dryRun) {
-    manifest.d1.id = parseD1DatabaseId(d1Output);
-    manifest.d1.created = true;
-    writeManifest(manifest);
-  }
-
-  run("pnpm", ["exec", "wrangler", "r2", "bucket", "create", manifest.r2.bucket], {
-    dryRun
-  });
-  manifest.r2.created = true;
-  writeManifest(manifest, { dryRun });
-
-  run("pnpm", ["exec", "wrangler", "queues", "create", manifest.queue.name], { dryRun });
-  run("pnpm", ["exec", "wrangler", "queues", "create", manifest.queue.deadLetterName], {
-    dryRun
-  });
-  manifest.queue.created = true;
-  writeManifest(manifest, { dryRun });
+  provisionResources(manifest, { checkpoint, dryRun, runCommand });
 
   writeWranglerConfig(manifest, { dryRun });
 
-  if (!skipDeploy) {
-    run("node", ["scripts/release/deploy.mjs", "--config", configPath(name)], {
+  if (!skipDeploy && !manifest.worker.deployed) {
+    runCommand("node", ["scripts/release/deploy.mjs", "--config", configPath(name)], {
       dryRun,
       env: {
+        CLOUDFLARE_ACCOUNT_ID: manifest.accountId,
         WORKERS_CI: "1",
         ...((optionalString(flags, "auth-secret") ?? process.env.HQBASE_AUTH_SECRET)
           ? {
@@ -75,12 +92,16 @@ export function install(flags) {
       }
     });
     manifest.worker.deployed = true;
-    writeManifest(manifest, { dryRun });
+    checkpoint(manifest, { dryRun });
   }
 
   if (domain && !noEmail) {
-    configureEmail(manifest, { dryRun, noSending: flags.sending === false });
-    writeManifest(manifest, { dryRun });
+    configureEmail(manifest, {
+      dryRun,
+      noSending: flags.sending === false,
+      runCommand
+    });
+    checkpoint(manifest, { dryRun });
   }
 
   console.log(`HQBase deployment "${name}" is ready.`);
@@ -100,22 +121,24 @@ export function createManifest(name, input) {
   });
 
   return {
-    version: 2,
+    version: 3,
     name,
     createdAt: new Date().toISOString(),
+    accountId: null,
     worker: { name: workerName, deployed: false },
     d1: {
       name: d1Name,
-      id: "00000000-0000-0000-0000-000000000000",
-      created: false,
-      reused: false
+      id: null,
+      ownership: "unclaimed"
     },
     r2: {
       bucket: r2Bucket,
-      created: false,
-      reused: false
+      ownership: "unclaimed"
     },
-    queue: { name: queueName, deadLetterName: `${queueName}-dlq`, created: false },
+    queue: {
+      primary: { name: queueName, id: null, ownership: "unclaimed" },
+      deadLetter: { name: `${queueName}-dlq`, id: null, ownership: "unclaimed" }
+    },
     appDomain: input.appDomain,
     authUrl: input.authUrl,
     cloudflareOAuth,
@@ -129,6 +152,28 @@ export function createManifest(name, input) {
         }
       : null
   };
+}
+
+function assertMatchingInstallFlags(manifest, flags) {
+  const recorded = {
+    "app-domain": manifest.appDomain,
+    "auth-url": manifest.authUrl,
+    "d1-name": manifest.d1?.name,
+    domain: manifest.email?.domain,
+    "oauth-client-id": manifest.cloudflareOAuth?.clientId,
+    "oauth-mode": manifest.cloudflareOAuth?.mode,
+    "queue-name": manifest.queue?.primary?.name ?? manifest.queue?.name,
+    "r2-bucket": manifest.r2?.bucket,
+    "worker-name": manifest.worker?.name
+  };
+  for (const [flag, expected] of Object.entries(recorded)) {
+    const supplied = optionalString(flags, flag);
+    if (supplied !== undefined && supplied !== expected) {
+      throw new Error(
+        `Refusing to resume: --${flag} is "${supplied}", but the manifest records "${expected ?? "no value"}".`
+      );
+    }
+  }
 }
 
 export function cloudflareOAuthConfig({ authUrl, clientId, mode }) {
@@ -173,21 +218,18 @@ function validateCanonicalHttpsOrigin(value) {
 
 function configureEmail(manifest, options) {
   const { domain } = manifest.email;
-  run("pnpm", ["exec", "wrangler", "email", "routing", "enable", domain], options);
+  wrangler(manifest, ["email", "routing", "enable", domain], options);
   manifest.email.routingEnabled = true;
 
-  const previous = run(
-    "pnpm",
-    ["exec", "wrangler", "email", "routing", "rules", "get", domain, "catch-all"],
-    { ...options, allowFailure: true }
-  );
+  const previous = wrangler(manifest, ["email", "routing", "rules", "get", domain, "catch-all"], {
+    ...options,
+    allowFailure: true
+  });
   manifest.email.previousCatchAll = previous || null;
 
-  run(
-    "pnpm",
+  wrangler(
+    manifest,
     [
-      "exec",
-      "wrangler",
       "email",
       "routing",
       "rules",
@@ -206,7 +248,7 @@ function configureEmail(manifest, options) {
   manifest.email.catchAllToWorker = true;
 
   if (!options.noSending) {
-    run("pnpm", ["exec", "wrangler", "email", "sending", "enable", domain], options);
+    wrangler(manifest, ["email", "sending", "enable", domain], options);
     manifest.email.sendingEnabled = true;
   }
 }

@@ -1,5 +1,5 @@
-import { Copy, KeyRound, Mail, UserPlus } from "lucide-react";
 import * as React from "react";
+import { PiCopy, PiEnvelope, PiKey, PiUserPlus } from "react-icons/pi";
 import { toast } from "sonner";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -99,7 +99,7 @@ export function UserOnboardingDialog({
     >
       <DialogTrigger asChild>
         <Button type="button">
-          <UserPlus data-icon="inline-start" />
+          <PiUserPlus data-icon="inline-start" />
           Add user
         </Button>
       </DialogTrigger>
@@ -120,11 +120,11 @@ export function UserOnboardingDialog({
             >
               <TabsList className="grid w-full grid-cols-2">
                 <TabsTrigger value="email_invite">
-                  <Mail data-icon="inline-start" />
+                  <PiEnvelope data-icon="inline-start" />
                   Email invite
                 </TabsTrigger>
                 <TabsTrigger value="temporary_password">
-                  <KeyRound data-icon="inline-start" />
+                  <PiKey data-icon="inline-start" />
                   Create directly
                 </TabsTrigger>
               </TabsList>
@@ -263,7 +263,7 @@ export function TemporaryPasswordReveal({
         </DialogDescription>
       </DialogHeader>
       <Alert>
-        <KeyRound />
+        <PiKey />
         <AlertTitle>Shown once</AlertTitle>
         <AlertDescription>
           HQBase stores only the password hash. The user must replace this password after signing
@@ -277,7 +277,7 @@ export function TemporaryPasswordReveal({
           onClick={() => void copyPassword()}
           size="icon"
         >
-          <Copy />
+          <PiCopy />
         </Button>
       </div>
       <DialogFooter>

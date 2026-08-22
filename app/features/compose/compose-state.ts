@@ -45,6 +45,13 @@ export const splitRecipients = (value: string) =>
     .map((part) => part.trim())
     .filter(Boolean);
 
+export function replyRecipients(message: MessageDetail): string[] {
+  if (message.direction === "inbound") return [message.fromAddress];
+
+  const sender = message.fromAddress.toLowerCase();
+  return message.to.filter((address) => address.toLowerCase() !== sender);
+}
+
 export function replySendingIdentity(
   message: MessageDetail,
   identities: SendingIdentity[],
@@ -138,6 +145,16 @@ export function readDraftRecovery(key: string, serverUpdatedAt: string): Recover
 
 export function composeTitle(mode: ComposeMode): string {
   return mode === "reply" ? "Reply" : mode === "forward" ? "Forward" : "New message";
+}
+
+export function composeContextLabel(
+  mode: ComposeMode,
+  message: MessageDetail | null
+): string | null {
+  if (mode === "new" || !message) return null;
+  const timestamp = message.receivedAt ?? message.sentAt ?? message.createdAt;
+  const action = mode === "reply" ? "Replying to" : "Forwarding message from";
+  return `${action} ${message.fromAddress} · ${formatDateTime(timestamp)}`;
 }
 
 export function draftStatus(state: DraftSaveState): string {

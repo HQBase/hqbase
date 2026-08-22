@@ -35,15 +35,16 @@ export async function signIn(email: string, password: string): Promise<string | 
 }
 
 export async function signOut(): Promise<void> {
-  await disableCurrentDeviceNotificationsBeforeSignOut().catch(() => {
-    // Signing out remains available if browser notification cleanup is unavailable.
-  });
-  await fetch("/api/auth/sign-out", {
-    body: JSON.stringify({}),
-    credentials: "include",
-    headers: { "content-type": "application/json" },
-    method: "POST"
-  });
+  const cleanup = disableCurrentDeviceNotificationsBeforeSignOut().catch(() => {});
+  await Promise.race([cleanup, new Promise<void>((resolve) => setTimeout(resolve, 1500))]);
+  try {
+    await fetch("/api/auth/sign-out", {
+      body: JSON.stringify({}),
+      credentials: "include",
+      headers: { "content-type": "application/json" },
+      method: "POST"
+    });
+  } catch {}
 }
 
 export async function requestPasswordReset(email: string, redirectTo: string): Promise<void> {

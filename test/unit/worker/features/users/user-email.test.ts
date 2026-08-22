@@ -87,9 +87,10 @@ function database(input: {
     prepare: vi.fn((sql: string) => {
       const statement = {
         bind: vi.fn(() => statement),
-        first: vi.fn(async () =>
-          sql.includes("FROM mailbox_addresses") ? input.sender : input.onboarding
-        ),
+        all: vi.fn(async () => {
+          const row = sql.includes("FROM mailbox_addresses") ? input.sender : input.onboarding;
+          return { results: row ? [row] : [] };
+        }),
         run: input.run
       };
       return statement;

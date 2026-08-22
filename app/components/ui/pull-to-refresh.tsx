@@ -1,5 +1,5 @@
-import { ArrowDown, ArrowUp, Check, TriangleAlert } from "lucide-react";
 import * as React from "react";
+import { PiArrowDown, PiArrowUp, PiCheck, PiWarning } from "react-icons/pi";
 
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
@@ -211,11 +211,11 @@ export function PullToRefresh({
         {status === "refreshing" ? (
           <Spinner aria-label="Refreshing mail" />
         ) : status === "complete" ? (
-          <Check aria-hidden="true" className="size-4" />
+          <PiCheck aria-hidden="true" className="size-4" />
         ) : status === "failed" ? (
-          <TriangleAlert aria-hidden="true" className="size-4" />
+          <PiWarning aria-hidden="true" className="size-4" />
         ) : (
-          <ArrowDown
+          <PiArrowDown
             aria-hidden="true"
             className={cn("size-4 transition-transform", armed && "rotate-180")}
           />
@@ -237,7 +237,7 @@ export function PullToRefresh({
         aria-hidden={!showScrollToTop}
         aria-label="Scroll to top"
         className={cn(
-          "absolute right-3 bottom-[max(1.25rem,env(safe-area-inset-bottom))] z-20 size-10 rounded-full border-border/70 bg-background/80 text-muted-foreground shadow-sm backdrop-blur-md transition-[opacity,transform] duration-200 hover:bg-background hover:text-foreground motion-reduce:transition-none md:hidden",
+          "absolute right-3 bottom-[max(1.25rem,env(safe-area-inset-bottom))] z-20 size-10 rounded-full border-border/70 bg-background/80 text-muted-foreground shadow-sm backdrop-blur-md transition-[opacity,transform] duration-200 [@media(hover:hover)]:hover:bg-background [@media(hover:hover)]:hover:text-foreground motion-reduce:transition-none lg:hidden",
           showScrollToTop
             ? "pointer-events-auto translate-y-0 opacity-70"
             : "pointer-events-none translate-y-1 opacity-0"
@@ -252,7 +252,7 @@ export function PullToRefresh({
           if (surface) scrollMailSurfaceToTop(surface);
         }}
       >
-        <ArrowUp aria-hidden="true" className="size-4" />
+        <PiArrowUp aria-hidden="true" className="size-4" />
       </Button>
     </div>
   );

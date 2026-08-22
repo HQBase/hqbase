@@ -1,5 +1,5 @@
-import { ChevronDown, Plus, Users } from "lucide-react";
 import type * as React from "react";
+import { PiCaretDown, PiPlus, PiUsers } from "react-icons/pi";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
@@ -71,7 +71,7 @@ export function MailboxDetailsSheet({
                   type="button"
                   onClick={() => onManageAccess(mailbox)}
                 >
-                  <Users data-icon="inline-start" />
+                  <PiUsers data-icon="inline-start" />
                   Manage access
                 </Button>
               ) : null}
@@ -105,7 +105,7 @@ export function MailboxDetailsSheet({
           <details className="group border-t pt-5">
             <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between rounded-md text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
               More settings
-              <ChevronDown className="size-4 text-muted-foreground transition-transform group-open:rotate-180 motion-reduce:transition-none" />
+              <PiCaretDown className="size-4 text-muted-foreground transition-transform group-open:rotate-180 motion-reduce:transition-none" />
             </summary>
             <div className="mt-3 space-y-5 rounded-md bg-muted/35 p-4">
               <section aria-labelledby="additional-addresses-heading">
@@ -128,7 +128,7 @@ export function MailboxDetailsSheet({
                       variant="outline"
                       onClick={() => onAddAddress(mailbox)}
                     >
-                      <Plus data-icon="inline-start" />
+                      <PiPlus data-icon="inline-start" />
                       Add
                     </Button>
                   ) : null}

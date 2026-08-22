@@ -45,6 +45,10 @@
 
 ## About HQBase
 
+<p align="center">
+  <img src="public/hqbase-desktop-screenshot.png" alt="HQBase shared inbox interface">
+</p>
+
 HQBase gives teams one place to work with shared mailboxes while keeping the application, mail,
 and Cloudflare credentials in customer infrastructure. It includes:
 
@@ -73,9 +77,11 @@ Before you run the optional seed command, add these values to `.dev.vars`:
 - `HQBASE_LOCAL_SEED_PASSWORD` with 8 to 128 characters
 
 The seed command writes only to local D1 and does not contact Cloudflare OAuth. Open
-`http://localhost:8787/` and sign in as `owner@hqbase.test` with the seed password.
+`http://127.0.0.1:5173/` and sign in as `owner@hqbase.test` with that
+password. Vite serves the frontend with live reload on port 5173 and proxies API requests to the
+Wrangler Worker on port 8787.
 
-To use the first-run setup flow, omit the seed command and open `http://localhost:8787/setup`.
+To use the first-run setup flow, omit the seed command and open `http://localhost:5173/setup`.
 
 ### Reset local data
 

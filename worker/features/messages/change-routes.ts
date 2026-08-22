@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 
 import { requireMailApiContext } from "../../auth/mail-api";
-import { accessibleMailboxIds } from "../../auth/mailbox-access";
+import { accessibleMessageScope } from "../../auth/mailbox-access";
 import type { HonoApp } from "../../lib/env";
 import { AppError } from "../../lib/errors";
 
@@ -20,12 +20,12 @@ changeRoutes.get("/", async (c) => {
       );
     }
   }
-  const mailboxIds = await accessibleMailboxIds(c.env.DB, auth.user.id, auth.user.role, "read");
+  const scope = await accessibleMessageScope(c.env.DB, auth.user.id, auth.user.role, "read");
   return c.json(
     await listMessageChanges(c.env.DB, {
       cursor: c.req.query("cursor"),
       limit: parseChangeLimit(c.req.query("limit")),
-      mailboxIds
+      scope
     })
   );
 });

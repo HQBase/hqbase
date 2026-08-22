@@ -1,17 +1,17 @@
 import Placeholder from "@tiptap/extension-placeholder";
 import { EditorContent, useEditor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
-import {
-  Bold,
-  Italic,
-  Link2,
-  List,
-  ListOrdered,
-  Redo2,
-  RemoveFormatting,
-  Undo2
-} from "lucide-react";
 import * as React from "react";
+import {
+  PiArrowUUpLeft,
+  PiArrowUUpRight,
+  PiEraser,
+  PiLink,
+  PiListBullets,
+  PiListNumbers,
+  PiTextB,
+  PiTextItalic
+} from "react-icons/pi";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
 
@@ -81,47 +81,47 @@ export function RichEmailEditor({
         aria-label="Formatting"
       >
         <Tool label="Undo" onClick={() => editor.chain().focus().undo().run()}>
-          <Undo2 />
+          <PiArrowUUpLeft />
         </Tool>
         <Tool label="Redo" onClick={() => editor.chain().focus().redo().run()}>
-          <Redo2 />
+          <PiArrowUUpRight />
         </Tool>
         <Tool
           label="Bold"
           active={editor.isActive("bold")}
           onClick={() => editor.chain().focus().toggleBold().run()}
         >
-          <Bold />
+          <PiTextB />
         </Tool>
         <Tool
           label="Italic"
           active={editor.isActive("italic")}
           onClick={() => editor.chain().focus().toggleItalic().run()}
         >
-          <Italic />
+          <PiTextItalic />
         </Tool>
         <Tool
           label="Bulleted list"
           active={editor.isActive("bulletList")}
           onClick={() => editor.chain().focus().toggleBulletList().run()}
         >
-          <List />
+          <PiListBullets />
         </Tool>
         <Tool
           label="Numbered list"
           active={editor.isActive("orderedList")}
           onClick={() => editor.chain().focus().toggleOrderedList().run()}
         >
-          <ListOrdered />
+          <PiListNumbers />
         </Tool>
         <Tool label="Link" active={editor.isActive("link")} onClick={link}>
-          <Link2 />
+          <PiLink />
         </Tool>
         <Tool
           label="Clear formatting"
           onClick={() => editor.chain().focus().unsetAllMarks().clearNodes().run()}
         >
-          <RemoveFormatting />
+          <PiEraser />
         </Tool>
       </div>
       <EditorContent editor={editor} />
@@ -143,7 +143,7 @@ function Tool({
     <Button
       aria-label={label}
       aria-pressed={active}
-      className="size-8"
+      className="size-10 min-h-10 min-w-10"
       size="icon"
       type="button"
       variant={active ? "secondary" : "ghost"}

@@ -42,7 +42,8 @@ describe("notification persistence", () => {
       ).bind(now, now, now)
     ]);
     await insertMessage("msg_inbox", "mbx_one", "inbox", null);
-    await insertMessage("msg_catchall", "mbx_one", "catchall", null);
+    // Unassigned catch-all messages have an explicit marker and no mailbox.
+    await insertMessage("msg_catchall", null, "catchall", null);
     await insertMessage("msg_read", "mbx_one", "inbox", now);
     await insertMessage("msg_z_other", "mbx_two", "inbox", null);
 
@@ -57,17 +58,44 @@ describe("notification persistence", () => {
   });
 
   it("counts only accessible unread attention folders", async () => {
-    await expect(countUnreadMessages(env.DB, ["mbx_one"])).resolves.toEqual({
+    await expect(
+      countUnreadMessages(env.DB, { includeUnassigned: false, mailboxIds: ["mbx_one"] })
+    ).resolves.toEqual({
+      catchall: 0,
+      inbox: 1,
+      inboxByMailbox: { mbx_one: 1 },
+      total: 1
+    });
+    await expect(
+      countUnreadMessages(env.DB, {
+        includeUnassigned: false,
+        mailboxIds: ["mbx_one", "mbx_two"]
+      })
+    ).resolves.toEqual({
+      catchall: 0,
+      inbox: 2,
+      inboxByMailbox: { mbx_one: 1, mbx_two: 1 },
+      total: 2
+    });
+  });
+
+  it("counts catch-all messages only for scopes that include them", async () => {
+    await expect(
+      countUnreadMessages(env.DB, { includeUnassigned: true, mailboxIds: ["mbx_one"] })
+    ).resolves.toEqual({
       catchall: 1,
       inbox: 1,
       inboxByMailbox: { mbx_one: 1 },
       total: 2
     });
-    await expect(countUnreadMessages(env.DB, ["mbx_one", "mbx_two"])).resolves.toEqual({
+    // An owner with no mailboxes at all still sees catch-all mail.
+    await expect(
+      countUnreadMessages(env.DB, { includeUnassigned: true, mailboxIds: [] })
+    ).resolves.toEqual({
       catchall: 1,
-      inbox: 2,
-      inboxByMailbox: { mbx_one: 1, mbx_two: 1 },
-      total: 3
+      inbox: 0,
+      inboxByMailbox: {},
+      total: 1
     });
   });
 
@@ -132,7 +160,7 @@ describe("notification persistence", () => {
     expect(status.status, await status.clone().text()).toBe(200);
     expect(await status.json()).toEqual({
       latestInboundMessageId: "msg_read",
-      unread: { catchall: 1, inbox: 1, inboxByMailbox: { mbx_one: 1 }, total: 2 },
+      unread: { catchall: 0, inbox: 1, inboxByMailbox: { mbx_one: 1 }, total: 1 },
       vapidPublicKey: "integration-vapid-public-key"
     });
 
@@ -178,20 +206,21 @@ function subscription(endpoint: string) {
 
 async function insertMessage(
   id: string,
-  mailboxId: string,
+  mailboxId: string | null,
   folder: "catchall" | "inbox",
   readAt: string | null
 ): Promise<void> {
   const now = "2026-07-29T12:00:00.000Z";
   await env.DB.prepare(
     `INSERT INTO messages (
-       id, thread_id, mailbox_id, direction, folder, from_address, to_json, cc_json, bcc_json,
+       id, thread_id, mailbox_id, is_unassigned, direction, folder,
+       from_address, to_json, cc_json, bcc_json,
        subject, snippet, text_body, references_json, received_at, read_at, has_attachments,
        created_at, updated_at
-     ) VALUES (?, 'thr_push', ?, 'inbound', ?, 'sender@example.com', '[]', '[]', '[]',
+     ) VALUES (?, 'thr_push', ?, ?, 'inbound', ?, 'sender@example.com', '[]', '[]', '[]',
        'Subject', 'Snippet', 'Body', '[]', ?, ?, 0, ?, ?)`
   )
-    .bind(id, mailboxId, folder, now, readAt, now, now)
+    .bind(id, mailboxId, folder === "catchall" ? 1 : 0, folder, now, readAt, now, now)
     .run();
 }
 
