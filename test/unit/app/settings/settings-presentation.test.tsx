@@ -318,7 +318,6 @@ describe("settings presentation", () => {
         defaultFromMailboxId={null}
         mailboxes={[]}
         notifications={notifications}
-        userRole="owner"
         setup={setup}
         updateStatus={null}
         users={[]}

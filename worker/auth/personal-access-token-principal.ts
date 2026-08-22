@@ -38,7 +38,7 @@ export class PersonalAccessTokenError extends Error {
 const identitySchema = z.object({
   tokenId: z.string().regex(/^pat_[A-Za-z0-9_-]+$/u),
   userId: z.string().min(1),
-  email: z.string().email(),
+  email: z.email(),
   name: z.string(),
   role: workspaceRoleSchema
 });

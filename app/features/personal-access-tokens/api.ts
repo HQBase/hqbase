@@ -49,8 +49,12 @@ export async function listPersonalAccessTokens(): Promise<PersonalAccessTokenLis
     credentials: "include",
     method: "GET"
   });
-  if (!response.ok) throw new Error("Personal access tokens could not be loaded.");
-  return response.json<PersonalAccessTokenList>();
+  if (!response.ok) throw listError();
+  try {
+    return readListResponse(await response.json());
+  } catch {
+    throw listError();
+  }
 }
 
 export async function revokePersonalAccessToken(id: string): Promise<void> {
@@ -114,6 +118,17 @@ function readCreateResponse(value: unknown): CreatePersonalAccessTokenResponse {
     personalAccessToken: readMetadata(value.personalAccessToken),
     token: value.token
   };
+}
+
+function readListResponse(value: unknown): PersonalAccessTokenList {
+  if (!isRecord(value) || !Array.isArray(value.personalAccessTokens)) {
+    throw new Error("Invalid response.");
+  }
+  return { personalAccessTokens: value.personalAccessTokens.map(readMetadata) };
+}
+
+function listError(): Error {
+  return new Error("Personal access tokens could not be loaded.");
 }
 
 function readMetadata(value: unknown): PersonalAccessTokenMetadata {

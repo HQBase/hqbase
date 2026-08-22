@@ -14,7 +14,7 @@ import type { SetupStatus } from "@/features/setup/types";
 import type { UpdateStatus } from "@/features/updates/types";
 import type { UpdateProgress } from "@/features/updates/update-progress";
 import { UpdateSettings } from "@/features/updates/update-settings";
-import type { WorkspaceRole, WorkspaceUser } from "@/features/users/types";
+import type { WorkspaceUser } from "@/features/users/types";
 import { UserSettings } from "@/features/users/user-settings";
 import type { SettingsTabId } from "@/lib/routes";
 
@@ -25,7 +25,6 @@ type SettingsPageProps = {
   defaultFromMailboxId: string | null;
   mailboxes: Mailbox[];
   notifications: NotificationController;
-  userRole: WorkspaceRole;
   setup: SetupStatus;
   users: WorkspaceUser[];
   onDefaultFromMailboxChange: (mailboxId: string) => void;
@@ -43,7 +42,6 @@ export function SettingsPage({
   defaultFromMailboxId,
   mailboxes,
   notifications,
-  userRole,
   setup,
   users,
   onDefaultFromMailboxChange,
@@ -84,7 +82,7 @@ export function SettingsPage({
           <NotificationSettings notifications={notifications} />
         ) : null}
         {activeTab === "interface" ? <InterfaceSettings /> : null}
-        {activeTab === "api" ? <PersonalAccessTokenSettings userRole={userRole} /> : null}
+        {activeTab === "api" ? <PersonalAccessTokenSettings userRole={currentUser.role} /> : null}
         {activeTab === "mcp" ? <McpSettings user={currentUser} /> : null}
         {activeTab === "updates" && canManage ? (
           <UpdateSettings

@@ -13,26 +13,18 @@ export type AuditInput = {
   metadata?: Record<string, string | number | boolean | null>;
 };
 
-const forbiddenMetadata = new Set([
-  "address",
-  "body",
-  "content",
-  "credential",
-  "email",
-  "filename",
-  "password",
-  "raw",
-  "recipient",
-  "secret",
-  "subject",
-  "token",
-  "tokenhash",
-  "accesstoken",
-  "refreshtoken",
-  "authorization",
-  "authorizationheader",
-  "requestbody",
-  "responsebody"
+const allowedMetadata = new Set([
+  "attempt",
+  "enabled",
+  "reason",
+  "kind",
+  "accesslevel",
+  "messagedays",
+  "trashdays",
+  "method",
+  "role",
+  "authenticationkind",
+  "personalaccesstokenid"
 ]);
 
 export type AuditInsertGuard =
@@ -107,7 +99,7 @@ export async function recordAudit(db: D1Database, input: AuditInput): Promise<vo
 function assertSafeAuditMetadata(input: AuditInput): void {
   for (const key of Object.keys(input.metadata ?? {})) {
     const normalizedKey = key.toLowerCase().replace(/[^a-z0-9]/gu, "");
-    if (forbiddenMetadata.has(normalizedKey)) {
+    if (!allowedMetadata.has(normalizedKey)) {
       throw new Error(`Sensitive audit metadata rejected: ${key}`);
     }
   }

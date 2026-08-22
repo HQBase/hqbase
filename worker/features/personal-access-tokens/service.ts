@@ -12,6 +12,8 @@ import type {
 } from "./types";
 import { readPersonalAccessTokenMetadata } from "./validation";
 
+export const MAX_ACTIVE_PERSONAL_ACCESS_TOKENS = 10;
+
 export async function listPersonalAccessTokens(
   db: D1Database,
   input: { userId: string; role: WorkspaceRole; now?: number }
@@ -55,7 +57,7 @@ export async function createPersonalAccessToken(
        WHERE (
          SELECT COUNT(*) FROM personal_access_tokens
          WHERE user_id = ? AND revoked_at IS NULL AND (expires_at IS NULL OR expires_at > ?)
-       ) < 10`
+       ) < ${MAX_ACTIVE_PERSONAL_ACCESS_TOKENS}`
     )
     .bind(
       id,
@@ -88,7 +90,7 @@ export async function createPersonalAccessToken(
   if (insertChanges === 0 && auditChanges === 0) {
     throw new AppError(
       "PERSONAL_ACCESS_TOKEN_LIMIT_REACHED",
-      "This user already has ten active personal access tokens.",
+      `This user already has ${MAX_ACTIVE_PERSONAL_ACCESS_TOKENS} active personal access tokens.`,
       409
     );
   }

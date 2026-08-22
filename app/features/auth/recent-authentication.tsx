@@ -8,6 +8,10 @@ import {
   DialogTitle
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import {
+  initialRecentAuthenticationState,
+  recentAuthenticationReducer
+} from "@/features/auth/recent-authentication-state";
 import { getRecentAuthentication, reauthenticate } from "./recent-authentication-api";
 
 export type RecentAuthenticationGateProps = {
@@ -25,30 +29,27 @@ export function RecentAuthenticationGate({
   ready,
   onAuthenticated
 }: RecentAuthenticationGateProps): React.ReactElement {
-  const [authentication, setAuthentication] = React.useState<"checking" | "recent" | "stale">(
-    "checking"
+  const [state, dispatch] = React.useReducer(
+    recentAuthenticationReducer,
+    initialRecentAuthenticationState
   );
-  const [password, setPassword] = React.useState("");
-  const [error, setError] = React.useState<string | null>(null);
-  const [pending, setPending] = React.useState(false);
+  const passwordId = React.useId();
 
   React.useEffect(() => {
     if (!active) return;
     let cancelled = false;
-    setAuthentication("checking");
-    setPassword("");
-    setError(null);
-    setPending(false);
+    dispatch({ type: "check-started" });
     void getRecentAuthentication()
       .then((recent) => {
-        if (!cancelled) setAuthentication(recent ? "recent" : "stale");
+        if (!cancelled) dispatch({ type: "check-finished", recent });
       })
       .catch((nextError: unknown) => {
         if (cancelled) return;
-        setAuthentication("stale");
-        setError(
-          nextError instanceof Error ? nextError.message : "Your sign-in could not be confirmed."
-        );
+        dispatch({
+          type: "check-failed",
+          message:
+            nextError instanceof Error ? nextError.message : "Your sign-in could not be confirmed."
+        });
       });
     return () => {
       cancelled = true;
@@ -57,31 +58,52 @@ export function RecentAuthenticationGate({
 
   async function confirmPassword(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setPending(true);
-    setError(null);
+    dispatch({ type: "submit-started" });
     try {
-      await reauthenticate(password);
-      setAuthentication("recent");
-      await onAuthenticated?.();
+      await reauthenticate(state.password);
     } catch (nextError) {
-      setAuthentication("stale");
-      setError(nextError instanceof Error ? nextError.message : "Sign-in confirmation failed.");
-      setPending(false);
+      dispatch({
+        type: "authentication-failed",
+        message: nextError instanceof Error ? nextError.message : "Sign-in confirmation failed."
+      });
+      return;
+    }
+
+    dispatch({ type: "authenticated" });
+    try {
+      await onAuthenticated?.();
+    } catch {
+      dispatch({
+        type: "continuation-failed",
+        message: "Sign-in was confirmed, but the next action could not start. Try again."
+      });
     }
   }
 
-  if (authentication === "recent") return <>{ready}</>;
-  if (authentication === "checking") {
+  if (state.authentication === "recent") {
+    return (
+      <>
+        {state.continuationError ? (
+          <p className="text-xs text-destructive" role="alert">
+            {state.continuationError}
+          </p>
+        ) : null}
+        {ready}
+      </>
+    );
+  }
+  if (state.authentication === "checking") {
     return <AuthenticationChecking description={description} layout={layout} />;
   }
   return (
     <ReauthenticationForm
       description={description}
-      error={error}
+      error={state.authenticationError}
       layout={layout}
-      password={password}
-      pending={pending}
-      onPasswordChange={setPassword}
+      password={state.password}
+      passwordId={passwordId}
+      pending={state.pending}
+      onPasswordChange={(password) => dispatch({ type: "password-changed", password })}
       onSubmit={(event) => void confirmPassword(event)}
     />
   );
@@ -92,6 +114,7 @@ function ReauthenticationForm({
   error,
   layout,
   password,
+  passwordId,
   pending,
   onPasswordChange,
   onSubmit
@@ -100,6 +123,7 @@ function ReauthenticationForm({
   error: string | null;
   layout: "dialog" | "inline";
   password: string;
+  passwordId: string;
   pending: boolean;
   onPasswordChange: (value: string) => void;
   onSubmit: (event: React.FormEvent<HTMLFormElement>) => void;
@@ -121,16 +145,13 @@ function ReauthenticationForm({
         </div>
       )}
       <form className="flex flex-col gap-4" onSubmit={onSubmit}>
-        <label
-          className="flex flex-col gap-2 text-xs text-muted-foreground"
-          htmlFor="recent-authentication-password"
-        >
+        <label className="flex flex-col gap-2 text-xs text-muted-foreground" htmlFor={passwordId}>
           Password
           <Input
             aria-label="Password"
             autoComplete="current-password"
             autoFocus
-            id="recent-authentication-password"
+            id={passwordId}
             required
             type="password"
             value={password}

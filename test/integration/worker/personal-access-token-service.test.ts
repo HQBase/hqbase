@@ -3,6 +3,7 @@ import { beforeAll, beforeEach, describe, expect, it } from "vitest";
 import {
   createPersonalAccessToken,
   listPersonalAccessTokens,
+  MAX_ACTIVE_PERSONAL_ACCESS_TOKENS,
   revokePersonalAccessToken
 } from "../../../worker/features/personal-access-tokens/service";
 import { AppError } from "../../../worker/lib/errors";
@@ -107,7 +108,7 @@ describe("personal access token service", () => {
   });
 
   it("enforces the active-token limit per user", async () => {
-    for (let index = 0; index < 10; index += 1) {
+    for (let index = 0; index < MAX_ACTIVE_PERSONAL_ACCESS_TOKENS; index += 1) {
       await insertPat(
         `pat_limit_${index}`,
         "usr_pat_service_owner",
@@ -147,7 +148,7 @@ describe("personal access token service", () => {
       .all<{ userId: string; count: number }>();
     expect(counts.results).toEqual([
       { userId: "usr_pat_service_admin", count: 1 },
-      { userId: "usr_pat_service_owner", count: 10 }
+      { userId: "usr_pat_service_owner", count: MAX_ACTIVE_PERSONAL_ACCESS_TOKENS }
     ]);
   });
 

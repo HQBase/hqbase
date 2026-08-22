@@ -51,6 +51,7 @@ describe("RecentAuthenticationGate", () => {
       "Password is incorrect."
     );
     expect(view.container.querySelector("[data-ready]")).toBeNull();
+    expect(view.container.querySelector('input[type="password"]')).not.toBeNull();
     await view.unmount();
   });
 
@@ -68,6 +69,60 @@ describe("RecentAuthenticationGate", () => {
     expect(onAuthenticated).toHaveBeenCalledOnce();
     await flushHookEffects();
     expect(onAuthenticated).toHaveBeenCalledOnce();
+    await view.unmount();
+  });
+
+  it("keeps authentication recent when the continuation fails", async () => {
+    mocks.getRecentAuthentication.mockResolvedValue(false);
+    mocks.reauthenticate.mockResolvedValue(undefined);
+    const onAuthenticated = vi.fn().mockRejectedValue(new Error("transition failed"));
+    const readyAction = vi.fn();
+    const view = await renderGate(
+      onAuthenticated,
+      <button data-ready type="button" onClick={readyAction}>
+        Continue ready action
+      </button>
+    );
+    await flushHookEffects();
+
+    await submitPassword(view.container, "correct-password");
+
+    expect(mocks.reauthenticate).toHaveBeenCalledWith("correct-password");
+    expect(view.container.querySelector("[data-ready]")).not.toBeNull();
+    expect(view.container.querySelector('input[type="password"]')).toBeNull();
+    expect(view.container.querySelector('[role="alert"]')?.textContent).toContain(
+      "Sign-in was confirmed, but the next action could not start. Try again."
+    );
+    await flushHookEffects(() => {
+      view.container.querySelector<HTMLButtonElement>("[data-ready]")?.click();
+    });
+    expect(readyAction).toHaveBeenCalledOnce();
+    await view.unmount();
+  });
+
+  it("uses a unique password field ID for each gate", async () => {
+    mocks.getRecentAuthentication.mockResolvedValue(false);
+    const view = await renderComponent(
+      <>
+        <RecentAuthenticationGate
+          active
+          description="First protected action"
+          layout="inline"
+          ready={<div>First ready</div>}
+        />
+        <RecentAuthenticationGate
+          active
+          description="Second protected action"
+          layout="inline"
+          ready={<div>Second ready</div>}
+        />
+      </>
+    );
+    await flushHookEffects();
+    const ids = [
+      ...view.container.querySelectorAll<HTMLInputElement>('input[type="password"]')
+    ].map((input) => input.id);
+    expect(new Set(ids).size).toBe(2);
     await view.unmount();
   });
 
@@ -104,13 +159,16 @@ describe("RecentAuthenticationGate", () => {
   });
 });
 
-async function renderGate(onAuthenticated?: () => void) {
+async function renderGate(
+  onAuthenticated?: () => void | Promise<void>,
+  ready: React.ReactNode = <div data-ready>Ready</div>
+) {
   return renderComponent(
     <RecentAuthenticationGate
       active
       description="Protected action"
       layout="inline"
-      ready={<div data-ready>Ready</div>}
+      ready={ready}
       {...(onAuthenticated ? { onAuthenticated } : {})}
     />
   );

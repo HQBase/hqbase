@@ -1,8 +1,11 @@
 // @vitest-environment happy-dom
+
 import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import * as React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { signOutStartedEvent } from "@/features/auth/sign-out-lifecycle";
+import { OneTimeTokenDialog } from "@/features/personal-access-tokens/one-time-token-dialog";
 import { PersonalAccessTokenSettings } from "@/features/personal-access-tokens/personal-access-token-settings";
 import { assertSecretSafeEqual } from "../../../helpers/secret-safe-assertions";
 
@@ -226,6 +229,92 @@ describe("personal access token creation UI", () => {
     expect(apiMocks.createPersonalAccessToken).toHaveBeenCalledOnce();
   });
 
+  it("shows manual-copy guidance when clipboard access is unavailable, then permits retry", async () => {
+    const originalClipboard = navigator.clipboard;
+    const user = userEvent.setup();
+    apiMocks.createPersonalAccessToken.mockResolvedValue({
+      personalAccessToken: metadata,
+      token: "test-only-token"
+    });
+    render(<PersonalAccessTokenSettings userRole="member" />);
+    await submitCreateForm(user);
+    await screen.findByText("Copy this token now. HQBase cannot show it again.");
+
+    vi.stubGlobal("navigator", { clipboard: undefined });
+    await user.click(screen.getByRole("button", { name: "Copy token" }));
+    expect(screen.getByRole("alert").textContent).toContain(
+      "Select the token above and copy it manually."
+    );
+
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    vi.stubGlobal("navigator", { clipboard: { ...originalClipboard, writeText } });
+    await user.click(screen.getByRole("button", { name: "Copy token" }));
+    await waitFor(() => expect(screen.queryByRole("alert")).toBeNull());
+    expect(screen.getByRole("button", { name: "Copied" })).toBeTruthy();
+    expect(writeText).toHaveBeenCalledWith("test-only-token");
+  });
+
+  it("shows manual-copy guidance after a rejected copy, then permits retry", async () => {
+    const writeText = vi
+      .spyOn(navigator.clipboard, "writeText")
+      .mockRejectedValueOnce(new Error("synthetic clipboard rejection"))
+      .mockResolvedValueOnce(undefined);
+    const user = userEvent.setup();
+    apiMocks.createPersonalAccessToken.mockResolvedValue({
+      personalAccessToken: metadata,
+      token: "test-only-token"
+    });
+    render(<PersonalAccessTokenSettings userRole="member" />);
+    await submitCreateForm(user);
+    await screen.findByText("Copy this token now. HQBase cannot show it again.");
+
+    await user.click(screen.getByRole("button", { name: "Copy token" }));
+    expect(screen.getByRole("alert").textContent).toContain(
+      "Select the token above and copy it manually."
+    );
+    await user.click(screen.getByRole("button", { name: "Copy token" }));
+    await waitFor(() => expect(screen.queryByRole("alert")).toBeNull());
+    expect(writeText).toHaveBeenCalledTimes(2);
+  });
+
+  it("clears copy success and failure state when the one-time dialog closes", async () => {
+    const onCopy = vi.fn().mockResolvedValueOnce(true).mockResolvedValueOnce(false);
+    const user = userEvent.setup();
+
+    function Harness(): React.ReactElement {
+      const [open, setOpen] = React.useState(true);
+      return (
+        <>
+          <button type="button" onClick={() => setOpen(true)}>
+            Reopen token
+          </button>
+          <OneTimeTokenDialog
+            open={open}
+            token="test-only-token"
+            onCopy={onCopy}
+            onOpenChange={setOpen}
+          />
+        </>
+      );
+    }
+
+    render(<Harness />);
+    await user.click(screen.getByRole("button", { name: "Copy token" }));
+    expect(screen.getByRole("button", { name: "Copied" })).toBeTruthy();
+    await user.click(screen.getByRole("button", { name: "Done" }));
+    await user.click(screen.getByRole("button", { name: "Reopen token" }));
+    expect(screen.getByRole("button", { name: "Copy token" })).toBeTruthy();
+
+    await user.click(screen.getByRole("button", { name: "Copy token" }));
+    expect(screen.getByRole("alert").textContent).toContain(
+      "Select the token above and copy it manually."
+    );
+    await user.click(screen.getByRole("button", { name: "Done" }));
+    await user.click(screen.getByRole("button", { name: "Reopen token" }));
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(screen.getByRole("button", { name: "Copy token" })).toBeTruthy();
+  });
+
   it("closes and refreshes after ambiguous delivery without retry", async () => {
     apiMocks.createPersonalAccessToken.mockRejectedValue(
       new actualApi.AmbiguousPersonalAccessTokenCreateError()
@@ -238,6 +327,41 @@ describe("personal access token creation UI", () => {
     expect(screen.queryByRole("dialog", { name: "Create personal access token" })).toBeNull();
     expect(apiMocks.createPersonalAccessToken).toHaveBeenCalledOnce();
     expect(apiMocks.listPersonalAccessTokens).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not restore an older ambiguous warning after a newer refresh", async () => {
+    const olderList = deferred<{ personalAccessTokens: [] }>();
+    const newerList = deferred<{ personalAccessTokens: [] }>();
+    apiMocks.listPersonalAccessTokens
+      .mockResolvedValueOnce({ personalAccessTokens: [] })
+      .mockReturnValueOnce(olderList.promise)
+      .mockReturnValueOnce(newerList.promise);
+    apiMocks.createPersonalAccessToken
+      .mockRejectedValueOnce(new actualApi.AmbiguousPersonalAccessTokenCreateError())
+      .mockResolvedValueOnce({ personalAccessToken: metadata, token: "test-only-newer-token" });
+    const user = userEvent.setup();
+    render(<PersonalAccessTokenSettings userRole="member" />);
+
+    await submitCreateForm(user);
+    await waitFor(() => expect(apiMocks.listPersonalAccessTokens).toHaveBeenCalledTimes(2));
+    await user.click(screen.getByRole("button", { name: "Create token" }));
+    const name = await screen.findByRole("textbox", { name: "Name" });
+    await user.type(name, "Newer automation");
+    await user.click(screen.getByRole("button", { name: "Create personal access token" }));
+    await waitFor(() => expect(apiMocks.createPersonalAccessToken).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(apiMocks.listPersonalAccessTokens).toHaveBeenCalledTimes(3));
+
+    await act(async () => {
+      newerList.resolve({ personalAccessTokens: [] });
+      await newerList.promise;
+    });
+    await act(async () => {
+      olderList.resolve({ personalAccessTokens: [] });
+      await olderList.promise;
+    });
+
+    await waitFor(() => expect(screen.queryByText(ambiguousMessage)).toBeNull());
+    expect(screen.getByText("No active personal access tokens.")).toBeTruthy();
   });
 
   it("keeps a definitive fixed error in the form without retry", async () => {
@@ -346,12 +470,18 @@ describe("personal access token creation UI", () => {
 
 const createInput = { name: "Automation", expiresAt: null };
 
-function deferred<T>(): { promise: Promise<T>; resolve: (value: T) => void } {
+function deferred<T>(): {
+  promise: Promise<T>;
+  reject: (reason: unknown) => void;
+  resolve: (value: T) => void;
+} {
+  let reject!: (reason: unknown) => void;
   let resolve!: (value: T) => void;
-  const promise = new Promise<T>((nextResolve) => {
+  const promise = new Promise<T>((nextResolve, nextReject) => {
     resolve = nextResolve;
+    reject = nextReject;
   });
-  return { promise, resolve };
+  return { promise, reject, resolve };
 }
 
 async function submitCreateForm(user: ReturnType<typeof userEvent.setup>): Promise<void> {

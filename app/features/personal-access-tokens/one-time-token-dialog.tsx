@@ -21,10 +21,20 @@ export function OneTimeTokenDialog({
   onOpenChange: (open: boolean) => void;
 }): React.ReactElement {
   const [copied, setCopied] = React.useState(false);
+  const [copyFailed, setCopyFailed] = React.useState(false);
 
   React.useEffect(() => {
-    if (open) setCopied(false);
+    if (!open) {
+      setCopied(false);
+      setCopyFailed(false);
+    }
   }, [open]);
+
+  async function copy(): Promise<void> {
+    const succeeded = await onCopy();
+    setCopied(succeeded);
+    setCopyFailed(!succeeded);
+  }
 
   return (
     <Dialog open={open && token !== null} onOpenChange={onOpenChange}>
@@ -36,6 +46,11 @@ export function OneTimeTokenDialog({
         <code className="block overflow-x-auto rounded-lg border bg-muted/40 p-3 text-sm">
           {token}
         </code>
+        {copyFailed ? (
+          <p className="text-xs text-destructive" role="alert">
+            Clipboard copy failed. Select the token above and copy it manually.
+          </p>
+        ) : null}
         <DialogFooter>
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
             Done
@@ -43,7 +58,7 @@ export function OneTimeTokenDialog({
           <Button
             type="button"
             onClick={() => {
-              void onCopy().then(setCopied);
+              void copy();
             }}
           >
             {copied ? "Copied" : "Copy token"}

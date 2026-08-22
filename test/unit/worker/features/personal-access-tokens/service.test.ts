@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   createPersonalAccessToken,
+  MAX_ACTIVE_PERSONAL_ACCESS_TOKENS,
   revokePersonalAccessToken
 } from "../../../../../worker/features/personal-access-tokens/service";
 import { AppError } from "../../../../../worker/lib/errors";
@@ -44,6 +45,9 @@ describe("personal access token creation", () => {
     );
     expect(error.code).toBe("PERSONAL_ACCESS_TOKEN_LIMIT_REACHED");
     expect(error.status).toBe(409);
+    expect(error.message).toBe(
+      `This user already has ${MAX_ACTIVE_PERSONAL_ACCESS_TOKENS} active personal access tokens.`
+    );
   });
 
   it("fails closed on mismatched create batch metadata", async () => {

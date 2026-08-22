@@ -80,33 +80,67 @@ describe("prepared audit inserts", () => {
 });
 
 describe("audit redaction guard", () => {
+  const allowedMetadata = {
+    attempt: 1,
+    enabled: true,
+    reason: "test",
+    kind: "web",
+    accessLevel: "read",
+    messageDays: 30,
+    trashDays: 7,
+    method: "password",
+    role: "member",
+    authenticationKind: "pat",
+    personalAccessTokenId: "pat_safe_id"
+  };
+
+  it("allows every supported metadata key through both audit writers", async () => {
+    const fixture = auditDatabase();
+    try {
+      await recordAudit(fixture.db, { ...auditInput(), metadata: allowedMetadata });
+      await prepareAuditInsert(fixture.db, { ...auditInput(), metadata: allowedMetadata }).run();
+      const rows = fixture.sqlite
+        .prepare("SELECT metadata_json FROM audit_events ORDER BY rowid")
+        .all() as { metadata_json: string }[];
+      expect(rows).toHaveLength(2);
+      expect(rows.map((row) => JSON.parse(row.metadata_json))).toEqual([
+        allowedMetadata,
+        allowedMetadata
+      ]);
+    } finally {
+      fixture.sqlite.close();
+    }
+  });
+
+  it.each([
+    "tokenValue",
+    "credentialText",
+    "passwordHash"
+  ])("rejects compound key %s through both audit writers", async (key) => {
+    const input = { ...auditInput(), metadata: { [key]: "sensitive" } };
+    await expect(recordAudit(null as unknown as D1Database, input)).rejects.toThrow(
+      "Sensitive audit metadata rejected"
+    );
+    expect(() => prepareAuditInsert(null as unknown as D1Database, input)).toThrow(
+      "Sensitive audit metadata rejected"
+    );
+  });
+
   it.each([
     "subject",
     "body",
     "email",
-    "password",
-    "token",
     "filename",
-    "tokenHash",
-    "token_hash",
-    "TOKEN-HASH",
-    "accessToken",
-    "access_token",
-    "refreshToken",
-    "refresh-token",
     "authorization",
-    "Authorization-Header",
-    "requestBody",
-    "request_body",
-    "responseBody",
-    "response-body"
-  ])("rejects %s metadata before touching storage", async (key) => {
-    await expect(
-      recordAudit(null as unknown as D1Database, {
-        ...auditInput(),
-        metadata: { [key]: "sensitive" }
-      })
-    ).rejects.toThrow("Sensitive audit metadata");
+    "requestBody"
+  ])("rejects unsupported key %s through both audit writers", async (key) => {
+    const input = { ...auditInput(), metadata: { [key]: "sensitive" } };
+    await expect(recordAudit(null as unknown as D1Database, input)).rejects.toThrow(
+      "Sensitive audit metadata rejected"
+    );
+    expect(() => prepareAuditInsert(null as unknown as D1Database, input)).toThrow(
+      "Sensitive audit metadata rejected"
+    );
   });
 
   it("allows the safe personal access token record ID", async () => {

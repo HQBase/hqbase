@@ -1,4 +1,6 @@
 // @vitest-environment happy-dom
+import { screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { PersonalAccessTokenSettings } from "@/features/personal-access-tokens/personal-access-token-settings";
 import type { WorkspaceRole } from "@/features/users/types";
@@ -94,6 +96,62 @@ describe("personal access token settings", () => {
     expect(view.container.textContent).not.toContain("Deployment agent");
     await view.unmount();
   });
+
+  it("keeps the newest token list when an older refresh finishes last", async () => {
+    const olderList = deferred<Response>();
+    const newerList = deferred<Response>();
+    const fetchMock = patCreationFetch([olderList.promise, newerList.promise]);
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+    const view = await renderSettings("member");
+    document.body.appendChild(view.container);
+
+    await createToken(user);
+    await waitFor(() => expect(personalAccessTokenListCalls(fetchMock)).toHaveLength(2));
+
+    newerList.resolve(
+      jsonResponse({
+        personalAccessTokens: [{ ...token, id: "pat_newer", name: "Newest client" }]
+      })
+    );
+    await screen.findByText("Newest client");
+
+    olderList.resolve(
+      jsonResponse({
+        personalAccessTokens: [{ ...token, id: "pat_older", name: "Older client" }]
+      })
+    );
+    await flushHookEffects();
+
+    expect(view.container.textContent).toContain("Newest client");
+    expect(view.container.textContent).not.toContain("Older client");
+    await view.unmount();
+  });
+
+  it("keeps the latest refresh loading when an older refresh fails", async () => {
+    const olderList = deferred<Response>();
+    const newerList = deferred<Response>();
+    const fetchMock = patCreationFetch([olderList.promise, newerList.promise]);
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+    const view = await renderSettings("member");
+    document.body.appendChild(view.container);
+
+    await createToken(user);
+    await waitFor(() => expect(personalAccessTokenListCalls(fetchMock)).toHaveLength(2));
+
+    olderList.reject(new Error("older refresh failed"));
+    await flushHookEffects();
+
+    expect(view.container.textContent).toContain("Loading personal access tokens…");
+    expect(view.container.textContent).not.toContain("older refresh failed");
+
+    newerList.resolve(jsonResponse({ personalAccessTokens: [] }));
+    await waitFor(() =>
+      expect(view.container.textContent).toContain("No active personal access tokens.")
+    );
+    await view.unmount();
+  });
 });
 
 async function renderSettings(role: WorkspaceRole) {
@@ -105,4 +163,57 @@ function jsonResponse(value: unknown): Response {
     headers: { "content-type": "application/json" },
     status: 200
   });
+}
+
+function patCreationFetch(listResponses: Promise<Response>[]) {
+  let listIndex = 0;
+  return vi.fn((input: string | URL | Request, init?: RequestInit): Promise<Response> => {
+    const path = String(input);
+    if (path === "/api/personal-access-tokens" && init?.method === "GET") {
+      const response = listResponses[listIndex];
+      listIndex += 1;
+      if (!response) return Promise.reject(new Error("Unexpected PAT list request."));
+      return response;
+    }
+    if (path === "/api/sessions/recent-authentication" && init?.method === "GET") {
+      return Promise.resolve(jsonResponse({ recent: true }));
+    }
+    if (path === "/api/personal-access-tokens" && init?.method === "POST") {
+      return Promise.resolve(
+        new Response(
+          JSON.stringify({ personalAccessToken: token, token: "test-only-race-token" }),
+          { headers: { "content-type": "application/json" }, status: 201 }
+        )
+      );
+    }
+    return Promise.reject(new Error(`Unexpected request: ${init?.method ?? "GET"} ${path}`));
+  });
+}
+
+function personalAccessTokenListCalls(fetchMock: ReturnType<typeof vi.fn>): unknown[][] {
+  return fetchMock.mock.calls.filter(
+    ([path, init]) => path === "/api/personal-access-tokens" && init?.method === "GET"
+  );
+}
+
+async function createToken(user: ReturnType<typeof userEvent.setup>): Promise<void> {
+  await user.click(screen.getByRole("button", { name: "Create token" }));
+  const name = await screen.findByRole("textbox", { name: "Name" });
+  await user.type(name, "Race client");
+  await user.click(screen.getByRole("button", { name: "Create personal access token" }));
+  await screen.findByText("Copy this token now. HQBase cannot show it again.");
+}
+
+function deferred<T>(): {
+  promise: Promise<T>;
+  reject: (reason: unknown) => void;
+  resolve: (value: T) => void;
+} {
+  let reject!: (reason: unknown) => void;
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((nextResolve, nextReject) => {
+    resolve = nextResolve;
+    reject = nextReject;
+  });
+  return { promise, reject, resolve };
 }
