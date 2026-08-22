@@ -8,6 +8,11 @@ import type { Mailbox } from "../mailboxes/types";
 import { setDefaultFromMailboxId } from "../preferences/queries";
 
 import {
+  claimBootstrapLock,
+  releaseBootstrapLock,
+  startBootstrapLockHeartbeat
+} from "./bootstrap-lock";
+import {
   getSetupStatus,
   setChecklistAcknowledged,
   setPrimaryDomain,
@@ -42,72 +47,83 @@ export async function bootstrapSetup(
   request: Request,
   input: BootstrapInput
 ): Promise<BootstrapResult> {
-  const existing = await getSetupStatus(env.DB);
-  if (existing.isComplete) {
-    throw new AppError("SETUP_ALREADY_COMPLETE", "Setup is already complete.", 409);
-  }
-  if (existing.userCount > 0) {
-    throw new AppError("SETUP_OWNER_EXISTS", "An owner user already exists.", 409);
-  }
+  const lock = await claimBootstrapLock(env.DB);
+  const heartbeat = startBootstrapLockHeartbeat(env.DB, lock);
+  try {
+    const existing = await getSetupStatus(env.DB);
+    if (existing.isComplete) {
+      throw new AppError("SETUP_ALREADY_COMPLETE", "Setup is already complete.", 409);
+    }
+    if (existing.userCount > 0) {
+      throw new AppError("SETUP_OWNER_EXISTS", "An owner user already exists.", 409);
+    }
 
-  const domains = input.emailDomains ?? [{ name: input.primaryDomain ?? "" }];
-  if (!domains[0]?.name) throw new AppError("DOMAIN_REQUIRED", "Choose an email domain.", 400);
-  assertLoginEmailOutsideDomains(
-    input.ownerEmail,
-    domains.map((domain) => domain.name)
-  );
-
-  for (const domain of domains) {
-    await upsertMailDomain(env.DB, {
-      ...domain,
-      receivingStatus: "ready",
-      sendingStatus: "ready",
-      dnsStatus: "ready"
-    });
-  }
-
-  const owner = await signUpOwnerUser(env, request, {
-    email: input.ownerEmail,
-    name: input.ownerName,
-    password: input.ownerPassword,
-    role: "owner"
-  });
-
-  await setPrimaryDomain(env.DB, domains[0].name);
-  if (input.portalHostname) {
-    await upsertWorkspaceHost(env.DB, {
-      hostname: input.portalHostname,
-      zoneId:
-        domains.find((domain) => input.portalHostname?.endsWith(`.${domain.name}`))?.zoneId ?? null,
-      kind: "portal",
-      canonical: true
-    });
-  }
-  await setChecklistAcknowledged(env.DB, input.checklistAcknowledged);
-
-  const mailboxes: Mailbox[] = [];
-  for (const mailbox of input.mailboxes) {
-    mailboxes.push(await createMailbox(env.DB, mailbox));
-  }
-  const defaultFromMailbox = mailboxes.find(
-    (mailbox) => mailbox.address === input.defaultFromMailboxAddress
-  );
-  if (!defaultFromMailbox) {
-    throw new AppError(
-      "DEFAULT_FROM_MAILBOX_REQUIRED",
-      "Choose one of the setup mailboxes as the default From mailbox.",
-      400
+    const domains = input.emailDomains ?? [{ name: input.primaryDomain ?? "" }];
+    if (!domains[0]?.name) throw new AppError("DOMAIN_REQUIRED", "Choose an email domain.", 400);
+    assertLoginEmailOutsideDomains(
+      input.ownerEmail,
+      domains.map((domain) => domain.name)
     );
+
+    for (const domain of domains) {
+      await upsertMailDomain(env.DB, {
+        ...domain,
+        receivingStatus: "ready",
+        sendingStatus: "ready",
+        dnsStatus: "ready"
+      });
+    }
+
+    await heartbeat.renew();
+    const owner = await signUpOwnerUser(env, request, {
+      email: input.ownerEmail,
+      name: input.ownerName,
+      password: input.ownerPassword,
+      role: "owner"
+    });
+    await heartbeat.renew();
+
+    await setPrimaryDomain(env.DB, domains[0].name);
+    if (input.portalHostname) {
+      await upsertWorkspaceHost(env.DB, {
+        hostname: input.portalHostname,
+        zoneId:
+          domains.find((domain) => input.portalHostname?.endsWith(`.${domain.name}`))?.zoneId ??
+          null,
+        kind: "portal",
+        canonical: true
+      });
+    }
+    await setChecklistAcknowledged(env.DB, input.checklistAcknowledged);
+
+    const mailboxes: Mailbox[] = [];
+    for (const mailbox of input.mailboxes) {
+      mailboxes.push(await createMailbox(env.DB, mailbox));
+    }
+    const defaultFromMailbox = mailboxes.find(
+      (mailbox) => mailbox.address === input.defaultFromMailboxAddress
+    );
+    if (!defaultFromMailbox) {
+      throw new AppError(
+        "DEFAULT_FROM_MAILBOX_REQUIRED",
+        "Choose one of the setup mailboxes as the default From mailbox.",
+        400
+      );
+    }
+    await setDefaultFromMailboxId(env.DB, owner.id, defaultFromMailbox.id);
+
+    await heartbeat.renew();
+    await completeSetupIfReady(env.DB);
+
+    return {
+      owner,
+      mailboxes,
+      setup: await getSetupStatus(env.DB)
+    };
+  } finally {
+    await heartbeat.stop().catch(() => undefined);
+    await releaseBootstrapLock(env.DB, lock).catch(() => undefined);
   }
-  await setDefaultFromMailboxId(env.DB, owner.id, defaultFromMailbox.id);
-
-  await completeSetupIfReady(env.DB);
-
-  return {
-    owner,
-    mailboxes,
-    setup: await getSetupStatus(env.DB)
-  };
 }
 
 export async function completeSetupIfReady(db: D1Database): Promise<SetupStatus> {
