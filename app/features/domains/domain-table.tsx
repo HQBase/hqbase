@@ -15,10 +15,12 @@ import type { MailDomain } from "./types";
 export function DomainTable({
   domains,
   pendingDomainId,
+  onEnableSending,
   onToggle
 }: {
   domains: MailDomain[];
   pendingDomainId: string | null;
+  onEnableSending: (domain: MailDomain) => void;
   onToggle: (domain: MailDomain) => void;
 }): React.ReactElement {
   return (
@@ -67,20 +69,34 @@ export function DomainTable({
               </Badge>
             </TableCell>
             <TableCell className="text-right">
-              <Button
-                aria-label={`${domain.isEnabled ? "Disable" : "Enable"} ${domain.name}`}
-                disabled={pendingDomainId === domain.id}
-                size="sm"
-                type="button"
-                variant="outline"
-                onClick={() => onToggle(domain)}
-              >
-                {pendingDomainId === domain.id
-                  ? "Updating…"
-                  : domain.isEnabled
-                    ? "Disable"
-                    : "Enable"}
-              </Button>
+              <div className="flex justify-end gap-2">
+                {domain.isEnabled && domain.sendingStatus !== "ready" && domain.zoneId ? (
+                  <Button
+                    aria-label={`Enable sending for ${domain.name}`}
+                    disabled={pendingDomainId === domain.id}
+                    size="sm"
+                    type="button"
+                    variant="outline"
+                    onClick={() => onEnableSending(domain)}
+                  >
+                    Enable sending
+                  </Button>
+                ) : null}
+                <Button
+                  aria-label={`${domain.isEnabled ? "Disable" : "Enable"} ${domain.name}`}
+                  disabled={pendingDomainId === domain.id}
+                  size="sm"
+                  type="button"
+                  variant="outline"
+                  onClick={() => onToggle(domain)}
+                >
+                  {pendingDomainId === domain.id
+                    ? "Updating…"
+                    : domain.isEnabled
+                      ? "Disable"
+                      : "Enable"}
+                </Button>
+              </div>
             </TableCell>
           </TableRow>
         ))}

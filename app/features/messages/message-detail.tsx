@@ -11,7 +11,7 @@ import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { PullToRefresh } from "@/components/ui/pull-to-refresh";
-import type { ComposeMode } from "@/features/compose/compose-state";
+import { type ComposeMode, sendingIdentities } from "@/features/compose/compose-state";
 import type { Mailbox } from "@/features/mailboxes/types";
 import type { MailFolderId } from "@/lib/routes";
 import { ConversationMessages } from "./conversation-messages";
@@ -70,6 +70,7 @@ export function MessageDetail({
   onSent
 }: MessageDetailProps): React.ReactElement {
   const [composeState, setComposeState] = React.useState<ThreadComposeState | null>(null);
+  const canSend = sendingIdentities(mailboxes).length > 0;
 
   if (isLoading) {
     return <MessageReaderStatus label="Loading conversation" />;
@@ -181,7 +182,12 @@ export function MessageDetail({
       <PullToRefresh className="min-h-0 flex-1" onRefresh={onRefresh}>
         <ConversationMessages
           messages={messages}
-          onCompose={(message, mode) => setComposeState({ message, mode })}
+          {...(canSend
+            ? {
+                onCompose: (message: MessageDetailType, mode: ThreadComposeMode) =>
+                  setComposeState({ message, mode })
+              }
+            : {})}
         />
         {composeState ? (
           <div className="px-4 pb-8 pt-2 sm:px-6">

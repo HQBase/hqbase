@@ -16,6 +16,7 @@ export type MailboxAddress = {
   displayName: string;
   receiveEnabled: boolean;
   sendEnabled: boolean;
+  sendAvailable: boolean;
   isPrimary: boolean;
 };
 
@@ -27,6 +28,8 @@ export type MailboxAddressRow = {
   display_name: string;
   receive_enabled: number;
   send_enabled: number;
+  sending_status: "pending" | "ready" | "degraded" | "disabled";
+  domain_is_enabled: number;
   is_primary: number;
 };
 

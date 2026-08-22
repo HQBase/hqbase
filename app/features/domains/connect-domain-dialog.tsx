@@ -2,6 +2,7 @@ import * as React from "react";
 import { PiPlus } from "react-icons/pi";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogClose,
@@ -12,7 +13,7 @@ import {
   DialogTitle,
   DialogTrigger
 } from "@/components/ui/dialog";
-import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
+import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field";
 import {
   Select,
   SelectContent,
@@ -44,6 +45,7 @@ export function ConnectDomainDialog({
   const [zones, setZones] = React.useState<CloudflareZone[]>([]);
   const [zoneId, setZoneId] = React.useState("");
   const [name, setName] = React.useState("");
+  const [enableSending, setEnableSending] = React.useState(true);
   const [pending, setPending] = React.useState(false);
 
   const loadZones = React.useCallback(async () => {
@@ -82,7 +84,7 @@ export function ConnectDomainDialog({
     event.preventDefault();
     setPending(true);
     try {
-      await provisionDomain({ zoneId, name, enableSending: true });
+      await provisionDomain({ zoneId, name, enableSending });
       reset();
       onConnected();
       toast.success("Domain connected.");
@@ -95,6 +97,7 @@ export function ConnectDomainDialog({
 
   function reset() {
     setName("");
+    setEnableSending(true);
     setZoneId("");
     setZones([]);
   }
@@ -139,6 +142,21 @@ export function ConnectDomainDialog({
                     </SelectGroup>
                   </SelectContent>
                 </Select>
+              </Field>
+              <Field className="grid grid-cols-[auto_1fr] items-start gap-x-2.5 gap-y-1">
+                <Checkbox
+                  checked={enableSending}
+                  id="connect-domain-enable-sending"
+                  onCheckedChange={(checked) => setEnableSending(checked === true)}
+                />
+                <div className="grid gap-1 leading-none">
+                  <FieldLabel htmlFor="connect-domain-enable-sending">
+                    Enable outbound sending
+                  </FieldLabel>
+                  <FieldDescription>
+                    Requires Workers Paid. Clear this option for receive-only mail.
+                  </FieldDescription>
+                </div>
               </Field>
             </FieldGroup>
             <DialogFooter>

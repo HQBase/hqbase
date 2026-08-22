@@ -37,6 +37,8 @@ export function mapMailboxAddress(row: MailboxAddressRow): MailboxAddress {
     displayName: row.display_name,
     receiveEnabled: row.receive_enabled === 1,
     sendEnabled: row.send_enabled === 1,
+    sendAvailable:
+      row.send_enabled === 1 && row.domain_is_enabled === 1 && row.sending_status === "ready",
     isPrimary: row.is_primary === 1
   };
 }
@@ -49,9 +51,11 @@ export async function addressMap(
   if (mailboxIds.length === 0) return mapped;
   const rows = await getRows<MailboxAddressRow>(
     db,
-    sql`SELECT id, mailbox_id, mail_domain_id, address, display_name,
-     receive_enabled, send_enabled, is_primary
-     FROM mailbox_addresses
+    sql`SELECT a.id, a.mailbox_id, a.mail_domain_id, a.address, a.display_name,
+     a.receive_enabled, a.send_enabled, a.is_primary, d.sending_status,
+     d.is_enabled AS domain_is_enabled
+     FROM mailbox_addresses a
+     JOIN mail_domains d ON d.id = a.mail_domain_id
      WHERE mailbox_id IN (${sql.join(
        mailboxIds.map((mailboxId) => sql`${mailboxId}`),
        sql`, `
@@ -158,7 +162,8 @@ export async function findMailboxById(db: D1Database, id: string): Promise<Mailb
 export async function insertMailbox(
   db: D1Database,
   input: CreateMailboxInput,
-  mailDomainId: string
+  mailDomainId: string,
+  sendingReady: boolean
 ): Promise<Mailbox> {
   const timestamp = nowIso();
   const id = newId("mbx");
@@ -201,6 +206,7 @@ export async function insertMailbox(
         displayName: input.displayName,
         receiveEnabled: true,
         sendEnabled: true,
+        sendAvailable: sendingReady,
         isPrimary: true
       }
     ],
@@ -215,7 +221,8 @@ export async function insertMailboxAddress(
   db: D1Database,
   mailboxId: string,
   mailDomainId: string,
-  input: CreateMailboxAddressInput
+  input: CreateMailboxAddressInput,
+  sendingReady: boolean
 ): Promise<MailboxAddress> {
   const id = newId("addr");
   const timestamp = nowIso();
@@ -243,6 +250,7 @@ export async function insertMailboxAddress(
     displayName: input.displayName,
     receiveEnabled: input.receiveEnabled !== false,
     sendEnabled: input.sendEnabled !== false,
+    sendAvailable: input.sendEnabled !== false && sendingReady,
     isPrimary: false
   };
 }

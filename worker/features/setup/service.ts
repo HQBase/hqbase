@@ -27,10 +27,11 @@ type BootstrapInput = {
         name: string;
         zoneId?: string | null | undefined;
         accountId?: string | null | undefined;
+        sendingStatus: "ready" | "disabled";
       }>
     | undefined;
   checklistAcknowledged: boolean;
-  defaultFromMailboxAddress: string;
+  defaultFromMailboxAddress: string | null;
   mailboxes: Array<{
     address: string;
     displayName: string;
@@ -50,8 +51,33 @@ export async function bootstrapSetup(
     throw new AppError("SETUP_OWNER_EXISTS", "An owner user already exists.", 409);
   }
 
-  const domains = input.emailDomains ?? [{ name: input.primaryDomain ?? "" }];
+  const domains = input.emailDomains ?? [
+    { name: input.primaryDomain ?? "", sendingStatus: "ready" as const }
+  ];
   if (!domains[0]?.name) throw new AppError("DOMAIN_REQUIRED", "Choose an email domain.", 400);
+  const sendingDomains = new Set(
+    domains.filter((domain) => domain.sendingStatus === "ready").map((domain) => domain.name)
+  );
+  const defaultFromDomain = input.defaultFromMailboxAddress?.split("@")[1];
+  if (
+    sendingDomains.size > 0 &&
+    (!input.defaultFromMailboxAddress ||
+      !defaultFromDomain ||
+      !sendingDomains.has(defaultFromDomain))
+  ) {
+    throw new AppError(
+      "DEFAULT_FROM_MAILBOX_REQUIRED",
+      "Choose one of the setup mailboxes on a send-enabled domain as the default From mailbox.",
+      400
+    );
+  }
+  if (sendingDomains.size === 0 && input.defaultFromMailboxAddress !== null) {
+    throw new AppError(
+      "DEFAULT_FROM_MAILBOX_NOT_ALLOWED",
+      "Receive-only setup must not choose a default From mailbox.",
+      400
+    );
+  }
   assertLoginEmailOutsideDomains(
     input.ownerEmail,
     domains.map((domain) => domain.name)
@@ -61,7 +87,7 @@ export async function bootstrapSetup(
     await upsertMailDomain(env.DB, {
       ...domain,
       receivingStatus: "ready",
-      sendingStatus: "ready",
+      sendingStatus: domain.sendingStatus,
       dnsStatus: "ready"
     });
   }
@@ -89,17 +115,19 @@ export async function bootstrapSetup(
   for (const mailbox of input.mailboxes) {
     mailboxes.push(await createMailbox(env.DB, mailbox));
   }
-  const defaultFromMailbox = mailboxes.find(
-    (mailbox) => mailbox.address === input.defaultFromMailboxAddress
-  );
-  if (!defaultFromMailbox) {
-    throw new AppError(
-      "DEFAULT_FROM_MAILBOX_REQUIRED",
-      "Choose one of the setup mailboxes as the default From mailbox.",
-      400
+  if (input.defaultFromMailboxAddress) {
+    const defaultFromMailbox = mailboxes.find(
+      (mailbox) => mailbox.address === input.defaultFromMailboxAddress
     );
+    if (!defaultFromMailbox) {
+      throw new AppError(
+        "DEFAULT_FROM_MAILBOX_REQUIRED",
+        "Choose one of the setup mailboxes as the default From mailbox.",
+        400
+      );
+    }
+    await setDefaultFromMailboxId(env.DB, owner.id, defaultFromMailbox.id);
   }
-  await setDefaultFromMailboxId(env.DB, owner.id, defaultFromMailbox.id);
 
   await completeSetupIfReady(env.DB);
 

@@ -22,7 +22,8 @@ export async function findAddressIdentity(
   >(
     db,
     sql`SELECT a.id, a.mailbox_id, a.mail_domain_id, a.address, a.display_name,
-            a.receive_enabled, a.send_enabled, a.is_primary,
+            a.receive_enabled, a.send_enabled, a.is_primary, d.sending_status,
+            d.is_enabled AS domain_is_enabled,
             m.address AS mailbox_address, m.display_name AS mailbox_display_name,
             m.is_active, m.created_at, m.updated_at
      FROM mailbox_addresses a

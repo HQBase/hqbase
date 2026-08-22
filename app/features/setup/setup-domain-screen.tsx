@@ -27,6 +27,7 @@ export function DomainStep(props: {
   appHostname: string;
   appSubdomain: string;
   connectionError: string | null;
+  enableSending: boolean;
   errors: DomainErrors;
   isLoading: boolean;
   onBack: () => void;
@@ -38,6 +39,7 @@ export function DomainStep(props: {
   selectedZoneIds: string[];
   selectedZones: CloudflareZone[];
   setAppSubdomain: (value: string) => void;
+  setEnableSending: (value: boolean) => void;
   setPortalZoneId: (value: string) => void;
   zones: CloudflareZone[];
 }): React.ReactElement {
@@ -105,6 +107,20 @@ export function DomainStep(props: {
               </div>
             );
           })}
+        </div>
+      </Field>
+
+      <Field className="grid grid-cols-[auto_1fr] items-start gap-x-2.5 gap-y-1">
+        <Checkbox
+          checked={props.enableSending}
+          id="setup-enable-sending"
+          onCheckedChange={(checked) => props.setEnableSending(checked === true)}
+        />
+        <div className="grid gap-1 leading-none">
+          <FieldLabel htmlFor="setup-enable-sending">Enable outbound sending</FieldLabel>
+          <FieldDescription>
+            Requires Workers Paid. Clear this option to create a receive-only workspace.
+          </FieldDescription>
         </div>
       </Field>
 
@@ -250,7 +266,7 @@ function describeReadinessFailure(status: CloudflareConfigureResult["status"]): 
   if (!status.catchAll.enabled || !status.catchAll.configuredForWorker) {
     issues.push(status.catchAll.error ?? "Catch-all is not routing to this HQBase Worker.");
   }
-  if (!status.sending.enabled) {
+  if (status.sendingRequired && !status.sending.enabled) {
     issues.push(status.sending.error ?? "Email Sending is not enabled.");
   }
   return issues.join(" ") || "Cloudflare has not reported this domain as ready yet.";

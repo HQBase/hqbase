@@ -46,6 +46,7 @@ describe("composer state", () => {
               displayName: "Support",
               receiveEnabled: true,
               sendEnabled: true,
+              sendAvailable: true,
               isPrimary: true
             },
             {
@@ -56,6 +57,7 @@ describe("composer state", () => {
               displayName: "Support",
               receiveEnabled: true,
               sendEnabled: false,
+              sendAvailable: false,
               isPrimary: false
             }
           ]
@@ -77,6 +79,7 @@ describe("composer state", () => {
               displayName: "Sales",
               receiveEnabled: true,
               sendEnabled: true,
+              sendAvailable: true,
               isPrimary: true
             }
           ]
@@ -86,6 +89,35 @@ describe("composer state", () => {
       { mailboxId: "mbx_1", address: "support@example.com" },
       { mailboxId: "mbx_2", address: "sales@example.net" }
     ]);
+  });
+
+  it("does not expose an address when its domain cannot send", () => {
+    expect(
+      sendingIdentities([
+        {
+          id: "mbx_1",
+          address: "support@example.com",
+          displayName: "Support",
+          isActive: true,
+          accessLevel: "manager",
+          createdAt: "now",
+          updatedAt: "now",
+          addresses: [
+            {
+              id: "addr_1",
+              mailboxId: "mbx_1",
+              mailDomainId: "dom_1",
+              address: "support@example.com",
+              displayName: "Support",
+              receiveEnabled: true,
+              sendEnabled: true,
+              sendAvailable: false,
+              isPrimary: true
+            }
+          ]
+        }
+      ])
+    ).toEqual([]);
   });
 
   it("uses crash recovery only when it is newer than the server draft", () => {
@@ -219,6 +251,7 @@ describe("composer state", () => {
             displayName: "Support",
             receiveEnabled: true,
             sendEnabled: true,
+            sendAvailable: true,
             isPrimary: true
           }
         ]
@@ -240,6 +273,7 @@ describe("composer state", () => {
             displayName: "Privacy",
             receiveEnabled: true,
             sendEnabled: true,
+            sendAvailable: true,
             isPrimary: true
           }
         ]

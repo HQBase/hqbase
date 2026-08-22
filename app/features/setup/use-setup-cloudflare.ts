@@ -23,6 +23,7 @@ export function useSetupCloudflare(callbacks: {
   const [portalZoneId, setPortalZoneId] = React.useState("");
   const workerName = React.useMemo(() => inferWorkerName(), []);
   const [appSubdomain, setAppSubdomain] = React.useState("hqbase");
+  const [enableSending, setEnableSending] = React.useState(true);
   const [domainAttempted, setDomainAttempted] = React.useState(false);
   const [connectionError, setConnectionError] = React.useState<string | null>(null);
   const [results, setResults] = React.useState<ConfiguredDomain[]>([]);
@@ -37,7 +38,8 @@ export function useSetupCloudflare(callbacks: {
     ...selectedZoneIds.slice().sort(),
     portalZoneId,
     appHostname,
-    workerName
+    workerName,
+    enableSending ? "send" : "receive-only"
   ].join(":");
   const domainConnected = Boolean(
     configuredKey === currentConnectionKey &&
@@ -96,7 +98,7 @@ export function useSetupCloudflare(callbacks: {
         const result = await configureCloudflareDomain({
           ...(isPortal ? { appHostname } : {}),
           attachCustomDomain: isPortal,
-          enableSending: true,
+          enableSending,
           workerName: workerName.trim(),
           zoneId: zone.id
         });
@@ -155,6 +157,7 @@ export function useSetupCloudflare(callbacks: {
     domain: {
       appHostname,
       appSubdomain,
+      enableSending,
       connectionError,
       errors: domainErrors,
       isLoading,
@@ -167,10 +170,16 @@ export function useSetupCloudflare(callbacks: {
       onConnect: () => void handleDomainConnect(),
       onToggleZone: toggleZone,
       setAppSubdomain: (value: string) => update(() => setAppSubdomain(value)),
+      setEnableSending: (value: boolean) => update(() => setEnableSending(value)),
       setPortalZoneId: (value: string) => update(() => setPortalZoneId(value))
     },
     domainConnected,
-    emailDomains: selectedZones.map(({ accountId, id, name }) => ({ accountId, name, zoneId: id })),
+    emailDomains: selectedZones.map(({ accountId, id, name }) => ({
+      accountId,
+      name,
+      sendingStatus: enableSending ? ("ready" as const) : ("disabled" as const),
+      zoneId: id
+    })),
     primaryDomain,
     portalHostname: appHostname,
     requireConnection(message = "Connect the domains before continuing.") {

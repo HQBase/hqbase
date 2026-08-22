@@ -27,14 +27,15 @@ export const bootstrapSetupSchema = z
         z.object({
           name: domainSchema,
           zoneId: z.string().trim().min(1).max(64).nullable().optional(),
-          accountId: z.string().trim().min(1).max(64).nullable().optional()
+          accountId: z.string().trim().min(1).max(64).nullable().optional(),
+          sendingStatus: z.enum(["ready", "disabled"])
         })
       )
       .min(1)
       .max(50)
       .optional(),
     checklistAcknowledged: z.literal(true),
-    defaultFromMailboxAddress: emailAddressSchema,
+    defaultFromMailboxAddress: emailAddressSchema.nullable(),
     mailboxes: z.array(createMailboxSchema).min(1).max(20)
   })
   .superRefine((input, context) => {
@@ -75,10 +76,28 @@ export const bootstrapSetupSchema = z
       }
       seen.add(mailbox.address);
     }
-    if (!input.mailboxes.some((mailbox) => mailbox.address === input.defaultFromMailboxAddress)) {
+    const sendingDomains = new Set(
+      input.emailDomains
+        ?.filter((domain) => domain.sendingStatus === "ready")
+        .map((domain) => domain.name) ?? domains
+    );
+    const defaultFromMailbox = input.mailboxes.find(
+      (mailbox) => mailbox.address === input.defaultFromMailboxAddress
+    );
+    const defaultFromDomain = defaultFromMailbox?.address.split("@")[1];
+    if (
+      sendingDomains.size > 0 &&
+      (!defaultFromMailbox || !defaultFromDomain || !sendingDomains.has(defaultFromDomain))
+    ) {
       context.addIssue({
         code: "custom",
-        message: "Choose one of the setup mailboxes as the default From mailbox.",
+        message: "Choose a mailbox on a send-enabled domain as the default From mailbox.",
+        path: ["defaultFromMailboxAddress"]
+      });
+    } else if (sendingDomains.size === 0 && input.defaultFromMailboxAddress !== null) {
+      context.addIssue({
+        code: "custom",
+        message: "Receive-only setup must not choose a default From mailbox.",
         path: ["defaultFromMailboxAddress"]
       });
     }
@@ -90,6 +109,7 @@ export const listCloudflareZonesSchema = z.object({}).strict();
 
 export const inspectCloudflareDomainSchema = z.object({
   workerName: z.string().trim().min(1).max(63).optional(),
+  requireSending: z.boolean().optional(),
   zoneId: z.string().trim().min(1).max(64)
 });
 

@@ -12,6 +12,7 @@ import {
   TemporaryPasswordSetupPage
 } from "@/features/auth/password-setup-page";
 import type { CurrentUser } from "@/features/auth/types";
+import { sendingIdentities } from "@/features/compose/compose-state";
 import { DraftsPage } from "@/features/drafts/drafts-page";
 import { useDrafts } from "@/features/drafts/use-drafts";
 import { InboxPage } from "@/features/inbox/inbox-page";
@@ -70,6 +71,10 @@ export function App(): React.ReactElement {
   const contentMailboxes = React.useMemo(
     () => mailboxes.filter((mailbox) => mailbox.accessLevel !== null),
     [mailboxes]
+  );
+  const canSend = React.useMemo(
+    () => sendingIdentities(contentMailboxes).length > 0,
+    [contentMailboxes]
   );
   const canManageUpdates =
     !user?.passwordSetupRequired && (user?.role === "owner" || user?.role === "admin");
@@ -204,9 +209,7 @@ export function App(): React.ReactElement {
         onOpenUpdates={() => {
           navigate({ kind: "settings", tab: "updates" });
         }}
-        onCompose={() => {
-          setComposeOpen(true);
-        }}
+        {...(canSend ? { onCompose: () => setComposeOpen(true) } : {})}
         onFolderChange={(folder) => {
           navigate(
             folder === "settings"

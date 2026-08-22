@@ -26,7 +26,19 @@ const setup = {
 const mailbox: Mailbox = {
   id: "mailbox-1",
   address: "support@example.com",
-  addresses: [],
+  addresses: [
+    {
+      id: "address-1",
+      mailboxId: "mailbox-1",
+      mailDomainId: "domain-1",
+      address: "support@example.com",
+      displayName: "Support",
+      receiveEnabled: true,
+      sendEnabled: true,
+      sendAvailable: true,
+      isPrimary: true
+    }
+  ],
   displayName: "Support",
   isActive: true,
   accessLevel: "manager",
@@ -38,6 +50,19 @@ const secondDomainMailbox: Mailbox = {
   ...mailbox,
   id: "mailbox-2",
   address: "privacy@example.net",
+  addresses: [
+    {
+      id: "address-2",
+      mailboxId: "mailbox-2",
+      mailDomainId: "domain-2",
+      address: "privacy@example.net",
+      displayName: "Privacy",
+      receiveEnabled: true,
+      sendEnabled: true,
+      sendAvailable: true,
+      isPrimary: true
+    }
+  ],
   displayName: "Privacy"
 };
 
@@ -229,6 +254,25 @@ describe("settings presentation", () => {
     expect(html).toContain('aria-label="Filter mailboxes by domain"');
   });
 
+  it("does not offer a default From mailbox for a receive-only domain", () => {
+    const receiveOnlyMailbox: Mailbox = {
+      ...mailbox,
+      addresses: mailbox.addresses.map((address) => ({ ...address, sendAvailable: false }))
+    };
+    const html = renderToStaticMarkup(
+      <MailboxSettings
+        canManage
+        defaultFromMailboxId={null}
+        mailboxes={[receiveOnlyMailbox]}
+        users={[member]}
+        onChanged={() => undefined}
+        onDefaultFromMailboxChange={() => undefined}
+      />
+    );
+
+    expect(html).not.toContain("Default From mailbox");
+  });
+
   it("only shows one bulk action after mailbox selection", () => {
     expect(
       renderToStaticMarkup(<MailboxSelectionBar selectedCount={0} onManage={() => undefined} />)
@@ -259,7 +303,12 @@ describe("settings presentation", () => {
 
   it("renders connected domains in the compact settings table", () => {
     const html = renderToStaticMarkup(
-      <DomainTable domains={[connectedDomain]} pendingDomainId={null} onToggle={() => undefined} />
+      <DomainTable
+        domains={[connectedDomain]}
+        pendingDomainId={null}
+        onEnableSending={() => undefined}
+        onToggle={() => undefined}
+      />
     );
 
     expect(html).toContain(">Domain<");

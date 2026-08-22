@@ -142,6 +142,7 @@ export function MailboxStep({
   errors,
   isPending,
   mailboxes,
+  sendingEnabled,
   onAdd,
   onBack,
   onComplete,
@@ -154,6 +155,7 @@ export function MailboxStep({
   errors: MailboxErrors;
   isPending: boolean;
   mailboxes: MailboxDraft[];
+  sendingEnabled: boolean;
   onAdd: () => void;
   onBack: () => void;
   onComplete: () => void;
@@ -248,29 +250,35 @@ export function MailboxStep({
         Add mailbox
       </Button>
 
-      <Field className="max-w-md">
-        <FieldLabel htmlFor="setup-default-from-mailbox">Default From mailbox</FieldLabel>
-        <Select value={defaultFromMailboxAddress} onValueChange={onSetDefaultFromMailboxAddress}>
-          <SelectTrigger id="setup-default-from-mailbox" className="w-full shadow-none">
-            <SelectValue placeholder="Choose a mailbox" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectGroup>
-              {mailboxes
-                .filter((mailbox) => mailbox.address)
-                .map((mailbox, index) => (
-                  <SelectItem key={`${index}:${mailbox.address}`} value={mailbox.address}>
-                    {mailbox.displayName || "Mailbox"} — {mailbox.address}
-                  </SelectItem>
-                ))}
-            </SelectGroup>
-          </SelectContent>
-        </Select>
-        <FieldDescription>
-          New messages and forwards start from this mailbox. Replies use the mailbox that received
-          the original message.
-        </FieldDescription>
-      </Field>
+      {sendingEnabled ? (
+        <Field className="max-w-md">
+          <FieldLabel htmlFor="setup-default-from-mailbox">Default From mailbox</FieldLabel>
+          <Select value={defaultFromMailboxAddress} onValueChange={onSetDefaultFromMailboxAddress}>
+            <SelectTrigger id="setup-default-from-mailbox" className="w-full shadow-none">
+              <SelectValue placeholder="Choose a mailbox" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectGroup>
+                {mailboxes
+                  .filter((mailbox) => mailbox.address)
+                  .map((mailbox, index) => (
+                    <SelectItem key={`${index}:${mailbox.address}`} value={mailbox.address}>
+                      {mailbox.displayName || "Mailbox"} — {mailbox.address}
+                    </SelectItem>
+                  ))}
+              </SelectGroup>
+            </SelectContent>
+          </Select>
+          <FieldDescription>
+            New messages and forwards start from this mailbox. Replies use the mailbox that received
+            the original message.
+          </FieldDescription>
+        </Field>
+      ) : (
+        <p className="max-w-md text-sm text-muted-foreground">
+          These mailboxes can receive mail. Enable sending later in Settings → Domains.
+        </p>
+      )}
 
       {errors.form ? <FieldError>{errors.form}</FieldError> : null}
       {submitError ? (

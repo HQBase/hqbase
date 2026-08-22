@@ -28,7 +28,7 @@ type TopBarProps = {
   mailboxId: string;
   search: string;
   unread: UnreadCounts;
-  onCompose: () => void;
+  onCompose?: (() => void) | undefined;
   onFolderChange: (folder: FolderId) => void;
   onMailboxChange: (mailboxId: string) => void;
   onSearchChange: (search: string) => void;
@@ -81,7 +81,7 @@ export function TopBar({
         mailboxes={mailboxes}
         unread={unread}
         user={user}
-        onCompose={onCompose}
+        {...(onCompose ? { onCompose } : {})}
         onFolderChange={onFolderChange}
         onMailboxChange={onMailboxChange}
         onSettingsTabChange={onSettingsTabChange}
