@@ -115,7 +115,7 @@ export function renderPreviewFixture(input: FixtureInput): React.ReactNode {
         connectionError={
           readinessError ? "Cloudflare needs attention on one or more checks below." : null
         }
-        enableSending
+        enableSending={true}
         errors={{}}
         isLoading={false}
         onBack={() => undefined}
@@ -166,7 +166,7 @@ export function renderPreviewFixture(input: FixtureInput): React.ReactNode {
       errors={{ rows: input.mailboxes.map(() => ({})) }}
       isPending={input.state === "submitting"}
       mailboxes={input.mailboxes}
-      sendingEnabled
+      sendingEnabled={true}
       onAdd={() => input.setMailboxes((current) => [...current, { address: "", displayName: "" }])}
       onBack={() => undefined}
       onComplete={() => undefined}
