@@ -1,13 +1,18 @@
 import type { WorkerEnv } from "../../lib/env";
 import { AppError } from "../../lib/errors";
 import { parseWith } from "../../lib/validation";
-import { addDraftAttachment, deleteDraft, saveDraft } from "../drafts/queries";
+import {
+  addDraftAttachment,
+  deleteDraft,
+  removeDraftAttachment,
+  saveDraft
+} from "../drafts/queries";
 import { findMailboxForSending } from "../mailboxes/queries";
 import { getMessageDetail } from "../messages/queries";
 import type { MessageDetail } from "../messages/types";
 
 import { sendNewMessage } from "./service";
-import { type ForwardMessageInput, sendMessageSchema } from "./validation";
+import { type ForwardMessageInput, type SendMessageInput, sendMessageSchema } from "./validation";
 
 const maxForwardedAttachments = 20;
 
@@ -34,13 +39,7 @@ export async function forwardMessage(env: WorkerEnv, input: ForwardMessageInput,
     return sendNewMessage(env, outbound, userId);
   }
 
-  if (original.attachments.length + input.attachmentIds.length > maxForwardedAttachments) {
-    throw new AppError(
-      "ATTACHMENTS_TOO_MANY",
-      "A forwarded message may contain at most 20 attachments.",
-      400
-    );
-  }
+  requireForwardedAttachmentCount(original.attachments.length, input.attachmentIds.length);
 
   const draft = await saveDraft(env.DB, userId, {
     mailboxId: mailbox.id,
@@ -56,26 +55,14 @@ export async function forwardMessage(env: WorkerEnv, input: ForwardMessageInput,
     version: undefined
   });
 
-  const copiedAttachmentIds: string[] = [];
+  let copiedAttachmentIds: string[];
   try {
-    for (const attachment of original.attachments) {
-      const object = await env.MAIL_OBJECTS.get(attachment.r2Key);
-      if (!object) {
-        throw new AppError(
-          "ATTACHMENT_NOT_FOUND",
-          "A forwarded attachment object is unavailable.",
-          404
-        );
-      }
-      const file = new File([await object.arrayBuffer()], attachment.filename, {
-        type: attachment.contentType
-      });
-      const added = await addDraftAttachment(env.DB, userId, draft.id, file);
-      await env.MAIL_OBJECTS.put(added.r2Key, file.stream(), {
-        httpMetadata: { contentType: added.attachment.contentType }
-      });
-      copiedAttachmentIds.push(added.attachment.id);
-    }
+    copiedAttachmentIds = await copyOriginalAttachments(
+      env,
+      userId,
+      draft.id,
+      original.attachments
+    );
   } catch (error) {
     await deleteDraft(env.DB, env.MAIL_OBJECTS, userId, draft.id);
     throw error;
@@ -90,6 +77,96 @@ export async function forwardMessage(env: WorkerEnv, input: ForwardMessageInput,
     }),
     userId
   );
+}
+
+export async function sendForwardDraft(
+  env: WorkerEnv,
+  input: SendMessageInput,
+  draftId: string,
+  originalMessageId: string,
+  userId: string
+) {
+  const original = await getMessageDetail(env.DB, originalMessageId);
+  if (!original) throw new AppError("MESSAGE_NOT_FOUND", "Message not found.", 404);
+  if (original.attachments.length === 0) {
+    return sendNewMessage(env, { ...input, draftId }, userId);
+  }
+
+  requireForwardedAttachmentCount(original.attachments.length, input.attachmentIds.length);
+  const copiedAttachmentIds = await copyOriginalAttachments(
+    env,
+    userId,
+    draftId,
+    original.attachments
+  );
+  try {
+    return await sendNewMessage(
+      env,
+      {
+        ...input,
+        attachmentIds: [...input.attachmentIds, ...copiedAttachmentIds],
+        draftId
+      },
+      userId
+    );
+  } catch (error) {
+    await removeCopiedAttachments(env, userId, draftId, copiedAttachmentIds);
+    throw error;
+  }
+}
+
+async function copyOriginalAttachments(
+  env: WorkerEnv,
+  userId: string,
+  draftId: string,
+  attachments: MessageDetail["attachments"]
+): Promise<string[]> {
+  const copiedAttachmentIds: string[] = [];
+  try {
+    for (const attachment of attachments) {
+      const object = await env.MAIL_OBJECTS.get(attachment.r2Key);
+      if (!object) {
+        throw new AppError(
+          "ATTACHMENT_NOT_FOUND",
+          "A forwarded attachment object is unavailable.",
+          404
+        );
+      }
+      const file = new File([await object.arrayBuffer()], attachment.filename, {
+        type: attachment.contentType
+      });
+      const added = await addDraftAttachment(env.DB, userId, draftId, file);
+      copiedAttachmentIds.push(added.attachment.id);
+      await env.MAIL_OBJECTS.put(added.r2Key, file.stream(), {
+        httpMetadata: { contentType: added.attachment.contentType }
+      });
+    }
+    return copiedAttachmentIds;
+  } catch (error) {
+    await removeCopiedAttachments(env, userId, draftId, copiedAttachmentIds);
+    throw error;
+  }
+}
+
+async function removeCopiedAttachments(
+  env: WorkerEnv,
+  userId: string,
+  draftId: string,
+  attachmentIds: string[]
+): Promise<void> {
+  for (const attachmentId of attachmentIds) {
+    await removeDraftAttachment(env.DB, env.MAIL_OBJECTS, userId, draftId, attachmentId);
+  }
+}
+
+function requireForwardedAttachmentCount(originalCount: number, draftCount: number): void {
+  if (originalCount + draftCount > maxForwardedAttachments) {
+    throw new AppError(
+      "ATTACHMENTS_TOO_MANY",
+      "A forwarded message may contain at most 20 attachments.",
+      400
+    );
+  }
 }
 
 export function forwardedBody(
