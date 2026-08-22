@@ -139,7 +139,7 @@ export function useMailEvents(
     };
 
     const runFallbackPoll = (): void => {
-      if (!canConnect() || socketIsOpen() || fallbackInFlight) return;
+      if (!canConnect() || socketIsOpen() || fallbackTimer !== null || fallbackInFlight) return;
       fallbackInFlight = true;
       setStatus("fallback");
       void Promise.resolve()

@@ -161,6 +161,29 @@ describe("useMailEvents", () => {
     await hook.unmount();
   });
 
+  it("keeps failed reconnects within the fallback polling cadence", async () => {
+    vi.useFakeTimers();
+    vi.spyOn(crypto, "getRandomValues").mockImplementation((values) => {
+      if (values instanceof Uint32Array) values[0] = 0;
+      return values;
+    });
+    const callbacks = handlers();
+    callbacks.onFallbackPoll.mockResolvedValue(undefined);
+    const hook = await renderHook(() => useMailEvents("user-1", callbacks), undefined);
+    const first = FakeWebSocket.instances[0];
+    await flushHookEffects(() => first?.open());
+    await flushHookEffects(() => first?.close());
+
+    await flushHookEffects(() => vi.advanceTimersByTime(1_000));
+    await flushHookEffects(() => FakeWebSocket.instances[1]?.close());
+    await flushHookEffects(() => vi.advanceTimersByTime(28_999));
+    expect(callbacks.onFallbackPoll).toHaveBeenCalledOnce();
+
+    await flushHookEffects(() => vi.advanceTimersByTime(1));
+    expect(callbacks.onFallbackPoll).toHaveBeenCalledTimes(2);
+    await hook.unmount();
+  });
+
   it("reports unavailable when both live events and fallback sync fail", async () => {
     const callbacks = handlers();
     callbacks.onFallbackPoll.mockRejectedValue(new Error("API unavailable"));
