@@ -10,7 +10,6 @@ import { attemptRun, emitCommandOutput, run } from "./command.mjs";
 export function deploySource(cwd, options = {}) {
   const execute = options.run ?? run;
   const attempt = options.attempt ?? attemptRun;
-  const workersCi = options.workersCi ?? process.env.WORKERS_CI === "1";
   const workerName = options.workerName ?? workerNameFromConfigFile(resolve(cwd, "wrangler.jsonc"));
   const deployArgs = [
     "exec",
@@ -21,11 +20,6 @@ export function deploySource(cwd, options = {}) {
     `HQBASE_WORKER_NAME:${workerName}`
   ];
   if (options.releaseTag) deployArgs.push("--tag", options.releaseTag);
-
-  if (!workersCi) {
-    execute("pnpm", deployArgs, cwd);
-    return;
-  }
 
   const inspection = attempt(
     "pnpm",

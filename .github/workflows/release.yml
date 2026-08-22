@@ -200,7 +200,6 @@ jobs:
           HQBASE_EXPECTED_RELEASE_VERSION="$previous_version" \
           HQBASE_RELEASE_ARTIFACT_FILE="$previous_archive" \
           HQBASE_RELEASE_MANIFEST_FILE="/tmp/hqbase-previous/stable.json" \
-          WORKERS_CI=1 \
             node scripts/release/deploy.mjs --config "$config"
       - name: Wait for the previous stable release
         if: needs.candidate.outputs.previous_tag != ''
@@ -234,7 +233,6 @@ jobs:
           HQBASE_EXPECTED_RELEASE_VERSION="$CANDIDATE_VERSION" \
           HQBASE_RELEASE_ARTIFACT_FILE="release/hqbase-${CANDIDATE_VERSION}.tar.gz" \
           HQBASE_RELEASE_MANIFEST_FILE="release/stable.json" \
-          WORKERS_CI=1 \
             node scripts/release/deploy.mjs --config "$config"
       - name: Wait for the signed candidate
         run: |

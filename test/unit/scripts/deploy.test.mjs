@@ -267,10 +267,9 @@ describe("HQBase release deployment", () => {
       /HQBASE_FORCE_SOURCE_DEPLOY supports only the repository-root wrangler\.jsonc/
     );
   });
-  it("generates masked auth and Web Push secrets when the first Workers Build needs them", () => {
+  it("generates masked auth and Web Push secrets for a first deployment outside CI", () => {
     let secretFile;
     deploySource("/customer/repo", {
-      workersCi: true,
       workerName: "hqbase-deeptake-test",
       attempt: () => ({
         status: 0,
@@ -313,7 +312,6 @@ describe("HQBase release deployment", () => {
   it("preserves existing secrets and detects only missing installation secrets", () => {
     let deployCalls = 0;
     deploySource("/customer/repo", {
-      workersCi: true,
       workerName: "hqbase-deeptake-test",
       attempt: () => ({
         status: 0,
@@ -359,7 +357,6 @@ describe("HQBase release deployment", () => {
   });
   it("adds a VAPID pair to an existing installation without rotating its auth identity", () => {
     deploySource("/customer/repo", {
-      workersCi: true,
       workerName: "hqbase-existing",
       attempt: () => ({
         status: 0,
