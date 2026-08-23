@@ -35,12 +35,15 @@ export async function publishMessageMailEvent(
 export async function publishMailboxMailEvent(env: WorkerEnv, mailboxId: string): Promise<void> {
   const rows = await getRows<{ id: string }>(
     env.DB,
-    sql`SELECT DISTINCT user_row.id
-        FROM "user" user_row
-        WHERE COALESCE(user_row.banned, 0) = 0
-          AND (user_row.role IN ('owner', 'admin') OR EXISTS (
+    sql`SELECT DISTINCT principal.id
+        FROM principals principal
+        LEFT JOIN "user" user_row
+          ON user_row.id = principal.id AND principal.type = 'user'
+        WHERE principal.status = 'active'
+          AND ((principal.type = 'user' AND COALESCE(user_row.banned, 0) = 0
+                AND user_row.role IN ('owner', 'admin')) OR EXISTS (
             SELECT 1 FROM mailbox_grants grant_row
-            WHERE grant_row.user_id = user_row.id
+            WHERE grant_row.principal_id = principal.id
               AND grant_row.mailbox_id = ${mailboxId}
               AND grant_row.access_level IN ('read', 'agent', 'manager')
           ))`
@@ -128,12 +131,14 @@ async function messageEventUserIds(
   ];
   const includeUnassigned = targets.some((target) => target.isUnassigned);
   const visibility: SQL[] = [];
-  if (includeUnassigned) visibility.push(sql`user_row.role = 'owner'`);
+  if (includeUnassigned) {
+    visibility.push(sql`principal.type = 'user' AND user_row.role = 'owner'`);
+  }
   if (mailboxIds.length > 0) {
     // Admins can manage mailbox metadata, but mail content still requires a mailbox grant.
-    visibility.push(sql`user_row.role = 'owner' OR EXISTS (
+    visibility.push(sql`(principal.type = 'user' AND user_row.role = 'owner') OR EXISTS (
       SELECT 1 FROM mailbox_grants grant_row
-      WHERE grant_row.user_id = user_row.id
+      WHERE grant_row.principal_id = principal.id
         AND grant_row.mailbox_id IN (${sql.join(
           mailboxIds.map((mailboxId) => sql`${mailboxId}`),
           sql`, `
@@ -145,9 +150,12 @@ async function messageEventUserIds(
 
   const rows = await getRows<{ id: string }>(
     db,
-    sql`SELECT DISTINCT user_row.id
-        FROM "user" user_row
-        WHERE COALESCE(user_row.banned, 0) = 0
+    sql`SELECT DISTINCT principal.id
+        FROM principals principal
+        LEFT JOIN "user" user_row
+          ON user_row.id = principal.id AND principal.type = 'user'
+        WHERE principal.status = 'active'
+          AND (principal.type = 'agent' OR COALESCE(user_row.banned, 0) = 0)
           AND (${sql.join(visibility, sql` OR `)})`
   );
   return rows.map((row) => row.id);

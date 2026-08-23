@@ -1,7 +1,7 @@
 import { sql } from "drizzle-orm";
 import { check, index, integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
 
-import { users } from "./schema-auth";
+import { principals } from "./schema-core";
 import { mailboxAddresses, mailboxes } from "./schema-mail";
 
 export const threads = sqliteTable(
@@ -113,9 +113,9 @@ export const drafts = sqliteTable(
   "drafts",
   {
     id: text("id").primaryKey().notNull(),
-    userId: text("user_id")
+    principalId: text("principal_id")
       .notNull()
-      .references(() => users.id, { onDelete: "cascade" }),
+      .references(() => principals.id, { onDelete: "cascade" }),
     mailboxId: text("mailbox_id").references(() => mailboxes.id, { onDelete: "set null" }),
     replyToMessageId: text("reply_to_message_id").references(() => messages.id, {
       onDelete: "set null"
@@ -135,8 +135,8 @@ export const drafts = sqliteTable(
     })
   },
   (table) => [
-    index("drafts_user_updated_id_idx").on(
-      table.userId,
+    index("drafts_principal_updated_id_idx").on(
+      table.principalId,
       sql`${table.updatedAt} DESC`,
       sql`${table.id} DESC`
     ),
@@ -165,12 +165,12 @@ export const draftChanges = sqliteTable(
   {
     sequence: integer("sequence").primaryKey({ autoIncrement: true }),
     draftId: text("draft_id").notNull(),
-    userId: text("user_id").notNull(),
+    principalId: text("principal_id").notNull(),
     kind: text("kind", { enum: ["upsert", "delete"] }).notNull(),
     changedAt: text("changed_at").notNull()
   },
   (table) => [
     check("draft_changes_kind_check", sql`${table.kind} IN ('upsert', 'delete')`),
-    index("draft_changes_user_sequence_idx").on(table.userId, table.sequence)
+    index("draft_changes_principal_sequence_idx").on(table.principalId, table.sequence)
   ]
 );

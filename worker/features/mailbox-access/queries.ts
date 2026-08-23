@@ -3,7 +3,7 @@ import { and, asc, eq } from "drizzle-orm";
 import type { MailboxAccessLevel } from "../../auth/mailbox-access";
 import { nowIso } from "../../db/client";
 import { createDatabase } from "../../db/drizzle";
-import { mailboxGrants } from "../../db/schema";
+import { mailboxGrants, principals } from "../../db/schema";
 
 export type MailboxGrant = {
   mailboxId: string;
@@ -17,13 +17,15 @@ export async function listMailboxGrants(db: D1Database): Promise<MailboxGrant[]>
   return createDatabase(db)
     .select({
       mailboxId: mailboxGrants.mailboxId,
-      userId: mailboxGrants.userId,
+      userId: mailboxGrants.principalId,
       accessLevel: mailboxGrants.accessLevel,
       createdAt: mailboxGrants.createdAt,
       updatedAt: mailboxGrants.updatedAt
     })
     .from(mailboxGrants)
-    .orderBy(asc(mailboxGrants.mailboxId), asc(mailboxGrants.userId));
+    .innerJoin(principals, eq(principals.id, mailboxGrants.principalId))
+    .where(eq(principals.type, "user"))
+    .orderBy(asc(mailboxGrants.mailboxId), asc(mailboxGrants.principalId));
 }
 
 export async function setMailboxGrant(
@@ -38,15 +40,15 @@ export async function setMailboxGrant(
     .insert(mailboxGrants)
     .values({
       mailboxId,
-      userId,
+      principalId: userId,
       accessLevel,
-      createdBy: actorId,
+      createdByPrincipalId: actorId,
       createdAt: timestamp,
       updatedAt: timestamp
     })
     .onConflictDoUpdate({
-      target: [mailboxGrants.mailboxId, mailboxGrants.userId],
-      set: { accessLevel, createdBy: actorId, updatedAt: timestamp }
+      target: [mailboxGrants.mailboxId, mailboxGrants.principalId],
+      set: { accessLevel, createdByPrincipalId: actorId, updatedAt: timestamp }
     })
     .run();
 }
@@ -58,7 +60,7 @@ export async function revokeMailboxGrant(
 ): Promise<boolean> {
   const result = await createDatabase(db)
     .delete(mailboxGrants)
-    .where(and(eq(mailboxGrants.mailboxId, mailboxId), eq(mailboxGrants.userId, userId)))
+    .where(and(eq(mailboxGrants.mailboxId, mailboxId), eq(mailboxGrants.principalId, userId)))
     .run();
   return (result.meta.changes ?? 0) > 0;
 }

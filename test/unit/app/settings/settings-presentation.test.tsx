@@ -28,6 +28,7 @@ const mailbox: Mailbox = {
   address: "support@example.com",
   addresses: [],
   displayName: "Support",
+  kind: "human",
   isActive: true,
   accessLevel: "manager",
   createdAt: "2026-07-20T00:00:00.000Z",
@@ -81,7 +82,7 @@ const notifications = {
 };
 
 describe("settings presentation", () => {
-  it("offers MCP and the deployment-local Agent Skill on the MCP page", () => {
+  it("offers account and agentic-mailbox connection paths in Settings", () => {
     const html = renderToStaticMarkup(
       <McpSettings
         user={{
@@ -95,10 +96,11 @@ describe("settings presentation", () => {
       />
     );
 
-    expect(html).toContain("Connecting as");
+    expect(html).toContain("Connect AI agents");
+    expect(html).toContain("Your account");
+    expect(html).toContain("Agentic mailbox");
     expect(html).toContain("MCP");
     expect(html).toContain("Agent Skill");
-    expect(html).not.toContain("Connect AI agent");
   });
 
   it("renders mailbox content at the top level and opens creation from a dialog trigger", () => {
@@ -214,7 +216,7 @@ describe("settings presentation", () => {
         [member],
         false
       )
-    ).toBe("Owners · Manager, Avery Stone · Agent");
+    ).toBe("Owners · Manager, Avery Stone · Handle mail");
   });
 
   it("shows the domain filter only when there are multiple domains", () => {

@@ -3,6 +3,7 @@ export type Mailbox = {
   address: string;
   addresses: MailboxAddress[];
   displayName: string;
+  kind: "human" | "agent";
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -34,6 +35,7 @@ export type MailboxRow = {
   id: string;
   address: string;
   display_name: string;
+  kind: "human" | "agent";
   is_active: number;
   created_at: string;
   updated_at: string;

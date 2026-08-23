@@ -12,6 +12,15 @@ describe("Mail API public artifacts", () => {
     expect(openApi.paths["/api/v1/messages"].get.security).toContainEqual({
       oauth2: ["mail:read"]
     });
+    expect(openApi.paths["/api/v1/messages"].get.security).toContainEqual({ agentBearer: [] });
+    expect(openApi.paths["/api/v1/messages"].get["x-hqbase-agent-capabilities"]).toEqual([
+      "mail:read"
+    ]);
+    expect(openApi.components.securitySchemes.agentBearer).toMatchObject({
+      type: "http",
+      scheme: "bearer",
+      bearerFormat: "hqb_agent_<secret>"
+    });
     expect(openApi.paths["/api/v1/changes"].get.security).toContainEqual({
       oauth2: ["mail:read"]
     });
@@ -42,6 +51,9 @@ describe("Mail API public artifacts", () => {
       oauth2: ["mail:send"]
     });
     expect(
+      openApi.paths["/api/v1/messages/{id}/remote-media/trust"].post.security
+    ).not.toContainEqual({ agentBearer: [] });
+    expect(
       openApi.paths["/api/v1/messages/{id}/{action}"].post.parameters.find(
         (parameter) => parameter.name === "action"
       ).schema.enum
@@ -59,6 +71,7 @@ describe("Mail API public artifacts", () => {
     const serialized = JSON.stringify(postman);
     expect(serialized).toContain("/.well-known/oauth-protected-resource/api/v1");
     expect(serialized).toContain("/api/auth/oauth2/register");
+    expect(serialized).toContain("hqb_agent_ credential");
     expect(serialized).toContain("{{ws_base_url}}/api/v1/events");
     expect(postman.variable).toContainEqual({
       key: "ws_base_url",

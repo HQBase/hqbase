@@ -1,6 +1,6 @@
 import { type Context, Hono } from "hono";
 
-import { requireMailApiContext } from "../../auth/mail-api";
+import { requireMailApiPrincipal } from "../../auth/mail-api";
 import { requireAuthContext, requireRole } from "../../auth/session";
 import type { HonoApp } from "../../lib/env";
 import { readJson } from "../../lib/json";
@@ -21,8 +21,8 @@ export const mailboxRoutes = new Hono<HonoApp>();
 export const mailboxReadRoutes = new Hono<HonoApp>();
 
 const listForUser = async (c: Context<HonoApp>) => {
-  const auth = await requireMailApiContext(c.env, c.req.raw, "mail:read");
-  return c.json(await listMailboxesForUser(c.env.DB, auth.user.id, auth.user.role));
+  const auth = await requireMailApiPrincipal(c.env, c.req.raw, "mail:read");
+  return c.json(await listMailboxesForUser(c.env.DB, auth.principal.id, auth.principal.role));
 };
 
 mailboxRoutes.get("/", listForUser);

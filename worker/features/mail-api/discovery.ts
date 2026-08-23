@@ -3,34 +3,24 @@ import mailApiDocumentSource from "../../../api/hqbase-mail-api-v1.openapi.json"
 import { authOrigin } from "../../auth/auth";
 import type { WorkerEnv } from "../../lib/env";
 
-const agentSkillPath = "/skills/hqbase-mail/SKILL.md";
+const humanMailSkillPath = "/skills/hqbase-mail/SKILL.md";
+const mailboxAgentSkillPath = "/skills/hqbase-mailbox/SKILL.md";
+const provisionerSkillPath = "/skills/hqbase-provisioner/SKILL.md";
 const mailApiOpenApiPath = "/api/v1/openapi.json";
 
-const legacyAgentInstructionPaths = new Set(["/AGENTS.md", "/agents.md"]);
+const retiredAgentInstructionPaths = new Set(["/AGENTS.md", "/agents.md"]);
 
 const publicDiscoveryCacheControl = "public, max-age=300";
-const apiMethods = ["get", "post", "patch", "delete"] as const;
-
-type ApiMethod = (typeof apiMethods)[number];
-type OpenApiOperation = {
-  security?: Array<{ oauth2?: string[] }>;
-  summary?: string;
-  tags?: string[];
-};
-type OpenApiDocument = {
-  paths: Record<string, Partial<Record<ApiMethod, OpenApiOperation>>>;
-};
-
-const mailApiDocument: OpenApiDocument = mailApiDocumentSource;
-const mailApiMethodIndex = buildMethodIndex(mailApiDocument);
 
 export function handleMailApiDiscovery(request: Request, env: WorkerEnv): Response | null {
   const pathname = new URL(request.url).pathname;
-  const isLegacyAgentInstructionPath = legacyAgentInstructionPaths.has(pathname);
+  const isRetiredAgentInstructionPath = retiredAgentInstructionPaths.has(pathname);
   if (
-    pathname !== agentSkillPath &&
+    pathname !== humanMailSkillPath &&
+    pathname !== mailboxAgentSkillPath &&
+    pathname !== provisionerSkillPath &&
     pathname !== mailApiOpenApiPath &&
-    !isLegacyAgentInstructionPath
+    !isRetiredAgentInstructionPath
   ) {
     return null;
   }
@@ -46,13 +36,16 @@ export function handleMailApiDiscovery(request: Request, env: WorkerEnv): Respon
   }
 
   const origin = authOrigin(env, request);
-  if (isLegacyAgentInstructionPath) {
-    headers.set("location", `${origin}${agentSkillPath}`);
-    return new Response(null, { status: 308, headers });
-  }
-
   const responseBody =
-    pathname === agentSkillPath ? buildAgentSkill(origin) : buildInstanceOpenApi(origin);
+    pathname === mailApiOpenApiPath
+      ? buildInstanceOpenApi(origin)
+      : pathname === humanMailSkillPath
+        ? buildHumanMailSkill(origin)
+        : pathname === mailboxAgentSkillPath
+          ? buildMailboxAgentSkill(origin)
+          : pathname === provisionerSkillPath
+            ? buildProvisionerSkill(origin)
+            : buildRetirementNotice();
   return new Response(request.method === "HEAD" ? null : responseBody, { headers });
 }
 
@@ -62,8 +55,8 @@ function buildInstanceOpenApi(origin: string): string {
       ...mailApiDocumentSource,
       servers: [{ url: origin, description: "This HQBase installation" }],
       externalDocs: {
-        description: "Connect an AI agent to this HQBase installation",
-        url: `${origin}${agentSkillPath}`
+        description: "Connect through the HQBase Mail API with human approval",
+        url: `${origin}${humanMailSkillPath}`
       }
     },
     null,
@@ -71,7 +64,7 @@ function buildInstanceOpenApi(origin: string): string {
   )}\n`;
 }
 
-function buildAgentSkill(origin: string): string {
+function buildHumanMailSkill(origin: string): string {
   const apiBase = `${origin}/api/v1`;
   const openApiUrl = `${origin}${mailApiOpenApiPath}`;
   const resourceMetadataUrl = `${origin}/.well-known/oauth-protected-resource/api/v1`;
@@ -79,12 +72,12 @@ function buildAgentSkill(origin: string): string {
 
   return `---
 name: hqbase-mail
-description: Connect to and operate this HQBase installation through its Mail API. Use when a person asks to read, search, organize, draft, or send mail in HQBase.
+description: Use human OAuth to operate mail available to a signed-in person in this HQBase installation.
 ---
 
-# HQBase Mail
+# HQBase Mail for Your Account
 
-This document explains how an AI agent can connect to and operate this HQBase installation through its public Mail API.
+Use this skill when a person asks an AI agent to work with mail available to their HQBase account. For a machine identity, use the separate mailbox-agent or provisioner skill shown in **Settings → Connect AI agents**.
 
 ## Instance
 
@@ -98,7 +91,7 @@ The OpenAPI document is authoritative for query parameters, request bodies, resp
 
 ## Authentication
 
-External agents must use an OAuth bearer token. Do not copy or reuse an HQBase browser session cookie.
+Use OAuth. Do not copy or reuse an HQBase browser session cookie.
 
 1. Fetch the OAuth protected-resource metadata.
 2. Fetch the advertised authorization-server metadata.
@@ -109,26 +102,61 @@ External agents must use an OAuth bearer token. Do not copy or reuse an HQBase b
 7. Continue polling after \`authorization_pending\`. Increase the wait after \`slow_down\`. Stop after success, \`access_denied\`, \`expired_token\`, or another terminal error.
 8. Send the access token as \`Authorization: Bearer <access-token>\`.
 
-Prefer Device Authorization for agents, command-line tools, and other clients that cannot safely receive a browser callback. A callback-capable client may instead register \`authorization_code\` and use Authorization Code with PKCE and the S256 challenge method. Both flows require the same resource, scopes, sign-in, and explicit approval.
+Prefer Device Authorization for command-line tools and other clients that cannot safely receive a browser callback. A callback-capable client may instead register \`authorization_code\` and use Authorization Code with PKCE and the S256 challenge method. Both flows require the same resource, scopes, sign-in, and explicit approval.
 
 Native desktop and mobile clients that use Authorization Code with PKCE must register with \`application_type\` set to \`native\`. HQBase accepts the native redirect forms defined by RFC 8252: app-claimed HTTPS, loopback HTTP, and private-use schemes. A private-use redirect must use a reverse-domain scheme with no authority component, for example \`com.example.mail:/oauth/callback\`.
 
 Use this exact OAuth resource and token audience: \`${apiBase}\`. MCP uses separate audiences at \`${origin}/mcp\` and \`${origin}/mcp/full\`; an MCP token cannot be used with the Mail API.
 
-## Permissions
+Request only the permissions needed for the person's task. Add \`offline_access\` only when the client needs a refresh token.
+
+${buildMailApiGuide(apiBase, openApiUrl)}
+`;
+}
+
+function buildMailboxAgentSkill(origin: string): string {
+  const apiBase = `${origin}/api/v1`;
+  const openApiUrl = `${origin}${mailApiOpenApiPath}`;
+
+  return `---
+name: hqbase-mailbox
+description: Operate one assigned HQBase mailbox with a mailbox-agent bearer credential.
+---
+
+# HQBase Mailbox Agent
+
+Use this skill only with a mailbox-agent credential created in **Settings → Agents** or returned by an approved provisioner.
+
+## Instance
+
+- Instance origin: ${origin}
+- API base URL: ${apiBase}
+- OpenAPI contract: ${openApiUrl}
+
+The OpenAPI document is authoritative for request and response shapes. Fetch it before constructing a request. Do not guess payload shapes.
+
+## Authentication
+
+Send the credential as \`Authorization: Bearer <agent-credential>\`. HQBase credentials currently start with \`hqb_agent_\`, but the prefix does not identify their permissions. This credential works only with the Mail API, only for its machine identity, and only while the agent and mailbox grant are active.
+
+Do not exchange the credential through OAuth. Do not use it with MCP or the Management API. Never log it or put it in a prompt, URL, or mail content.
+
+${buildMailApiGuide(apiBase, openApiUrl)}
+`;
+}
+
+function buildMailApiGuide(apiBase: string, openApiUrl: string): string {
+  return `## Permissions
 
 - \`mail:read\` — List visible mailboxes and conversations, search and open messages, render message HTML, and download attachments.
-- \`mail:write\` — Mark mail read or unread, add or remove stars, archive or unarchive mail, move mail to Trash, restore mail, and trust remote images from a sender.
+- \`mail:write\` — Mark mail read or unread, add or remove stars, archive or unarchive mail, move mail to Trash, and restore mail. A mailbox agent cannot change a person's remote-image trust preferences.
 - \`mail:send\` — Create and manage drafts and attachments, send new messages, reply, and forward.
-- \`offline_access\` — Request an optional refresh token. This is not an API endpoint permission.
 
-OAuth permissions do not override HQBase mailbox access. The connected person must also have the necessary Read or Agent mailbox grant. This API never grants Manager access.
+Permissions do not override HQBase mailbox access. The caller must also have the necessary Read or Handle mail grant. Machine agents never inherit owner access or see unassigned catch-all mail. This API never grants Manager access.
 
-## API methods
+## API contract
 
-${mailApiMethodIndex}
-
-The method index is an orientation aid. Consult ${openApiUrl} for exact parameters, payloads, action values, and schemas.
+Fetch ${openApiUrl} for the available methods, parameters, payloads, action values, schemas, content types, and error responses.
 
 ## Operating rules
 
@@ -141,16 +169,15 @@ The method index is an orientation aid. Consult ${openApiUrl} for exact paramete
 - List mailboxes before each change cycle. Remove cached mail for mailboxes that are no longer readable, and bootstrap each newly readable mailbox.
 - Repeat a full draft bootstrap when mailbox access changes so newly hidden or visible drafts are reconciled.
 - Ignore response fields you do not recognize.
-- Do not log access tokens, refresh tokens, message bodies, or attachments.
-- Do not log device codes or user codes, and do not paste them into unrelated chats or tools.
-- Do not send, reply, or forward unless that external action matches the person's request.
+- Do not log credentials, access tokens, refresh tokens, message bodies, or attachments.
+- Do not send, reply, or forward unless that external action matches the authorized task.
 - Sending, replying, and forwarding are not idempotent. Never retry them blindly.
 - Use the returned draft version when updating a draft so newer work is not overwritten.
 - A \`410 CHANGE_CURSOR_EXPIRED\` response requires a new full message bootstrap. A \`410 DRAFT_CHANGE_CURSOR_EXPIRED\` response requires a new full draft bootstrap.
 
 ## Errors
 
-JSON errors contain a stable \`error.code\` and human-readable \`error.message\`. A missing or invalid token returns \`401\`; insufficient OAuth scope or mailbox access returns \`403\`. Responses include \`X-Request-Id\`. Retain that identifier when reporting a failure, but never include credentials or private mail content.
+JSON errors contain a stable \`error.code\` and human-readable \`error.message\`. A missing or invalid credential returns \`401\`; insufficient permission or mailbox access returns \`403\`. Responses include \`X-Request-Id\`. Retain that identifier when reporting a failure, but never include credentials or private mail content.
 
 ## API boundary and stability
 
@@ -160,27 +187,69 @@ The Mail API covers mailboxes, messages, conversations, attachments, drafts, sen
 `;
 }
 
-function buildMethodIndex(document: OpenApiDocument): string {
-  const groups = new Map<string, string[]>();
-  for (const [path, pathItem] of Object.entries(document.paths)) {
-    for (const method of apiMethods) {
-      const operation = pathItem[method];
-      if (!operation) continue;
-      const tag = operation.tags?.[0] ?? "Mail API";
-      const scopes = [
-        ...new Set(operation.security?.flatMap((security) => security.oauth2 ?? []) ?? [])
-      ];
-      const permission = scopes.length > 0 ? ` Requires \`${scopes.join(" ")}\`.` : "";
-      const description = operation.summary ? ` — ${operation.summary}.` : ".";
-      const entries = groups.get(tag) ?? [];
-      entries.push(`- \`${method.toUpperCase()} ${path}\`${description}${permission}`);
-      groups.set(tag, entries);
-    }
-  }
+function buildProvisionerSkill(origin: string): string {
+  const managementBase = `${origin}/management/v1`;
+  const mailboxSkillUrl = `${origin}${mailboxAgentSkillPath}`;
 
-  return [...groups.entries()]
-    .map(([tag, entries]) => `### ${tag}\n\n${entries.join("\n")}`)
-    .join("\n\n");
+  return `---
+name: hqbase-provisioner
+description: Create mailbox agents and mailboxes with a trusted HQBase provisioner credential.
+---
+
+# HQBase Provisioner
+
+Use this skill only with a provisioner credential created in **Settings → Agents**. A provisioner is a trusted control-plane service because it receives every child mailbox credential that it creates.
+
+## Instance
+
+- Instance origin: ${origin}
+- Management API base URL: ${managementBase}
+- Child mailbox skill: ${mailboxSkillUrl}
+
+## Authentication
+
+Send the provisioner credential as \`Authorization: Bearer <provisioner-credential>\`. HQBase credentials currently start with \`hqb_agent_\`, but the prefix does not identify their permissions. The stored provisioner profile and \`mailbox:provision\` permission are authoritative.
+
+This credential works only with the Management API. It cannot read or send mail and does not work with the Mail API or MCP. Never log the provisioner credential or a child credential, and never put one in a prompt, URL, or mail content.
+
+## Create a mailbox agent
+
+Send one JSON request to \`POST ${managementBase}/agents\`:
+
+\`\`\`json
+{
+  "profile": "mailbox",
+  "name": "Orders agent",
+  "accessLevel": "agent",
+  "mailbox": {
+    "address": "orders-agent@example.com",
+    "displayName": "Orders agent"
+  }
+}
+\`\`\`
+
+\`accessLevel\` is \`read\` or \`agent\`. The address must use the provisioner's approved domain. Each request creates a new mailbox, its first address, a mailbox agent, and its explicit grant. The provisioner's domain, status, lifetime mailbox limit, and hourly rate limit still apply.
+
+A successful response contains \`agent\` and the new \`credential\` once. Give the child agent its credential and ${mailboxSkillUrl} through a secure channel.
+
+## Recover safely
+
+- \`GET ${managementBase}/agents\` lists only mailbox agents created by this provisioner.
+- \`POST ${managementBase}/agents/{agent-id}/credential\` creates a replacement credential for one listed child. The previous credential stops working immediately.
+
+Mailbox creation is not idempotent. Never retry a create request blindly. If a response is lost, list the provisioner's agents first. If the child exists, replace its credential instead of creating the address again.
+
+## Errors and boundaries
+
+JSON errors contain a stable \`error.code\` and human-readable \`error.message\`. Retain \`X-Request-Id\` when reporting a failure, but never include credentials or private mail content. A provisioner cannot create another provisioner, use an existing mailbox, connect a domain, manage agents created by someone else, or disable agents through this API.
+`;
+}
+
+function buildRetirementNotice(): string {
+  return `# HQBase AI connections
+
+This file is retired. Open **Settings → Connect AI agents** in HQBase to choose the correct Agent Skill or MCP server.
+`;
 }
 
 function publicDiscoveryHeaders(contentType: string): Headers {

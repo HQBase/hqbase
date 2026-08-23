@@ -75,13 +75,27 @@ describe("mobile application shell", () => {
     expect(composeForm).toContain("pb-[max(1rem,env(safe-area-inset-bottom))]");
   });
 
-  it("keeps MCP and Agent Skill connection details in Settings", () => {
+  it("keeps account and agentic-mailbox connections in Settings", () => {
     expect(agentConnectionDetails.match(/h-7 min-h-0 rounded-full/g)).toHaveLength(2);
     expect(mcpConnectionDetails).toContain("text-base sm:text-xs");
     expect(mcpConnectionDetails).toContain('value="read-only"');
     expect(mcpConnectionDetails).toContain('value="mail-actions"');
     expect(mcpSettings).toContain("/mcp/full");
     expect(mcpSettings).toContain("/skills/hqbase-mail/SKILL.md");
+    expect(mcpSettings).toContain("/skills/hqbase-mailbox/SKILL.md");
+    expect(mcpSettings).toContain("/skills/hqbase-provisioner/SKILL.md");
+    expect(mcpSettings).toContain('value="your-account"');
+    expect(mcpSettings).toContain('value="agentic-mailbox"');
+    expect(mcpSettings).not.toContain('value="mailbox-agent"');
+    expect(mcpSettings).not.toContain('value="provisioner"');
+
+    const mailboxAgentIndex = mcpSettings.indexOf('title="Mailbox agent"');
+    const provisionerAgentIndex = mcpSettings.indexOf('title="Provisioner agent"');
+
+    expect(mailboxAgentIndex).toBeGreaterThan(-1);
+    expect(provisionerAgentIndex).toBeGreaterThan(mailboxAgentIndex);
+    expect(mcpSettings).toContain("<Separator />");
+    expect(mcpSettings).toContain("grid-cols-2");
   });
 
   it("keeps agent connection in MCP settings instead of standalone navigation", () => {
@@ -93,6 +107,18 @@ describe("mobile application shell", () => {
     expect(mobileNavigation).not.toContain("Connect AI agent");
     expect(topBar).not.toContain("Connect MCP");
     expect(topBar).not.toContain("Connect AI agent");
+  });
+
+  it("uses a compact desktop mailbox dropdown with agent mailboxes last", () => {
+    expect(topBar).toContain("DropdownMenuTrigger");
+    expect(topBar).toContain('side="bottom"');
+    expect(topBar).not.toContain("SelectTrigger");
+    expect(topBar).toContain('mailbox.kind === "human"');
+    expect(topBar).toContain('mailbox.kind === "agent"');
+    expect(topBar.indexOf("humanMailboxes.map")).toBeLessThan(topBar.indexOf("Agent mailboxes"));
+    expect(topBar.indexOf("Agent mailboxes")).toBeLessThan(topBar.indexOf("agentMailboxes.map"));
+    expect(topBar).toContain("PiRobot");
+    expect(topBar).toContain('className="py-1 text-xs"');
   });
 
   it("keeps editable field text large enough to avoid iOS focus zoom", () => {

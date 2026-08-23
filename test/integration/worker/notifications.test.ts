@@ -32,7 +32,7 @@ describe("notification persistence", () => {
       ).bind(now, now, now, now),
       env.DB.prepare(
         `INSERT INTO mailbox_grants
-         (mailbox_id, user_id, access_level, created_by, created_at, updated_at)
+         (mailbox_id, principal_id, access_level, created_by_principal_id, created_at, updated_at)
          VALUES ('mbx_one', 'usr_member', 'read', 'usr_owner', ?, ?)`
       ).bind(now, now),
       env.DB.prepare(
@@ -146,7 +146,7 @@ describe("notification persistence", () => {
     expect(user).not.toBeNull();
     await env.DB.prepare(
       `INSERT INTO mailbox_grants
-       (mailbox_id, user_id, access_level, created_by, created_at, updated_at)
+       (mailbox_id, principal_id, access_level, created_by_principal_id, created_at, updated_at)
        VALUES ('mbx_one', ?, 'read', 'usr_owner', ?, ?)`
     )
       .bind(user?.id, "2026-07-29T12:00:00.000Z", "2026-07-29T12:00:00.000Z")

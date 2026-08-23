@@ -7,7 +7,7 @@ export function buildDraftSeedLines(timeline) {
       "drafts",
       [
         "id",
-        "user_id",
+        "principal_id",
         "mailbox_id",
         "reply_to_message_id",
         "from_address",
@@ -44,7 +44,7 @@ export function buildDraftSeedLines(timeline) {
       "drafts",
       [
         "id",
-        "user_id",
+        "principal_id",
         "mailbox_id",
         "reply_to_message_id",
         "from_address",
@@ -81,7 +81,7 @@ export function buildDraftSeedLines(timeline) {
       "drafts",
       [
         "id",
-        "user_id",
+        "principal_id",
         "mailbox_id",
         "reply_to_message_id",
         "from_address",
@@ -118,7 +118,7 @@ export function buildDraftSeedLines(timeline) {
       "drafts",
       [
         "id",
-        "user_id",
+        "principal_id",
         "mailbox_id",
         "reply_to_message_id",
         "from_address",

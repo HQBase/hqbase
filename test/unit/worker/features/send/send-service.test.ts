@@ -39,6 +39,7 @@ const mailbox = {
   createdAt: "2026-07-10T00:00:00.000Z",
   displayName: "Support",
   id: "mailbox-1",
+  kind: "human" as const,
   isActive: true,
   updatedAt: "2026-07-10T00:00:00.000Z"
 };

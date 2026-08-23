@@ -135,6 +135,9 @@ jobs:
             "/.well-known/oauth-protected-resource/api/v1"
             "/.well-known/oauth-authorization-server/api/auth"
             "/skills/hqbase-mail/SKILL.md"
+            "/skills/hqbase-mailbox/SKILL.md"
+            "/skills/hqbase-provisioner/SKILL.md"
+            "/agents.md"
           )
 
           probe() {

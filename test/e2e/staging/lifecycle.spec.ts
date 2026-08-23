@@ -233,6 +233,68 @@ test("Track 1 enforces read-only mailbox access and exposes operator diagnostics
   expect(scan.status()).toBe(202);
 });
 
+test("a mailbox agent stays inside its assigned mailbox and revokes cleanly", async ({
+  request
+}) => {
+  const login = await request.post("/api/auth/sign-in/email", {
+    data: { email, password, rememberMe: false },
+    headers: { origin: stagingUrl }
+  });
+  expect(login.ok(), await login.text()).toBeTruthy();
+
+  const mailboxesResponse = await request.get(stagingMailApiPath("/mailboxes"));
+  expect(mailboxesResponse.ok(), await mailboxesResponse.text()).toBeTruthy();
+  const mailboxes = (await mailboxesResponse.json()) as Array<{ id: string; address: string }>;
+  const mailbox = mailboxes.find((item) => item.address === sender);
+  if (!mailbox) throw new Error(`Staging mailbox ${sender} was not found.`);
+
+  const createdResponse = await request.post("/management/v1/agents", {
+    data: {
+      profile: "mailbox",
+      name: `Staging reader ${Date.now()}`,
+      accessLevel: "read",
+      mailbox: { id: mailbox.id }
+    }
+  });
+  expect(createdResponse.status(), await createdResponse.text()).toBe(201);
+  const created = (await createdResponse.json()) as {
+    agent: { id: string };
+    credential: string;
+  };
+  expect(created.credential).toMatch(/^hqb_agent_/u);
+
+  const agentRequest = await playwrightRequest.newContext({
+    baseURL: stagingUrl,
+    extraHTTPHeaders: {
+      ...accessHeaders(),
+      authorization: `Bearer ${created.credential}`
+    }
+  });
+  try {
+    const visible = await agentRequest.get(stagingMailApiPath("/mailboxes"));
+    expect(visible.ok(), await visible.text()).toBeTruthy();
+    expect(await visible.json()).toEqual([expect.objectContaining({ id: mailbox.id })]);
+
+    const wrongResource = await agentRequest.post("/management/v1/agents", {
+      data: {
+        profile: "mailbox",
+        name: "Forbidden child",
+        accessLevel: "read",
+        mailbox: { address: `forbidden@${domain}`, displayName: "Forbidden" }
+      }
+    });
+    expect(wrongResource.status()).toBe(401);
+  } finally {
+    const disabled = await request.patch(`/management/v1/agents/${created.agent.id}`, {
+      data: { isActive: false }
+    });
+    expect(disabled.ok(), await disabled.text()).toBeTruthy();
+    const revoked = await agentRequest.get(stagingMailApiPath("/mailboxes"));
+    expect(revoked.status()).toBe(401);
+    await agentRequest.dispose();
+  }
+});
+
 async function createStagingMember(
   request: APIRequestContext,
   input: { email: string; password: string }

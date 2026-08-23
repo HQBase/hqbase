@@ -6,19 +6,19 @@ const maximumSqliteSequence = 9_223_372_036_854_775_807n;
 export type DraftChangeCursor = {
   after: string;
   highWater: string | null;
-  userId: string;
+  principalId: string;
 };
 
 export function encodeDraftChangeCursor(cursor: DraftChangeCursor): string {
   return btoa(
-    JSON.stringify([draftChangeCursorVersion, cursor.userId, cursor.after, cursor.highWater])
+    JSON.stringify([draftChangeCursorVersion, cursor.principalId, cursor.after, cursor.highWater])
   )
     .replaceAll("+", "-")
     .replaceAll("/", "_")
     .replace(/=+$/u, "");
 }
 
-export function decodeDraftChangeCursor(value: string, userId: string): DraftChangeCursor {
+export function decodeDraftChangeCursor(value: string, principalId: string): DraftChangeCursor {
   try {
     if (value.length === 0 || value.length > 512) throw new Error("Invalid cursor length.");
     const base64 = value.replaceAll("-", "+").replaceAll("_", "/");
@@ -28,14 +28,14 @@ export function decodeDraftChangeCursor(value: string, userId: string): DraftCha
       !Array.isArray(decoded) ||
       decoded.length !== 4 ||
       decoded[0] !== draftChangeCursorVersion ||
-      decoded[1] !== userId ||
+      decoded[1] !== principalId ||
       !isDraftChangeSequence(decoded[2]) ||
       !(decoded[3] === null || isDraftChangeSequence(decoded[3])) ||
       (decoded[3] !== null && BigInt(decoded[2]) > BigInt(decoded[3]))
     ) {
       throw new Error("Invalid cursor payload.");
     }
-    return { after: decoded[2], highWater: decoded[3], userId };
+    return { after: decoded[2], highWater: decoded[3], principalId };
   } catch {
     throw new AppError("INVALID_DRAFT_CHANGE_CURSOR", "Draft change cursor is invalid.", 400);
   }

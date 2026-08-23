@@ -65,6 +65,20 @@ test("deployed HQBase publishes the v1 Mail API OAuth resource", async ({ reques
   expect(skillText).toContain(
     "Do not open, navigate to, or interact with the verification URL in Cloud Browser"
   );
+
+  const mailboxSkill = await getSuccessfulResponseBody(request, "/skills/hqbase-mailbox/SKILL.md");
+  expect(mailboxSkill).toMatch(/^---\nname: hqbase-mailbox\ndescription: [^\n]+\n---/);
+  expect(mailboxSkill).toContain(`${origin}/api/v1/openapi.json`);
+
+  const provisionerSkill = await getSuccessfulResponseBody(
+    request,
+    "/skills/hqbase-provisioner/SKILL.md"
+  );
+  expect(provisionerSkill).toMatch(/^---\nname: hqbase-provisioner\ndescription: [^\n]+\n---/);
+  expect(provisionerSkill).toContain(`${origin}/management/v1`);
+
+  const retiredInstructions = await getSuccessfulResponseBody(request, "/agents.md");
+  expect(retiredInstructions).toContain("Settings → Connect AI agents");
 });
 
 test("customer-managed OAuth starts directly with the exact staging callback", async ({

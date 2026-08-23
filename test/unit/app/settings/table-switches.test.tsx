@@ -13,6 +13,7 @@ const mailbox: Mailbox = {
   address: "support@example.com",
   addresses: [],
   displayName: "Support",
+  kind: "human",
   isActive: true,
   accessLevel: "manager",
   createdAt: "2026-08-23T00:00:00.000Z",

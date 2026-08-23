@@ -16,7 +16,9 @@ import { defaultDraftLimit, listDraftPage } from "./list-queries";
 import { draftIdsForAttachmentIds, getDraft } from "./queries";
 import type { Draft } from "./types";
 
-export type DraftPrincipal = { role: WorkspaceRole; userId: string };
+export type DraftPrincipal =
+  | { id: string; role: WorkspaceRole | null }
+  | { role: WorkspaceRole; userId: string };
 
 export type AccessibleDraftPage = {
   drafts: Draft[];
@@ -45,7 +47,7 @@ export async function listAccessibleDraftPage(
   principal: DraftPrincipal,
   input: { cursor?: string | undefined; limit: number }
 ): Promise<AccessibleDraftPage> {
-  const page = await listDraftPage(env.DB, principal.userId, input);
+  const page = await listDraftPage(env.DB, draftPrincipalId(principal), input);
   return {
     drafts: await filterAccessibleDrafts(env, principal, page.drafts),
     nextCursor: page.nextCursor
@@ -67,7 +69,7 @@ export async function getAccessibleDraft(
   principal: DraftPrincipal,
   draftId: string
 ): Promise<Draft> {
-  const draft = await getDraft(env.DB, principal.userId, draftId);
+  const draft = await getDraft(env.DB, draftPrincipalId(principal), draftId);
   if (!draft) throw new AppError("DRAFT_NOT_FOUND", "Draft not found.", 404);
   await requireDraftAccess(env, principal, draft);
   return draft;
@@ -86,7 +88,11 @@ export async function requireDraftAttachmentIdsAccess(
   principal: DraftPrincipal,
   attachmentIds: string[]
 ): Promise<void> {
-  for (const draftId of await draftIdsForAttachmentIds(env.DB, principal.userId, attachmentIds)) {
+  for (const draftId of await draftIdsForAttachmentIds(
+    env.DB,
+    draftPrincipalId(principal),
+    attachmentIds
+  )) {
     await getAccessibleDraft(env, principal, draftId);
   }
 }
@@ -130,19 +136,24 @@ async function loadDraftAccessContext(
       )
     )
   ];
+  const principalId = draftPrincipalId(principal);
   const [active, mailboxes, messageTargets] = await Promise.all([
-    draftPrincipalIsActive(env.DB, principal.userId),
-    listMailboxesForUser(env.DB, principal.userId, principal.role),
+    draftPrincipalIsActive(env.DB, principalId),
+    listMailboxesForUser(env.DB, principalId, principal.role),
     getDraftMessageTargets(env.DB, messageIds)
   ]);
   return { active, mailboxes, messageTargets };
 }
 
-async function draftPrincipalIsActive(db: D1Database, userId: string): Promise<boolean> {
+export function draftPrincipalId(principal: DraftPrincipal): string {
+  return "id" in principal ? principal.id : principal.userId;
+}
+
+async function draftPrincipalIsActive(db: D1Database, principalId: string): Promise<boolean> {
   const row = await getRow<{ active: number }>(
     db,
-    sql`SELECT CASE WHEN COALESCE(banned, 0) = 0 THEN 1 ELSE 0 END AS active
-        FROM "user" WHERE id = ${userId}`
+    sql`SELECT CASE WHEN status = 'active' THEN 1 ELSE 0 END AS active
+        FROM principals WHERE id = ${principalId}`
   );
   return row?.active === 1;
 }

@@ -28,7 +28,7 @@
     "test:integration": "vitest run --config vitest.worker.config.ts",
     "test:coverage": "vitest run --config vitest.config.ts --coverage",
     "test:architecture": "node scripts/check-architecture.mjs",
-    "api:generate": "node scripts/generate-mail-api-artifacts.mjs --write",
+    "api:generate": "node scripts/generate-mail-api-artifacts.mjs --write && biome format --write api/hqbase-mail-api-v1.openapi.json api/hqbase-mail-api-v1.postman_collection.json api/hqbase-mail-api-v1.postman_environment.json",
     "api:check": "node scripts/generate-mail-api-artifacts.mjs --check",
     "test:pwa": "node scripts/test-pwa.mjs",
     "test:e2e:staging": "playwright test --config playwright.config.ts app-shell-smoke.spec.ts lifecycle.spec.ts",

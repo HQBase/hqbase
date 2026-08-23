@@ -38,7 +38,7 @@ export async function handleMailEventRoute(
     const headers = new Headers({ upgrade: "websocket" });
     headers.set(mailEventInternalHeaders.requestId, requestId);
     headers.set(mailEventInternalHeaders.topics, topics.join(","));
-    headers.set(mailEventInternalHeaders.user, principal.auth.user.id);
+    headers.set(mailEventInternalHeaders.user, principal.principal.id);
     const response = await env.MAIL_EVENTS.getByName(workspaceHubName).fetch(
       new Request(request.url, { headers })
     );
@@ -58,7 +58,10 @@ export async function handleMailEventRoute(
   }
 }
 
-function validateSessionOrigin(request: Request, authentication: "bearer" | "session"): void {
+function validateSessionOrigin(
+  request: Request,
+  authentication: "agent" | "bearer" | "session"
+): void {
   if (authentication !== "session") return;
   const origin = request.headers.get("origin");
   if (origin !== new URL(request.url).origin) {

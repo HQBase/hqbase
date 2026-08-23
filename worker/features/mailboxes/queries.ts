@@ -22,6 +22,7 @@ export function mapMailbox(row: MailboxRow, addresses: MailboxAddress[] = []): M
     address: row.address,
     addresses,
     displayName: row.display_name,
+    kind: row.kind,
     isActive: row.is_active === 1,
     createdAt: row.created_at,
     updatedAt: row.updated_at
@@ -81,8 +82,8 @@ async function listMailboxes(db: D1Database): Promise<Mailbox[]> {
 
 export async function listMailboxesForUser(
   db: D1Database,
-  userId: string,
-  role: WorkspaceRole
+  principalId: string,
+  role: WorkspaceRole | null
 ): Promise<Array<Mailbox & { accessLevel: MailboxAccessLevel | null }>> {
   if (role === "owner") {
     return (await listMailboxes(db)).map((mailbox) => ({ ...mailbox, accessLevel: "manager" }));
@@ -91,7 +92,7 @@ export async function listMailboxesForUser(
   const rows = await getRows<MailboxRow & { access_level: MailboxAccessLevel | null }>(
     db,
     sql`SELECT m.*, g.access_level FROM mailboxes m
-       LEFT JOIN mailbox_grants g ON g.mailbox_id = m.id AND g.user_id = ${userId}
+       LEFT JOIN mailbox_grants g ON g.mailbox_id = m.id AND g.principal_id = ${principalId}
        WHERE ${includeWithoutGrant ? 1 : 0} = 1 OR g.access_level IS NOT NULL
        ORDER BY m.is_active DESC, m.address ASC`
   );
@@ -170,6 +171,7 @@ export async function insertMailbox(
       id,
       address: input.address,
       displayName: input.displayName,
+      kind: "human",
       isActive: true,
       createdAt: timestamp,
       updatedAt: timestamp
@@ -205,6 +207,7 @@ export async function insertMailbox(
       }
     ],
     displayName: input.displayName,
+    kind: "human",
     isActive: true,
     createdAt: timestamp,
     updatedAt: timestamp

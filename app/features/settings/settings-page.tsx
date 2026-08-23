@@ -1,4 +1,5 @@
 import type * as React from "react";
+import { AgentSettings } from "@/features/agents/agent-settings";
 import type { CurrentUser } from "@/features/auth/types";
 import { DomainSettings } from "@/features/domains/domain-settings";
 import { MailboxSettings } from "@/features/mailboxes/mailbox-settings";
@@ -62,6 +63,9 @@ export function SettingsPage({
             onDefaultFromMailboxChange={onDefaultFromMailboxChange}
             onChanged={onRefresh}
           />
+        ) : null}
+        {activeTab === "agents" && canManage ? (
+          <AgentSettings domains={setup.domains} mailboxes={mailboxes} onChanged={onRefresh} />
         ) : null}
         {activeTab === "users" ? (
           canManage ? (
