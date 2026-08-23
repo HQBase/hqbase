@@ -1,4 +1,4 @@
-export type MessageFolder = "inbox" | "sent" | "archived" | "trash" | "catchall";
+type MessageFolder = "inbox" | "sent" | "archived" | "trash" | "catchall";
 
 export type MessageSummary = {
   id: string;

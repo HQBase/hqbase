@@ -38,7 +38,7 @@ export type CloudflareAccessStatus = {
   active: boolean;
 };
 
-export type CloudflareDomainStatus = {
+type CloudflareDomainStatus = {
   zone: CloudflareZone;
   workerName: string;
   routing: {

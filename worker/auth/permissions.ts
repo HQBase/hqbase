@@ -1,9 +1,5 @@
 import type { WorkspaceRole } from "../lib/validation";
 
-export function canManageSetup(role: WorkspaceRole): boolean {
-  return role === "owner" || role === "admin";
-}
-
 export function canManageUsers(role: WorkspaceRole): boolean {
   return role === "owner" || role === "admin";
 }

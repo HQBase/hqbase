@@ -6,7 +6,7 @@ import { mailDomains } from "../../db/schema";
 import { assertDomainUnusedByLoginEmails } from "../../security/login-email";
 import type { CatchAllPolicy, DomainStatus, MailDomain, MailDomainRow } from "./types";
 
-export function mapMailDomain(row: MailDomainRow): MailDomain {
+function mapMailDomain(row: MailDomainRow): MailDomain {
   return {
     id: row.id,
     name: row.name,
@@ -44,7 +44,7 @@ export async function findMailDomainByName(
   return row ? mapMailDomain(row) : null;
 }
 
-export async function findMailDomainById(db: D1Database, id: string): Promise<MailDomain | null> {
+async function findMailDomainById(db: D1Database, id: string): Promise<MailDomain | null> {
   const row = await getRow<MailDomainRow>(db, sql`SELECT * FROM mail_domains WHERE id = ${id}`);
   return row ? mapMailDomain(row) : null;
 }

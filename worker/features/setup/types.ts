@@ -11,16 +11,6 @@ export type SetupStatus = {
   checklistAcknowledged: boolean;
 };
 
-export type WorkspaceHost = {
-  id: string;
-  hostname: string;
-  zoneId: string | null;
-  kind: "portal";
-  isCanonical: boolean;
-  status: "pending" | "ready" | "degraded" | "disabled";
-  verifiedAt: string | null;
-};
-
 export type BootstrapResult = {
   owner: {
     id: string;

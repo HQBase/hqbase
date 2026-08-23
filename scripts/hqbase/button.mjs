@@ -5,7 +5,7 @@ import { rootPath } from "./paths.mjs";
 const buttonPattern =
   /\[!\[Deploy to Cloudflare\]\(https:\/\/deploy\.workers\.cloudflare\.com\/button\)\]\(https:\/\/deploy\.workers\.cloudflare\.com\/\?url=[^)]+\)/;
 
-export function deployButtonMarkdown(repoUrl) {
+function deployButtonMarkdown(repoUrl) {
   validateRepoUrl(repoUrl);
   const encoded = encodeURIComponent(repoUrl);
   return `[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=${encoded})`;

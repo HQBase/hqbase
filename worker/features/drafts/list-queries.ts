@@ -15,7 +15,7 @@ export type DraftPage = {
   nextCursor: string | null;
 };
 
-export function decodeDraftCursor(value: string) {
+function decodeDraftCursor(value: string) {
   const cursor = decodeKeysetCursor(draftCursorVersion, value);
   if (!cursor) throw new AppError("INVALID_DRAFT_CURSOR", "Draft cursor is invalid.", 400);
   return { id: cursor.id, updatedAt: cursor.activityAt };

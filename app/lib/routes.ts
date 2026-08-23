@@ -9,11 +9,7 @@ export const mailFolders = [
 
 export const draftFolder = { id: "drafts", label: "Drafts", path: "drafts" } as const;
 
-export const folders = [
-  ...mailFolders,
-  draftFolder,
-  { id: "settings", label: "Settings" }
-] as const;
+const folders = [...mailFolders, draftFolder, { id: "settings", label: "Settings" }] as const;
 
 export const settingsTabs = [
   "mailboxes",
@@ -108,11 +104,7 @@ export function appRoutePath(route: AppRoute): string {
   return route.messageId ? `${base}/${encodeURIComponent(route.messageId)}` : base;
 }
 
-export function isMailFolderId(value: string): value is MailFolderId {
-  return mailFolders.some((folder) => folder.id === value);
-}
-
-export function isSettingsTabId(value: string): value is SettingsTabId {
+function isSettingsTabId(value: string): value is SettingsTabId {
   return settingsTabs.includes(value as SettingsTabId);
 }
 

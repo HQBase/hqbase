@@ -25,10 +25,6 @@ export function configPath(name) {
   return path.join(deploymentDir(name), "wrangler.jsonc");
 }
 
-export function secretsPath(name) {
-  return path.join(deploymentDir(name), "secrets.json");
-}
-
 export function ensureDeploymentDir(name) {
   const dir = deploymentDir(name);
   fs.mkdirSync(dir, { recursive: true });
@@ -64,7 +60,7 @@ export function manifestExists(name) {
   return fs.existsSync(manifestPath(name));
 }
 
-export function deploymentNameFromConfig(configFile) {
+function deploymentNameFromConfig(configFile) {
   const resolvedConfig = path.resolve(configFile);
   if (path.basename(resolvedConfig) !== "wrangler.jsonc") {
     return null;

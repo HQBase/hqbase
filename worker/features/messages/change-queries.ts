@@ -17,7 +17,7 @@ import type { MessageRow, MessageSummary } from "./types";
 export const defaultChangeLimit = 100;
 export const maxChangeLimit = 100;
 
-export type MessageChange =
+type MessageChange =
   | { type: "upsert"; message: MessageSummary }
   | { type: "delete"; messageId: string; mailboxId: string | null };
 

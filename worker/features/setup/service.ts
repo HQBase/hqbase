@@ -126,7 +126,7 @@ export async function bootstrapSetup(
   }
 }
 
-export async function completeSetupIfReady(db: D1Database): Promise<SetupStatus> {
+async function completeSetupIfReady(db: D1Database): Promise<SetupStatus> {
   const status = await getSetupStatus(db);
   const canComplete =
     status.userCount > 0 &&

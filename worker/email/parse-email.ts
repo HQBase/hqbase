@@ -3,7 +3,7 @@ import PostalMime from "postal-mime";
 
 import { parseReferences } from "../features/messages/headers";
 
-export type ParsedAttachment = {
+type ParsedAttachment = {
   filename: string;
   contentType: string;
   contentId: string | null;

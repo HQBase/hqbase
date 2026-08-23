@@ -92,7 +92,7 @@ export async function upsertWorkspaceHost(
   await upsert.run();
 }
 
-export async function countUsers(db: D1Database): Promise<number> {
+async function countUsers(db: D1Database): Promise<number> {
   const row = await getRow<{ count: number }>(db, sql`SELECT COUNT(*) AS count FROM "user"`);
   return row?.count ?? 0;
 }

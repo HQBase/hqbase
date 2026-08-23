@@ -46,7 +46,6 @@
   :root {
     color-scheme: light;
     --star: 42 96% 50%;
-    --star-foreground: 42 96% 50%;
     --background: 0 0% 100%;
     --foreground: 0 0% 9%;
     --card: 0 0% 99%;
@@ -81,7 +80,6 @@
   .dark {
     color-scheme: dark;
     --star: 42 96% 58%;
-    --star-foreground: 42 96% 58%;
     --background: 0 0% 3%;
     --foreground: 0 0% 96%;
     --card: 0 0% 5%;

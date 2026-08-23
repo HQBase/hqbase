@@ -34,28 +34,3 @@ export const InputGroupInput = React.forwardRef<
   />
 ));
 InputGroupInput.displayName = "InputGroupInput";
-
-export const InputGroupAddon = React.forwardRef<
-  HTMLDivElement,
-  React.HTMLAttributes<HTMLDivElement> & { align?: "inline-start" | "inline-end" }
->(({ align = "inline-start", className, ...props }, ref) => (
-  <div
-    className={cn(
-      "flex h-full max-w-[65%] shrink-0 items-center bg-muted/45 px-3 text-sm text-muted-foreground",
-      align === "inline-start" ? "order-first border-r" : "order-last border-l",
-      className
-    )}
-    data-align={align}
-    data-slot="input-group-addon"
-    ref={ref}
-    {...props}
-  />
-));
-InputGroupAddon.displayName = "InputGroupAddon";
-
-export function InputGroupText({
-  className,
-  ...props
-}: React.HTMLAttributes<HTMLSpanElement>): React.ReactElement {
-  return <span className={cn("truncate", className)} {...props} />;
-}

@@ -66,7 +66,7 @@ export async function addressMap(
   return mapped;
 }
 
-export async function listMailboxes(db: D1Database): Promise<Mailbox[]> {
+async function listMailboxes(db: D1Database): Promise<Mailbox[]> {
   const rows = await getRows<MailboxRow>(
     db,
     sql`SELECT * FROM mailboxes ORDER BY is_active DESC, address ASC`
