@@ -1,4 +1,4 @@
-import { extraAddresses, mailboxes } from "./local-seed-data.mjs";
+import { mailboxes } from "./local-seed-data.mjs";
 import { insert, messageColumns, messageValues } from "./local-seed-sql.mjs";
 
 export function buildCuratedMessageLinesB(timeline) {
@@ -23,8 +23,7 @@ export function buildCuratedMessageLinesB(timeline) {
           inReplyTo: "<local-community-inbound@example.test>",
           references: ["<local-community-inbound@example.test>"],
           sentAt: timeline.communityReply,
-          readAt: timeline.communityReply,
-          sentFromAddressId: mailboxes[3].addressId
+          readAt: timeline.communityReply
         },
         timeline.now
       )
@@ -52,7 +51,7 @@ export function buildCuratedMessageLinesB(timeline) {
             "<local-community-reply@example.test>"
           ],
           receivedAt: timeline.communityFollowUp,
-          deliveredToAddressId: mailboxes[3].addressId
+          deliveredToAddress: mailboxes[3].address
         },
         timeline.now
       )
@@ -76,7 +75,7 @@ export function buildCuratedMessageLinesB(timeline) {
           dedupeKey: "local-vendor",
           receivedAt: timeline.vendorReceived,
           archivedAt: timeline.vendorArchived,
-          deliveredToAddressId: mailboxes[1].addressId
+          deliveredToAddress: mailboxes[1].address
         },
         timeline.now
       )
@@ -99,7 +98,7 @@ export function buildCuratedMessageLinesB(timeline) {
           messageId: "<local-support-thread-inbound@example.test>",
           dedupeKey: "local-support-thread-inbound",
           receivedAt: timeline.supportThreadReceived,
-          deliveredToAddressId: mailboxes[0].addressId
+          deliveredToAddress: mailboxes[0].address
         },
         timeline.now
       )
@@ -124,8 +123,7 @@ export function buildCuratedMessageLinesB(timeline) {
           inReplyTo: "<local-support-thread-inbound@example.test>",
           references: ["<local-support-thread-inbound@example.test>"],
           sentAt: timeline.supportThreadReply,
-          readAt: timeline.supportThreadReply,
-          sentFromAddressId: mailboxes[0].addressId
+          readAt: timeline.supportThreadReply
         },
         timeline.now
       )
@@ -153,7 +151,7 @@ export function buildCuratedMessageLinesB(timeline) {
             "<local-support-thread-reply@example.test>"
           ],
           receivedAt: timeline.supportThreadFollowUp,
-          deliveredToAddressId: mailboxes[0].addressId
+          deliveredToAddress: mailboxes[0].address
         },
         timeline.now
       )
@@ -182,8 +180,7 @@ export function buildCuratedMessageLinesB(timeline) {
             "<local-support-thread-followup@example.test>"
           ],
           sentAt: timeline.supportThreadResolved,
-          readAt: timeline.supportThreadResolved,
-          sentFromAddressId: mailboxes[0].addressId
+          readAt: timeline.supportThreadResolved
         },
         timeline.now
       )
@@ -208,7 +205,7 @@ export function buildCuratedMessageLinesB(timeline) {
           dedupeKey: "local-billing",
           receivedAt: timeline.billingReceived,
           starredAt: timeline.billingStarred,
-          deliveredToAddressId: mailboxes[4].addressId
+          deliveredToAddress: mailboxes[4].address
         },
         timeline.now
       )
@@ -232,7 +229,7 @@ export function buildCuratedMessageLinesB(timeline) {
           dedupeKey: "local-hello",
           receivedAt: timeline.helloReceived,
           readAt: timeline.helloRead,
-          deliveredToAddressId: mailboxes[3].addressId
+          deliveredToAddress: mailboxes[3].address
         },
         timeline.now
       )
@@ -255,7 +252,7 @@ export function buildCuratedMessageLinesB(timeline) {
           messageId: "<local-catchall@example.test>",
           dedupeKey: "local-catchall",
           receivedAt: timeline.catchallReceived,
-          deliveredToAddressId: extraAddresses[1].id
+          deliveredToAddress: "unknown@ops.example.test"
         },
         timeline.now
       )
@@ -279,7 +276,7 @@ export function buildCuratedMessageLinesB(timeline) {
           dedupeKey: "local-security",
           receivedAt: timeline.securityReceived,
           starredAt: timeline.securityStarred,
-          deliveredToAddressId: mailboxes[2].addressId
+          deliveredToAddress: mailboxes[2].address
         },
         timeline.now
       )
@@ -303,7 +300,7 @@ export function buildCuratedMessageLinesB(timeline) {
           dedupeKey: "local-welcome",
           receivedAt: timeline.welcomeReceived,
           readAt: timeline.welcomeRead,
-          deliveredToAddressId: mailboxes[0].addressId
+          deliveredToAddress: mailboxes[0].address
         },
         timeline.now
       )

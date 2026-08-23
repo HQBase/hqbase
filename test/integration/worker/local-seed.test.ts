@@ -2,16 +2,8 @@ import { env, SELF } from "cloudflare:test";
 import { hashPassword } from "better-auth/crypto";
 import { beforeAll, describe, expect, it } from "vitest";
 
-import initialMigration from "../../../migrations/0001_initial.sql?raw";
-import workspaceMigration from "../../../migrations/0002_workspace.sql?raw";
-import oauthResourcesMigration from "../../../migrations/0003_oauth_resources.sql?raw";
-import conversationMigration from "../../../migrations/0004_conversations.sql?raw";
-import threadRebuildMigration from "../../../migrations/0005_rebuild_threads.sql?raw";
-import pushMigration from "../../../migrations/0006_push_notifications.sql?raw";
-import userMailPreferencesMigration from "../../../migrations/0007_user_mail_preferences.sql?raw";
-import userOnboardingMigration from "../../../migrations/0008_user_onboarding.sql?raw";
-import loginEmailDomainMigration from "../../../migrations/0009_login_email_domain_isolation.sql?raw";
 import { buildSeedSql } from "../../../scripts/local-seed-fixture.mjs";
+import { applyCurrentMigrations } from "./current-migrations";
 import { migrationStatements } from "./migration-statements";
 
 const origin = "https://hqbase.test";
@@ -19,19 +11,7 @@ const password = "local-seed-password";
 
 describe("local database seed fixture", () => {
   beforeAll(async () => {
-    for (const migration of [
-      initialMigration,
-      workspaceMigration,
-      oauthResourcesMigration,
-      conversationMigration,
-      threadRebuildMigration,
-      pushMigration,
-      userMailPreferencesMigration,
-      userOnboardingMigration,
-      loginEmailDomainMigration
-    ]) {
-      await applyStatements(migration);
-    }
+    await applyCurrentMigrations();
     await applyStatements(
       buildSeedSql(await hashPassword(password), new Date("2026-08-14T18:00:00.000Z"))
     );
@@ -43,7 +23,7 @@ describe("local database seed fixture", () => {
       isComplete: true,
       primaryDomain: "example.test",
       userCount: 4,
-      mailboxCount: 6
+      mailboxCount: 8
     });
 
     const counts = await env.DB.prepare(
@@ -51,27 +31,50 @@ describe("local database seed fixture", () => {
           (SELECT COUNT(*) FROM threads) AS threads,
           (SELECT COUNT(*) FROM messages) AS messages,
           (SELECT COUNT(*) FROM drafts) AS drafts,
-          (SELECT COUNT(*) FROM mailbox_addresses) AS addresses,
+          (SELECT COUNT(*) FROM mailboxes) AS mailboxes,
+          (SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'mailbox_addresses') AS alias_tables,
           (SELECT value_json FROM app_settings WHERE key = 'local_seed_version') AS seed_version`
     ).first<{
       threads: number;
       messages: number;
       drafts: number;
-      addresses: number;
+      mailboxes: number;
+      alias_tables: number;
       seed_version: string;
     }>();
     expect(counts).toEqual({
       threads: 116,
       messages: 123,
       drafts: 4,
-      addresses: 8,
+      mailboxes: 8,
+      alias_tables: 0,
       seed_version: '"local-demo-v3"'
     });
+
+    const promotedMailboxes = await env.DB.prepare(
+      `SELECT id, address, mail_domain_id
+       FROM mailboxes
+       WHERE id IN ('mbx_migrated_addr_local_support_alias',
+                    'mbx_migrated_addr_local_ops_catchall')
+       ORDER BY id`
+    ).all<{ id: string; address: string; mail_domain_id: string }>();
+    expect(promotedMailboxes.results).toEqual([
+      {
+        id: "mbx_migrated_addr_local_ops_catchall",
+        address: "catchall@ops.example.test",
+        mail_domain_id: "dom_local_ops"
+      },
+      {
+        id: "mbx_migrated_addr_local_support_alias",
+        address: "help@example.test",
+        mail_domain_id: "dom_local_demo"
+      }
+    ]);
 
     const deliveries = await env.DB.prepare(
       `SELECT COUNT(*) AS count
        FROM messages
-       WHERE direction = 'inbound' AND delivered_to_address_id IS NOT NULL`
+       WHERE direction = 'inbound' AND delivered_to_address IS NOT NULL`
     ).first<{ count: number }>();
     expect(deliveries?.count).toBe(118);
   });

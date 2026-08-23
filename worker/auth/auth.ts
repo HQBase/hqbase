@@ -169,5 +169,5 @@ export function mcpFullResource(env: WorkerEnv, request: Request): string {
 }
 
 export function mailApiResource(env: WorkerEnv, request: Request): string {
-  return `${authOrigin(env, request)}/api/v1`;
+  return `${authOrigin(env, request)}/api/v2`;
 }

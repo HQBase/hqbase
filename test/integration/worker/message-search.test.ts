@@ -14,8 +14,14 @@ describe("message search", () => {
     const stamp = "2026-08-22T00:00:00.000Z";
     await env.DB.batch([
       env.DB.prepare(
-        `INSERT INTO mailboxes (id, address, display_name, is_active, created_at, updated_at)
-         VALUES (?, 'search@example.com', 'Search', 1, ?, ?)`
+        `INSERT INTO mail_domains
+         (id, name, receiving_status, sending_status, dns_status, is_enabled, created_at, updated_at)
+         VALUES ('dom_search', 'example.com', 'ready', 'ready', 'ready', 1, ?, ?)`
+      ).bind(stamp, stamp),
+      env.DB.prepare(
+        `INSERT INTO mailboxes
+         (id, address, mail_domain_id, display_name, is_active, created_at, updated_at)
+         VALUES (?, 'search@example.com', 'dom_search', 'Search', 1, ?, ?)`
       ).bind(mailboxId, stamp, stamp),
       ...searchMessageRows("percent", "Save 100% today", stamp),
       ...searchMessageRows("percent_noise", "Save 100 dollars today", stamp),

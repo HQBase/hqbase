@@ -6,7 +6,7 @@ import { jsonResponse } from "../../lib/json";
 import { mailEventInternalHeaders } from "./durable-object";
 import type { MailEventTopic } from "./types";
 
-const eventPath = "/api/v1/events";
+const eventPath = "/api/v2/events";
 const workspaceHubName = "workspace";
 
 export async function handleMailEventRoute(

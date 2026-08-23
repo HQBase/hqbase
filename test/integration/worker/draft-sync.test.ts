@@ -12,7 +12,7 @@ import { applyCurrentMigrations } from "./current-migrations";
 import { tokenRow } from "./mail-api-token-fixture";
 
 const origin = "https://hqbase.test";
-const apiResource = `${origin}/api/v1`;
+const apiResource = `${origin}/api/v2`;
 const sendToken = "hqb_access_draft-sync-send-token";
 const readToken = "hqb_access_draft-sync-read-token";
 let userId = "";
@@ -72,6 +72,11 @@ describe("HQBase Mail API draft synchronization", () => {
       )
     ]);
     await env.DB.batch([
+      env.DB.prepare(
+        `INSERT INTO mail_domains
+         (id, name, receiving_status, sending_status, dns_status, is_enabled, created_at, updated_at)
+         VALUES ('dom_draft_sync', 'example.com', 'ready', 'ready', 'ready', 1, ?, ?)`
+      ).bind(stamp, stamp),
       mailboxRow("mbx_draft_sync", "draft-sync@example.com", stamp),
       mailboxRow("mbx_draft_sync_secret", "secret-draft@example.com", stamp),
       grantRow("mbx_draft_sync", stamp),
@@ -97,11 +102,11 @@ describe("HQBase Mail API draft synchronization", () => {
   });
 
   it("starts with a checkpoint and does not replay historical drafts", async () => {
-    const first = await changePage(await apiFetch("/api/v1/drafts/changes", sendToken));
+    const first = await changePage(await apiFetch("/api/v2/drafts/changes", sendToken));
     expect(first).toMatchObject({ changes: [], hasMore: false });
 
     const next = await changePage(
-      await apiFetch(`/api/v1/drafts/changes?cursor=${first.nextCursor}`, sendToken)
+      await apiFetch(`/api/v2/drafts/changes?cursor=${first.nextCursor}`, sendToken)
     );
     expect(next).toMatchObject({ changes: [], hasMore: false });
   });
@@ -126,7 +131,7 @@ describe("HQBase Mail API draft synchronization", () => {
       .run();
 
     const pages: Array<Array<{ id: string; attachments: Array<{ id: string }> }>> = [];
-    let next: string | null = `${origin}/api/v1/drafts?limit=2`;
+    let next: string | null = `${origin}/api/v2/drafts?limit=2`;
     while (next) {
       if (pages.length > 20) throw new Error("Draft pagination did not terminate.");
       const response = await apiFetch(next.slice(origin.length), sendToken);
@@ -165,7 +170,7 @@ describe("HQBase Mail API draft synchronization", () => {
     await env.DB.prepare("DELETE FROM draft_attachments WHERE id = 'att_changes'").run();
 
     const upserts = await changePage(
-      await apiFetch(`/api/v1/drafts/changes?cursor=${cursor}`, sendToken)
+      await apiFetch(`/api/v2/drafts/changes?cursor=${cursor}`, sendToken)
     );
     expect(upserts.hasMore).toBe(false);
     expect(upserts.changes).toHaveLength(3);
@@ -178,7 +183,7 @@ describe("HQBase Mail API draft synchronization", () => {
 
     await env.DB.prepare("DELETE FROM drafts WHERE id = 'drf_changes'").run();
     const deletion = await changePage(
-      await apiFetch(`/api/v1/drafts/changes?cursor=${upserts.nextCursor}`, sendToken)
+      await apiFetch(`/api/v2/drafts/changes?cursor=${upserts.nextCursor}`, sendToken)
     );
     expect(deletion.changes).toEqual([{ type: "delete", draftId: "drf_changes" }]);
   });
@@ -193,7 +198,7 @@ describe("HQBase Mail API draft synchronization", () => {
     ]);
 
     const first = await changePage(
-      await apiFetch(`/api/v1/drafts/changes?cursor=${cursor}&limit=2`, sendToken)
+      await apiFetch(`/api/v2/drafts/changes?cursor=${cursor}&limit=2`, sendToken)
     );
     expect(first.hasMore).toBe(true);
     expect(first.changes.map(upsertId)).toEqual(["drf_cycle_1", "drf_cycle_2"]);
@@ -204,13 +209,13 @@ describe("HQBase Mail API draft synchronization", () => {
       .bind("2026-08-22T03:00:01.000Z", "drf_cycle_1")
       .run();
     const second = await changePage(
-      await apiFetch(`/api/v1/drafts/changes?cursor=${first.nextCursor}&limit=2`, sendToken)
+      await apiFetch(`/api/v2/drafts/changes?cursor=${first.nextCursor}&limit=2`, sendToken)
     );
     expect(second.hasMore).toBe(false);
     expect(second.changes.map(upsertId)).toEqual(["drf_cycle_3"]);
 
     const nextCycle = await changePage(
-      await apiFetch(`/api/v1/drafts/changes?cursor=${second.nextCursor}`, sendToken)
+      await apiFetch(`/api/v2/drafts/changes?cursor=${second.nextCursor}`, sendToken)
     );
     expect(nextCycle.changes.map(upsertId)).toEqual(["drf_cycle_1"]);
   });
@@ -226,14 +231,14 @@ describe("HQBase Mail API draft synchronization", () => {
       .run();
 
     const hidden = await changePage(
-      await apiFetch(`/api/v1/drafts/changes?cursor=${cursor}`, sendToken)
+      await apiFetch(`/api/v2/drafts/changes?cursor=${cursor}`, sendToken)
     );
     expect(hidden.changes).toEqual([]);
 
     await grantRow("mbx_draft_sync", stamp).run();
     await env.DB.prepare("DELETE FROM drafts WHERE id = 'drf_access_revoked'").run();
     const deletion = await changePage(
-      await apiFetch(`/api/v1/drafts/changes?cursor=${hidden.nextCursor}`, sendToken)
+      await apiFetch(`/api/v2/drafts/changes?cursor=${hidden.nextCursor}`, sendToken)
     );
     expect(deletion.changes).toEqual([{ type: "delete", draftId: "drf_access_revoked" }]);
   });
@@ -254,7 +259,7 @@ describe("HQBase Mail API draft synchronization", () => {
       .bind("msg_draft_secret_target")
       .run();
 
-    const listed = await apiFetch("/api/v1/drafts?limit=100", sendToken);
+    const listed = await apiFetch("/api/v2/drafts?limit=100", sendToken);
     expect(listed.status, await listed.clone().text()).toBe(200);
     expect((await listed.json<Array<{ id: string }>>()).map((draft) => draft.id)).not.toContain(
       "drf_secret_target"
@@ -303,28 +308,28 @@ describe("HQBase Mail API draft synchronization", () => {
     );
 
     const page = await changePage(
-      await apiFetch(`/api/v1/drafts/changes?cursor=${cursor}&limit=100`, sendToken)
+      await apiFetch(`/api/v2/drafts/changes?cursor=${cursor}&limit=100`, sendToken)
     );
     expect(page.hasMore).toBe(false);
     expect(page.changes).toHaveLength(100);
   });
 
   it("validates scope, filters, limits, and foreign cursors", async () => {
-    const noSend = await apiFetch("/api/v1/drafts/changes", readToken);
+    const noSend = await apiFetch("/api/v2/drafts/changes", readToken);
     expect(noSend.status).toBe(403);
     expect(noSend.headers.get("www-authenticate")).toContain('scope="mail:send"');
 
     for (const path of [
-      "/api/v1/drafts?limit=0",
-      "/api/v1/drafts?limit=101",
-      "/api/v1/drafts/changes?limit=1.5"
+      "/api/v2/drafts?limit=0",
+      "/api/v2/drafts?limit=101",
+      "/api/v2/drafts/changes?limit=1.5"
     ]) {
       const response = await apiFetch(path, sendToken);
       expect(response.status, path).toBe(400);
       await expect(response.json()).resolves.toMatchObject({ error: { code: "INVALID_LIMIT" } });
     }
 
-    const filtered = await apiFetch("/api/v1/drafts/changes?updatedSince=now", sendToken);
+    const filtered = await apiFetch("/api/v2/drafts/changes?updatedSince=now", sendToken);
     expect(filtered.status).toBe(400);
     await expect(filtered.json()).resolves.toMatchObject({
       error: { code: "INVALID_DRAFT_CHANGE_FILTER" }
@@ -332,7 +337,7 @@ describe("HQBase Mail API draft synchronization", () => {
 
     const messageCursor = encodeChangeCursor({ after: "0", highWater: null });
     const listWithForeignCursor = await apiFetch(
-      `/api/v1/drafts?cursor=${encodeURIComponent(messageCursor)}`,
+      `/api/v2/drafts?cursor=${encodeURIComponent(messageCursor)}`,
       sendToken
     );
     expect(listWithForeignCursor.status).toBe(400);
@@ -347,7 +352,7 @@ describe("HQBase Mail API draft synchronization", () => {
     });
     for (const value of [messageCursor, future]) {
       const response = await apiFetch(
-        `/api/v1/drafts/changes?cursor=${encodeURIComponent(value)}`,
+        `/api/v2/drafts/changes?cursor=${encodeURIComponent(value)}`,
         sendToken
       );
       expect(response.status, value).toBe(400);
@@ -369,7 +374,7 @@ type DraftChangePage = {
 };
 
 async function checkpoint(): Promise<string> {
-  return (await changePage(await apiFetch("/api/v1/drafts/changes", sendToken))).nextCursor;
+  return (await changePage(await apiFetch("/api/v2/drafts/changes", sendToken))).nextCursor;
 }
 
 async function changePage(response: Response): Promise<DraftChangePage> {
@@ -392,8 +397,9 @@ function nextPageUrl(response: Response): string | null {
 
 function mailboxRow(id: string, address: string, stamp: string): D1PreparedStatement {
   return env.DB.prepare(
-    `INSERT INTO mailboxes (id, address, display_name, is_active, created_at, updated_at)
-     VALUES (?, ?, ?, 1, ?, ?)`
+    `INSERT INTO mailboxes
+     (id, address, mail_domain_id, display_name, is_active, created_at, updated_at)
+     VALUES (?, ?, 'dom_draft_sync', ?, 1, ?, ?)`
   ).bind(id, address, id, stamp, stamp);
 }
 

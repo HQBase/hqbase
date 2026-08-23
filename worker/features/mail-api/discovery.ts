@@ -1,10 +1,10 @@
-import mailApiDocumentSource from "../../../api/hqbase-mail-api-v1.openapi.json";
+import mailApiDocumentSource from "../../../api/hqbase-mail-api-v2.openapi.json";
 
 import { authOrigin } from "../../auth/auth";
 import type { WorkerEnv } from "../../lib/env";
 
 const agentSkillPath = "/skills/hqbase-mail/SKILL.md";
-const mailApiOpenApiPath = "/api/v1/openapi.json";
+const mailApiOpenApiPath = "/api/v2/openapi.json";
 
 const legacyAgentInstructionPaths = new Set(["/AGENTS.md", "/agents.md"]);
 
@@ -72,9 +72,9 @@ function buildInstanceOpenApi(origin: string): string {
 }
 
 function buildAgentSkill(origin: string): string {
-  const apiBase = `${origin}/api/v1`;
+  const apiBase = `${origin}/api/v2`;
   const openApiUrl = `${origin}${mailApiOpenApiPath}`;
-  const resourceMetadataUrl = `${origin}/.well-known/oauth-protected-resource/api/v1`;
+  const resourceMetadataUrl = `${origin}/.well-known/oauth-protected-resource/api/v2`;
   const authorizationMetadataUrl = `${origin}/.well-known/oauth-authorization-server/api/auth`;
 
   return `---
@@ -156,7 +156,7 @@ JSON errors contain a stable \`error.code\` and human-readable \`error.message\`
 
 The Mail API covers mailboxes, messages, conversations, attachments, drafts, sending, replying, and forwarding. It does not manage people, mailbox grants, domains, setup, updates, audits, sessions, notifications, app secrets, or Cloudflare credentials.
 
-\`/api/v1\` is HQBase's stable public Mail API. Additive fields and endpoints may appear, so ignore unknown response fields. Breaking changes use a new versioned base path such as \`/api/v2\`.
+\`/api/v2\` is HQBase's stable public Mail API. Additive fields and endpoints may appear, so ignore unknown response fields. Breaking changes use a new versioned base path such as \`/api/v3\`.
 `;
 }
 

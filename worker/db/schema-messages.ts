@@ -2,7 +2,7 @@ import { sql } from "drizzle-orm";
 import { check, index, integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
 
 import { users } from "./schema-auth";
-import { mailboxAddresses, mailboxes } from "./schema-mail";
+import { mailboxes } from "./schema-mail";
 
 export const threads = sqliteTable(
   "threads",
@@ -50,12 +50,7 @@ export const messages = sqliteTable(
     hasAttachments: integer("has_attachments", { mode: "boolean" }).default(sql`0`).notNull(),
     createdAt: text("created_at").notNull(),
     updatedAt: text("updated_at").notNull(),
-    deliveredToAddressId: text("delivered_to_address_id").references(() => mailboxAddresses.id, {
-      onDelete: "set null"
-    }),
-    sentFromAddressId: text("sent_from_address_id").references(() => mailboxAddresses.id, {
-      onDelete: "set null"
-    }),
+    deliveredToAddress: text("delivered_to_address"),
     isUnassigned: integer("is_unassigned", { mode: "boolean" }).default(sql`0`).notNull()
   },
   (table) => [

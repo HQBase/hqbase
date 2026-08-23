@@ -1,10 +1,4 @@
-import {
-  bulkBuckets,
-  bulkSenders,
-  bulkSubjects,
-  extraAddresses,
-  mailboxes
-} from "./local-seed-data.mjs";
+import { bulkBuckets, bulkSenders, bulkSubjects, mailboxes } from "./local-seed-data.mjs";
 import { insert, messageColumns, messageValues } from "./local-seed-sql.mjs";
 
 export function buildBulkSeedLines(seedDate, timeline) {
@@ -32,7 +26,8 @@ export function buildBulkSeedLines(seedDate, timeline) {
               ? "catchall"
               : "inbox";
       const mailboxId = folder === "catchall" ? mailboxes[2].id : mailbox.id;
-      const deliveredToAddressId = folder === "catchall" ? extraAddresses[1].id : mailbox.addressId;
+      const deliveredToAddress =
+        folder === "catchall" ? "unknown@ops.example.test" : mailbox.address;
       const starredAt = bulkIndex % 8 === 0 ? receivedAt : null;
       const readAt =
         bulkIndex % 3 === 0
@@ -66,7 +61,7 @@ export function buildBulkSeedLines(seedDate, timeline) {
               direction: "inbound",
               folder,
               from: sender,
-              to: [mailbox.address],
+              to: [deliveredToAddress],
               subject,
               snippet: `${subject} — bulk seed ${bucket.days}d bucket #${i + 1}`,
               text: `${subject}\n\nThis is bulk seed data for testing. Bucket: ${bucket.days} days ago, item ${i + 1} of ${bucket.count}.`,
@@ -77,7 +72,7 @@ export function buildBulkSeedLines(seedDate, timeline) {
               starredAt,
               archivedAt,
               trashedAt,
-              deliveredToAddressId
+              deliveredToAddress
             },
             timeline.now
           )

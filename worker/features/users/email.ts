@@ -66,15 +66,13 @@ export async function sendPasswordSetupEmail(
 async function invitationSender(db: D1Database): Promise<string | null> {
   const row = await getRow<{ address: string }>(
     db,
-    sql`SELECT address.address
-       FROM mailbox_addresses address
-       JOIN mailboxes mailbox ON mailbox.id = address.mailbox_id
-       JOIN mail_domains domain ON domain.id = address.mail_domain_id
+    sql`SELECT mailbox.address
+       FROM mailboxes mailbox
+       JOIN mail_domains domain ON domain.id = mailbox.mail_domain_id
        WHERE mailbox.is_active = 1
-         AND address.send_enabled = 1
          AND domain.is_enabled = 1
          AND domain.sending_status = 'ready'
-       ORDER BY address.is_primary DESC, mailbox.created_at ASC, address.address ASC
+       ORDER BY mailbox.created_at ASC, mailbox.address ASC
        LIMIT 1`
   );
   return row?.address ?? null;

@@ -175,7 +175,7 @@ export function useMailEvents(
     const connect = (): void => {
       if (!canConnect() || socket !== null) return;
 
-      const url = new URL("/api/v1/events", window.location.href);
+      const url = new URL("/api/v2/events", window.location.href);
       url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
       const next = new WebSocket(url);
       socket = next;

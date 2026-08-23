@@ -38,15 +38,8 @@ describe("workspace user onboarding", () => {
       ).bind(timestamp, timestamp),
       env.DB.prepare(
         `INSERT INTO mailboxes
-         (id, address, display_name, is_active, created_at, updated_at)
-         VALUES ('mailbox_users', 'support@example.com', 'Support', 1, ?, ?)`
-      ).bind(timestamp, timestamp),
-      env.DB.prepare(
-        `INSERT INTO mailbox_addresses
-         (id, mailbox_id, mail_domain_id, local_part, address, display_name,
-          receive_enabled, send_enabled, is_primary, created_at, updated_at)
-         VALUES ('address_users', 'mailbox_users', 'domain_users', 'support',
-                 'support@example.com', 'Support', 1, 1, 1, ?, ?)`
+         (id, address, mail_domain_id, display_name, is_active, created_at, updated_at)
+         VALUES ('mailbox_users', 'support@example.com', 'domain_users', 'Support', 1, ?, ?)`
       ).bind(timestamp, timestamp)
     ]);
   });

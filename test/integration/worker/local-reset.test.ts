@@ -16,6 +16,9 @@ import latestPasswordResetTokenMigration from "../../../migrations/0011_latest_p
 import messageActivityIndexMigration from "../../../migrations/0012_message_activity_index.sql?raw";
 import messageChangesMigration from "../../../migrations/0013_message_changes.sql?raw";
 import unassignedMessagesMigration from "../../../migrations/0014_unassigned_messages.sql?raw";
+import draftChangesMigration from "../../../migrations/0015_draft_changes.sql?raw";
+import oneAddressMigration from "../../../migrations/0016_one_address_per_mailbox.sql?raw";
+import removeAliasStorageMigration from "../../../migrations-after-deploy/0001_remove_mailbox_alias_storage.sql?raw";
 import resetSql from "../../../scripts/hqbase/reset-d1.sql?raw";
 import { buildSeedSql } from "../../../scripts/local-seed-fixture.mjs";
 import { migrationStatements } from "./migration-statements";
@@ -35,7 +38,10 @@ const migrations = [
   latestPasswordResetTokenMigration,
   messageActivityIndexMigration,
   messageChangesMigration,
-  unassignedMessagesMigration
+  unassignedMessagesMigration,
+  draftChangesMigration,
+  oneAddressMigration,
+  removeAliasStorageMigration
 ];
 
 describe("local database reset", () => {
@@ -104,6 +110,22 @@ describe("local database reset", () => {
       name: string;
     }>();
     expect(messageColumns.results.map((column) => column.name)).toContain("is_unassigned");
+    expect(messageColumns.results.map((column) => column.name)).toContain("delivered_to_address");
+
+    const mailboxColumns = await env.DB.prepare("PRAGMA table_info(mailboxes)").all<{
+      name: string;
+    }>();
+    expect(mailboxColumns.results.map((column) => column.name)).toContain("mail_domain_id");
+    await expect(
+      env.DB.prepare(
+        "SELECT installed_schema_version FROM release_state WHERE singleton = 1"
+      ).first()
+    ).resolves.toEqual({ installed_schema_version: 3 });
+    await expect(
+      env.DB.prepare(
+        "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'mailbox_addresses'"
+      ).first()
+    ).resolves.toBeNull();
   });
 });
 

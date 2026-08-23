@@ -26,8 +26,7 @@ export const messageColumns = [
   "has_attachments",
   "created_at",
   "updated_at",
-  "delivered_to_address_id",
-  "sent_from_address_id"
+  "delivered_to_address"
 ];
 
 export function insert(table, columns, values) {
@@ -67,8 +66,7 @@ export function messageValues(input, seedTimestamp) {
     0,
     input.receivedAt ?? input.sentAt ?? seedTimestamp,
     input.receivedAt ?? input.sentAt ?? seedTimestamp,
-    input.deliveredToAddressId ?? null,
-    input.sentFromAddressId ?? null
+    input.deliveredToAddress ?? null
   ];
 }
 

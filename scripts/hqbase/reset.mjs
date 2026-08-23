@@ -1,3 +1,4 @@
+import { applyMigrationPhase } from "../d1-migrations.mjs";
 import { optionalBoolean, requireString } from "./args.mjs";
 import { run } from "./command.mjs";
 import { writeWranglerConfig } from "./config.mjs";
@@ -50,21 +51,13 @@ function resetData(manifest, options) {
     ],
     options
   );
-  run(
-    "pnpm",
-    [
-      "exec",
-      "wrangler",
-      "d1",
-      "migrations",
-      "apply",
-      manifest.d1.name,
-      "--remote",
-      "--config",
-      configPath(manifest.name)
-    ],
-    options
-  );
+  const migrationOptions = {
+    configFile: configPath(manifest.name),
+    target: "remote",
+    run: (command, args) => run(command, args, options)
+  };
+  applyMigrationPhase(rootPath(), "normal", migrationOptions);
+  applyMigrationPhase(rootPath(), "after-deploy", migrationOptions);
 }
 
 function resetStorage(manifest, options) {

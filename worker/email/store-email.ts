@@ -2,8 +2,7 @@ import { sql } from "drizzle-orm";
 
 import { newId, nowIso } from "../db/client";
 import { getRow } from "../db/drizzle";
-import { findAddressIdentity } from "../features/mailboxes/address-queries";
-import { findMailboxByAddress } from "../features/mailboxes/queries";
+import { findMailboxForReceiving } from "../features/mailboxes/queries";
 import { getMessageDetail, insertAttachment, insertMessage } from "../features/messages/queries";
 import { resolveInboundThread } from "../features/messages/threading";
 import type { MessageDetail, MessageSummary } from "../features/messages/types";
@@ -53,8 +52,7 @@ export async function storeInboundEmail(
     });
   }
 
-  const mailbox = await findMailboxByAddress(db, recipient);
-  const receivingIdentity = await findAddressIdentity(db, recipient, "receive");
+  const mailbox = await findMailboxForReceiving(db, recipient);
   const plan = planInboundStorage({
     envelopeRecipient: recipient,
     mailboxId: mailbox?.id ?? null,
@@ -90,7 +88,7 @@ export async function storeInboundEmail(
     sentAt: null,
     readAt: null,
     hasAttachments: input.parsed.attachments.length > 0,
-    deliveredToAddressId: receivingIdentity?.address.id ?? null
+    deliveredToAddress: recipient
   });
 
   for (const attachment of input.parsed.attachments) {

@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import {
+  type AnySQLiteColumn,
   check,
   customType,
   index,
@@ -7,7 +8,6 @@ import {
   primaryKey,
   sqliteTable,
   text,
-  unique,
   uniqueIndex
 } from "drizzle-orm/sqlite-core";
 
@@ -17,14 +17,21 @@ const nocaseText = customType<{ data: string; driverData: string }>({
   dataType: () => "text COLLATE NOCASE"
 });
 
-export const mailboxes = sqliteTable("mailboxes", {
-  id: text("id").primaryKey().notNull(),
-  address: text("address").notNull().unique(),
-  displayName: text("display_name").notNull(),
-  isActive: integer("is_active", { mode: "boolean" }).default(sql`1`).notNull(),
-  createdAt: text("created_at").notNull(),
-  updatedAt: text("updated_at").notNull()
-});
+export const mailboxes = sqliteTable(
+  "mailboxes",
+  {
+    id: text("id").primaryKey().notNull(),
+    address: text("address").notNull().unique(),
+    mailDomainId: text("mail_domain_id")
+      .notNull()
+      .references((): AnySQLiteColumn => mailDomains.id, { onDelete: "restrict" }),
+    displayName: text("display_name").notNull(),
+    isActive: integer("is_active", { mode: "boolean" }).default(sql`1`).notNull(),
+    createdAt: text("created_at").notNull(),
+    updatedAt: text("updated_at").notNull()
+  },
+  (table) => [uniqueIndex("mailboxes_address_ci_unique").on(sql`lower(${table.address})`)]
+);
 
 export const mailboxGrants = sqliteTable(
   "mailbox_grants",
@@ -98,9 +105,12 @@ export const mailDomains = sqliteTable(
     catchAllPolicy: text("catch_all_policy", { enum: ["reject", "mailbox", "unassigned"] })
       .default("reject")
       .notNull(),
-    catchAllMailboxId: text("catch_all_mailbox_id").references(() => mailboxes.id, {
-      onDelete: "set null"
-    }),
+    catchAllMailboxId: text("catch_all_mailbox_id").references(
+      (): AnySQLiteColumn => mailboxes.id,
+      {
+        onDelete: "set null"
+      }
+    ),
     isEnabled: integer("is_enabled", { mode: "boolean" }).default(sql`1`).notNull(),
     lastErrorCode: text("last_error_code"),
     verifiedAt: text("verified_at"),
@@ -125,41 +135,6 @@ export const mailDomains = sqliteTable(
       sql`${table.catchAllPolicy} IN ('reject', 'mailbox', 'unassigned')`
     ),
     check("mail_domains_is_enabled_check", sql`${table.isEnabled} IN (0, 1)`)
-  ]
-);
-
-export const mailboxAddresses = sqliteTable(
-  "mailbox_addresses",
-  {
-    id: text("id").primaryKey().notNull(),
-    mailboxId: text("mailbox_id")
-      .notNull()
-      .references(() => mailboxes.id, { onDelete: "cascade" }),
-    mailDomainId: text("mail_domain_id")
-      .notNull()
-      .references(() => mailDomains.id, { onDelete: "restrict" }),
-    localPart: text("local_part").notNull(),
-    address: text("address").notNull().unique(),
-    displayName: text("display_name").notNull(),
-    receiveEnabled: integer("receive_enabled", { mode: "boolean" }).default(sql`1`).notNull(),
-    sendEnabled: integer("send_enabled", { mode: "boolean" }).default(sql`1`).notNull(),
-    isPrimary: integer("is_primary", { mode: "boolean" }).default(sql`0`).notNull(),
-    createdAt: text("created_at").notNull(),
-    updatedAt: text("updated_at").notNull()
-  },
-  (table) => [
-    unique().on(table.mailDomainId, table.localPart),
-    check("mailbox_addresses_receive_enabled_check", sql`${table.receiveEnabled} IN (0, 1)`),
-    check("mailbox_addresses_send_enabled_check", sql`${table.sendEnabled} IN (0, 1)`),
-    check("mailbox_addresses_is_primary_check", sql`${table.isPrimary} IN (0, 1)`),
-    index("mailbox_addresses_mailbox_idx").on(
-      table.mailboxId,
-      sql`${table.isPrimary} DESC`,
-      table.address
-    ),
-    uniqueIndex("mailbox_addresses_primary_idx")
-      .on(table.mailboxId)
-      .where(sql`${table.isPrimary} = 1`)
   ]
 );
 

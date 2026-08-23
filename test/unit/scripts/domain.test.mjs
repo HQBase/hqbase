@@ -20,6 +20,7 @@ import {
 import {
   canonicalHostnameFromD1Output,
   createDomainProbe,
+  probeServiceOrigin,
   setCanonicalPortal
 } from "../../../scripts/hqbase/domain-runtime.mjs";
 import { assertUnambiguousManifest } from "../../../scripts/hqbase/lifecycle-manifest.mjs";
@@ -944,7 +945,7 @@ describe("Cloudflare custom domain seam", () => {
       }
     );
 
-    await expect(probe("https://app.example.com/api/v1/openapi.json")).resolves.toBe(
+    await expect(probe("https://app.example.com/api/v2/openapi.json")).resolves.toBe(
       "https://service.example.com"
     );
     expect(requests[0].init.headers).toMatchObject({
@@ -953,6 +954,41 @@ describe("Cloudflare custom domain seam", () => {
     });
     expect(() => createDomainProbe({ HQBASE_DOMAIN_ACCESS_CLIENT_ID: "client-id" })).toThrowError(
       /both HQBASE_DOMAIN_ACCESS/
+    );
+  });
+
+  it("prefers v2 discovery and falls back to the N-1 v1 release", async () => {
+    const requests = [];
+    const probe = async (url) => {
+      requests.push(url);
+      if (url.endsWith("/api/v2/openapi.json")) throw new Error("HTTP 404");
+      return "https://service.example.com/";
+    };
+
+    await expect(
+      probeServiceOrigin({
+        origin: "https://app.example.com",
+        probe,
+        retry: { attempts: 1, delayMs: 0 }
+      })
+    ).resolves.toBe("https://service.example.com");
+    expect(requests).toEqual([
+      "https://app.example.com/api/v2/openapi.json",
+      "https://app.example.com/api/v1/openapi.json"
+    ]);
+  });
+
+  it("reports both discovery failures when neither API version is healthy", async () => {
+    await expect(
+      probeServiceOrigin({
+        origin: "https://app.example.com",
+        probe: async (url) => {
+          throw new Error(url.endsWith("/api/v2/openapi.json") ? "HTTP 503" : "HTTP 404");
+        },
+        retry: { attempts: 1, delayMs: 0 }
+      })
+    ).rejects.toThrowError(
+      /\/api\/v2\/openapi\.json: HTTP 503; \/api\/v1\/openapi\.json: HTTP 404/
     );
   });
 
@@ -969,7 +1005,7 @@ describe("Cloudflare custom domain seam", () => {
       { timeoutMs: 10 }
     );
 
-    await expect(probe("https://app.example.com/api/v1/openapi.json")).rejects.toMatchObject({
+    await expect(probe("https://app.example.com/api/v2/openapi.json")).rejects.toMatchObject({
       name: "TimeoutError"
     });
     expect(requestSignal.aborted).toBe(true);

@@ -88,7 +88,7 @@ function database(input: {
       const statement = {
         bind: vi.fn(() => statement),
         all: vi.fn(async () => {
-          const row = sql.includes("FROM mailbox_addresses") ? input.sender : input.onboarding;
+          const row = sql.includes("FROM mailboxes mailbox") ? input.sender : input.onboarding;
           return { results: row ? [row] : [] };
         }),
         run: input.run

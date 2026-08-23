@@ -141,8 +141,7 @@ export type InsertMessageInput = {
   sentAt: string | null;
   readAt: string | null;
   hasAttachments: boolean;
-  deliveredToAddressId?: string | null | undefined;
-  sentFromAddressId?: string | null | undefined;
+  deliveredToAddress?: string | null | undefined;
 };
 
 export type InsertAttachmentInput = {

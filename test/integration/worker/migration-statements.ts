@@ -5,7 +5,7 @@ export function migrationStatements(source: string): string[] {
 
   for (const line of source.split(/\r?\n/)) {
     const trimmed = line.trim();
-    if (lines.length === 0 && trimmed === "") {
+    if (lines.length === 0 && (trimmed === "" || trimmed.startsWith("--"))) {
       continue;
     }
 
