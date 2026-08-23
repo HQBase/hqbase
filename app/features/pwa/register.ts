@@ -27,9 +27,13 @@ export function registerPwa({
   let activeUpdateDeadline = 0;
 
   const activate = (): void => {
-    if (!registration?.waiting) return;
+    const waiting = registration?.waiting;
+    if (!waiting) {
+      window.location.reload();
+      return;
+    }
     refreshAfterActivation = true;
-    registration.waiting.postMessage({ type: "SKIP_WAITING" });
+    waiting.postMessage({ type: "SKIP_WAITING" });
   };
 
   const announceWaitingWorker = (): void => {
