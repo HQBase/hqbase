@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import * as React from "react";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { Dialog, DialogClose, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import {
@@ -16,24 +16,66 @@ afterEach(() => {
   document.body.replaceChildren();
 });
 
-async function openDialog() {
+type OutsideHandler = NonNullable<
+  React.ComponentProps<typeof DialogContent>["onPointerDownOutside"]
+>;
+
+async function settleOutsideListeners(): Promise<void> {
+  const tick = () =>
+    flushHookEffects(() => new Promise<void>((resolve) => window.setTimeout(resolve, 0)));
+  await tick();
+  await tick();
+}
+
+function pointerClick(target: Element): void {
+  target.dispatchEvent(
+    new PointerEvent("pointerdown", {
+      bubbles: true,
+      button: 0,
+      cancelable: true,
+      composed: true,
+      pointerId: 1,
+      pointerType: "mouse"
+    })
+  );
+  target.dispatchEvent(
+    new MouseEvent("click", {
+      bubbles: true,
+      button: 0,
+      cancelable: true,
+      composed: true
+    })
+  );
+}
+
+function dialogOverlay(): HTMLElement | undefined {
+  return [...document.body.querySelectorAll<HTMLElement>('[data-state="open"]')].find((element) =>
+    element.className.includes("fixed inset-0")
+  );
+}
+
+async function openDialog(onPointerDownOutside?: OutsideHandler) {
   const view = await renderComponent(
     <Dialog defaultOpen>
-      <DialogContent>
+      <DialogContent {...(onPointerDownOutside ? { onPointerDownOutside } : {})}>
         <DialogTitle>Test dialog</DialogTitle>
         <DialogClose aria-label="Close test dialog">Close</DialogClose>
       </DialogContent>
     </Dialog>
   );
-  await flushHookEffects(() => new Promise((resolve) => setTimeout(resolve, 0)));
+  await settleOutsideListeners();
   return view;
 }
 
-function DialogWithOpenSelect(): React.ReactElement {
+function DialogWithOpenSelect({
+  onPointerDownOutside
+}: {
+  onPointerDownOutside: OutsideHandler;
+}): React.ReactElement {
   const [selectOpen, setSelectOpen] = React.useState(true);
   return (
     <Dialog defaultOpen>
-      <DialogContent>
+      <DialogContent onPointerDownOutside={onPointerDownOutside}>
         <DialogTitle>Dialog with dropdown</DialogTitle>
         <Select open={selectOpen} value="first" onOpenChange={setSelectOpen}>
           <SelectTrigger aria-label="Test dropdown">
@@ -44,9 +86,6 @@ function DialogWithOpenSelect(): React.ReactElement {
             <SelectItem value="second">Second</SelectItem>
           </SelectContent>
         </Select>
-        <button data-dialog-control type="button">
-          Another dialog control
-        </button>
         <output data-select-state>{selectOpen ? "open" : "closed"}</output>
       </DialogContent>
     </Dialog>
@@ -54,64 +93,50 @@ function DialogWithOpenSelect(): React.ReactElement {
 }
 
 describe("dialog interactions", () => {
-  it("ignores a backdrop pointer down", async () => {
-    const view = await openDialog();
-    const overlay = document.body.querySelector<HTMLElement>(
-      '[data-state="open"]:not([role="dialog"])'
-    );
+  it("ignores a backdrop click after Radix reports it", async () => {
+    const outside = vi.fn();
+    const view = await openDialog(outside);
+    const overlay = dialogOverlay();
 
-    expect(overlay).not.toBeNull();
-    await flushHookEffects(() =>
-      overlay?.dispatchEvent(
-        new PointerEvent("pointerdown", {
-          bubbles: true,
-          button: 0,
-          composed: true,
-          pointerType: "mouse"
-        })
-      )
-    );
+    expect(overlay).toBeDefined();
+    await flushHookEffects(() => pointerClick(overlay as HTMLElement));
 
+    expect(outside).toHaveBeenCalledOnce();
     expect(document.body.querySelector('[role="dialog"]')?.getAttribute("data-state")).toBe("open");
     await view.unmount();
   });
 
   it("closes a nested dropdown without closing its dialog", async () => {
-    const view = await renderComponent(<DialogWithOpenSelect />);
-    await flushHookEffects(() => new Promise((resolve) => setTimeout(resolve, 0)));
-    const dialogControl = document.body.querySelector<HTMLElement>("[data-dialog-control]");
+    const outside = vi.fn();
+    const view = await renderComponent(<DialogWithOpenSelect onPointerDownOutside={outside} />);
+    await settleOutsideListeners();
+    const overlay = dialogOverlay();
 
     expect(document.body.querySelector("[data-select-state]")?.textContent).toBe("open");
-    expect(dialogControl).not.toBeNull();
-    await flushHookEffects(() =>
-      dialogControl?.dispatchEvent(
-        new PointerEvent("pointerdown", {
-          bubbles: true,
-          button: 0,
-          composed: true,
-          pointerType: "mouse"
-        })
-      )
-    );
+    expect(overlay).toBeDefined();
+    await flushHookEffects(() => pointerClick(overlay as HTMLElement));
 
     expect(document.body.querySelector("[data-select-state]")?.textContent).toBe("closed");
+    expect(outside).toHaveBeenCalledOnce();
     expect(document.body.querySelector('[role="dialog"]')?.getAttribute("data-state")).toBe("open");
     await view.unmount();
   });
 
-  it("still closes through Escape and an explicit close control", async () => {
-    const escapeView = await openDialog();
+  it("still closes through Escape", async () => {
+    const view = await openDialog();
     await flushHookEffects(() =>
       document.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, key: "Escape" }))
     );
     expect(document.body.querySelector('[role="dialog"]')).toBeNull();
-    await escapeView.unmount();
+    await view.unmount();
+  });
 
-    const closeView = await openDialog();
+  it("still closes through an explicit close control", async () => {
+    const view = await openDialog();
     await flushHookEffects(() =>
       document.body.querySelector<HTMLButtonElement>('[aria-label="Close test dialog"]')?.click()
     );
     expect(document.body.querySelector('[role="dialog"]')).toBeNull();
-    await closeView.unmount();
+    await view.unmount();
   });
 });
