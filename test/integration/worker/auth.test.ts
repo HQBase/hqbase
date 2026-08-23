@@ -11,6 +11,7 @@ import userOnboardingMigration from "../../../migrations/0008_user_onboarding.sq
 import loginEmailDomainMigration from "../../../migrations/0009_login_email_domain_isolation.sql?raw";
 import deviceAuthorizationMigration from "../../../migrations/0010_oauth_device_authorization.sql?raw";
 import latestPasswordResetTokenMigration from "../../../migrations/0011_latest_password_reset_token.sql?raw";
+import oneAddressPerMailboxMigration from "../../../migrations/0016_one_address_per_mailbox.sql?raw";
 import { createAuth } from "../../../worker/auth/auth";
 import { migrationStatements } from "./migration-statements";
 
@@ -64,6 +65,7 @@ describe("Better Auth schema", () => {
     await applyMigration(loginEmailDomainMigration);
     await applyMigration(deviceAuthorizationMigration);
     await applyMigration(latestPasswordResetTokenMigration);
+    await applyMigration(oneAddressPerMailboxMigration);
   });
 
   it("backfills the Better Auth 1.7 account identity without losing credential rows", async () => {
@@ -226,21 +228,16 @@ describe("Better Auth schema", () => {
     const timestamp = new Date().toISOString();
     await env.DB.batch([
       env.DB.prepare(
-        `INSERT INTO mail_domains (id, name, created_at, updated_at)
-         VALUES ('domain_preferences', 'preferences.example', ?, ?)`
+        `INSERT INTO mail_domains
+         (id, name, receiving_status, sending_status, dns_status, is_enabled, created_at, updated_at)
+         VALUES ('domain_preferences', 'preferences.example', 'ready', 'ready', 'ready', 1, ?, ?)`
       ).bind(timestamp, timestamp),
       env.DB.prepare(
         `INSERT INTO mailboxes
-         (id, address, display_name, is_active, created_at, updated_at)
-         VALUES ('mailbox_preferences', 'support@preferences.example', 'Support', 1, ?, ?)`
-      ).bind(timestamp, timestamp),
-      env.DB.prepare(
-        `INSERT INTO mailbox_addresses
-         (id, mailbox_id, mail_domain_id, local_part, address, display_name,
-          receive_enabled, send_enabled, is_primary, created_at, updated_at)
+         (id, address, mail_domain_id, display_name, is_active, created_at, updated_at)
          VALUES
-         ('address_preferences', 'mailbox_preferences', 'domain_preferences', 'support',
-          'support@preferences.example', 'Support', 1, 1, 1, ?, ?)`
+         ('mailbox_preferences', 'support@preferences.example', 'domain_preferences',
+          'Support', 1, ?, ?)`
       ).bind(timestamp, timestamp),
       env.DB.prepare(
         `INSERT INTO mailbox_grants

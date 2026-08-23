@@ -8,9 +8,6 @@ vi.mock("@worker/db/client", () => ({
 vi.mock("@worker/features/mailboxes/queries", () => ({
   findMailboxForSending: vi.fn()
 }));
-vi.mock("@worker/features/mailboxes/address-queries", () => ({
-  findAddressIdentity: vi.fn().mockResolvedValue(null)
-}));
 vi.mock("@worker/features/messages/queries", () => ({
   getMessageDetail: vi.fn(),
   getMessageHtmlKey: vi.fn(),
@@ -34,12 +31,12 @@ import { replyToMessage, sendNewMessage } from "@worker/features/send/service";
 import type { WorkerEnv } from "@worker/lib/env";
 
 const mailbox = {
-  addresses: [],
   address: "support@example.com",
   createdAt: "2026-07-10T00:00:00.000Z",
   displayName: "Support",
   id: "mailbox-1",
   isActive: true,
+  mailDomainId: "domain-1",
   updatedAt: "2026-07-10T00:00:00.000Z"
 };
 
@@ -112,6 +109,7 @@ describe("send service", () => {
       env.DB,
       expect.objectContaining({ messageId: "<cloudflare-new@example.com>" })
     );
+    expect(findMailboxForSending).toHaveBeenCalledOnce();
     expect(createThread).toHaveBeenCalledWith(env.DB, "Hello", "2026-07-10T00:00:00.000Z");
   });
 

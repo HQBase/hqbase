@@ -57,15 +57,6 @@ export function replySendingIdentity(
   identities: SendingIdentity[],
   defaultIdentity: SendingIdentity | null = null
 ): SendingIdentity | null {
-  const addresses = [message.deliveredToAddress, ...message.to].filter(
-    (address): address is string => Boolean(address)
-  );
-  for (const address of addresses) {
-    const identity = identities.find(
-      (candidate) => candidate.address.toLowerCase() === address.toLowerCase()
-    );
-    if (identity) return identity;
-  }
   return (
     identities.find((identity) => identity.mailboxId === message.mailboxId) ??
     defaultIdentity ??
@@ -76,18 +67,10 @@ export function replySendingIdentity(
 
 export function defaultSendingIdentity(
   defaultFromMailboxId: string | null,
-  mailboxes: Mailbox[],
   identities: SendingIdentity[]
 ): SendingIdentity | null {
-  const mailbox = mailboxes.find((candidate) => candidate.id === defaultFromMailboxId);
-  const primaryAddress =
-    mailbox?.addresses.find((address) => address.isPrimary && address.sendEnabled)?.address ??
-    (mailbox?.addresses.length === 0 ? mailbox.address : null);
   return (
-    identities.find(
-      (identity) =>
-        identity.mailboxId === defaultFromMailboxId && identity.address === primaryAddress
-    ) ??
+    identities.find((identity) => identity.mailboxId === defaultFromMailboxId) ??
     identities[0] ??
     null
   );
@@ -99,13 +82,7 @@ export function sendingIdentities(mailboxes: Mailbox[]): SendingIdentity[] {
       (mailbox) =>
         mailbox.isActive && (mailbox.accessLevel === "agent" || mailbox.accessLevel === "manager")
     )
-    .flatMap((mailbox) =>
-      mailbox.addresses?.length
-        ? mailbox.addresses
-            .filter((address) => address.sendEnabled)
-            .map((address) => ({ mailboxId: mailbox.id, address: address.address }))
-        : [{ mailboxId: mailbox.id, address: mailbox.address }]
-    );
+    .map((mailbox) => ({ mailboxId: mailbox.id, address: mailbox.address }));
 }
 
 export const serializeDraft = (

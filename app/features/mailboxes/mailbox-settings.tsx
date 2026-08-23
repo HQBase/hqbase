@@ -27,9 +27,8 @@ import { useMailboxAccessPolicies } from "@/features/mailbox-access/mailbox-acce
 import { MailboxAccessPolicyDialog } from "@/features/mailbox-access/mailbox-access-policy";
 import { SettingsSection } from "@/features/settings/settings-section";
 import type { WorkspaceUser } from "@/features/users/types";
-import { addMailboxAddress, createMailbox, removeMailboxAddress, updateMailbox } from "./api";
+import { createMailbox, updateMailbox } from "./api";
 import { DefaultFromMailboxControl } from "./default-from-mailbox-control";
-import { MailboxAliasDialog } from "./mailbox-alias-dialog";
 import { MailboxDetailsSheet } from "./mailbox-details-sheet";
 import { mailboxDomains, mailboxMatchesDomain } from "./mailbox-filtering";
 import { MailboxSelectionBar, MailboxTable } from "./mailbox-table";
@@ -55,14 +54,12 @@ export function MailboxSettings({
   const [address, setAddress] = React.useState("");
   const [displayName, setDisplayName] = React.useState("");
   const [createOpen, setCreateOpen] = React.useState(false);
-  const [aliasMailbox, setAliasMailbox] = React.useState<Mailbox | null>(null);
   const [detailsMailboxId, setDetailsMailboxId] = React.useState<string | null>(null);
   const [accessMailboxId, setAccessMailboxId] = React.useState<string | null>(null);
   const [bulkAccessOpen, setBulkAccessOpen] = React.useState(false);
   const [domainFilter, setDomainFilter] = React.useState("all");
   const [selectedMailboxIds, setSelectedMailboxIds] = React.useState<string[]>([]);
-  const [aliasAddress, setAliasAddress] = React.useState("");
-  const [pendingAction, setPendingAction] = React.useState<"mailbox" | "alias" | null>(null);
+  const [createPending, setCreatePending] = React.useState(false);
   const [pendingMailboxId, setPendingMailboxId] = React.useState<string | null>(null);
   const accessPolicies = useMailboxAccessPolicies(canManage);
   const domains = mailboxDomains(mailboxes);
@@ -78,7 +75,7 @@ export function MailboxSettings({
 
   async function handleCreate(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setPendingAction("mailbox");
+    setCreatePending(true);
     try {
       await createMailbox({ address, displayName });
       setAddress("");
@@ -89,7 +86,7 @@ export function MailboxSettings({
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Mailbox creation failed.");
     } finally {
-      setPendingAction(null);
+      setCreatePending(false);
     }
   }
 
@@ -103,35 +100,6 @@ export function MailboxSettings({
       toast.error(error instanceof Error ? error.message : "Mailbox could not be updated.");
     } finally {
       setPendingMailboxId(null);
-    }
-  }
-
-  async function handleAlias(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!aliasMailbox) return;
-    setPendingAction("alias");
-    try {
-      await addMailboxAddress(aliasMailbox.id, {
-        address: aliasAddress,
-        displayName: aliasMailbox.displayName
-      });
-      setAliasAddress("");
-      setAliasMailbox(null);
-      toast.success("Email address added.");
-      await onChanged();
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Address creation failed.");
-    } finally {
-      setPendingAction(null);
-    }
-  }
-
-  async function handleRemoveAlias(mailbox: Mailbox, addressId: string) {
-    try {
-      await removeMailboxAddress(mailbox.id, addressId);
-      await onChanged();
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Address could not be removed.");
     }
   }
 
@@ -181,8 +149,8 @@ export function MailboxSettings({
                       Cancel
                     </Button>
                   </DialogClose>
-                  <Button disabled={pendingAction !== null} type="submit">
-                    {pendingAction === "mailbox" ? "Adding mailbox…" : "Add mailbox"}
+                  <Button disabled={createPending} type="submit">
+                    {createPending ? "Adding mailbox…" : "Add mailbox"}
                   </Button>
                 </DialogFooter>
               </form>
@@ -190,7 +158,7 @@ export function MailboxSettings({
           </Dialog>
         ) : null
       }
-      description="Shared addresses across your connected domains"
+      description="Shared mailboxes across your connected domains"
       title="Mailboxes"
     >
       <DefaultFromMailboxControl
@@ -247,10 +215,6 @@ export function MailboxSettings({
         mailbox={detailsMailbox}
         policies={accessPolicies}
         users={users}
-        onAddAddress={(mailbox) => {
-          setDetailsMailboxId(null);
-          setAliasMailbox(mailbox);
-        }}
         onManageAccess={(mailbox) => {
           setDetailsMailboxId(null);
           setAccessMailboxId(mailbox.id);
@@ -258,19 +222,6 @@ export function MailboxSettings({
         onOpenChange={(open) => {
           if (!open) setDetailsMailboxId(null);
         }}
-        onRemoveAddress={(mailbox, addressId) => void handleRemoveAlias(mailbox, addressId)}
-      />
-
-      <MailboxAliasDialog
-        address={aliasAddress}
-        mailbox={aliasMailbox}
-        pending={pendingAction === "alias"}
-        onAddressChange={setAliasAddress}
-        onClose={() => {
-          setAliasMailbox(null);
-          setAliasAddress("");
-        }}
-        onSubmit={(event) => void handleAlias(event)}
       />
 
       <MailboxAccessPolicyDialog

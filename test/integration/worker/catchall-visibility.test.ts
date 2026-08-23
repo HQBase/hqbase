@@ -21,8 +21,14 @@ describe("catch-all visibility", () => {
     const now = "2026-08-15T13:15:00.000Z";
     await env.DB.batch([
       env.DB.prepare(
-        `INSERT INTO mailboxes (id, address, display_name, is_active, created_at, updated_at)
-         VALUES ('mbx_support', 'support@example.com', 'Support', 1, ?, ?)`
+        `INSERT INTO mail_domains
+         (id, name, receiving_status, sending_status, dns_status, is_enabled, created_at, updated_at)
+         VALUES ('dom_catchall', 'example.com', 'ready', 'ready', 'ready', 1, ?, ?)`
+      ).bind(now, now),
+      env.DB.prepare(
+        `INSERT INTO mailboxes
+         (id, address, mail_domain_id, display_name, is_active, created_at, updated_at)
+         VALUES ('mbx_support', 'support@example.com', 'dom_catchall', 'Support', 1, ?, ?)`
       ).bind(now, now),
       env.DB.prepare(
         `INSERT INTO threads (id, subject_normalized, last_message_at, created_at, updated_at)

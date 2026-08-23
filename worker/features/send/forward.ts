@@ -22,6 +22,9 @@ export async function forwardMessage(env: WorkerEnv, input: ForwardMessageInput,
 
   const mailbox = await findMailboxForSending(env.DB, input.from);
   if (!mailbox) throw new AppError("MAILBOX_NOT_FOUND", "Sending mailbox not found.", 404);
+  if (!mailbox.isActive) {
+    throw new AppError("MAILBOX_DISABLED", "Disabled mailboxes cannot send email.", 400);
+  }
 
   const body = forwardedBody(original, input.text, input.html);
   const subject = input.subject ?? forwardSubject(original.subject);

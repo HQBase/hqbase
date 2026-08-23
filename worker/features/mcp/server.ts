@@ -14,7 +14,7 @@ export async function serveMcp(
   ctx: ExecutionContext,
   principal: McpPrincipal
 ): Promise<Response> {
-  const server = new McpServer({ name: "HQBase", version: "1.0.0" });
+  const server = new McpServer({ name: "HQBase", version: "2.0.0" });
   const schedule: MailEventScheduler = (promise) => ctx.waitUntil(promise);
   registerTools(server, env, principal, schedule);
   const url = new URL(request.url);

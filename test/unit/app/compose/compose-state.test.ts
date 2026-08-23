@@ -26,60 +26,28 @@ describe("composer state", () => {
     ]);
   });
 
-  it("exposes every send-enabled identity on an authorized mailbox", () => {
+  it("exposes one identity for every authorized active mailbox", () => {
     expect(
       sendingIdentities([
         {
           id: "mbx_1",
           address: "support@example.com",
+          mailDomainId: "dom_1",
           displayName: "Support",
           isActive: true,
           accessLevel: "agent",
           createdAt: "now",
-          updatedAt: "now",
-          addresses: [
-            {
-              id: "addr_1",
-              mailboxId: "mbx_1",
-              mailDomainId: "dom_1",
-              address: "support@example.com",
-              displayName: "Support",
-              receiveEnabled: true,
-              sendEnabled: true,
-              isPrimary: true
-            },
-            {
-              id: "addr_2",
-              mailboxId: "mbx_1",
-              mailDomainId: "dom_2",
-              address: "help@example.net",
-              displayName: "Support",
-              receiveEnabled: true,
-              sendEnabled: false,
-              isPrimary: false
-            }
-          ]
+          updatedAt: "now"
         },
         {
           id: "mbx_2",
           address: "sales@example.net",
+          mailDomainId: "dom_2",
           displayName: "Sales",
           isActive: true,
           accessLevel: "manager",
           createdAt: "now",
-          updatedAt: "now",
-          addresses: [
-            {
-              id: "addr_3",
-              mailboxId: "mbx_2",
-              mailDomainId: "dom_2",
-              address: "sales@example.net",
-              displayName: "Sales",
-              receiveEnabled: true,
-              sendEnabled: true,
-              isPrimary: true
-            }
-          ]
+          updatedAt: "now"
         }
       ])
     ).toEqual([
@@ -131,7 +99,7 @@ describe("composer state", () => {
     expect(findDraftForComposer(drafts, "missing", null, null)).toBeNull();
   });
 
-  it("uses the exact address that received the message as the reply identity", () => {
+  it("uses the mailbox that received the message as the reply identity", () => {
     const inboundMessage: MessageDetail = {
       id: "msg_1",
       threadId: "thr_1",
@@ -139,10 +107,10 @@ describe("composer state", () => {
       direction: "inbound",
       folder: "inbox",
       fromAddress: "sender@example.com",
-      to: ["alias@example.com"],
+      to: ["support@example.com"],
       cc: [],
       bcc: [],
-      deliveredToAddress: "alias@example.com",
+      deliveredToAddress: "support@example.com",
       subject: "Account access",
       snippet: "Please help",
       textBody: "Please help",
@@ -162,12 +130,12 @@ describe("composer state", () => {
       inboundMessage,
       [
         { mailboxId: "mbx_1", address: "support@example.com" },
-        { mailboxId: "mbx_1", address: "alias@example.com" }
+        { mailboxId: "mbx_2", address: "privacy@example.com" }
       ],
       { mailboxId: "mbx_2", address: "privacy@example.com" }
     );
 
-    expect(identity).toEqual({ mailboxId: "mbx_1", address: "alias@example.com" });
+    expect(identity).toEqual({ mailboxId: "mbx_1", address: "support@example.com" });
     expect(replyRecipients(inboundMessage)).toEqual(["sender@example.com"]);
     expect(composeContextLabel("reply", inboundMessage)).toContain(
       "Replying to sender@example.com ·"
@@ -200,54 +168,32 @@ describe("composer state", () => {
     ).toEqual([]);
   });
 
-  it("uses the preferred mailbox primary address for new messages", () => {
+  it("uses the preferred mailbox for new messages", () => {
     const mailboxes = [
       {
         id: "mbx_1",
         address: "support@example.com",
+        mailDomainId: "dom_1",
         displayName: "Support",
         isActive: true,
         accessLevel: "manager" as const,
         createdAt: "now",
-        updatedAt: "now",
-        addresses: [
-          {
-            id: "addr_1",
-            mailboxId: "mbx_1",
-            mailDomainId: "dom_1",
-            address: "support@example.com",
-            displayName: "Support",
-            receiveEnabled: true,
-            sendEnabled: true,
-            isPrimary: true
-          }
-        ]
+        updatedAt: "now"
       },
       {
         id: "mbx_2",
         address: "privacy@example.com",
+        mailDomainId: "dom_1",
         displayName: "Privacy",
         isActive: true,
         accessLevel: "agent" as const,
         createdAt: "now",
-        updatedAt: "now",
-        addresses: [
-          {
-            id: "addr_2",
-            mailboxId: "mbx_2",
-            mailDomainId: "dom_1",
-            address: "privacy@example.com",
-            displayName: "Privacy",
-            receiveEnabled: true,
-            sendEnabled: true,
-            isPrimary: true
-          }
-        ]
+        updatedAt: "now"
       }
     ];
     const identities = sendingIdentities(mailboxes);
 
-    expect(defaultSendingIdentity("mbx_2", mailboxes, identities)).toEqual({
+    expect(defaultSendingIdentity("mbx_2", identities)).toEqual({
       mailboxId: "mbx_2",
       address: "privacy@example.com"
     });

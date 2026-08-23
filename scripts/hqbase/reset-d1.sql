@@ -1,5 +1,17 @@
 PRAGMA foreign_keys = OFF;
 
+DROP TRIGGER IF EXISTS mailbox_addresses_transition_insert_guard;
+DROP TRIGGER IF EXISTS mailbox_addresses_transition_update_guard;
+DROP TRIGGER IF EXISTS mailbox_addresses_transition_delete_guard;
+DROP TRIGGER IF EXISTS mailboxes_transition_update_guard;
+DROP TRIGGER IF EXISTS mailboxes_transition_delete_guard;
+DROP TRIGGER IF EXISTS mailbox_grants_transition_insert_guard;
+DROP TRIGGER IF EXISTS mailbox_grants_transition_update_guard;
+DROP TRIGGER IF EXISTS mailbox_grants_transition_delete_guard;
+DROP TRIGGER IF EXISTS retention_policies_transition_insert_guard;
+DROP TRIGGER IF EXISTS retention_policies_transition_update_guard;
+DROP TRIGGER IF EXISTS retention_policies_transition_delete_guard;
+
 DROP TABLE IF EXISTS deviceCode;
 DROP TABLE IF EXISTS oauthClientAssertion;
 DROP TABLE IF EXISTS oauthClientResource;
@@ -19,7 +31,9 @@ DROP TABLE IF EXISTS installation_identity;
 DROP TABLE IF EXISTS draft_attachments;
 DROP TABLE IF EXISTS drafts;
 DROP TABLE IF EXISTS domain_setup_operations;
+DROP TABLE IF EXISTS mailbox_address_migration;
 DROP TABLE IF EXISTS mailbox_addresses;
+DELETE FROM mailboxes;
 DROP TABLE IF EXISTS mail_domains;
 DROP TABLE IF EXISTS workspace_hosts;
 DROP TABLE IF EXISTS deployment_state;
@@ -40,5 +54,6 @@ DROP TABLE IF EXISTS account;
 DROP TABLE IF EXISTS "session";
 DROP TABLE IF EXISTS "user";
 DROP TABLE IF EXISTS d1_migrations;
+DROP TABLE IF EXISTS d1_migrations_after_deploy;
 
 PRAGMA foreign_keys = ON;

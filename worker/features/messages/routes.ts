@@ -103,7 +103,7 @@ messageRoutes.get("/:id/html", async (c) => {
     allowRemoteImages: trusted || c.req.query("loadRemoteImages") === "1",
     attachments: message.attachments,
     html: await object.text(),
-    inlineBasePath: isVersionedMailApiRequest(c.req.raw) ? "/api/v1/messages" : "/api/messages",
+    inlineBasePath: isVersionedMailApiRequest(c.req.raw) ? "/api/v2/messages" : "/api/messages",
     messageId: message.id,
     origin: new URL(c.req.url).origin
   });

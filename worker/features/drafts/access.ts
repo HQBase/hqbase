@@ -164,9 +164,7 @@ function draftAccessDenial(input: {
   if (draft.from) {
     const normalizedFrom = draft.from.toLowerCase();
     const mailbox = context.mailboxes.find(
-      (candidate) =>
-        candidate.address.toLowerCase() === normalizedFrom ||
-        candidate.addresses.some((address) => address.address.toLowerCase() === normalizedFrom)
+      (candidate) => candidate.address.toLowerCase() === normalizedFrom
     );
     if (!mailbox) {
       return { code: "MAILBOX_NOT_FOUND", message: "Sending mailbox not found.", status: 404 };

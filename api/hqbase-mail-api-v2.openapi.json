@@ -2,8 +2,8 @@
   "openapi": "3.1.0",
   "info": {
     "title": "HQBase Mail API",
-    "version": "1.0.0",
-    "description": "Stable v1 mail API for HQBase clients, automations, and agents. Additive fields may be introduced within v1; clients must ignore unknown response fields. Administrative APIs are not part of this contract."
+    "version": "2.0.0",
+    "description": "Stable v2 mail API for HQBase clients, automations, and agents. Additive fields may be introduced within v2; clients must ignore unknown response fields. Administrative APIs are not part of this contract."
   },
   "servers": [
     {
@@ -40,7 +40,7 @@
     }
   ],
   "paths": {
-    "/api/v1/mailboxes": {
+    "/api/v2/mailboxes": {
       "get": {
         "summary": "List mailboxes",
         "security": [
@@ -120,7 +120,7 @@
         "operationId": "listMailboxes"
       }
     },
-    "/api/v1/events": {
+    "/api/v2/events": {
       "get": {
         "summary": "Open change event WebSocket",
         "description": "Opens an authenticated wake-only WebSocket. The server sends `changed` frames for messages, mailboxes, and permitted drafts. Frames contain no mail data or cursors. After a frame or reconnect, read the authoritative REST resources and change journals. OAuth tokens require `mail:read`; draft frames also require `mail:send`. The authorization decision at upgrade is an event-delivery lease for 10 minutes. Credential or session revocation does not close the current socket immediately. The server closes the socket when the lease ends, and reconnection must use current credentials and permissions.",
@@ -203,7 +203,7 @@
         "operationId": "openMailEvents"
       }
     },
-    "/api/v1/changes": {
+    "/api/v2/changes": {
       "get": {
         "summary": "Read message changes",
         "description": "Returns a bounded page of message upserts and deletion tombstones in journal order. A request without a cursor returns an empty checkpoint at the current high-water sequence.",
@@ -305,7 +305,7 @@
         ]
       }
     },
-    "/api/v1/messages": {
+    "/api/v2/messages": {
       "get": {
         "summary": "List or search messages",
         "security": [
@@ -401,7 +401,7 @@
               "type": "string",
               "enum": ["inbox", "sent", "drafts", "archived", "trash", "catchall"]
             },
-            "description": "Message folder to list. The `drafts` value remains for v1 compatibility, but current write paths do not store drafts as message rows. Use `/api/v1/drafts` for drafts."
+            "description": "Message folder to list. Drafts are separate resources, not message rows. Use `/api/v2/drafts` to list drafts."
           },
           {
             "in": "query",
@@ -448,7 +448,7 @@
         ]
       }
     },
-    "/api/v1/messages/{id}": {
+    "/api/v2/messages/{id}": {
       "get": {
         "summary": "Get a message",
         "security": [
@@ -537,7 +537,7 @@
         ]
       }
     },
-    "/api/v1/messages/{id}/thread": {
+    "/api/v2/messages/{id}/thread": {
       "get": {
         "summary": "Get a message thread",
         "security": [
@@ -629,7 +629,7 @@
         ]
       }
     },
-    "/api/v1/messages/{id}/html": {
+    "/api/v2/messages/{id}/html": {
       "get": {
         "summary": "Get sanitized message HTML",
         "security": [
@@ -728,7 +728,7 @@
         ]
       }
     },
-    "/api/v1/messages/{id}/inline/{attachmentId}": {
+    "/api/v2/messages/{id}/inline/{attachmentId}": {
       "get": {
         "summary": "Render a safe inline image",
         "security": [
@@ -838,7 +838,7 @@
         ]
       }
     },
-    "/api/v1/attachments/{id}": {
+    "/api/v2/attachments/{id}": {
       "get": {
         "summary": "Download an attachment",
         "security": [
@@ -928,7 +928,7 @@
         ]
       }
     },
-    "/api/v1/messages/{id}/remote-media/trust": {
+    "/api/v2/messages/{id}/remote-media/trust": {
       "post": {
         "summary": "Trust remote media from this sender",
         "security": [
@@ -1017,7 +1017,7 @@
         ]
       }
     },
-    "/api/v1/messages/{id}/{action}": {
+    "/api/v2/messages/{id}/{action}": {
       "post": {
         "summary": "Update message state",
         "security": [
@@ -1124,7 +1124,7 @@
         ]
       }
     },
-    "/api/v1/conversations": {
+    "/api/v2/conversations": {
       "get": {
         "summary": "List or search conversations",
         "security": [
@@ -1243,7 +1243,7 @@
         ]
       }
     },
-    "/api/v1/conversations/{id}/{action}": {
+    "/api/v2/conversations/{id}/{action}": {
       "post": {
         "summary": "Update conversation state",
         "description": "Applies the action to the accessible part of the conversation identified by the message {id}.",
@@ -1365,7 +1365,7 @@
         }
       }
     },
-    "/api/v1/drafts": {
+    "/api/v2/drafts": {
       "get": {
         "summary": "List drafts",
         "security": [
@@ -1575,7 +1575,7 @@
         }
       }
     },
-    "/api/v1/drafts/changes": {
+    "/api/v2/drafts/changes": {
       "get": {
         "summary": "Read draft changes",
         "description": "Returns a bounded page of private draft upserts and deletion tombstones in journal order. A request without a cursor returns an empty checkpoint at the current user-specific high-water sequence.",
@@ -1677,7 +1677,7 @@
         ]
       }
     },
-    "/api/v1/drafts/{id}": {
+    "/api/v2/drafts/{id}": {
       "get": {
         "summary": "Get a draft",
         "security": [
@@ -1966,7 +1966,7 @@
         ]
       }
     },
-    "/api/v1/drafts/{id}/attachments": {
+    "/api/v2/drafts/{id}/attachments": {
       "post": {
         "summary": "Add a draft attachment",
         "description": "Records the file part's Content-Type, or application/octet-stream when no type is present. One file and all files in one draft can each total at most 25 MiB; larger uploads return 413 ATTACHMENTS_TOO_LARGE.",
@@ -2089,7 +2089,7 @@
         }
       }
     },
-    "/api/v1/drafts/{draftId}/attachments/{id}": {
+    "/api/v2/drafts/{draftId}/attachments/{id}": {
       "delete": {
         "summary": "Remove a draft attachment",
         "security": [
@@ -2181,7 +2181,7 @@
         ]
       }
     },
-    "/api/v1/send": {
+    "/api/v2/send": {
       "post": {
         "summary": "Send a new message",
         "security": [
@@ -2278,7 +2278,7 @@
         }
       }
     },
-    "/api/v1/reply": {
+    "/api/v2/reply": {
       "post": {
         "summary": "Reply to a message",
         "security": [
@@ -2374,7 +2374,7 @@
         }
       }
     },
-    "/api/v1/forward": {
+    "/api/v2/forward": {
       "post": {
         "summary": "Forward a message",
         "security": [
@@ -2477,7 +2477,7 @@
     "securitySchemes": {
       "oauth2": {
         "type": "oauth2",
-        "description": "Audience-bound OAuth token. Request resource={origin}/api/v1.",
+        "description": "Audience-bound OAuth token. Request resource={origin}/api/v2.",
         "flows": {
           "authorizationCode": {
             "authorizationUrl": "/api/auth/oauth2/authorize",
@@ -2518,52 +2518,12 @@
           }
         }
       },
-      "MailboxAddress": {
-        "type": "object",
-        "required": [
-          "id",
-          "mailboxId",
-          "mailDomainId",
-          "address",
-          "displayName",
-          "receiveEnabled",
-          "sendEnabled",
-          "isPrimary"
-        ],
-        "properties": {
-          "id": {
-            "type": "string"
-          },
-          "mailboxId": {
-            "type": "string"
-          },
-          "mailDomainId": {
-            "type": "string"
-          },
-          "address": {
-            "type": "string",
-            "format": "email"
-          },
-          "displayName": {
-            "type": "string"
-          },
-          "receiveEnabled": {
-            "type": "boolean"
-          },
-          "sendEnabled": {
-            "type": "boolean"
-          },
-          "isPrimary": {
-            "type": "boolean"
-          }
-        }
-      },
       "Mailbox": {
         "type": "object",
         "required": [
           "id",
           "address",
-          "addresses",
+          "mailDomainId",
           "displayName",
           "isActive",
           "accessLevel",
@@ -2578,11 +2538,8 @@
             "type": "string",
             "format": "email"
           },
-          "addresses": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/MailboxAddress"
-            }
+          "mailDomainId": {
+            "type": "string"
           },
           "displayName": {
             "type": "string"

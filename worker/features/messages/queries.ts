@@ -20,10 +20,7 @@ import type {
   StoredAttachment
 } from "./types";
 
-const messageSelect = sql`SELECT messages.*,
-  (SELECT address FROM mailbox_addresses
-   WHERE id = messages.delivered_to_address_id) AS delivered_to_address
-  FROM messages`;
+const messageSelect = sql`SELECT messages.* FROM messages`;
 
 /** Message cursors are versioned separately from conversation cursors. */
 const messageCursorVersion = "m1";
@@ -87,8 +84,7 @@ export async function insertMessage(
       hasAttachments: input.hasAttachments,
       createdAt: timestamp,
       updatedAt: timestamp,
-      deliveredToAddressId: input.deliveredToAddressId ?? null,
-      sentFromAddressId: input.sentFromAddressId ?? null
+      deliveredToAddress: input.deliveredToAddress ?? null
     })
     .run();
 

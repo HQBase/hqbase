@@ -1,5 +1,5 @@
 import type { WorkerEnv } from "../lib/env";
-import { AppError } from "../lib/errors";
+import { AppError, errorBody } from "../lib/errors";
 
 import { authOrigin, mailApiResource } from "./auth";
 import { authenticateOAuthBearer, OAuthBearerError } from "./oauth-principal";
@@ -7,7 +7,8 @@ import { type AuthContext, requireAuthContext } from "./session";
 
 const mailApiScopes = ["mail:read", "mail:write", "mail:send"] as const;
 export type MailApiScope = (typeof mailApiScopes)[number];
-const mailApiMetadataPath = "/.well-known/oauth-protected-resource/api/v1";
+const retiredMailApiMetadataPath = "/.well-known/oauth-protected-resource/api/v1";
+const mailApiMetadataPath = "/.well-known/oauth-protected-resource/api/v2";
 const agentSkillPath = "/skills/hqbase-mail/SKILL.md";
 
 export type MailApiPrincipal = {
@@ -116,7 +117,7 @@ export async function requireMailApiPrincipal(
 
 export function isVersionedMailApiRequest(request: Request): boolean {
   const pathname = new URL(request.url).pathname;
-  return pathname === "/api/v1" || pathname.startsWith("/api/v1/");
+  return pathname === "/api/v2" || pathname.startsWith("/api/v2/");
 }
 
 export function mailApiChallenge(
@@ -133,7 +134,18 @@ export function mailApiChallenge(
 }
 
 export function handleMailApiMetadata(request: Request, env: WorkerEnv): Response | null {
-  if (new URL(request.url).pathname !== mailApiMetadataPath) return null;
+  const pathname = new URL(request.url).pathname;
+  if (pathname === retiredMailApiMetadataPath) {
+    return Response.json(errorBody("NOT_FOUND", "Mail API v1 is no longer available."), {
+      status: 404,
+      headers: {
+        "access-control-allow-origin": "*",
+        "cache-control": "no-store",
+        "x-content-type-options": "nosniff"
+      }
+    });
+  }
+  if (pathname !== mailApiMetadataPath) return null;
   const origin = authOrigin(env, request);
   return Response.json(
     {

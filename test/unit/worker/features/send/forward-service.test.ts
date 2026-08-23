@@ -59,7 +59,7 @@ const mailbox = {
   address: "support@example.com",
   displayName: "Support",
   isActive: true,
-  addresses: [],
+  mailDomainId: "domain-1",
   createdAt: "2026-07-29T12:00:00.000Z",
   updatedAt: "2026-07-29T12:00:00.000Z"
 };
@@ -126,6 +126,47 @@ describe("forward service", () => {
       "user-1"
     );
     expect(saveDraft).not.toHaveBeenCalled();
+  });
+
+  it("rejects a disabled mailbox before creating an attachment draft", async () => {
+    vi.mocked(findMailboxForSending).mockResolvedValue({ ...mailbox, isActive: false });
+    vi.mocked(getMessageDetail).mockResolvedValue({
+      ...original,
+      attachments: [
+        {
+          id: "attachment-1",
+          messageId: original.id,
+          filename: "original.txt",
+          contentType: "text/plain",
+          sizeBytes: 8,
+          contentId: null,
+          r2Key: "mail/original.txt",
+          createdAt: original.createdAt
+        }
+      ],
+      hasAttachments: true
+    });
+
+    await expect(
+      forwardMessage(
+        env,
+        {
+          messageId: original.id,
+          from: mailbox.address,
+          to: ["recipient@example.com"],
+          cc: [],
+          bcc: [],
+          text: "",
+          attachmentIds: [],
+          includeOriginalAttachments: true
+        },
+        "user-1"
+      )
+    ).rejects.toMatchObject({ code: "MAILBOX_DISABLED", status: 400 });
+
+    expect(saveDraft).not.toHaveBeenCalled();
+    expect(get).not.toHaveBeenCalled();
+    expect(sendNewMessage).not.toHaveBeenCalled();
   });
 
   it("copies original attachments through a temporary draft before sending", async () => {

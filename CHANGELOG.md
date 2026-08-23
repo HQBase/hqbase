@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+
+- Give every mailbox one email address. Existing additional addresses become separate mailboxes
+  with the same access and retention settings. An address that could not both send and receive
+  becomes a disabled mailbox.
+- Replace Mail API v1 with Mail API v2. Mailbox responses now contain one `address` and one
+  `mailDomainId`. OAuth clients must reconnect and approve the `/api/v2` resource. Open HQBase tabs
+  must reload after the upgrade.
+
 ## 1.2.0
 
 ### New

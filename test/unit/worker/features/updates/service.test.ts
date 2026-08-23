@@ -37,6 +37,7 @@ describe("HQBase updates", () => {
     expect(status).toMatchObject({
       product: "hqbase",
       installedVersion: "0.1.1",
+      installedSchemaVersion: 3,
       available: false,
       compatible: true
     });

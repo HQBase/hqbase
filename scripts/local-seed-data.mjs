@@ -77,63 +77,50 @@ export const domain = domains[0];
 export const mailboxes = [
   {
     id: "mbx_local_support",
-    addressId: "addr_local_support",
     address: "support@example.test",
     domainId: domains[0].id,
     displayName: "Support"
   },
   {
     id: "mbx_local_sales",
-    addressId: "addr_local_sales",
     address: "sales@example.test",
     domainId: domains[0].id,
     displayName: "Sales"
   },
   {
     id: "mbx_local_ops",
-    addressId: "addr_local_ops",
     address: "ops@ops.example.test",
     domainId: domains[1].id,
     displayName: "Ops"
   },
   {
     id: "mbx_local_info",
-    addressId: "addr_local_info",
     address: "info@example.test",
     domainId: domains[0].id,
     displayName: "Info"
   },
   {
     id: "mbx_local_billing",
-    addressId: "addr_local_billing",
     address: "billing@example.test",
     domainId: domains[0].id,
     displayName: "Billing"
   },
   {
     id: "mbx_local_noreply",
-    addressId: "addr_local_noreply",
     address: "noreply@example.test",
     domainId: domains[0].id,
     displayName: "No Reply"
-  }
-];
-
-export const extraAddresses = [
-  {
-    id: "addr_local_support_alias",
-    mailboxId: "mbx_local_support",
-    domainId: domains[0].id,
-    localPart: "help",
-    address: "help@example.test",
-    displayName: "Support Alias"
   },
   {
-    id: "addr_local_ops_catchall",
-    mailboxId: "mbx_local_ops",
-    domainId: domains[1].id,
-    localPart: "catchall",
+    id: "mbx_migrated_addr_local_support_alias",
+    address: "help@example.test",
+    domainId: domains[0].id,
+    displayName: "Help"
+  },
+  {
+    id: "mbx_migrated_addr_local_ops_catchall",
     address: "catchall@ops.example.test",
+    domainId: domains[1].id,
     displayName: "Ops Catch-all"
   }
 ];

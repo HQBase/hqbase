@@ -37,14 +37,14 @@ test("deployed HQBase PWA shell is ready", async ({ page, request }) => {
   }).toPass({ intervals: [2_000, 5_000, 10_000], timeout: 60_000 });
 });
 
-test("deployed HQBase publishes the v1 Mail API OAuth resource", async ({ request }) => {
+test("deployed HQBase publishes the v2 Mail API OAuth resource", async ({ request }) => {
   const origin = new URL(stagingUrl).origin;
   const metadata = await getSuccessfulResponseBody(
     request,
-    "/.well-known/oauth-protected-resource/api/v1"
+    "/.well-known/oauth-protected-resource/api/v2"
   );
   expect(JSON.parse(metadata)).toMatchObject({
-    resource: `${origin}/api/v1`,
+    resource: `${origin}/api/v2`,
     authorization_servers: [`${origin}/api/auth`],
     scopes_supported: ["mail:read", "mail:write", "mail:send"]
   });

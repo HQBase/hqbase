@@ -52,26 +52,19 @@ describe("HQBase MCP server", () => {
         userId
       ),
       env.DB.prepare(
-        `INSERT INTO mailboxes (id, address, display_name, is_active, created_at, updated_at)
-         VALUES ('mbx_allowed', 'allowed@example.com', 'Allowed', 1, ?, ?)`
-      ).bind(now.toISOString(), now.toISOString()),
-      env.DB.prepare(
-        `INSERT INTO mailboxes (id, address, display_name, is_active, created_at, updated_at)
-         VALUES ('mbx_hidden', 'hidden@example.com', 'Hidden', 1, ?, ?)`
-      ).bind(now.toISOString(), now.toISOString()),
-      env.DB.prepare(
         `INSERT INTO mail_domains (
           id, name, receiving_status, sending_status, dns_status, is_enabled, created_at, updated_at
         ) VALUES ('dom_example', 'example.com', 'ready', 'ready', 'ready', 1, ?, ?)`
       ).bind(now.toISOString(), now.toISOString()),
       env.DB.prepare(
-        `INSERT INTO mailbox_addresses (
-          id, mailbox_id, mail_domain_id, local_part, address, display_name,
-          receive_enabled, send_enabled, is_primary, created_at, updated_at
-        ) VALUES (
-          'addr_allowed', 'mbx_allowed', 'dom_example', 'allowed', 'allowed@example.com', 'Allowed',
-          1, 1, 1, ?, ?
-        )`
+        `INSERT INTO mailboxes
+         (id, address, mail_domain_id, display_name, is_active, created_at, updated_at)
+         VALUES ('mbx_allowed', 'allowed@example.com', 'dom_example', 'Allowed', 1, ?, ?)`
+      ).bind(now.toISOString(), now.toISOString()),
+      env.DB.prepare(
+        `INSERT INTO mailboxes
+         (id, address, mail_domain_id, display_name, is_active, created_at, updated_at)
+         VALUES ('mbx_hidden', 'hidden@example.com', 'dom_example', 'Hidden', 1, ?, ?)`
       ).bind(now.toISOString(), now.toISOString()),
       env.DB.prepare(
         `INSERT INTO mailbox_grants
@@ -359,8 +352,20 @@ describe("HQBase MCP server", () => {
   });
 
   it("filters mailbox results through live mailbox grants", async () => {
-    const mailboxes = (await callTool("list_mailboxes", {}, readToken)) as Array<{ id: string }>;
-    expect(mailboxes.map((mailbox) => mailbox.id)).toEqual(["mbx_allowed"]);
+    const mailboxes = (await callTool("list_mailboxes", {}, readToken)) as Array<{
+      address: string;
+      addresses?: unknown;
+      id: string;
+      mailDomainId: string;
+    }>;
+    expect(mailboxes).toEqual([
+      expect.objectContaining({
+        address: "allowed@example.com",
+        id: "mbx_allowed",
+        mailDomainId: "dom_example"
+      })
+    ]);
+    expect(mailboxes[0]).not.toHaveProperty("addresses");
   });
 
   it("reads permitted threads and returns bounded embedded attachments", async () => {

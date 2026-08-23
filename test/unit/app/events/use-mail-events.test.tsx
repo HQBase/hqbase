@@ -71,7 +71,7 @@ describe("useMailEvents", () => {
     });
     const socket = FakeWebSocket.instances[0];
 
-    expect(socket?.url).toBe("ws://localhost:3000/api/v1/events");
+    expect(socket?.url).toBe("ws://localhost:3000/api/v2/events");
     expect(hook.result).toBe("connecting");
     await flushHookEffects(() => socket?.open());
     expect(hook.result).toBe("connected");

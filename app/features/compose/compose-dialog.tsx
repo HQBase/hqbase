@@ -47,8 +47,8 @@ export function ComposeDialog({
 }: ComposeDialogProps): React.ReactElement | null {
   const identities = React.useMemo(() => sendingIdentities(mailboxes), [mailboxes]);
   const defaultIdentity = React.useMemo(
-    () => defaultSendingIdentity(defaultFromMailboxId, mailboxes, identities),
-    [defaultFromMailboxId, identities, mailboxes]
+    () => defaultSendingIdentity(defaultFromMailboxId, identities),
+    [defaultFromMailboxId, identities]
   );
   const [draft, setDraft] = React.useState<Draft | null>(null);
   const [from, setFrom] = React.useState("");

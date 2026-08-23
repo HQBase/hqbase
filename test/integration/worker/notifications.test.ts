@@ -25,10 +25,16 @@ describe("notification persistence", () => {
            ('usr_banned', 'Banned', 'banned@login.example', 1, ?, ?, 'owner', 1)`
       ).bind(now, now, now, now, now, now, now, now),
       env.DB.prepare(
-        `INSERT INTO mailboxes (id, address, display_name, is_active, created_at, updated_at)
+        `INSERT INTO mail_domains
+         (id, name, receiving_status, sending_status, dns_status, is_enabled, created_at, updated_at)
+         VALUES ('dom_notifications', 'example.com', 'ready', 'ready', 'ready', 1, ?, ?)`
+      ).bind(now, now),
+      env.DB.prepare(
+        `INSERT INTO mailboxes
+         (id, address, mail_domain_id, display_name, is_active, created_at, updated_at)
          VALUES
-           ('mbx_one', 'support@example.com', 'Support', 1, ?, ?),
-           ('mbx_two', 'privacy@example.com', 'Privacy', 1, ?, ?)`
+           ('mbx_one', 'support@example.com', 'dom_notifications', 'Support', 1, ?, ?),
+           ('mbx_two', 'privacy@example.com', 'dom_notifications', 'Privacy', 1, ?, ?)`
       ).bind(now, now, now, now),
       env.DB.prepare(
         `INSERT INTO mailbox_grants

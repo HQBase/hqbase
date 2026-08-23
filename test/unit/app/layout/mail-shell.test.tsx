@@ -28,7 +28,7 @@ const unread = {
 const mailbox: Mailbox = {
   id: "mailbox-1",
   address: "support@example.com",
-  addresses: [],
+  mailDomainId: "domain-1",
   displayName: "Support",
   isActive: true,
   accessLevel: "manager",

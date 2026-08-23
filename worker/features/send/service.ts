@@ -6,8 +6,8 @@ import { drafts } from "../../db/schema";
 import type { WorkerEnv } from "../../lib/env";
 import { AppError } from "../../lib/errors";
 import { draftAttachmentObjects } from "../drafts/queries";
-import { findAddressIdentity } from "../mailboxes/address-queries";
 import { findMailboxForSending } from "../mailboxes/queries";
+import type { Mailbox } from "../mailboxes/types";
 import { ensureReplySubject } from "../messages/headers";
 import { sanitizeQuotedMessageHtml } from "../messages/html-sanitizer";
 import { isSafeInlineImage } from "../messages/inline-media";
@@ -28,7 +28,7 @@ export async function sendNewMessage(
   input: SendMessageInput,
   userId?: string
 ): Promise<MessageSummary> {
-  await ensureActiveMailbox(env.DB, input.from);
+  const mailbox = await ensureActiveMailbox(env.DB, input.from);
 
   const timestamp = nowIso();
   const email = {
@@ -51,6 +51,7 @@ export async function sendNewMessage(
     ...input,
     inReplyTo: null,
     messageId: sendResult.messageId,
+    mailboxId: mailbox.id,
     references: [],
     sentAt: timestamp,
     subject: input.subject,
@@ -66,7 +67,7 @@ export async function replyToMessage(
   input: ReplyMessageInput,
   userId?: string
 ): Promise<MessageSummary> {
-  await ensureActiveMailbox(env.DB, input.from);
+  const mailbox = await ensureActiveMailbox(env.DB, input.from);
 
   const original = await getMessageDetail(env.DB, input.messageId);
   if (!original) {
@@ -117,6 +118,7 @@ export async function replyToMessage(
     ...(body.html ? { html: body.html } : {}),
     inReplyTo: original.messageId ?? original.id,
     messageId: sendResult.messageId,
+    mailboxId: mailbox.id,
     references,
     sentAt: timestamp,
     threadId: original.threadId,
@@ -126,7 +128,7 @@ export async function replyToMessage(
   });
 }
 
-async function ensureActiveMailbox(db: D1Database, address: string): Promise<void> {
+async function ensureActiveMailbox(db: D1Database, address: string): Promise<Mailbox> {
   const mailbox = await findMailboxForSending(db, address);
   if (!mailbox) {
     throw new AppError("MAILBOX_NOT_FOUND", "Sending mailbox not found.", 404);
@@ -134,6 +136,7 @@ async function ensureActiveMailbox(db: D1Database, address: string): Promise<voi
   if (!mailbox.isActive) {
     throw new AppError("MAILBOX_DISABLED", "Disabled mailboxes cannot send email.", 400);
   }
+  return mailbox;
 }
 
 async function storeSentMessage(
@@ -148,6 +151,7 @@ async function storeSentMessage(
     html?: string | undefined;
     inReplyTo: string | null;
     messageId: string;
+    mailboxId: string;
     references: string[];
     sentAt: string;
     threadId: string;
@@ -156,11 +160,6 @@ async function storeSentMessage(
     userId: string | null;
   }
 ): Promise<MessageSummary> {
-  const mailbox = await findMailboxForSending(env.DB, input.from);
-  if (!mailbox) {
-    throw new AppError("MAILBOX_NOT_FOUND", "Sending mailbox not found.", 404);
-  }
-
   const htmlR2Key = input.html ? `sent/${input.sentAt.slice(0, 10)}/${newId("html")}.html` : null;
   if (input.html && htmlR2Key) {
     await env.MAIL_OBJECTS.put(htmlR2Key, input.html, {
@@ -169,11 +168,10 @@ async function storeSentMessage(
   }
 
   await touchThread(env.DB, input.threadId, input.sentAt);
-  const sendingIdentity = await findAddressIdentity(env.DB, input.from, "send");
   const message = await insertMessage(env.DB, {
     threadId: input.threadId,
     isUnassigned: false,
-    mailboxId: mailbox.id,
+    mailboxId: input.mailboxId,
     direction: "outbound",
     folder: "sent",
     fromAddress: input.from,
@@ -192,8 +190,7 @@ async function storeSentMessage(
     receivedAt: null,
     sentAt: input.sentAt,
     readAt: input.sentAt,
-    hasAttachments: input.storedAttachments.length > 0,
-    sentFromAddressId: sendingIdentity?.address.id ?? null
+    hasAttachments: input.storedAttachments.length > 0
   });
   for (const attachment of input.storedAttachments) {
     await insertAttachment(env.DB, {
