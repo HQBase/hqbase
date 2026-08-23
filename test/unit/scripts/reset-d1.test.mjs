@@ -1,5 +1,6 @@
 import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
+import { DatabaseSync } from "node:sqlite";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
@@ -21,6 +22,15 @@ describe("local D1 reset", () => {
     expect(resetTables).toContain("mailbox_address_migration");
     expect(resetTables).toContain("d1_migrations");
     expect(resetTables).toContain("d1_migrations_after_deploy");
+  });
+
+  it("runs against a fresh database", () => {
+    const database = new DatabaseSync(":memory:");
+    try {
+      expect(() => database.exec(resetSql)).not.toThrow();
+    } finally {
+      database.close();
+    }
   });
 
   it("keeps the destructive workflow local for both reset and migration", () => {

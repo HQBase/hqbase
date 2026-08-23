@@ -39,6 +39,14 @@ SELECT mail_domain_id FROM mailboxes;
 
 DROP TABLE mailbox_domain_migration_guard;
 
+-- Current write paths store lowercase addresses. Normalize legacy mailbox rows and stop instead
+-- of choosing between case-only duplicates.
+CREATE UNIQUE INDEX mailboxes_address_ci_unique
+ON mailboxes(lower(address));
+
+UPDATE mailboxes
+SET address = lower(address);
+
 CREATE TABLE mailbox_address_migration (
   address_id TEXT PRIMARY KEY NOT NULL,
   source_mailbox_id TEXT NOT NULL,
@@ -72,7 +80,7 @@ SELECT
     ELSE 'mbx_migrated_' || address.id
   END,
   address.mail_domain_id,
-  address.address,
+  lower(address.address),
   address.display_name,
   address.receive_enabled,
   address.send_enabled,

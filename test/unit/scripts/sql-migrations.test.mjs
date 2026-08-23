@@ -198,6 +198,70 @@ describe("SQL migration contract", () => {
     database.exec("ROLLBACK");
   });
 
+  it("rejects ambiguous case-only legacy mailbox addresses", async () => {
+    const database = createDatabase();
+    const migrations = await readD1Migrations(migrationsDirectory);
+    for (const migration of migrations.slice(0, -1)) applyMigration(database, migration);
+
+    database.exec(`
+      INSERT INTO mailboxes (id, address, display_name, created_at, updated_at)
+      VALUES ('mbx_case', 'support@example.com', 'Support', 'now', 'now');
+      INSERT INTO mail_domains (id, name, created_at, updated_at)
+      VALUES ('dom_case', 'example.com', 'now', 'now');
+      INSERT INTO mailbox_addresses (
+        id, mailbox_id, mail_domain_id, local_part, address, display_name,
+        receive_enabled, send_enabled, is_primary, created_at, updated_at
+      ) VALUES
+        ('addr_case_upper', 'mbx_case', 'dom_case', 'Sales', 'Sales@example.com',
+         'Sales', 1, 1, 0, 'now', 'now'),
+        ('addr_case_lower', 'mbx_case', 'dom_case', 'sales', 'sales@example.com',
+         'Sales', 1, 1, 0, 'now', 'now');
+    `);
+
+    expect(() => applyMigration(database, migrations.at(-1))).toThrow(/UNIQUE constraint failed/);
+    expect(database.prepare("SELECT COUNT(*) AS count FROM mailbox_addresses").get()).toEqual({
+      count: 2
+    });
+    expect(
+      database.prepare("SELECT 1 FROM sqlite_master WHERE name = 'mailbox_address_migration'").get()
+    ).toBeUndefined();
+  });
+
+  it("normalizes unmapped legacy mailboxes and rejects case-only duplicates", async () => {
+    const migrations = await readD1Migrations(migrationsDirectory);
+    const single = createDatabase();
+    for (const migration of migrations.slice(0, -1)) applyMigration(single, migration);
+    single.exec(`
+      INSERT INTO mail_domains (id, name, created_at, updated_at)
+      VALUES ('dom_unmapped', 'example.com', 'now', 'now');
+      INSERT INTO mailboxes (id, address, display_name, created_at, updated_at)
+      VALUES ('mbx_unmapped', 'Sales@Example.com', 'Sales', 'now', 'now');
+    `);
+
+    expect(applyMigration(single, migrations.at(-1))).toBe(true);
+    expect(
+      single
+        .prepare("SELECT address, mail_domain_id FROM mailboxes WHERE id = 'mbx_unmapped'")
+        .get()
+    ).toEqual({ address: "sales@example.com", mail_domain_id: "dom_unmapped" });
+
+    const duplicates = createDatabase();
+    for (const migration of migrations.slice(0, -1)) applyMigration(duplicates, migration);
+    duplicates.exec(`
+      INSERT INTO mail_domains (id, name, created_at, updated_at)
+      VALUES ('dom_duplicate', 'example.com', 'now', 'now');
+      INSERT INTO mailboxes (id, address, display_name, created_at, updated_at) VALUES
+        ('mbx_upper', 'Sales@example.com', 'Upper', 'now', 'now'),
+        ('mbx_lower', 'sales@example.com', 'Lower', 'now', 'now');
+    `);
+
+    expect(() => applyMigration(duplicates, migrations.at(-1))).toThrow(/UNIQUE constraint failed/);
+    expect(duplicates.prepare("SELECT address FROM mailboxes ORDER BY id").all()).toEqual([
+      { address: "sales@example.com" },
+      { address: "Sales@example.com" }
+    ]);
+  });
+
   it("applies every migration to a fresh database", async () => {
     const database = createDatabase();
     const migrations = await readD1Migrations(migrationsDirectory);

@@ -16,9 +16,14 @@ describe("staging workflow lifecycle record", () => {
     const legacy = workflow.indexOf('set_migrations_dir "migrations-before-0014"');
     const current = workflow.indexOf('set_migrations_dir "../../../migrations"');
     const beforeDeployAssertion = workflow.indexOf('"alias_table_count":1');
+    const beforeAddressIdAssertion = workflow.indexOf('"address_id_column_count":2');
+    const beforeSchemaAssertion = workflow.indexOf('"schema_version":2');
     const deployStep = workflow.indexOf("      - name: Deploy reviewed source candidate");
     const deploy = workflow.indexOf("pnpm exec wrangler deploy --config");
     const afterDeployDirectory = workflow.indexOf('"../../../migrations-after-deploy"');
+    const afterAliasAssertion = workflow.indexOf('"alias_table_count":0');
+    const afterAddressIdAssertion = workflow.indexOf('"address_id_column_count":0');
+    const afterSchemaAssertion = workflow.indexOf('"schema_version":3');
     const finalAssertion = workflow.indexOf('"post_migration_count":1');
     const cleanup = workflow.indexOf(
       "DELETE FROM messages WHERE id IN ('msg_sql_upgrade', 'msg_sql_alias_upgrade')"
@@ -30,9 +35,16 @@ describe("staging workflow lifecycle record", () => {
     expect(legacy).toBeGreaterThan(-1);
     expect(current).toBeGreaterThan(legacy);
     expect(beforeDeployAssertion).toBeGreaterThan(current);
+    expect(beforeAddressIdAssertion).toBeGreaterThan(current);
+    expect(beforeSchemaAssertion).toBeGreaterThan(current);
     expect(deployStep).toBeGreaterThan(beforeDeployAssertion);
+    expect(deployStep).toBeGreaterThan(beforeAddressIdAssertion);
+    expect(deployStep).toBeGreaterThan(beforeSchemaAssertion);
     expect(deploy).toBeGreaterThan(deployStep);
     expect(afterDeployDirectory).toBeGreaterThan(deploy);
+    expect(afterAliasAssertion).toBeGreaterThan(afterDeployDirectory);
+    expect(afterAddressIdAssertion).toBeGreaterThan(afterDeployDirectory);
+    expect(afterSchemaAssertion).toBeGreaterThan(afterDeployDirectory);
     expect(finalAssertion).toBeGreaterThan(afterDeployDirectory);
     expect(cleanup).toBeGreaterThan(finalAssertion);
     expect(lifecycle).toBeGreaterThan(cleanup);
@@ -43,14 +55,8 @@ describe("staging workflow lifecycle record", () => {
     expect(workflow).toContain('"$(basename "$migration")" < "0014_"');
     expect(workflow).toContain('"is_unassigned":1');
     expect(workflow).toContain('"delivered_to_address":"alias@sql-upgrade.example.test"');
-    expect(workflow).toContain('"alias_table_count":1');
-    expect(workflow).toContain('"address_id_column_count":2');
-    expect(workflow).toContain('"alias_table_count":0');
-    expect(workflow).toContain('"address_id_column_count":0');
     expect(workflow).toContain('"migration_count":16');
     expect(workflow).toContain('"post_migration_count":1');
-    expect(workflow).toContain('"schema_version":2');
-    expect(workflow).toContain('"schema_version":3');
     expect(workflow).toContain('migrations_table = "d1_migrations_after_deploy"');
     expect(workflow).toContain("del(.d1_databases[0].migrations_pattern)");
     expect(normalUpgrade.match(/migrations apply DB --remote --config "\$config"/g)).toHaveLength(

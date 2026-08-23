@@ -7,7 +7,8 @@ import {
   integer,
   primaryKey,
   sqliteTable,
-  text
+  text,
+  uniqueIndex
 } from "drizzle-orm/sqlite-core";
 
 import { users } from "./schema-auth";
@@ -16,17 +17,21 @@ const nocaseText = customType<{ data: string; driverData: string }>({
   dataType: () => "text COLLATE NOCASE"
 });
 
-export const mailboxes = sqliteTable("mailboxes", {
-  id: text("id").primaryKey().notNull(),
-  address: text("address").notNull().unique(),
-  mailDomainId: text("mail_domain_id")
-    .notNull()
-    .references((): AnySQLiteColumn => mailDomains.id, { onDelete: "restrict" }),
-  displayName: text("display_name").notNull(),
-  isActive: integer("is_active", { mode: "boolean" }).default(sql`1`).notNull(),
-  createdAt: text("created_at").notNull(),
-  updatedAt: text("updated_at").notNull()
-});
+export const mailboxes = sqliteTable(
+  "mailboxes",
+  {
+    id: text("id").primaryKey().notNull(),
+    address: text("address").notNull().unique(),
+    mailDomainId: text("mail_domain_id")
+      .notNull()
+      .references((): AnySQLiteColumn => mailDomains.id, { onDelete: "restrict" }),
+    displayName: text("display_name").notNull(),
+    isActive: integer("is_active", { mode: "boolean" }).default(sql`1`).notNull(),
+    createdAt: text("created_at").notNull(),
+    updatedAt: text("updated_at").notNull()
+  },
+  (table) => [uniqueIndex("mailboxes_address_ci_unique").on(sql`lower(${table.address})`)]
+);
 
 export const mailboxGrants = sqliteTable(
   "mailbox_grants",

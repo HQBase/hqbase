@@ -33,6 +33,8 @@ DROP TABLE IF EXISTS drafts;
 DROP TABLE IF EXISTS domain_setup_operations;
 DROP TABLE IF EXISTS mailbox_address_migration;
 DROP TABLE IF EXISTS mailbox_addresses;
+-- Break the mailbox/domain foreign-key cycle. The placeholder also makes a fresh reset valid.
+CREATE TABLE IF NOT EXISTS mailboxes (id TEXT PRIMARY KEY);
 DELETE FROM mailboxes;
 DROP TABLE IF EXISTS mail_domains;
 DROP TABLE IF EXISTS workspace_hosts;
