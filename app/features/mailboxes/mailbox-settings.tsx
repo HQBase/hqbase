@@ -127,8 +127,12 @@ export function MailboxSettings({
   }
 
   async function handleRemoveAlias(mailbox: Mailbox, addressId: string) {
-    await removeMailboxAddress(mailbox.id, addressId);
-    await onChanged();
+    try {
+      await removeMailboxAddress(mailbox.id, addressId);
+      await onChanged();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Address could not be removed.");
+    }
   }
 
   return (
