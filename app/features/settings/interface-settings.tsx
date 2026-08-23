@@ -1,8 +1,8 @@
 import type * as React from "react";
 
+import { Switch } from "@/components/ui/switch";
 import { SettingsSection } from "@/features/settings/settings-section";
 import { useTheme } from "@/features/theme/theme-provider";
-import { cn } from "@/lib/cn";
 
 export function InterfaceSettings(): React.ReactElement {
   const { setTheme, theme } = useTheme();
@@ -18,29 +18,11 @@ export function InterfaceSettings(): React.ReactElement {
               Toggle the theme. Stored locally in this browser.
             </p>
           </div>
-          <button
-            aria-checked={isDark}
-            aria-label={isDark ? "Dark mode on" : "Dark mode off"}
-            className="flex shrink-0 items-center gap-2"
-            role="switch"
-            type="button"
-            onClick={() => setTheme(isDark ? "light" : "dark")}
-          >
-            <span
-              aria-hidden="true"
-              className={cn(
-                "inline-flex h-6 w-11 items-center rounded-full border px-0.5 transition-colors",
-                isDark ? "border-input bg-foreground/90" : "border-input bg-muted"
-              )}
-            >
-              <span
-                className={cn(
-                  "size-5 rounded-full bg-background shadow-sm transition-transform",
-                  isDark ? "translate-x-5 bg-card" : "translate-x-0"
-                )}
-              />
-            </span>
-          </button>
+          <Switch
+            aria-label="Dark mode"
+            checked={isDark}
+            onCheckedChange={(checked) => setTheme(checked ? "dark" : "light")}
+          />
         </div>
       </div>
     </SettingsSection>

@@ -27,7 +27,7 @@ type SettingsPageProps = {
   setup: SetupStatus;
   users: WorkspaceUser[];
   onDefaultFromMailboxChange: (mailboxId: string) => void;
-  onRefresh: () => void;
+  onRefresh: () => Promise<void>;
   onUpdateStarted: (buildId: string) => void;
   onUpdateStatusChange: (status: UpdateStatus) => void;
   updateProgress: UpdateProgress | null;

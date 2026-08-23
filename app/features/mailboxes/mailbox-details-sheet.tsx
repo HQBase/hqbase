@@ -19,8 +19,7 @@ export function MailboxDetailsSheet({
   onAddAddress,
   onManageAccess,
   onOpenChange,
-  onRemoveAddress,
-  onToggle
+  onRemoveAddress
 }: {
   canManage: boolean;
   mailbox: Mailbox | null;
@@ -30,7 +29,6 @@ export function MailboxDetailsSheet({
   onManageAccess: (mailbox: Mailbox) => void;
   onOpenChange: (open: boolean) => void;
   onRemoveAddress: (mailbox: Mailbox, addressId: string) => void;
-  onToggle: (mailbox: Mailbox) => void;
 }): React.ReactElement {
   const people = mailbox ? getMailboxAccessEntries(mailbox.id, policies.grants, users) : [];
   const additionalAddresses = mailbox?.addresses.filter((address) => !address.isPrimary) ?? [];
@@ -161,35 +159,6 @@ export function MailboxDetailsSheet({
                   </p>
                 )}
               </section>
-
-              <div className="border-t pt-4">
-                <div className="flex items-center justify-between gap-4">
-                  <div>
-                    <p className="text-sm font-medium">Mailbox status</p>
-                    <p className="mt-0.5 text-xs text-muted-foreground">
-                      {mailbox?.isActive
-                        ? "This mailbox can receive and send mail."
-                        : "This mailbox is currently disabled."}
-                    </p>
-                  </div>
-                  {mailbox ? (
-                    canManage ? (
-                      <Button
-                        size="sm"
-                        type="button"
-                        variant="outline"
-                        onClick={() => onToggle(mailbox)}
-                      >
-                        {mailbox.isActive ? "Disable" : "Enable"}
-                      </Button>
-                    ) : (
-                      <Badge variant={mailbox.isActive ? "secondary" : "outline"}>
-                        {mailbox.isActive ? "Active" : "Disabled"}
-                      </Badge>
-                    )
-                  ) : null}
-                </div>
-              </div>
             </div>
           </details>
         </div>
