@@ -1,10 +1,8 @@
 import { newId, nowIso } from "../../db/client";
-import { createDatabase } from "../../db/drizzle";
-import { auditEvents } from "../../db/schema";
 
 export type AuditInput = {
   correlationId: string;
-  actorType: "user" | "system" | "operator";
+  actorType: "user" | "agent" | "system" | "operator";
   actorId?: string | null;
   action: string;
   resourceType: string;
@@ -29,25 +27,36 @@ const forbiddenMetadata = new Set([
 ]);
 
 export async function recordAudit(db: D1Database, input: AuditInput): Promise<void> {
+  await auditStatement(db, input).run();
+}
+
+export function auditStatement(
+  db: D1Database,
+  input: AuditInput,
+  occurredAt = nowIso()
+): D1PreparedStatement {
   for (const key of Object.keys(input.metadata ?? {})) {
     if (forbiddenMetadata.has(key.toLowerCase())) {
       throw new Error(`Sensitive audit metadata rejected: ${key}`);
     }
   }
-  const database = createDatabase(db);
-  await database
-    .insert(auditEvents)
-    .values({
-      id: newId("aud"),
-      occurredAt: nowIso(),
-      correlationId: input.correlationId,
-      actorType: input.actorType,
-      actorId: input.actorId ?? null,
-      action: input.action,
-      resourceType: input.resourceType,
-      resourceId: input.resourceId ?? null,
-      outcome: input.outcome,
-      metadata: input.metadata ?? {}
-    })
-    .run();
+  return db
+    .prepare(
+      `INSERT INTO audit_events
+       (id, occurred_at, correlation_id, actor_type, actor_id, action, resource_type,
+        resource_id, outcome, metadata_json)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    )
+    .bind(
+      newId("aud"),
+      occurredAt,
+      input.correlationId,
+      input.actorType,
+      input.actorId ?? null,
+      input.action,
+      input.resourceType,
+      input.resourceId ?? null,
+      input.outcome,
+      JSON.stringify(input.metadata ?? {})
+    );
 }

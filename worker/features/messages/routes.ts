@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { isVersionedMailApiRequest, requireMailApiContext } from "../../auth/mail-api";
+import { isVersionedMailApiRequest, requireMailApiPrincipal } from "../../auth/mail-api";
 import { accessibleMessageScope } from "../../auth/mailbox-access";
 import type { HonoApp } from "../../lib/env";
 import { AppError } from "../../lib/errors";
@@ -41,8 +41,13 @@ const actions: readonly MessageAction[] = [
 ];
 
 messageRoutes.get("/", async (c) => {
-  const auth = await requireMailApiContext(c.env, c.req.raw, "mail:read");
-  const scope = await accessibleMessageScope(c.env.DB, auth.user.id, auth.user.role, "read");
+  const auth = await requireMailApiPrincipal(c.env, c.req.raw, "mail:read");
+  const scope = await accessibleMessageScope(
+    c.env.DB,
+    auth.principal.id,
+    auth.principal.role,
+    "read"
+  );
   const limit = parseMessageLimit(c.req.query("limit"));
   const page = await listMessagePage(c.env.DB, {
     cursor: c.req.query("cursor"),
@@ -61,19 +66,30 @@ messageRoutes.get("/", async (c) => {
 });
 
 messageRoutes.get("/:id/thread", async (c) => {
-  const auth = await requireMailApiContext(c.env, c.req.raw, "mail:read");
+  const auth = await requireMailApiPrincipal(c.env, c.req.raw, "mail:read");
   const message = await getMessageDetail(c.env.DB, c.req.param("id"));
   if (!message) {
     throw new AppError("MESSAGE_NOT_FOUND", "Message not found.", 404);
   }
-  await requireMessageAccess(c.env.DB, auth.user.id, auth.user.role, message.id, "read");
-  const scope = await accessibleMessageScope(c.env.DB, auth.user.id, auth.user.role, "read");
+  await requireMessageAccess(c.env.DB, auth.principal.id, auth.principal.role, message.id, "read");
+  const scope = await accessibleMessageScope(
+    c.env.DB,
+    auth.principal.id,
+    auth.principal.role,
+    "read"
+  );
   return c.json((await listThreadMessages(c.env.DB, message.threadId, scope)).map(publicMessage));
 });
 
 messageRoutes.get("/:id", async (c) => {
-  const auth = await requireMailApiContext(c.env, c.req.raw, "mail:read");
-  await requireMessageAccess(c.env.DB, auth.user.id, auth.user.role, c.req.param("id"), "read");
+  const auth = await requireMailApiPrincipal(c.env, c.req.raw, "mail:read");
+  await requireMessageAccess(
+    c.env.DB,
+    auth.principal.id,
+    auth.principal.role,
+    c.req.param("id"),
+    "read"
+  );
   const message = await getMessageDetail(c.env.DB, c.req.param("id"));
   if (!message) {
     throw new AppError("MESSAGE_NOT_FOUND", "Message not found.", 404);
@@ -82,8 +98,14 @@ messageRoutes.get("/:id", async (c) => {
 });
 
 messageRoutes.get("/:id/html", async (c) => {
-  const auth = await requireMailApiContext(c.env, c.req.raw, "mail:read");
-  await requireMessageAccess(c.env.DB, auth.user.id, auth.user.role, c.req.param("id"), "read");
+  const auth = await requireMailApiPrincipal(c.env, c.req.raw, "mail:read");
+  await requireMessageAccess(
+    c.env.DB,
+    auth.principal.id,
+    auth.principal.role,
+    c.req.param("id"),
+    "read"
+  );
   const message = await getMessageDetail(c.env.DB, c.req.param("id"));
   if (!message) {
     throw new AppError("MESSAGE_NOT_FOUND", "Message not found.", 404);
@@ -98,7 +120,8 @@ messageRoutes.get("/:id/html", async (c) => {
   }
   const trusted =
     message.direction === "outbound" ||
-    (await isRemoteMediaTrusted(c.env.DB, auth.user.id, message.fromAddress));
+    (auth.principal.type === "user" &&
+      (await isRemoteMediaTrusted(c.env.DB, auth.principal.id, message.fromAddress)));
   const rendered = sanitizeMessageHtml({
     allowRemoteImages: trusted || c.req.query("loadRemoteImages") === "1",
     attachments: message.attachments,
@@ -111,22 +134,35 @@ messageRoutes.get("/:id/html", async (c) => {
 });
 
 messageRoutes.post("/:id/remote-media/trust", async (c) => {
-  const auth = await requireMailApiContext(c.env, c.req.raw, "mail:write");
-  await requireMessageAccess(c.env.DB, auth.user.id, auth.user.role, c.req.param("id"), "read");
+  const auth = await requireMailApiPrincipal(c.env, c.req.raw, "mail:write");
+  if (auth.principal.type !== "user") {
+    throw new AppError(
+      "AGENT_REMOTE_MEDIA_PREFERENCE_UNSUPPORTED",
+      "Machine agents cannot change sender image preferences.",
+      403
+    );
+  }
+  await requireMessageAccess(
+    c.env.DB,
+    auth.principal.id,
+    auth.principal.role,
+    c.req.param("id"),
+    "read"
+  );
   const message = await getMessageDetail(c.env.DB, c.req.param("id"));
   if (!message) {
     throw new AppError("MESSAGE_NOT_FOUND", "Message not found.", 404);
   }
-  await trustRemoteMediaSender(c.env.DB, auth.user.id, message.fromAddress);
+  await trustRemoteMediaSender(c.env.DB, auth.principal.id, message.fromAddress);
   return c.json({ remoteMediaTrusted: true });
 });
 
 messageRoutes.get("/:id/inline/:attachmentId", async (c) => {
-  const auth = await requireMailApiContext(c.env, c.req.raw, "mail:read");
+  const auth = await requireMailApiPrincipal(c.env, c.req.raw, "mail:read");
   await requireAttachmentAccess(
     c.env.DB,
-    auth.user.id,
-    auth.user.role,
+    auth.principal.id,
+    auth.principal.role,
     c.req.param("attachmentId"),
     "read"
   );
@@ -154,11 +190,11 @@ messageRoutes.get("/:id/inline/:attachmentId", async (c) => {
 
 for (const action of actions) {
   messageRoutes.post(`/:id/${action}`, async (c) => {
-    const auth = await requireMailApiContext(c.env, c.req.raw, "mail:write");
+    const auth = await requireMailApiPrincipal(c.env, c.req.raw, "mail:write");
     await requireMessageAccess(
       c.env.DB,
-      auth.user.id,
-      auth.user.role,
+      auth.principal.id,
+      auth.principal.role,
       c.req.param("id"),
       action === "read" || action === "unread" ? "read" : "agent"
     );
@@ -174,8 +210,14 @@ for (const action of actions) {
 export const attachmentRoutes = new Hono<HonoApp>();
 
 attachmentRoutes.get("/:id", async (c) => {
-  const auth = await requireMailApiContext(c.env, c.req.raw, "mail:read");
-  await requireAttachmentAccess(c.env.DB, auth.user.id, auth.user.role, c.req.param("id"), "read");
+  const auth = await requireMailApiPrincipal(c.env, c.req.raw, "mail:read");
+  await requireAttachmentAccess(
+    c.env.DB,
+    auth.principal.id,
+    auth.principal.role,
+    c.req.param("id"),
+    "read"
+  );
   const attachment = await findAttachment(c.env.DB, c.req.param("id"));
   if (!attachment) {
     throw new AppError("ATTACHMENT_NOT_FOUND", "Attachment not found.", 404);

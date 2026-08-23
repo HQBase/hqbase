@@ -23,6 +23,7 @@ export function useMailSync({ activeFolder, mailboxId, search, userId }: MailSyn
   loadMore: () => Promise<void>;
   loadMoreError: string | null;
   notifications: ReturnType<typeof useNotifications>;
+  hardRefresh: () => Promise<void>;
   refresh: () => Promise<void>;
   totalCount: number | null;
 } {
@@ -47,12 +48,26 @@ export function useMailSync({ activeFolder, mailboxId, search, userId }: MailSyn
     promise: Promise<void>;
   } | null>(null);
   const loadedAdditionalPages = React.useRef(false);
+  const refreshGeneration = React.useRef(0);
   currentUserId.current = userId;
   currentSyncKey.current = syncKey;
+
+  const reset = React.useCallback((): void => {
+    refreshGeneration.current += 1;
+    inFlight.current = null;
+    loadMoreInFlight.current = null;
+    loadedAdditionalPages.current = false;
+    setConversations([]);
+    setNextCursor(null);
+    setTotalCount(null);
+    setIsLoadingMore(false);
+    setLoadMoreError(null);
+  }, []);
 
   const refresh = React.useCallback((): Promise<void> => {
     if (inFlight.current?.key === syncKey) return inFlight.current.promise;
 
+    const generation = refreshGeneration.current;
     const promise = (async () => {
       if (!userId) {
         setConversations([]);
@@ -72,7 +87,13 @@ export function useMailSync({ activeFolder, mailboxId, search, userId }: MailSyn
               search: search || undefined
             })
       ]);
-      if (currentSyncKey.current !== syncKey || currentUserId.current !== userId) return;
+      if (
+        currentSyncKey.current !== syncKey ||
+        currentUserId.current !== userId ||
+        refreshGeneration.current !== generation
+      ) {
+        return;
+      }
 
       if (conversationResult.status === "fulfilled" && conversationResult.value !== null) {
         const page = conversationResult.value;
@@ -114,17 +135,16 @@ export function useMailSync({ activeFolder, mailboxId, search, userId }: MailSyn
     return promise;
   }, [activeFolder, mailboxId, refreshNotifications, search, syncKey, userId]);
 
+  const hardRefresh = React.useCallback((): Promise<void> => {
+    reset();
+    return refresh();
+  }, [refresh, reset]);
+
   React.useEffect(() => {
     if (paginationSyncKey.current === syncKey) return;
     paginationSyncKey.current = syncKey;
-    loadedAdditionalPages.current = false;
-    loadMoreInFlight.current = null;
-    setConversations([]);
-    setNextCursor(null);
-    setTotalCount(null);
-    setIsLoadingMore(false);
-    setLoadMoreError(null);
-  }, [syncKey]);
+    reset();
+  }, [reset, syncKey]);
 
   React.useEffect(() => {
     if (inboundSnapshotUserId.current === userId) return;
@@ -178,6 +198,7 @@ export function useMailSync({ activeFolder, mailboxId, search, userId }: MailSyn
     }
 
     const cursor = nextCursor;
+    const generation = refreshGeneration.current;
     setIsLoadingMore(true);
     setLoadMoreError(null);
     const promise = (async () => {
@@ -188,18 +209,26 @@ export function useMailSync({ activeFolder, mailboxId, search, userId }: MailSyn
           mailboxId: mailboxId === "all" ? undefined : mailboxId,
           search: search || undefined
         });
-        if (currentSyncKey.current !== syncKey || currentUserId.current !== userId) return;
+        if (
+          currentSyncKey.current !== syncKey ||
+          currentUserId.current !== userId ||
+          refreshGeneration.current !== generation
+        ) {
+          return;
+        }
         loadedAdditionalPages.current = true;
         setConversations((current) => appendConversationPage(current, page.conversations));
         setNextCursor(page.nextCursor);
       } catch (error: unknown) {
-        if (currentSyncKey.current === syncKey) {
+        if (currentSyncKey.current === syncKey && refreshGeneration.current === generation) {
           setLoadMoreError(
             error instanceof Error ? error.message : "More conversations could not be loaded."
           );
         }
       } finally {
-        if (currentSyncKey.current === syncKey) setIsLoadingMore(false);
+        if (currentSyncKey.current === syncKey && refreshGeneration.current === generation) {
+          setIsLoadingMore(false);
+        }
       }
     })();
     loadMoreInFlight.current = { cursor, key: syncKey, promise };
@@ -253,6 +282,7 @@ export function useMailSync({ activeFolder, mailboxId, search, userId }: MailSyn
     loadMore,
     loadMoreError,
     notifications,
+    hardRefresh,
     refresh,
     totalCount
   };

@@ -7,21 +7,21 @@ import {
 } from "../../../../../worker/features/drafts/change-cursor";
 
 describe("draft change cursor", () => {
-  const userId = "usr_cursor";
+  const principalId = "usr_cursor";
 
   it("round-trips a checkpoint and an active high-water cursor", () => {
     expect(
       decodeDraftChangeCursor(
-        encodeDraftChangeCursor({ after: "12", highWater: null, userId }),
-        userId
+        encodeDraftChangeCursor({ after: "12", highWater: null, principalId }),
+        principalId
       )
-    ).toEqual({ after: "12", highWater: null, userId });
+    ).toEqual({ after: "12", highWater: null, principalId });
     expect(
       decodeDraftChangeCursor(
-        encodeDraftChangeCursor({ after: "12", highWater: "25", userId }),
-        userId
+        encodeDraftChangeCursor({ after: "12", highWater: "25", principalId }),
+        principalId
       )
-    ).toEqual({ after: "12", highWater: "25", userId });
+    ).toEqual({ after: "12", highWater: "25", principalId });
   });
 
   it("compares decimal sequences without number precision loss", () => {
@@ -34,13 +34,13 @@ describe("draft change cursor", () => {
     const values = [
       "not-a-cursor",
       encode(["c1", "12", null]),
-      encode(["dc1", userId, "12", "11"]),
-      encode(["dc1", userId, "01", null]),
-      encode(["dc1", userId, "9223372036854775808", null]),
+      encode(["dc1", principalId, "12", "11"]),
+      encode(["dc1", principalId, "01", null]),
+      encode(["dc1", principalId, "9223372036854775808", null]),
       encode(["dc1", "usr_other", "12", null])
     ];
     for (const value of values) {
-      expect(() => decodeDraftChangeCursor(value, userId)).toThrowError(
+      expect(() => decodeDraftChangeCursor(value, principalId)).toThrowError(
         /Draft change cursor is invalid/u
       );
     }

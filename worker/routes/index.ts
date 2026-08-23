@@ -7,6 +7,7 @@ import {
   handleDeviceTokenRequest
 } from "../auth/device-authorization";
 import { MailApiAuthError, mailApiChallenge } from "../auth/mail-api";
+import { agentManagementRoutes } from "../features/agents/routes";
 import { auditRoutes } from "../features/audit/routes";
 import { domainRoutes } from "../features/domains/routes";
 import { draftRoutes } from "../features/drafts/routes";
@@ -50,6 +51,8 @@ apiRoutes.onError((error, c) => {
   });
   if (error instanceof MailApiAuthError) {
     response.headers.set("www-authenticate", mailApiChallenge(c.env, c.req.raw, error));
+  } else if (appError.code === "INVALID_AGENT_CREDENTIAL") {
+    response.headers.set("www-authenticate", 'Bearer realm="HQBase Management API"');
   }
   return response;
 });
@@ -76,6 +79,7 @@ apiRoutes.route("/api/users", userRoutes);
 apiRoutes.route("/api/updates", updateRoutes);
 apiRoutes.route("/api", sendRoutes);
 apiRoutes.route("/api/v2", mailApiRoutes);
+apiRoutes.route("/management/v1/agents", agentManagementRoutes);
 
 apiRoutes.all("/api/auth/*", async (c) => {
   const pathname = new URL(c.req.raw.url).pathname;

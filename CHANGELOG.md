@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### New
+
+- Add mailbox agents with explicit mailbox access and revocable credentials, plus provisioner
+  agents that can create and deprovision dedicated mailbox agents within a domain and quota.
+- Let owners and admins delete a mailbox without deleting its mail, then restore it later. Deleting
+  a mailbox disables its linked agents and revokes their credentials.
+
 ### Changed
 
 - Give every mailbox one email address. Existing additional addresses become separate mailboxes

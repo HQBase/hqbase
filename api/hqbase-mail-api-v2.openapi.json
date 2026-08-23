@@ -49,6 +49,9 @@
           },
           {
             "cookieSession": []
+          },
+          {
+            "agentBearer": []
           }
         ],
         "responses": {
@@ -117,7 +120,8 @@
           }
         },
         "tags": ["Mailboxes"],
-        "operationId": "listMailboxes"
+        "operationId": "listMailboxes",
+        "x-hqbase-agent-capabilities": ["mail:read"]
       }
     },
     "/api/v2/events": {
@@ -130,6 +134,9 @@
           },
           {
             "cookieSession": []
+          },
+          {
+            "agentBearer": []
           }
         ],
         "parameters": [
@@ -200,7 +207,8 @@
           }
         },
         "tags": ["Events"],
-        "operationId": "openMailEvents"
+        "operationId": "openMailEvents",
+        "x-hqbase-agent-capabilities": ["mail:read"]
       }
     },
     "/api/v2/changes": {
@@ -213,6 +221,9 @@
           },
           {
             "cookieSession": []
+          },
+          {
+            "agentBearer": []
           }
         ],
         "responses": {
@@ -302,7 +313,8 @@
             },
             "description": "Maximum number of journal entries read for this page."
           }
-        ]
+        ],
+        "x-hqbase-agent-capabilities": ["mail:read"]
       }
     },
     "/api/v2/messages": {
@@ -314,6 +326,9 @@
           },
           {
             "cookieSession": []
+          },
+          {
+            "agentBearer": []
           }
         ],
         "responses": {
@@ -445,7 +460,8 @@
             },
             "description": "Opaque cursor from the previous page. Read it from the Link header and send it unchanged."
           }
-        ]
+        ],
+        "x-hqbase-agent-capabilities": ["mail:read"]
       }
     },
     "/api/v2/messages/{id}": {
@@ -457,6 +473,9 @@
           },
           {
             "cookieSession": []
+          },
+          {
+            "agentBearer": []
           }
         ],
         "responses": {
@@ -534,7 +553,8 @@
               "maxLength": 100
             }
           }
-        ]
+        ],
+        "x-hqbase-agent-capabilities": ["mail:read"]
       }
     },
     "/api/v2/messages/{id}/thread": {
@@ -546,6 +566,9 @@
           },
           {
             "cookieSession": []
+          },
+          {
+            "agentBearer": []
           }
         ],
         "responses": {
@@ -626,7 +649,8 @@
               "maxLength": 100
             }
           }
-        ]
+        ],
+        "x-hqbase-agent-capabilities": ["mail:read"]
       }
     },
     "/api/v2/messages/{id}/html": {
@@ -638,6 +662,9 @@
           },
           {
             "cookieSession": []
+          },
+          {
+            "agentBearer": []
           }
         ],
         "responses": {
@@ -725,7 +752,8 @@
             },
             "description": "Load remote images for this response only."
           }
-        ]
+        ],
+        "x-hqbase-agent-capabilities": ["mail:read"]
       }
     },
     "/api/v2/messages/{id}/inline/{attachmentId}": {
@@ -737,6 +765,9 @@
           },
           {
             "cookieSession": []
+          },
+          {
+            "agentBearer": []
           }
         ],
         "responses": {
@@ -835,7 +866,8 @@
               "maxLength": 100
             }
           }
-        ]
+        ],
+        "x-hqbase-agent-capabilities": ["mail:read"]
       }
     },
     "/api/v2/attachments/{id}": {
@@ -847,6 +879,9 @@
           },
           {
             "cookieSession": []
+          },
+          {
+            "agentBearer": []
           }
         ],
         "responses": {
@@ -925,7 +960,8 @@
               "maxLength": 100
             }
           }
-        ]
+        ],
+        "x-hqbase-agent-capabilities": ["mail:read"]
       }
     },
     "/api/v2/messages/{id}/remote-media/trust": {
@@ -1026,6 +1062,9 @@
           },
           {
             "cookieSession": []
+          },
+          {
+            "agentBearer": []
           }
         ],
         "responses": {
@@ -1121,7 +1160,8 @@
               ]
             }
           }
-        ]
+        ],
+        "x-hqbase-agent-capabilities": ["mail:write"]
       }
     },
     "/api/v2/conversations": {
@@ -1133,6 +1173,9 @@
           },
           {
             "cookieSession": []
+          },
+          {
+            "agentBearer": []
           }
         ],
         "responses": {
@@ -1240,7 +1283,8 @@
             },
             "description": "Opaque cursor from the previous page."
           }
-        ]
+        ],
+        "x-hqbase-agent-capabilities": ["mail:read"]
       }
     },
     "/api/v2/conversations/{id}/{action}": {
@@ -1253,6 +1297,9 @@
           },
           {
             "cookieSession": []
+          },
+          {
+            "agentBearer": []
           }
         ],
         "responses": {
@@ -1362,7 +1409,8 @@
               }
             }
           }
-        }
+        },
+        "x-hqbase-agent-capabilities": ["mail:write"]
       }
     },
     "/api/v2/drafts": {
@@ -1374,6 +1422,9 @@
           },
           {
             "cookieSession": []
+          },
+          {
+            "agentBearer": []
           }
         ],
         "responses": {
@@ -1475,7 +1526,8 @@
             },
             "description": "Opaque cursor from the previous page. Read it from the Link header and send it unchanged."
           }
-        ]
+        ],
+        "x-hqbase-agent-capabilities": ["mail:send"]
       },
       "post": {
         "summary": "Create a draft",
@@ -1485,6 +1537,9 @@
           },
           {
             "cookieSession": []
+          },
+          {
+            "agentBearer": []
           }
         ],
         "responses": {
@@ -1572,7 +1627,8 @@
               }
             }
           }
-        }
+        },
+        "x-hqbase-agent-capabilities": ["mail:send"]
       }
     },
     "/api/v2/drafts/changes": {
@@ -1585,6 +1641,9 @@
           },
           {
             "cookieSession": []
+          },
+          {
+            "agentBearer": []
           }
         ],
         "responses": {
@@ -1674,7 +1733,8 @@
             },
             "description": "Maximum number of draft journal entries read for this page."
           }
-        ]
+        ],
+        "x-hqbase-agent-capabilities": ["mail:send"]
       }
     },
     "/api/v2/drafts/{id}": {
@@ -1686,6 +1746,9 @@
           },
           {
             "cookieSession": []
+          },
+          {
+            "agentBearer": []
           }
         ],
         "responses": {
@@ -1763,7 +1826,8 @@
               "maxLength": 100
             }
           }
-        ]
+        ],
+        "x-hqbase-agent-capabilities": ["mail:send"]
       },
       "patch": {
         "summary": "Update a draft",
@@ -1773,6 +1837,9 @@
           },
           {
             "cookieSession": []
+          },
+          {
+            "agentBearer": []
           }
         ],
         "responses": {
@@ -1883,7 +1950,8 @@
               }
             }
           }
-        }
+        },
+        "x-hqbase-agent-capabilities": ["mail:send"]
       },
       "delete": {
         "summary": "Delete a draft",
@@ -1893,6 +1961,9 @@
           },
           {
             "cookieSession": []
+          },
+          {
+            "agentBearer": []
           }
         ],
         "responses": {
@@ -1963,7 +2034,8 @@
               "maxLength": 100
             }
           }
-        ]
+        ],
+        "x-hqbase-agent-capabilities": ["mail:send"]
       }
     },
     "/api/v2/drafts/{id}/attachments": {
@@ -1976,6 +2048,9 @@
           },
           {
             "cookieSession": []
+          },
+          {
+            "agentBearer": []
           }
         ],
         "responses": {
@@ -2086,7 +2161,8 @@
               }
             }
           }
-        }
+        },
+        "x-hqbase-agent-capabilities": ["mail:send"]
       }
     },
     "/api/v2/drafts/{draftId}/attachments/{id}": {
@@ -2098,6 +2174,9 @@
           },
           {
             "cookieSession": []
+          },
+          {
+            "agentBearer": []
           }
         ],
         "responses": {
@@ -2178,7 +2257,8 @@
               "maxLength": 100
             }
           }
-        ]
+        ],
+        "x-hqbase-agent-capabilities": ["mail:send"]
       }
     },
     "/api/v2/send": {
@@ -2190,6 +2270,9 @@
           },
           {
             "cookieSession": []
+          },
+          {
+            "agentBearer": []
           }
         ],
         "responses": {
@@ -2275,7 +2358,8 @@
               }
             }
           }
-        }
+        },
+        "x-hqbase-agent-capabilities": ["mail:send"]
       }
     },
     "/api/v2/reply": {
@@ -2287,6 +2371,9 @@
           },
           {
             "cookieSession": []
+          },
+          {
+            "agentBearer": []
           }
         ],
         "responses": {
@@ -2371,7 +2458,8 @@
               }
             }
           }
-        }
+        },
+        "x-hqbase-agent-capabilities": ["mail:send"]
       }
     },
     "/api/v2/forward": {
@@ -2383,6 +2471,9 @@
           },
           {
             "cookieSession": []
+          },
+          {
+            "agentBearer": []
           }
         ],
         "responses": {
@@ -2469,7 +2560,8 @@
               }
             }
           }
-        }
+        },
+        "x-hqbase-agent-capabilities": ["mail:send"]
       }
     }
   },
@@ -2497,6 +2589,12 @@
         "in": "cookie",
         "name": "better-auth.session_token",
         "description": "Same-origin HQBase web session. Secure deployments may prefix the cookie name."
+      },
+      "agentBearer": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "hqb_agent_<secret>",
+        "description": "Mailbox agent credential created in Settings > Agents. It works only for the assigned Mail API capabilities and mailbox grant. Each operation lists required capabilities in x-hqbase-agent-capabilities."
       }
     },
     "schemas": {
@@ -2525,7 +2623,9 @@
           "address",
           "mailDomainId",
           "displayName",
+          "kind",
           "isActive",
+          "deletedAt",
           "accessLevel",
           "createdAt",
           "updatedAt"
@@ -2544,8 +2644,25 @@
           "displayName": {
             "type": "string"
           },
+          "kind": {
+            "type": "string",
+            "enum": ["human", "agent"],
+            "description": "Whether this is an ordinary mailbox or a dedicated mailbox created with a mailbox agent."
+          },
           "isActive": {
             "type": "boolean"
+          },
+          "deletedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Deletion time. Normal Mail API lists return null because deleted mailboxes are hidden."
           },
           "accessLevel": {
             "anyOf": [

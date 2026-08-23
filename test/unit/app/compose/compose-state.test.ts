@@ -34,7 +34,9 @@ describe("composer state", () => {
           address: "support@example.com",
           mailDomainId: "dom_1",
           displayName: "Support",
+          kind: "human",
           isActive: true,
+          deletedAt: null,
           accessLevel: "agent",
           createdAt: "now",
           updatedAt: "now"
@@ -44,7 +46,9 @@ describe("composer state", () => {
           address: "sales@example.net",
           mailDomainId: "dom_2",
           displayName: "Sales",
+          kind: "human",
           isActive: true,
+          deletedAt: null,
           accessLevel: "manager",
           createdAt: "now",
           updatedAt: "now"
@@ -175,7 +179,9 @@ describe("composer state", () => {
         address: "support@example.com",
         mailDomainId: "dom_1",
         displayName: "Support",
+        kind: "human" as const,
         isActive: true,
+        deletedAt: null,
         accessLevel: "manager" as const,
         createdAt: "now",
         updatedAt: "now"
@@ -185,7 +191,9 @@ describe("composer state", () => {
         address: "privacy@example.com",
         mailDomainId: "dom_1",
         displayName: "Privacy",
+        kind: "human" as const,
         isActive: true,
+        deletedAt: null,
         accessLevel: "agent" as const,
         createdAt: "now",
         updatedAt: "now"

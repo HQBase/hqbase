@@ -14,7 +14,9 @@ export function mapMailbox(row: MailboxRow): Mailbox {
     address: row.address,
     mailDomainId: row.mail_domain_id,
     displayName: row.display_name,
+    kind: row.kind,
     isActive: row.is_active === 1,
+    deletedAt: row.deleted_at,
     createdAt: row.created_at,
     updatedAt: row.updated_at
   };
@@ -23,15 +25,17 @@ export function mapMailbox(row: MailboxRow): Mailbox {
 async function listMailboxes(db: D1Database): Promise<Mailbox[]> {
   const rows = await getRows<MailboxRow>(
     db,
-    sql`SELECT * FROM mailboxes ORDER BY is_active DESC, address ASC`
+    sql`SELECT * FROM mailboxes
+        WHERE deleted_at IS NULL
+        ORDER BY is_active DESC, address ASC`
   );
   return rows.map(mapMailbox);
 }
 
 export async function listMailboxesForUser(
   db: D1Database,
-  userId: string,
-  role: WorkspaceRole
+  principalId: string,
+  role: WorkspaceRole | null
 ): Promise<Array<Mailbox & { accessLevel: MailboxAccessLevel | null }>> {
   if (role === "owner") {
     return (await listMailboxes(db)).map((mailbox) => ({ ...mailbox, accessLevel: "manager" }));
@@ -40,15 +44,29 @@ export async function listMailboxesForUser(
   const rows = await getRows<MailboxRow & { access_level: MailboxAccessLevel | null }>(
     db,
     sql`SELECT m.*, g.access_level FROM mailboxes m
-       LEFT JOIN mailbox_grants g ON g.mailbox_id = m.id AND g.user_id = ${userId}
-       WHERE ${includeWithoutGrant ? 1 : 0} = 1 OR g.access_level IS NOT NULL
+       LEFT JOIN mailbox_grants g ON g.mailbox_id = m.id AND g.principal_id = ${principalId}
+       WHERE m.deleted_at IS NULL
+         AND (${includeWithoutGrant ? 1 : 0} = 1 OR g.access_level IS NOT NULL)
        ORDER BY m.is_active DESC, m.address ASC`
   );
   return rows.map((row) => ({ ...mapMailbox(row), accessLevel: row.access_level }));
 }
 
+export async function listDeletedMailboxes(db: D1Database): Promise<Mailbox[]> {
+  const rows = await getRows<MailboxRow>(
+    db,
+    sql`SELECT * FROM mailboxes
+        WHERE deleted_at IS NOT NULL
+        ORDER BY deleted_at DESC, address ASC`
+  );
+  return rows.map(mapMailbox);
+}
+
 export async function countMailboxes(db: D1Database): Promise<number> {
-  const row = await getRow<{ count: number }>(db, sql`SELECT COUNT(*) AS count FROM mailboxes`);
+  const row = await getRow<{ count: number }>(
+    db,
+    sql`SELECT COUNT(*) AS count FROM mailboxes WHERE deleted_at IS NULL`
+  );
   return row?.count ?? 0;
 }
 
@@ -61,6 +79,7 @@ export async function findMailboxForReceiving(
     sql`SELECT m.* FROM mailboxes m
        JOIN mail_domains d ON d.id = m.mail_domain_id
        WHERE m.address = ${address.toLowerCase()}
+         AND m.deleted_at IS NULL
          AND m.is_active = 1
          AND d.is_enabled = 1
          AND d.receiving_status = 'ready'
@@ -78,6 +97,7 @@ export async function findMailboxForSending(
     sql`SELECT m.* FROM mailboxes m
        JOIN mail_domains d ON d.id = m.mail_domain_id
        WHERE m.address = ${address.toLowerCase()}
+         AND m.deleted_at IS NULL
          AND d.is_enabled = 1
          AND d.sending_status = 'ready'
        LIMIT 1`
@@ -104,7 +124,9 @@ export async function insertMailbox(
       address: input.address,
       mailDomainId,
       displayName: input.displayName,
+      kind: "human",
       isActive: true,
+      deletedAt: null,
       createdAt: timestamp,
       updatedAt: timestamp
     })
@@ -116,7 +138,9 @@ export async function insertMailbox(
     address: input.address,
     mailDomainId,
     displayName: input.displayName,
+    kind: "human",
     isActive: true,
+    deletedAt: null,
     createdAt: timestamp,
     updatedAt: timestamp
   };

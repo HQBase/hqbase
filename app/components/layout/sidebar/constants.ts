@@ -10,6 +10,7 @@ import {
   PiPalette,
   PiPaperPlaneTilt,
   PiPlug,
+  PiRobot,
   PiStar,
   PiTrash,
   PiTray,
@@ -45,6 +46,7 @@ export const settingsTabIcons: Record<
   React.ComponentType<{ className?: string }>
 > = {
   mailboxes: PiEnvelopeSimple,
+  agents: PiRobot,
   users: PiUsers,
   domains: PiGlobe,
   notifications: PiBell,
@@ -56,11 +58,12 @@ export const settingsTabIcons: Record<
 
 export const settingsTabLabels: Record<SettingsTabId, string> = {
   mailboxes: "Mailboxes",
+  agents: "Agents",
   users: "Users",
   domains: "Domains",
   notifications: "Notifications",
   interface: "Interface",
-  mcp: "MCP",
+  mcp: "Connect AI agents",
   updates: "Updates",
   debug: "Debug"
 };

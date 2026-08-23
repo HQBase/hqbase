@@ -13,7 +13,9 @@ const mailbox: Mailbox = {
   address: "support@example.com",
   mailDomainId: "domain-1",
   displayName: "Support",
+  kind: "human",
   isActive: true,
+  deletedAt: null,
   accessLevel: "manager",
   createdAt: "2026-08-23T00:00:00.000Z",
   updatedAt: "2026-08-23T00:00:00.000Z"

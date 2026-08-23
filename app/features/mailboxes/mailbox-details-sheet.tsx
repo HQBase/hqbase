@@ -1,5 +1,5 @@
 import type * as React from "react";
-import { PiUsers } from "react-icons/pi";
+import { PiTrash, PiUsers } from "react-icons/pi";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
@@ -16,6 +16,7 @@ export function MailboxDetailsSheet({
   mailbox,
   policies,
   users,
+  onDelete,
   onManageAccess,
   onOpenChange
 }: {
@@ -23,6 +24,7 @@ export function MailboxDetailsSheet({
   mailbox: Mailbox | null;
   policies: MailboxAccessPolicies;
   users: WorkspaceUser[];
+  onDelete: (mailbox: Mailbox) => void;
   onManageAccess: (mailbox: Mailbox) => void;
   onOpenChange: (open: boolean) => void;
 }): React.ReactElement {
@@ -94,6 +96,26 @@ export function MailboxDetailsSheet({
               ) : null}
             </div>
           </section>
+
+          {canManage && mailbox ? (
+            <section className="border-t pt-5" aria-labelledby="delete-mailbox-heading">
+              <h3 className="font-medium" id="delete-mailbox-heading">
+                Delete mailbox
+              </h3>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Hide this mailbox and stop new mail without deleting its history.
+              </p>
+              <Button
+                className="mt-4"
+                type="button"
+                variant="destructive"
+                onClick={() => onDelete(mailbox)}
+              >
+                <PiTrash data-icon="inline-start" />
+                Delete mailbox
+              </Button>
+            </section>
+          ) : null}
         </div>
       </SheetContent>
     </Sheet>

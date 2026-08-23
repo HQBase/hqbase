@@ -128,7 +128,7 @@ export function MailboxAccessPolicyDialog({
                         <SelectGroup>
                           <SelectItem value="none">No access</SelectItem>
                           <SelectItem value="read">Read</SelectItem>
-                          <SelectItem value="agent">Agent</SelectItem>
+                          <SelectItem value="agent">Handle mail</SelectItem>
                           <SelectItem value="manager">Manager</SelectItem>
                         </SelectGroup>
                       </SelectContent>

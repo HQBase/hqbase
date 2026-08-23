@@ -33,6 +33,7 @@ describe("local database seed fixture", () => {
           (SELECT COUNT(*) FROM drafts) AS drafts,
           (SELECT COUNT(*) FROM mailboxes) AS mailboxes,
           (SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'mailbox_addresses') AS alias_tables,
+          (SELECT COUNT(*) FROM principals) AS principals,
           (SELECT value_json FROM app_settings WHERE key = 'local_seed_version') AS seed_version`
     ).first<{
       threads: number;
@@ -40,6 +41,7 @@ describe("local database seed fixture", () => {
       drafts: number;
       mailboxes: number;
       alias_tables: number;
+      principals: number;
       seed_version: string;
     }>();
     expect(counts).toEqual({
@@ -48,6 +50,7 @@ describe("local database seed fixture", () => {
       drafts: 4,
       mailboxes: 8,
       alias_tables: 0,
+      principals: 4,
       seed_version: '"local-demo-v3"'
     });
 

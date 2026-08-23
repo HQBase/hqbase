@@ -26,7 +26,7 @@ import type { ReplyMessageInput, SendMessageInput } from "./validation";
 export async function sendNewMessage(
   env: WorkerEnv,
   input: SendMessageInput,
-  userId?: string
+  principalId?: string
 ): Promise<MessageSummary> {
   const mailbox = await ensureActiveMailbox(env.DB, input.from);
 
@@ -37,7 +37,7 @@ export async function sendNewMessage(
     subject: input.subject,
     text: input.text
   };
-  const attachments = await loadAttachments(env, input.attachmentIds, userId);
+  const attachments = await loadAttachments(env, input.attachmentIds, principalId);
   const sendResult = await env.MAIL_SENDER.send({
     ...email,
     ...(input.cc.length ? { cc: input.cc } : {}),
@@ -58,14 +58,14 @@ export async function sendNewMessage(
     threadId,
     storedAttachments: attachments,
     draftId: input.draftId ?? null,
-    userId: userId ?? null
+    principalId: principalId ?? null
   });
 }
 
 export async function replyToMessage(
   env: WorkerEnv,
   input: ReplyMessageInput,
-  userId?: string
+  principalId?: string
 ): Promise<MessageSummary> {
   const mailbox = await ensureActiveMailbox(env.DB, input.from);
 
@@ -79,7 +79,7 @@ export async function replyToMessage(
     (value): value is string => value !== null
   );
   const to = input.to?.length ? input.to : [original.fromAddress];
-  const attachments = await loadAttachments(env, input.attachmentIds, userId);
+  const attachments = await loadAttachments(env, input.attachmentIds, principalId);
   const quoted =
     input.html && original.htmlAvailable
       ? await loadQuotedMessageHtml(
@@ -124,7 +124,7 @@ export async function replyToMessage(
     threadId: original.threadId,
     storedAttachments: outgoingAttachments,
     draftId: input.draftId ?? null,
-    userId: userId ?? null
+    principalId: principalId ?? null
   });
 }
 
@@ -157,7 +157,7 @@ async function storeSentMessage(
     threadId: string;
     storedAttachments: StoredOutgoingAttachment[];
     draftId: string | null;
-    userId: string | null;
+    principalId: string | null;
   }
 ): Promise<MessageSummary> {
   const htmlR2Key = input.html ? `sent/${input.sentAt.slice(0, 10)}/${newId("html")}.html` : null;
@@ -202,10 +202,10 @@ async function storeSentMessage(
       r2Key: attachment.r2Key
     });
   }
-  if (input.draftId && input.userId) {
+  if (input.draftId && input.principalId) {
     await createDatabase(env.DB)
       .delete(drafts)
-      .where(and(eq(drafts.id, input.draftId), eq(drafts.userId, input.userId)))
+      .where(and(eq(drafts.id, input.draftId), eq(drafts.principalId, input.principalId)))
       .run();
   }
   return message;
@@ -222,12 +222,12 @@ type StoredOutgoingAttachment = StoredDraftAttachment & {
 async function loadAttachments(
   env: WorkerEnv,
   ids: string[],
-  userId?: string
+  principalId?: string
 ): Promise<StoredOutgoingAttachment[]> {
   if (ids.length === 0) return [];
-  if (!userId)
-    throw new AppError("ATTACHMENTS_FORBIDDEN", "Attachments require a user session.", 403);
-  return (await draftAttachmentObjects(env.DB, env.MAIL_OBJECTS, userId, ids)).map(
+  if (!principalId)
+    throw new AppError("ATTACHMENTS_FORBIDDEN", "Attachments require authentication.", 403);
+  return (await draftAttachmentObjects(env.DB, env.MAIL_OBJECTS, principalId, ids)).map(
     (attachment) => ({
       ...attachment,
       contentId: null,

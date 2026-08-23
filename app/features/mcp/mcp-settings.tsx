@@ -1,5 +1,7 @@
 import * as React from "react";
-import { AgentConnectionDetails } from "@/features/agents/connection-dialog";
+import { Separator } from "@/components/ui/separator";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { AgentConnectionDetails, AgentSkillDetails } from "@/features/agents/connection-dialog";
 import type { CurrentUser } from "@/features/auth/types";
 import { SettingsSection } from "@/features/settings/settings-section";
 
@@ -10,31 +12,80 @@ type McpSettingsProps = {
 export function McpSettings({ user }: McpSettingsProps): React.ReactElement {
   const [readOnlyEndpoint, setReadOnlyEndpoint] = React.useState("/mcp");
   const [fullEndpoint, setFullEndpoint] = React.useState("/mcp/full");
-  const [skillUrl, setSkillUrl] = React.useState("/skills/hqbase-mail/SKILL.md");
+  const [humanSkillUrl, setHumanSkillUrl] = React.useState("/skills/hqbase-mail/SKILL.md");
+  const [mailboxSkillUrl, setMailboxSkillUrl] = React.useState("/skills/hqbase-mailbox/SKILL.md");
+  const [provisionerSkillUrl, setProvisionerSkillUrl] = React.useState(
+    "/skills/hqbase-provisioner/SKILL.md"
+  );
   const readOnlyEndpointId = React.useId();
   const fullEndpointId = React.useId();
-  const skillUrlId = React.useId();
+  const humanSkillUrlId = React.useId();
+  const mailboxSkillUrlId = React.useId();
+  const provisionerSkillUrlId = React.useId();
 
   React.useEffect(() => {
     setReadOnlyEndpoint(new URL("/mcp", window.location.origin).toString());
     setFullEndpoint(new URL("/mcp/full", window.location.origin).toString());
-    setSkillUrl(new URL("/skills/hqbase-mail/SKILL.md", window.location.origin).toString());
+    setHumanSkillUrl(new URL("/skills/hqbase-mail/SKILL.md", window.location.origin).toString());
+    setMailboxSkillUrl(
+      new URL("/skills/hqbase-mailbox/SKILL.md", window.location.origin).toString()
+    );
+    setProvisionerSkillUrl(
+      new URL("/skills/hqbase-provisioner/SKILL.md", window.location.origin).toString()
+    );
   }, []);
 
   return (
     <SettingsSection
-      description="Connect through MCP or install this deployment's Agent Skill."
-      title="MCP"
+      description="Choose whose mail the AI can use, then copy the matching connection."
+      title="Connect AI agents"
     >
-      <AgentConnectionDetails
-        fullEndpoint={fullEndpoint}
-        fullEndpointId={fullEndpointId}
-        readOnlyEndpoint={readOnlyEndpoint}
-        readOnlyEndpointId={readOnlyEndpointId}
-        skillUrl={skillUrl}
-        skillUrlId={skillUrlId}
-        user={user}
-      />
+      <Tabs defaultValue="your-account">
+        <TabsList
+          aria-label="AI connection identity"
+          className="grid h-9 w-full grid-cols-2 rounded-full"
+        >
+          <TabsTrigger className="h-7 min-h-0 rounded-full px-2 text-xs" value="your-account">
+            Your account
+          </TabsTrigger>
+          <TabsTrigger className="h-7 min-h-0 rounded-full px-2 text-xs" value="agentic-mailbox">
+            Agentic mailbox
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent className="mt-6" value="your-account">
+          <AgentConnectionDetails
+            fullEndpoint={fullEndpoint}
+            fullEndpointId={fullEndpointId}
+            readOnlyEndpoint={readOnlyEndpoint}
+            readOnlyEndpointId={readOnlyEndpointId}
+            skillUrl={humanSkillUrl}
+            skillUrlId={humanSkillUrlId}
+            user={user}
+          />
+        </TabsContent>
+        <TabsContent className="mt-6" value="agentic-mailbox">
+          <div className="flex flex-col gap-6">
+            <AgentSkillDetails
+              flat
+              description="Use this skill with a credential for one exact mailbox."
+              nextStep="Create or rotate the mailbox agent in Settings → Agents. Give the credential and this skill URL to the service that will run it."
+              skillUrl={mailboxSkillUrl}
+              skillUrlId={mailboxSkillUrlId}
+              title="Mailbox agent"
+            />
+            <Separator />
+            <AgentSkillDetails
+              flat
+              description="Use this skill with a trusted credential that can create mailbox agents."
+              nextStep="Create or rotate the provisioner in Settings → Agents. Give the credential and this skill URL only to its trusted control-plane service."
+              skillUrl={provisionerSkillUrl}
+              skillUrlId={provisionerSkillUrlId}
+              title="Provisioner agent"
+            />
+          </div>
+        </TabsContent>
+      </Tabs>
     </SettingsSection>
   );
 }

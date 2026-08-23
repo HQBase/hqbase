@@ -23,10 +23,10 @@ function decodeDraftCursor(value: string) {
 
 export async function listDraftPage(
   db: D1Database,
-  userId: string,
+  principalId: string,
   input: { cursor?: string | undefined; limit?: number | undefined } = {}
 ): Promise<DraftPage> {
-  const where: SQL[] = [sql`user_id = ${userId}`];
+  const where: SQL[] = [sql`principal_id = ${principalId}`];
   const cursor = input.cursor ? decodeDraftCursor(input.cursor) : null;
   if (cursor) {
     where.push(
@@ -59,7 +59,7 @@ export async function listDraftPage(
 
 export async function getDraftsByIds(
   db: D1Database,
-  userId: string,
+  principalId: string,
   ids: string[]
 ): Promise<Draft[]> {
   if (ids.length === 0) return [];
@@ -70,7 +70,7 @@ export async function getDraftsByIds(
       ...(await getRows<DraftRow>(
         db,
         sql`SELECT * FROM drafts
-            WHERE user_id = ${userId}
+            WHERE principal_id = ${principalId}
               AND id IN (${sql.join(
                 batch.map((id) => sql`${id}`),
                 sql`, `

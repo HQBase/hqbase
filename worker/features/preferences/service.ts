@@ -15,7 +15,7 @@ export async function updateDefaultFromMailbox(
   await requireMailboxAccess(db, input.userId, input.role, input.mailboxId, "agent");
   const mailbox = await findMailboxById(db, input.mailboxId);
   const sendable = mailbox ? await findMailboxForSending(db, mailbox.address) : null;
-  if (!mailbox?.isActive || !sendable) {
+  if (!mailbox?.isActive || mailbox.deletedAt || !sendable) {
     throw new AppError(
       "MAILBOX_NOT_SENDABLE",
       "Choose an active mailbox on a domain that can send email.",

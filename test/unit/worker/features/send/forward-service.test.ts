@@ -57,7 +57,9 @@ const original = {
 const mailbox = {
   id: "mailbox-1",
   address: "support@example.com",
+  deletedAt: null,
   displayName: "Support",
+  kind: "human" as const,
   isActive: true,
   mailDomainId: "domain-1",
   createdAt: "2026-07-29T12:00:00.000Z",

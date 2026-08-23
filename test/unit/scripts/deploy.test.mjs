@@ -422,10 +422,13 @@ describe("HQBase release deployment", () => {
       not_found_handling: "single-page-application",
       run_worker_first: [
         "/api/*",
+        "/management/*",
         "/mcp",
         "/mcp/*",
         "/.well-known/*",
         "/skills/hqbase-mail/SKILL.md",
+        "/skills/hqbase-mailbox/SKILL.md",
+        "/skills/hqbase-provisioner/SKILL.md",
         "/AGENTS.md",
         "/agents.md"
       ]

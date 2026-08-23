@@ -70,6 +70,7 @@ async function invitationSender(db: D1Database): Promise<string | null> {
        FROM mailboxes mailbox
        JOIN mail_domains domain ON domain.id = mailbox.mail_domain_id
        WHERE mailbox.is_active = 1
+         AND mailbox.deleted_at IS NULL
          AND domain.is_enabled = 1
          AND domain.sending_status = 'ready'
        ORDER BY mailbox.created_at ASC, mailbox.address ASC

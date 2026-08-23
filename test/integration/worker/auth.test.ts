@@ -11,7 +11,13 @@ import userOnboardingMigration from "../../../migrations/0008_user_onboarding.sq
 import loginEmailDomainMigration from "../../../migrations/0009_login_email_domain_isolation.sql?raw";
 import deviceAuthorizationMigration from "../../../migrations/0010_oauth_device_authorization.sql?raw";
 import latestPasswordResetTokenMigration from "../../../migrations/0011_latest_password_reset_token.sql?raw";
+import messageActivityIndexMigration from "../../../migrations/0012_message_activity_index.sql?raw";
+import messageChangesMigration from "../../../migrations/0013_message_changes.sql?raw";
+import unassignedMessagesMigration from "../../../migrations/0014_unassigned_messages.sql?raw";
+import draftChangesMigration from "../../../migrations/0015_draft_changes.sql?raw";
 import oneAddressPerMailboxMigration from "../../../migrations/0016_one_address_per_mailbox.sql?raw";
+import agentPrincipalsMigration from "../../../migrations/0017_agent_principals.sql?raw";
+import mailboxLifecycleMigration from "../../../migrations/0018_mailbox_lifecycle.sql?raw";
 import { createAuth } from "../../../worker/auth/auth";
 import { migrationStatements } from "./migration-statements";
 
@@ -65,7 +71,13 @@ describe("Better Auth schema", () => {
     await applyMigration(loginEmailDomainMigration);
     await applyMigration(deviceAuthorizationMigration);
     await applyMigration(latestPasswordResetTokenMigration);
+    await applyMigration(messageActivityIndexMigration);
+    await applyMigration(messageChangesMigration);
+    await applyMigration(unassignedMessagesMigration);
+    await applyMigration(draftChangesMigration);
     await applyMigration(oneAddressPerMailboxMigration);
+    await applyMigration(agentPrincipalsMigration);
+    await applyMigration(mailboxLifecycleMigration);
   });
 
   it("backfills the Better Auth 1.7 account identity without losing credential rows", async () => {
@@ -241,7 +253,7 @@ describe("Better Auth schema", () => {
       ).bind(timestamp, timestamp),
       env.DB.prepare(
         `INSERT INTO mailbox_grants
-         (mailbox_id, user_id, access_level, created_by, created_at, updated_at)
+         (mailbox_id, principal_id, access_level, created_by_principal_id, created_at, updated_at)
          VALUES ('mailbox_preferences', ?, 'agent', ?, ?, ?)`
       ).bind(user?.id, user?.id, timestamp, timestamp)
     ]);

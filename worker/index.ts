@@ -26,7 +26,7 @@ export default {
     if (mailEventResponse) return mailEventResponse;
     const mcpResponse = await handleMcpRoute(request, env, ctx);
     if (mcpResponse) return mcpResponse;
-    if (url.pathname.startsWith("/api/")) {
+    if (url.pathname.startsWith("/api/") || url.pathname.startsWith("/management/")) {
       return apiRoutes.fetch(request, env, ctx);
     }
 

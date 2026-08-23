@@ -12,6 +12,7 @@ import {
 } from "drizzle-orm/sqlite-core";
 
 import { users } from "./schema-auth";
+import { principals } from "./schema-core";
 
 const nocaseText = customType<{ data: string; driverData: string }>({
   dataType: () => "text COLLATE NOCASE"
@@ -26,11 +27,18 @@ export const mailboxes = sqliteTable(
       .notNull()
       .references((): AnySQLiteColumn => mailDomains.id, { onDelete: "restrict" }),
     displayName: text("display_name").notNull(),
+    kind: text("kind", { enum: ["human", "agent"] })
+      .default("human")
+      .notNull(),
+    deletedAt: text("deleted_at"),
     isActive: integer("is_active", { mode: "boolean" }).default(sql`1`).notNull(),
     createdAt: text("created_at").notNull(),
     updatedAt: text("updated_at").notNull()
   },
-  (table) => [uniqueIndex("mailboxes_address_ci_unique").on(sql`lower(${table.address})`)]
+  (table) => [
+    uniqueIndex("mailboxes_address_ci_unique").on(sql`lower(${table.address})`),
+    check("mailboxes_kind_check", sql`${table.kind} IN ('human', 'agent')`)
+  ]
 );
 
 export const mailboxGrants = sqliteTable(
@@ -39,23 +47,23 @@ export const mailboxGrants = sqliteTable(
     mailboxId: text("mailbox_id")
       .notNull()
       .references(() => mailboxes.id, { onDelete: "cascade" }),
-    userId: text("user_id")
+    principalId: text("principal_id")
       .notNull()
-      .references(() => users.id, { onDelete: "cascade" }),
+      .references(() => principals.id, { onDelete: "cascade" }),
     accessLevel: text("access_level", { enum: ["read", "agent", "manager"] }).notNull(),
-    createdBy: text("created_by")
+    createdByPrincipalId: text("created_by_principal_id")
       .notNull()
-      .references(() => users.id, { onDelete: "restrict" }),
+      .references(() => principals.id, { onDelete: "restrict" }),
     createdAt: text("created_at").notNull(),
     updatedAt: text("updated_at").notNull()
   },
   (table) => [
-    primaryKey({ columns: [table.mailboxId, table.userId] }),
+    primaryKey({ columns: [table.mailboxId, table.principalId] }),
     check(
       "mailbox_grants_access_level_check",
       sql`${table.accessLevel} IN ('read', 'agent', 'manager')`
     ),
-    index("mailbox_grants_user_idx").on(table.userId, table.accessLevel, table.mailboxId)
+    index("mailbox_grants_principal_idx").on(table.principalId, table.accessLevel, table.mailboxId)
   ]
 );
 

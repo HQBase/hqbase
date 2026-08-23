@@ -219,7 +219,7 @@ describe("HQBase Mail API message changes", () => {
       messageRow("msg_changes_hidden", "thr_changes_secret", "mbx_changes_secret", stamp)
     ]);
     await env.DB.prepare(
-      "DELETE FROM mailbox_grants WHERE mailbox_id = 'mbx_changes' AND user_id = ?"
+      "DELETE FROM mailbox_grants WHERE mailbox_id = 'mbx_changes' AND principal_id = ?"
     )
       .bind(userId)
       .run();
@@ -353,7 +353,7 @@ function mailboxRow(id: string, address: string, stamp: string): D1PreparedState
 
 function grantRow(mailboxId: string, stamp: string): D1PreparedStatement {
   return env.DB.prepare(
-    `INSERT INTO mailbox_grants (mailbox_id, user_id, access_level, created_by, created_at, updated_at)
+    `INSERT INTO mailbox_grants (mailbox_id, principal_id, access_level, created_by_principal_id, created_at, updated_at)
      VALUES (?, ?, 'agent', ?, ?, ?)`
   ).bind(mailboxId, userId, userId, stamp, stamp);
 }

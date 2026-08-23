@@ -1,4 +1,5 @@
 import type * as React from "react";
+import { AgentSettings } from "@/features/agents/agent-settings";
 import type { CurrentUser } from "@/features/auth/types";
 import { DomainSettings } from "@/features/domains/domain-settings";
 import { MailboxSettings } from "@/features/mailboxes/mailbox-settings";
@@ -22,6 +23,7 @@ type SettingsPageProps = {
   canManage: boolean;
   currentUser: CurrentUser;
   defaultFromMailboxId: string | null;
+  deletedMailboxes: Mailbox[];
   mailboxes: Mailbox[];
   notifications: NotificationController;
   setup: SetupStatus;
@@ -39,6 +41,7 @@ export function SettingsPage({
   canManage,
   currentUser,
   defaultFromMailboxId,
+  deletedMailboxes,
   mailboxes,
   notifications,
   setup,
@@ -57,11 +60,15 @@ export function SettingsPage({
           <MailboxSettings
             canManage={canManage}
             defaultFromMailboxId={defaultFromMailboxId}
+            deletedMailboxes={deletedMailboxes}
             mailboxes={mailboxes}
             users={users}
             onDefaultFromMailboxChange={onDefaultFromMailboxChange}
             onChanged={onRefresh}
           />
+        ) : null}
+        {activeTab === "agents" && canManage ? (
+          <AgentSettings domains={setup.domains} mailboxes={mailboxes} onChanged={onRefresh} />
         ) : null}
         {activeTab === "users" ? (
           canManage ? (

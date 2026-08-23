@@ -3,9 +3,12 @@ import path from "node:path";
 
 const outputDirectory = "api";
 const openApiLocation = path.join(outputDirectory, "hqbase-mail-api-v2.openapi.json");
-const openApiDocument = JSON.parse(await readFile(openApiLocation, "utf8"));
+const openApiDocument = withAgentAuthentication(
+  JSON.parse(await readFile(openApiLocation, "utf8"))
+);
 validateOpenApi(openApiDocument);
 const outputs = {
+  "hqbase-mail-api-v2.openapi.json": openApiDocument,
   "hqbase-mail-api-v2.postman_collection.json": buildCollection(openApiDocument),
   "hqbase-mail-api-v2.postman_environment.json": buildEnvironment()
 };
@@ -23,10 +26,12 @@ if (process.argv.includes("--write")) {
   console.log("Generated HQBase Mail API OpenAPI and Postman artifacts.");
 } else {
   const drift = [];
-  for (const [name, expected] of Object.entries(serialized)) {
+  for (const [name, expected] of Object.entries(outputs)) {
     const location = path.join(outputDirectory, name);
-    const actual = await readFile(location, "utf8").catch(() => null);
-    if (actual !== expected) drift.push(location);
+    const actual = await readFile(location, "utf8")
+      .then((contents) => JSON.parse(contents))
+      .catch(() => null);
+    if (JSON.stringify(actual) !== JSON.stringify(expected)) drift.push(location);
   }
   if (drift.length > 0) {
     throw new Error(
@@ -57,7 +62,7 @@ function buildCollection(document) {
       _postman_id: "62c6dbf4-835d-4a3f-87df-77b7ddcf2db1",
       name: "HQBase Mail API v2",
       description:
-        "Generated from api/hqbase-mail-api-v2.openapi.json. Set base_url, run Register public client, and use Postman's OAuth 2.0 Authorization Code flow with PKCE (S256). Auth URL: {{base_url}}/api/auth/oauth2/authorize. Token URL: {{base_url}}/api/auth/oauth2/token. Client ID: {{client_id}}. Scope: mail:read mail:write mail:send offline_access. Add authorization request parameter resource={{api_resource}}, then store the resulting token only in your local environment as access_token. Postman v2.1 HTTP collections cannot contain WebSocket requests. To receive change wakes, create a separate WebSocket request to {{ws_base_url}}/api/v2/events and add Authorization: Bearer {{access_token}}. Sending, replying, and forwarding are not idempotent.",
+        "Generated from api/hqbase-mail-api-v2.openapi.json. For a tool acting for a person, set base_url, run Register public client, and use Postman's OAuth 2.0 Authorization Code flow with PKCE (S256). Auth URL: {{base_url}}/api/auth/oauth2/authorize. Token URL: {{base_url}}/api/auth/oauth2/token. Client ID: {{client_id}}. Scope: mail:read mail:write mail:send offline_access. Add authorization request parameter resource={{api_resource}}, then store the resulting token only in your local environment as access_token. For a mailbox agent, skip OAuth and set access_token to its one-time hqb_agent_ credential. Postman v2.1 HTTP collections cannot contain WebSocket requests. To receive change wakes, create a separate WebSocket request to {{ws_base_url}}/api/v2/events and add Authorization: Bearer {{access_token}}. Sending, replying, and forwarding are not idempotent.",
       schema: "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
     },
     auth: {
@@ -77,6 +82,37 @@ function buildCollection(document) {
     ],
     item: [oauthSetupFolder(), ...folders.values()]
   };
+}
+
+function withAgentAuthentication(document) {
+  const result = structuredClone(document);
+  result.components ??= {};
+  result.components.securitySchemes ??= {};
+  result.components.securitySchemes.agentBearer = {
+    type: "http",
+    scheme: "bearer",
+    bearerFormat: "hqb_agent_<secret>",
+    description:
+      "Mailbox agent credential created in Settings > Agents. It works only for the assigned Mail API capabilities and mailbox grant. Each operation lists required capabilities in x-hqbase-agent-capabilities."
+  };
+
+  for (const [route, pathItem] of Object.entries(result.paths ?? {})) {
+    for (const method of ["get", "post", "patch", "delete"]) {
+      const operation = pathItem[method];
+      if (!operation) continue;
+      operation.security = (operation.security ?? []).filter(
+        (requirement) => !("agentBearer" in requirement)
+      );
+      delete operation["x-hqbase-agent-capabilities"];
+      if (route === "/api/v2/messages/{id}/remote-media/trust") continue;
+      const capabilities = operation.security.find((requirement) => requirement.oauth2)?.oauth2;
+      if (!capabilities) continue;
+      operation.security.push({ agentBearer: [] });
+      operation["x-hqbase-agent-capabilities"] = [...capabilities];
+    }
+  }
+
+  return result;
 }
 
 function validateOpenApi(document) {

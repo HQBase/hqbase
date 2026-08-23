@@ -4,17 +4,17 @@ PRAGMA defer_foreign_keys = ON;
 
 -- Phase one froze the legacy address and mailbox configuration. Remove those temporary guards now;
 -- this migration transaction keeps concurrent writes serialized until the old objects are gone.
-DROP TRIGGER mailbox_addresses_transition_insert_guard;
-DROP TRIGGER mailbox_addresses_transition_update_guard;
-DROP TRIGGER mailbox_addresses_transition_delete_guard;
-DROP TRIGGER mailboxes_transition_update_guard;
-DROP TRIGGER mailboxes_transition_delete_guard;
-DROP TRIGGER mailbox_grants_transition_insert_guard;
-DROP TRIGGER mailbox_grants_transition_update_guard;
-DROP TRIGGER mailbox_grants_transition_delete_guard;
-DROP TRIGGER retention_policies_transition_insert_guard;
-DROP TRIGGER retention_policies_transition_update_guard;
-DROP TRIGGER retention_policies_transition_delete_guard;
+DROP TRIGGER IF EXISTS mailbox_addresses_transition_insert_guard;
+DROP TRIGGER IF EXISTS mailbox_addresses_transition_update_guard;
+DROP TRIGGER IF EXISTS mailbox_addresses_transition_delete_guard;
+DROP TRIGGER IF EXISTS mailboxes_transition_update_guard;
+DROP TRIGGER IF EXISTS mailboxes_transition_delete_guard;
+DROP TRIGGER IF EXISTS mailbox_grants_transition_insert_guard;
+DROP TRIGGER IF EXISTS mailbox_grants_transition_update_guard;
+DROP TRIGGER IF EXISTS mailbox_grants_transition_delete_guard;
+DROP TRIGGER IF EXISTS retention_policies_transition_insert_guard;
+DROP TRIGGER IF EXISTS retention_policies_transition_update_guard;
+DROP TRIGGER IF EXISTS retention_policies_transition_delete_guard;
 
 UPDATE messages
 SET delivered_to_address = (

@@ -24,7 +24,7 @@ describe("staging workflow lifecycle record", () => {
     const afterAliasAssertion = workflow.indexOf('"alias_table_count":0');
     const afterAddressIdAssertion = workflow.indexOf('"address_id_column_count":0');
     const afterSchemaAssertion = workflow.indexOf('"schema_version":3');
-    const finalAssertion = workflow.indexOf('"post_migration_count":1');
+    const finalAssertion = workflow.indexOf('"post_migration_count":2');
     const cleanup = workflow.indexOf(
       "DELETE FROM messages WHERE id IN ('msg_sql_upgrade', 'msg_sql_alias_upgrade')"
     );
@@ -55,8 +55,8 @@ describe("staging workflow lifecycle record", () => {
     expect(workflow).toContain('"$(basename "$migration")" < "0014_"');
     expect(workflow).toContain('"is_unassigned":1');
     expect(workflow).toContain('"delivered_to_address":"alias@sql-upgrade.example.test"');
-    expect(workflow).toContain('"migration_count":16');
-    expect(workflow).toContain('"post_migration_count":1');
+    expect(workflow).toContain('"migration_count":18');
+    expect(workflow).toContain('"post_migration_count":2');
     expect(workflow).toContain('migrations_table = "d1_migrations_after_deploy"');
     expect(workflow).toContain("del(.d1_databases[0].migrations_pattern)");
     expect(normalUpgrade.match(/migrations apply DB --remote --config "\$config"/g)).toHaveLength(

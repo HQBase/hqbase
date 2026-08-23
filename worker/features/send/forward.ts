@@ -16,7 +16,11 @@ import { type ForwardMessageInput, type SendMessageInput, sendMessageSchema } fr
 
 const maxForwardedAttachments = 20;
 
-export async function forwardMessage(env: WorkerEnv, input: ForwardMessageInput, userId: string) {
+export async function forwardMessage(
+  env: WorkerEnv,
+  input: ForwardMessageInput,
+  principalId: string
+) {
   const original = await getMessageDetail(env.DB, input.messageId);
   if (!original) throw new AppError("MESSAGE_NOT_FOUND", "Message not found.", 404);
 
@@ -39,12 +43,12 @@ export async function forwardMessage(env: WorkerEnv, input: ForwardMessageInput,
     attachmentIds: input.attachmentIds
   });
   if (!input.includeOriginalAttachments || original.attachments.length === 0) {
-    return sendNewMessage(env, outbound, userId);
+    return sendNewMessage(env, outbound, principalId);
   }
 
   requireForwardedAttachmentCount(original.attachments.length, input.attachmentIds.length);
 
-  const draft = await saveDraft(env.DB, userId, {
+  const draft = await saveDraft(env.DB, principalId, {
     mailboxId: mailbox.id,
     replyToMessageId: null,
     forwardOfMessageId: original.id,
@@ -62,12 +66,12 @@ export async function forwardMessage(env: WorkerEnv, input: ForwardMessageInput,
   try {
     copiedAttachmentIds = await copyOriginalAttachments(
       env,
-      userId,
+      principalId,
       draft.id,
       original.attachments
     );
   } catch (error) {
-    await deleteDraft(env.DB, env.MAIL_OBJECTS, userId, draft.id);
+    await deleteDraft(env.DB, env.MAIL_OBJECTS, principalId, draft.id);
     throw error;
   }
 
@@ -78,7 +82,7 @@ export async function forwardMessage(env: WorkerEnv, input: ForwardMessageInput,
       attachmentIds: [...input.attachmentIds, ...copiedAttachmentIds],
       draftId: draft.id
     }),
-    userId
+    principalId
   );
 }
 
@@ -87,18 +91,18 @@ export async function sendForwardDraft(
   input: SendMessageInput,
   draftId: string,
   originalMessageId: string,
-  userId: string
+  principalId: string
 ) {
   const original = await getMessageDetail(env.DB, originalMessageId);
   if (!original) throw new AppError("MESSAGE_NOT_FOUND", "Message not found.", 404);
   if (original.attachments.length === 0) {
-    return sendNewMessage(env, { ...input, draftId }, userId);
+    return sendNewMessage(env, { ...input, draftId }, principalId);
   }
 
   requireForwardedAttachmentCount(original.attachments.length, input.attachmentIds.length);
   const copiedAttachmentIds = await copyOriginalAttachments(
     env,
-    userId,
+    principalId,
     draftId,
     original.attachments
   );
@@ -110,17 +114,17 @@ export async function sendForwardDraft(
         attachmentIds: [...input.attachmentIds, ...copiedAttachmentIds],
         draftId
       },
-      userId
+      principalId
     );
   } catch (error) {
-    await removeCopiedAttachments(env, userId, draftId, copiedAttachmentIds);
+    await removeCopiedAttachments(env, principalId, draftId, copiedAttachmentIds);
     throw error;
   }
 }
 
 async function copyOriginalAttachments(
   env: WorkerEnv,
-  userId: string,
+  principalId: string,
   draftId: string,
   attachments: MessageDetail["attachments"]
 ): Promise<string[]> {
@@ -138,7 +142,7 @@ async function copyOriginalAttachments(
       const file = new File([await object.arrayBuffer()], attachment.filename, {
         type: attachment.contentType
       });
-      const added = await addDraftAttachment(env.DB, userId, draftId, file);
+      const added = await addDraftAttachment(env.DB, principalId, draftId, file);
       copiedAttachmentIds.push(added.attachment.id);
       await env.MAIL_OBJECTS.put(added.r2Key, file.stream(), {
         httpMetadata: { contentType: added.attachment.contentType }
@@ -146,19 +150,19 @@ async function copyOriginalAttachments(
     }
     return copiedAttachmentIds;
   } catch (error) {
-    await removeCopiedAttachments(env, userId, draftId, copiedAttachmentIds);
+    await removeCopiedAttachments(env, principalId, draftId, copiedAttachmentIds);
     throw error;
   }
 }
 
 async function removeCopiedAttachments(
   env: WorkerEnv,
-  userId: string,
+  principalId: string,
   draftId: string,
   attachmentIds: string[]
 ): Promise<void> {
   for (const attachmentId of attachmentIds) {
-    await removeDraftAttachment(env.DB, env.MAIL_OBJECTS, userId, draftId, attachmentId);
+    await removeDraftAttachment(env.DB, env.MAIL_OBJECTS, principalId, draftId, attachmentId);
   }
 }
 

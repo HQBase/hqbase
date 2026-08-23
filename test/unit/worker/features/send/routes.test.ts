@@ -4,19 +4,22 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   enforceRateLimit: vi.fn(),
   findMailboxForSending: vi.fn(),
+  forwardMessage: vi.fn(),
   getAccessibleDraft: vi.fn(),
   recordAudit: vi.fn(),
+  replyToMessage: vi.fn(),
   requireDraftAttachmentIdsAccess: vi.fn(),
   requireDraftIdAccess: vi.fn(),
-  requireMailApiContext: vi.fn(),
+  requireMailApiPrincipal: vi.fn(),
   requireMailboxAccess: vi.fn(),
+  requireMessageAccess: vi.fn(),
   scheduleSentMailEvents: vi.fn(),
   sendForwardDraft: vi.fn(),
   sendNewMessage: vi.fn()
 }));
 
 vi.mock("@worker/auth/mail-api", () => ({
-  requireMailApiContext: mocks.requireMailApiContext
+  requireMailApiPrincipal: mocks.requireMailApiPrincipal
 }));
 vi.mock("@worker/auth/mailbox-access", () => ({
   requireMailboxAccess: mocks.requireMailboxAccess
@@ -38,12 +41,15 @@ vi.mock("@worker/features/events/service", () => ({
 vi.mock("@worker/features/mailboxes/queries", () => ({
   findMailboxForSending: mocks.findMailboxForSending
 }));
+vi.mock("@worker/features/messages/access", () => ({
+  requireMessageAccess: mocks.requireMessageAccess
+}));
 vi.mock("@worker/features/send/service", () => ({
-  replyToMessage: vi.fn(),
+  replyToMessage: mocks.replyToMessage,
   sendNewMessage: mocks.sendNewMessage
 }));
 vi.mock("@worker/features/send/forward", () => ({
-  forwardMessage: vi.fn(),
+  forwardMessage: mocks.forwardMessage,
   sendForwardDraft: mocks.sendForwardDraft
 }));
 
@@ -52,8 +58,14 @@ import { sendRoutes } from "@worker/features/send/routes";
 describe("send routes", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.requireMailApiContext.mockResolvedValue({
-      user: { id: "user-1", role: "member" }
+    mocks.requireMailApiPrincipal.mockResolvedValue({
+      principal: {
+        email: "person@example.com",
+        id: "user-1",
+        name: "Person",
+        role: "member",
+        type: "user"
+      }
     });
     mocks.findMailboxForSending.mockResolvedValue({ id: "mailbox-1" });
     mocks.getAccessibleDraft.mockResolvedValue({
@@ -61,7 +73,9 @@ describe("send routes", () => {
       id: "draft-forward"
     });
     mocks.sendForwardDraft.mockResolvedValue({ id: "sent-message-1" });
+    mocks.forwardMessage.mockResolvedValue({ id: "sent-message-1" });
     mocks.sendNewMessage.mockResolvedValue({ id: "sent-message-1" });
+    mocks.replyToMessage.mockResolvedValue({ id: "sent-message-1" });
   });
 
   it("authorizes the selected sending mailbox before sending a draft", async () => {
@@ -148,4 +162,134 @@ describe("send routes", () => {
       { draftId: "draft-forward", mailboxId: "mailbox-1", userId: "user-1" }
     );
   });
+
+  it("sends as an agent with its exact mailbox grant and agent audit identity", async () => {
+    useAgentPrincipal();
+    const db = {} as D1Database;
+    const response = await request(db, "/send", {
+      from: "agent@example.com",
+      to: ["reader@example.com"],
+      subject: "Example",
+      text: "Hello"
+    });
+
+    expect(response.status).toBe(201);
+    expect(mocks.requireMailboxAccess).toHaveBeenCalledWith(
+      db,
+      "agent-1",
+      null,
+      "mailbox-1",
+      "agent"
+    );
+    expect(mocks.sendNewMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ DB: db }),
+      expect.objectContaining({ from: "agent@example.com" }),
+      "agent-1"
+    );
+    expect(mocks.recordAudit).toHaveBeenCalledWith(
+      db,
+      expect.objectContaining({ actorId: "agent-1", actorType: "agent", action: "message.send" })
+    );
+  });
+
+  it("replies as an agent only after checking its source and sending mailbox", async () => {
+    useAgentPrincipal();
+    const db = {} as D1Database;
+    const response = await request(db, "/reply", {
+      from: "agent@example.com",
+      messageId: "message-1",
+      text: "Reply"
+    });
+
+    expect(response.status).toBe(201);
+    expect(mocks.requireMessageAccess).toHaveBeenCalledWith(
+      db,
+      "agent-1",
+      null,
+      "message-1",
+      "agent"
+    );
+    expect(mocks.requireMailboxAccess).toHaveBeenCalledWith(
+      db,
+      "agent-1",
+      null,
+      "mailbox-1",
+      "agent"
+    );
+    expect(mocks.replyToMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ DB: db }),
+      expect.objectContaining({ messageId: "message-1" }),
+      "agent-1"
+    );
+    expect(mocks.recordAudit).toHaveBeenCalledWith(
+      db,
+      expect.objectContaining({ actorId: "agent-1", actorType: "agent", action: "message.reply" })
+    );
+  });
+
+  it("forwards as an agent only after checking its source and sending mailbox", async () => {
+    useAgentPrincipal();
+    const db = {} as D1Database;
+    const response = await request(db, "/forward", {
+      from: "agent@example.com",
+      messageId: "message-1",
+      to: ["reader@example.com"]
+    });
+
+    expect(response.status).toBe(201);
+    expect(mocks.requireMessageAccess).toHaveBeenCalledWith(
+      db,
+      "agent-1",
+      null,
+      "message-1",
+      "agent"
+    );
+    expect(mocks.requireMailboxAccess).toHaveBeenCalledWith(
+      db,
+      "agent-1",
+      null,
+      "mailbox-1",
+      "agent"
+    );
+    expect(mocks.forwardMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ DB: db }),
+      expect.objectContaining({ messageId: "message-1" }),
+      "agent-1"
+    );
+    expect(mocks.recordAudit).toHaveBeenCalledWith(
+      db,
+      expect.objectContaining({
+        actorId: "agent-1",
+        actorType: "agent",
+        action: "message.forward"
+      })
+    );
+  });
 });
+
+function useAgentPrincipal(): void {
+  mocks.requireMailApiPrincipal.mockResolvedValue({
+    authentication: "agent",
+    auth: null,
+    principal: {
+      id: "agent-1",
+      name: "Mail Agent",
+      profile: "mailbox",
+      role: null,
+      type: "agent"
+    },
+    scopes: new Set(["mail:send"])
+  });
+}
+
+async function request(db: D1Database, path: string, body: object): Promise<Response> {
+  return sendRoutes.request(
+    path,
+    {
+      body: JSON.stringify(body),
+      headers: { "content-type": "application/json" },
+      method: "POST"
+    },
+    { BETTER_AUTH_SECRET: "test-secret", DB: db } as WorkerEnv
+  );
+}

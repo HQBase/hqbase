@@ -33,8 +33,10 @@ import type { WorkerEnv } from "@worker/lib/env";
 const mailbox = {
   address: "support@example.com",
   createdAt: "2026-07-10T00:00:00.000Z",
+  deletedAt: null,
   displayName: "Support",
   id: "mailbox-1",
+  kind: "human" as const,
   isActive: true,
   mailDomainId: "domain-1",
   updatedAt: "2026-07-10T00:00:00.000Z"

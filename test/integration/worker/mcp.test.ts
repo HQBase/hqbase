@@ -68,7 +68,7 @@ describe("HQBase MCP server", () => {
       ).bind(now.toISOString(), now.toISOString()),
       env.DB.prepare(
         `INSERT INTO mailbox_grants
-         (mailbox_id, user_id, access_level, created_by, created_at, updated_at)
+         (mailbox_id, principal_id, access_level, created_by_principal_id, created_at, updated_at)
          VALUES ('mbx_allowed', ?, 'agent', ?, ?, ?)`
       ).bind(userId, userId, now.toISOString(), now.toISOString()),
       env.DB.prepare(

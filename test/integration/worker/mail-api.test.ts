@@ -1,6 +1,5 @@
 import { env, runDurableObjectAlarm, runInDurableObject, SELF } from "cloudflare:test";
 import { beforeAll, describe, expect, it, vi } from "vitest";
-import mailApiOpenApi from "../../../api/hqbase-mail-api-v2.openapi.json";
 import { createAuth } from "../../../worker/auth/auth";
 import { mailEventInternalHeaders } from "../../../worker/features/events/durable-object";
 import { applyCurrentMigrations } from "./current-migrations";
@@ -121,7 +120,7 @@ describe("HQBase Mail API v2", () => {
       ).bind(now.toISOString(), now.toISOString()),
       env.DB.prepare(
         `INSERT INTO mailbox_grants
-         (mailbox_id, user_id, access_level, created_by, created_at, updated_at)
+         (mailbox_id, principal_id, access_level, created_by_principal_id, created_at, updated_at)
          VALUES ('mbx_api', ?, 'agent', ?, ?, ?)`
       ).bind(userId, userId, now.toISOString(), now.toISOString()),
       env.DB.prepare(
@@ -255,67 +254,127 @@ describe("HQBase Mail API v2", () => {
     expect(rejected.headers.get("x-request-id")).toBeTruthy();
   });
 
-  it("publishes an instance-adjusted Agent Skill and OpenAPI discovery", async () => {
-    const skill = await SELF.fetch(`${origin}/skills/hqbase-mail/SKILL.md`);
-    expect(skill.status).toBe(200);
-    expect(skill.headers.get("content-type")).toContain("text/markdown");
-    expect(skill.headers.get("access-control-allow-origin")).toBe("*");
-    const instructions = await skill.text();
-    expect(instructions).toMatch(
-      /^---\nname: hqbase-mail\ndescription: [^\n]+\n---\n\n# HQBase Mail/
+  it("publishes separate connection skills, OpenAPI, and retirement notices", async () => {
+    const humanSkill = await SELF.fetch(`${origin}/skills/hqbase-mail/SKILL.md`);
+    expect(humanSkill.status).toBe(200);
+    expect(humanSkill.headers.get("content-type")).toContain("text/markdown");
+    expect(humanSkill.headers.get("access-control-allow-origin")).toBe("*");
+    const humanInstructions = await humanSkill.text();
+    expect(humanInstructions).toMatch(
+      /^---\nname: hqbase-mail\ndescription: [^\n]+\n---\n\n# HQBase Mail for Your Account/
     );
-    expect(instructions).toContain(`- Instance origin: ${origin}`);
-    expect(instructions).toContain(`- API base URL: ${apiResource}`);
-    expect(instructions).toContain(`- OpenAPI contract: ${origin}/api/v2/openapi.json`);
-    expect(instructions).toContain(`resource=${apiResource}`);
-    expect(instructions).toContain("urn:ietf:params:oauth:grant-type:device_code");
-    expect(instructions).toContain("verification_uri_complete");
-    expect(instructions).toContain("authorization_pending");
-    expect(instructions).toContain("Prefer Device Authorization");
-    expect(instructions).toContain(
+    expect(humanInstructions).toContain(`- Instance origin: ${origin}`);
+    expect(humanInstructions).toContain(`- API base URL: ${apiResource}`);
+    expect(humanInstructions).toContain(`- OpenAPI contract: ${origin}/api/v2/openapi.json`);
+    expect(humanInstructions).toContain(`resource=${apiResource}`);
+    expect(humanInstructions).toContain("urn:ietf:params:oauth:grant-type:device_code");
+    expect(humanInstructions).toContain("verification_uri_complete");
+    expect(humanInstructions).toContain("authorization_pending");
+    expect(humanInstructions).toContain("Prefer Device Authorization");
+    expect(humanInstructions).toContain(
       "Do not open, navigate to, or interact with the verification URL in Cloud Browser"
     );
-    expect(instructions).toContain("The person must open it themselves in a browser they control");
-    expect(instructions).toContain("Sending, replying, and forwarding are not idempotent");
-    expect(instructions).toContain(
+    expect(humanInstructions).toContain(
+      "The person must open it themselves in a browser they control"
+    );
+    expect(humanInstructions).toContain("Sending, replying, and forwarding are not idempotent");
+    expect(humanInstructions).toContain(
       "get a checkpoint from `GET https://hqbase.test/api/v2/changes`"
     );
-    expect(instructions).toContain("List mailboxes before each change cycle");
-    expect(instructions).toContain("`application_type` set to `native`");
-    expect(instructions).toContain("RFC 8252");
-    expect(instructions).toContain("app-claimed HTTPS, loopback HTTP, and private-use schemes");
-    for (const [path, pathItem] of Object.entries(mailApiOpenApi.paths)) {
-      for (const method of ["get", "post", "patch", "delete"] as const) {
-        if (method in pathItem) {
-          expect(instructions).toContain(`\`${method.toUpperCase()} ${path}\``);
-        }
-      }
+    expect(humanInstructions).not.toContain("credentials currently start with `hqb_agent_`");
+
+    const mailboxSkill = await SELF.fetch(`${origin}/skills/hqbase-mailbox/SKILL.md`);
+    expect(mailboxSkill.status).toBe(200);
+    const mailboxInstructions = await mailboxSkill.text();
+    expect(mailboxInstructions).toMatch(
+      /^---\nname: hqbase-mailbox\ndescription: [^\n]+\n---\n\n# HQBase Mailbox Agent/
+    );
+    expect(mailboxInstructions).toContain(`- API base URL: ${apiResource}`);
+    expect(mailboxInstructions).toContain("credentials currently start with `hqb_agent_`");
+    expect(mailboxInstructions).toContain("only with the Mail API");
+    expect(mailboxInstructions).not.toContain("device_authorization_endpoint");
+
+    const provisionerSkill = await SELF.fetch(`${origin}/skills/hqbase-provisioner/SKILL.md`);
+    expect(provisionerSkill.status).toBe(200);
+    const provisionerInstructions = await provisionerSkill.text();
+    expect(provisionerInstructions).toMatch(
+      /^---\nname: hqbase-provisioner\ndescription: [^\n]+\n---\n\n# HQBase Provisioner/
+    );
+    expect(provisionerInstructions).toContain(`- Management API base URL: ${origin}/management/v1`);
+    expect(provisionerInstructions).toContain(
+      `- Child mailbox skill: ${origin}/skills/hqbase-mailbox/SKILL.md`
+    );
+    expect(provisionerInstructions).toContain(
+      `POST ${origin}/management/v1/agents/{agent-id}/credential`
+    );
+    expect(provisionerInstructions).toContain(`DELETE ${origin}/management/v1/agents/{agent-id}`);
+    expect(provisionerInstructions).toContain("cannot read or send mail");
+    expect(provisionerInstructions).not.toContain("device_authorization_endpoint");
+
+    for (const instructions of [humanInstructions, mailboxInstructions]) {
+      expect(instructions).toContain("Sending, replying, and forwarding are not idempotent");
+      expect(instructions).toContain(
+        "get a checkpoint from `GET https://hqbase.test/api/v2/changes`"
+      );
+      expect(instructions).toContain("List mailboxes before each change cycle");
     }
 
     const openApi = await SELF.fetch(`${origin}/api/v2/openapi.json`);
     expect(openApi.status).toBe(200);
     expect(openApi.headers.get("content-type")).toContain("application/json");
     const document = (await openApi.json()) as {
+      components: {
+        securitySchemes: {
+          agentBearer: { bearerFormat: string; scheme: string; type: string };
+        };
+      };
       externalDocs: { url: string };
+      paths: Record<
+        string,
+        {
+          get?: {
+            security?: Array<Record<string, string[]>>;
+            "x-hqbase-agent-capabilities"?: string[];
+          };
+          post?: { security?: Array<Record<string, string[]>> };
+        }
+      >;
       servers: Array<{ url: string }>;
     };
     expect(document.servers).toEqual([{ url: origin, description: "This HQBase installation" }]);
     expect(document.externalDocs.url).toBe(`${origin}/skills/hqbase-mail/SKILL.md`);
-
-    const head = await SELF.fetch(`${origin}/skills/hqbase-mail/SKILL.md`, { method: "HEAD" });
-    expect(head.status).toBe(200);
-    expect(await head.text()).toBe("");
-
-    const rejectedMethod = await SELF.fetch(`${origin}/skills/hqbase-mail/SKILL.md`, {
-      method: "POST"
+    expect(document.components.securitySchemes.agentBearer).toMatchObject({
+      type: "http",
+      scheme: "bearer",
+      bearerFormat: "hqb_agent_<secret>"
     });
-    expect(rejectedMethod.status).toBe(405);
-    expect(rejectedMethod.headers.get("allow")).toBe("GET, HEAD");
+    expect(document.paths["/api/v2/messages"]?.get?.security).toContainEqual({ agentBearer: [] });
+    expect(document.paths["/api/v2/messages"]?.get).toMatchObject({
+      "x-hqbase-agent-capabilities": ["mail:read"]
+    });
+    expect(
+      document.paths["/api/v2/messages/{id}/remote-media/trust"]?.post?.security
+    ).not.toContainEqual({ agentBearer: [] });
 
-    for (const legacyPath of ["/AGENTS.md", "/agents.md"]) {
-      const redirect = await SELF.fetch(`${origin}${legacyPath}`, { redirect: "manual" });
-      expect(redirect.status).toBe(308);
-      expect(redirect.headers.get("location")).toBe(`${origin}/skills/hqbase-mail/SKILL.md`);
+    for (const skillPath of [
+      "/skills/hqbase-mail/SKILL.md",
+      "/skills/hqbase-mailbox/SKILL.md",
+      "/skills/hqbase-provisioner/SKILL.md"
+    ]) {
+      const head = await SELF.fetch(`${origin}${skillPath}`, { method: "HEAD" });
+      expect(head.status).toBe(200);
+      expect(await head.text()).toBe("");
+
+      const rejectedMethod = await SELF.fetch(`${origin}${skillPath}`, { method: "POST" });
+      expect(rejectedMethod.status).toBe(405);
+      expect(rejectedMethod.headers.get("allow")).toBe("GET, HEAD");
+    }
+
+    for (const retiredPath of ["/AGENTS.md", "/agents.md"]) {
+      const retired = await SELF.fetch(`${origin}${retiredPath}`, { redirect: "manual" });
+      expect(retired.status).toBe(200);
+      expect(retired.headers.get("location")).toBeNull();
+      expect(await retired.text()).toContain("Open **Settings → Connect AI agents** in HQBase");
     }
   });
 
@@ -734,7 +793,9 @@ describe("HQBase Mail API v2", () => {
     expect(draftResponse.status, await draftResponse.clone().text()).toBe(201);
     const mailboxDraft = (await draftResponse.json()) as { id: string };
 
-    await env.DB.prepare("DELETE FROM mailbox_grants WHERE mailbox_id = 'mbx_api' AND user_id = ?")
+    await env.DB.prepare(
+      "DELETE FROM mailbox_grants WHERE mailbox_id = 'mbx_api' AND principal_id = ?"
+    )
       .bind(userId)
       .run();
     try {
@@ -752,7 +813,7 @@ describe("HQBase Mail API v2", () => {
       const now = new Date().toISOString();
       await env.DB.prepare(
         `INSERT INTO mailbox_grants
-         (mailbox_id, user_id, access_level, created_by, created_at, updated_at)
+         (mailbox_id, principal_id, access_level, created_by_principal_id, created_at, updated_at)
          VALUES ('mbx_api', ?, 'agent', ?, ?, ?)`
       )
         .bind(userId, userId, now, now)
@@ -980,7 +1041,7 @@ function mailboxRow(id: string, address: string): D1PreparedStatement {
 function grantRow(mailboxId: string): D1PreparedStatement {
   const stamp = "2025-01-01T00:00:00.000Z";
   return env.DB.prepare(
-    `INSERT INTO mailbox_grants (mailbox_id, user_id, access_level, created_by, created_at, updated_at)
+    `INSERT INTO mailbox_grants (mailbox_id, principal_id, access_level, created_by_principal_id, created_at, updated_at)
      VALUES (?, ?, 'agent', ?, ?, ?)`
   ).bind(mailboxId, userId, userId, stamp, stamp);
 }

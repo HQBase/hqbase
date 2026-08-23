@@ -1,6 +1,6 @@
 import { type Context, Hono } from "hono";
 
-import { requireMailApiContext } from "../../auth/mail-api";
+import { requireMailApiPrincipal } from "../../auth/mail-api";
 import { requireAuthContext, requireRole } from "../../auth/session";
 import type { HonoApp } from "../../lib/env";
 import { readJson } from "../../lib/json";
@@ -8,7 +8,8 @@ import { parseWith } from "../../lib/validation";
 import { recordAudit } from "../audit/service";
 import { ignoreMailEventFailure, publishMailboxMailEvent } from "../events/service";
 
-import { listMailboxesForUser } from "./queries";
+import { restoreMailbox, softDeleteMailbox } from "./lifecycle-service";
+import { listDeletedMailboxes, listMailboxesForUser } from "./queries";
 import { createMailbox, updateExistingMailbox } from "./service";
 import { createMailboxSchema, updateMailboxSchema } from "./validation";
 
@@ -16,12 +17,18 @@ export const mailboxRoutes = new Hono<HonoApp>();
 export const mailboxReadRoutes = new Hono<HonoApp>();
 
 const listForUser = async (c: Context<HonoApp>) => {
-  const auth = await requireMailApiContext(c.env, c.req.raw, "mail:read");
-  return c.json(await listMailboxesForUser(c.env.DB, auth.user.id, auth.user.role));
+  const auth = await requireMailApiPrincipal(c.env, c.req.raw, "mail:read");
+  return c.json(await listMailboxesForUser(c.env.DB, auth.principal.id, auth.principal.role));
 };
 
 mailboxRoutes.get("/", listForUser);
 mailboxReadRoutes.get("/", listForUser);
+
+mailboxRoutes.get("/deleted", async (c) => {
+  const auth = await requireAuthContext(c.env, c.req.raw);
+  requireRole(auth, ["owner", "admin"]);
+  return c.json(await listDeletedMailboxes(c.env.DB));
+});
 
 mailboxRoutes.post("/", async (c) => {
   const authContext = await requireAuthContext(c.env, c.req.raw);
@@ -59,6 +66,38 @@ mailboxRoutes.patch("/:id", async (c) => {
   });
   scheduleMailboxEvent(c, c.req.param("id"));
   return c.json(updated);
+});
+
+mailboxRoutes.delete("/:id", async (c) => {
+  const auth = await requireAuthContext(c.env, c.req.raw);
+  requireRole(auth, ["owner", "admin"]);
+  const mailbox = await softDeleteMailbox(c.env.DB, c.req.param("id"), {
+    correlationId: c.get("correlationId"),
+    actorType: "user",
+    actorId: auth.user.id,
+    action: "mailbox.delete",
+    resourceType: "mailbox",
+    resourceId: c.req.param("id"),
+    outcome: "success"
+  });
+  scheduleMailboxEvent(c, mailbox.id);
+  return c.json(mailbox);
+});
+
+mailboxRoutes.post("/:id/restore", async (c) => {
+  const auth = await requireAuthContext(c.env, c.req.raw);
+  requireRole(auth, ["owner", "admin"]);
+  const mailbox = await restoreMailbox(c.env.DB, c.req.param("id"), {
+    correlationId: c.get("correlationId"),
+    actorType: "user",
+    actorId: auth.user.id,
+    action: "mailbox.restore",
+    resourceType: "mailbox",
+    resourceId: c.req.param("id"),
+    outcome: "success"
+  });
+  scheduleMailboxEvent(c, mailbox.id);
+  return c.json(mailbox);
 });
 
 function scheduleMailboxEvent(c: Context<HonoApp>, mailboxId: string): void {

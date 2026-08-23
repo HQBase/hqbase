@@ -28,6 +28,9 @@ export async function updateExistingMailbox(
   if (!existing) {
     throw new AppError("MAILBOX_NOT_FOUND", "Mailbox not found.", 404);
   }
+  if (existing.deletedAt) {
+    throw new AppError("MAILBOX_DELETED", "Restore the mailbox before changing it.", 409);
+  }
 
   const updated = await updateMailbox(db, id, input);
   if (!updated) {
