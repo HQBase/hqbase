@@ -2,6 +2,7 @@ import type * as React from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Switch } from "@/components/ui/switch";
 import {
   Table,
   TableBody,
@@ -37,19 +38,23 @@ export function MailboxSelectionBar({
 export function MailboxTable({
   canManage,
   mailboxes,
+  pendingMailboxId,
   policies,
   selectedIds,
   users,
   onOpenDetails,
-  onSelectionChange
+  onSelectionChange,
+  onToggle
 }: {
   canManage: boolean;
   mailboxes: Mailbox[];
+  pendingMailboxId: string | null;
   policies: MailboxAccessPolicies;
   selectedIds: string[];
   users: WorkspaceUser[];
   onOpenDetails: (mailbox: Mailbox) => void;
   onSelectionChange: (selectedIds: string[]) => void;
+  onToggle: (mailbox: Mailbox, isActive: boolean) => void;
 }): React.ReactElement {
   const selected = new Set(selectedIds);
   const visibleIds = mailboxes.map((mailbox) => mailbox.id);
@@ -88,7 +93,7 @@ export function MailboxTable({
           ) : null}
           <TableHead>Address</TableHead>
           <TableHead className="hidden sm:table-cell">Name</TableHead>
-          <TableHead className="hidden w-28 md:table-cell">Status</TableHead>
+          <TableHead className="w-20">Status</TableHead>
           <TableHead className="w-32 sm:w-48">Access</TableHead>
         </TableRow>
       </TableHeader>
@@ -132,18 +137,21 @@ export function MailboxTable({
                 <span className="mt-0.5 block truncate text-xs text-muted-foreground sm:hidden">
                   {mailbox.displayName}
                 </span>
-                <Badge
-                  className="mt-1 md:hidden"
-                  variant={mailbox.isActive ? "secondary" : "outline"}
-                >
-                  {mailbox.isActive ? "Active" : "Disabled"}
-                </Badge>
               </TableCell>
               <TableCell className="hidden sm:table-cell">{mailbox.displayName}</TableCell>
-              <TableCell className="hidden md:table-cell">
-                <Badge variant={mailbox.isActive ? "secondary" : "outline"}>
-                  {mailbox.isActive ? "Active" : "Disabled"}
-                </Badge>
+              <TableCell onClick={canManage ? (event) => event.stopPropagation() : undefined}>
+                {canManage ? (
+                  <Switch
+                    aria-label={`${mailbox.address} status`}
+                    checked={mailbox.isActive}
+                    disabled={pendingMailboxId !== null}
+                    onCheckedChange={(isActive) => onToggle(mailbox, isActive)}
+                  />
+                ) : (
+                  <Badge variant={mailbox.isActive ? "secondary" : "outline"}>
+                    {mailbox.isActive ? "Active" : "Disabled"}
+                  </Badge>
+                )}
               </TableCell>
               <TableCell>
                 {canManage ? (

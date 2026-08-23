@@ -1,6 +1,5 @@
 import type * as React from "react";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
 import {
   Table,
   TableBody,
@@ -19,7 +18,7 @@ export function DomainTable({
 }: {
   domains: MailDomain[];
   pendingDomainId: string | null;
-  onToggle: (domain: MailDomain) => void;
+  onToggle: (domain: MailDomain, isEnabled: boolean) => void;
 }): React.ReactElement {
   return (
     <Table containerClassName="rounded-lg border">
@@ -29,16 +28,13 @@ export function DomainTable({
           <TableHead className="hidden w-28 sm:table-cell">Receive</TableHead>
           <TableHead className="hidden w-28 sm:table-cell">Send</TableHead>
           <TableHead className="hidden w-28 sm:table-cell">DNS</TableHead>
-          <TableHead className="w-28">Status</TableHead>
-          <TableHead className="w-px text-right">
-            <span className="sr-only">Actions</span>
-          </TableHead>
+          <TableHead className="w-20">Enabled</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
         {domains.length === 0 ? (
           <TableRow>
-            <TableCell className="h-24 text-center text-muted-foreground" colSpan={6}>
+            <TableCell className="h-24 text-center text-muted-foreground" colSpan={5}>
               No domains connected.
             </TableCell>
           </TableRow>
@@ -62,25 +58,12 @@ export function DomainTable({
               <ReadinessStatus status={domain.dnsStatus} />
             </TableCell>
             <TableCell>
-              <Badge variant={domain.isEnabled ? "secondary" : "outline"}>
-                {domain.isEnabled ? "Enabled" : "Disabled"}
-              </Badge>
-            </TableCell>
-            <TableCell className="text-right">
-              <Button
-                aria-label={`${domain.isEnabled ? "Disable" : "Enable"} ${domain.name}`}
-                disabled={pendingDomainId === domain.id}
-                size="sm"
-                type="button"
-                variant="outline"
-                onClick={() => onToggle(domain)}
-              >
-                {pendingDomainId === domain.id
-                  ? "Updating…"
-                  : domain.isEnabled
-                    ? "Disable"
-                    : "Enable"}
-              </Button>
+              <Switch
+                aria-label={`${domain.name} enabled`}
+                checked={domain.isEnabled}
+                disabled={pendingDomainId !== null}
+                onCheckedChange={(isEnabled) => onToggle(domain, isEnabled)}
+              />
             </TableCell>
           </TableRow>
         ))}

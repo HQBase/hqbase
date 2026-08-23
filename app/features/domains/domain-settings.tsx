@@ -111,12 +111,14 @@ export function DomainSettings({
     setAuthorizationOperation({ action: "portal", zoneId: domain.zoneId, hostname });
   }
 
-  async function toggleDomain(domain: MailDomain) {
+  async function toggleDomain(domain: MailDomain, isEnabled: boolean) {
     setPendingDomainId(domain.id);
     try {
-      await updateDomain(domain.id, { isEnabled: !domain.isEnabled });
-      refresh();
-      toast.success(`${domain.name} ${domain.isEnabled ? "disabled" : "enabled"}.`);
+      const updatedDomain = await updateDomain(domain.id, { isEnabled });
+      setDomains((current) =>
+        current.map((item) => (item.id === updatedDomain.id ? updatedDomain : item))
+      );
+      toast.success(`${domain.name} ${isEnabled ? "enabled" : "disabled"}.`);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Domain could not be updated.");
     } finally {
@@ -155,7 +157,7 @@ export function DomainSettings({
       <DomainTable
         domains={domains}
         pendingDomainId={pendingDomainId}
-        onToggle={(domain) => void toggleDomain(domain)}
+        onToggle={(domain, isEnabled) => void toggleDomain(domain, isEnabled)}
       />
 
       <Separator />

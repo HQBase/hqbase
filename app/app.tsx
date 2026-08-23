@@ -266,7 +266,7 @@ export function App(): React.ReactElement {
                 onDefaultFromMailboxChange={(defaultFromMailboxId) => {
                   setUser((current) => (current ? { ...current, defaultFromMailboxId } : current));
                 }}
-                onRefresh={() => void reload()}
+                onRefresh={reload}
                 onUpdateStarted={updateMonitor.start}
                 onUpdateStatusChange={updateMonitor.acceptStatus}
                 updateProgress={updateMonitor.progress}

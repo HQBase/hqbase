@@ -1,0 +1,142 @@
+// @vitest-environment happy-dom
+import * as React from "react";
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+import { Dialog, DialogClose, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from "@/components/ui/select";
+import { flushHookEffects, renderComponent } from "../render-hook";
+
+afterEach(() => {
+  document.body.replaceChildren();
+});
+
+type OutsideHandler = NonNullable<
+  React.ComponentProps<typeof DialogContent>["onPointerDownOutside"]
+>;
+
+async function settleOutsideListeners(): Promise<void> {
+  const tick = () =>
+    flushHookEffects(() => new Promise<void>((resolve) => window.setTimeout(resolve, 0)));
+  await tick();
+  await tick();
+}
+
+function pointerClick(target: Element): void {
+  target.dispatchEvent(
+    new PointerEvent("pointerdown", {
+      bubbles: true,
+      button: 0,
+      cancelable: true,
+      composed: true,
+      pointerId: 1,
+      pointerType: "mouse"
+    })
+  );
+  target.dispatchEvent(
+    new MouseEvent("click", {
+      bubbles: true,
+      button: 0,
+      cancelable: true,
+      composed: true
+    })
+  );
+}
+
+function dialogOverlay(): HTMLElement | undefined {
+  return [...document.body.querySelectorAll<HTMLElement>('[data-state="open"]')].find((element) =>
+    element.className.includes("fixed inset-0")
+  );
+}
+
+async function openDialog(onPointerDownOutside?: OutsideHandler) {
+  const view = await renderComponent(
+    <Dialog defaultOpen>
+      <DialogContent {...(onPointerDownOutside ? { onPointerDownOutside } : {})}>
+        <DialogTitle>Test dialog</DialogTitle>
+        <DialogClose aria-label="Close test dialog">Close</DialogClose>
+      </DialogContent>
+    </Dialog>
+  );
+  await settleOutsideListeners();
+  return view;
+}
+
+function DialogWithOpenSelect({
+  onPointerDownOutside
+}: {
+  onPointerDownOutside: OutsideHandler;
+}): React.ReactElement {
+  const [selectOpen, setSelectOpen] = React.useState(true);
+  return (
+    <Dialog defaultOpen>
+      <DialogContent onPointerDownOutside={onPointerDownOutside}>
+        <DialogTitle>Dialog with dropdown</DialogTitle>
+        <Select open={selectOpen} value="first" onOpenChange={setSelectOpen}>
+          <SelectTrigger aria-label="Test dropdown">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="first">First</SelectItem>
+            <SelectItem value="second">Second</SelectItem>
+          </SelectContent>
+        </Select>
+        <output data-select-state>{selectOpen ? "open" : "closed"}</output>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+describe("dialog interactions", () => {
+  it("ignores a backdrop click after Radix reports it", async () => {
+    const outside = vi.fn();
+    const view = await openDialog(outside);
+    const overlay = dialogOverlay();
+
+    expect(overlay).toBeDefined();
+    await flushHookEffects(() => pointerClick(overlay as HTMLElement));
+
+    expect(outside).toHaveBeenCalledOnce();
+    expect(document.body.querySelector('[role="dialog"]')?.getAttribute("data-state")).toBe("open");
+    await view.unmount();
+  });
+
+  it("closes a nested dropdown without closing its dialog", async () => {
+    const outside = vi.fn();
+    const view = await renderComponent(<DialogWithOpenSelect onPointerDownOutside={outside} />);
+    await settleOutsideListeners();
+    const overlay = dialogOverlay();
+
+    expect(document.body.querySelector("[data-select-state]")?.textContent).toBe("open");
+    expect(overlay).toBeDefined();
+    await flushHookEffects(() => pointerClick(overlay as HTMLElement));
+
+    expect(document.body.querySelector("[data-select-state]")?.textContent).toBe("closed");
+    expect(outside).toHaveBeenCalledOnce();
+    expect(document.body.querySelector('[role="dialog"]')?.getAttribute("data-state")).toBe("open");
+    await view.unmount();
+  });
+
+  it("still closes through Escape", async () => {
+    const view = await openDialog();
+    await flushHookEffects(() =>
+      document.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, key: "Escape" }))
+    );
+    expect(document.body.querySelector('[role="dialog"]')).toBeNull();
+    await view.unmount();
+  });
+
+  it("still closes through an explicit close control", async () => {
+    const view = await openDialog();
+    await flushHookEffects(() =>
+      document.body.querySelector<HTMLButtonElement>('[aria-label="Close test dialog"]')?.click()
+    );
+    expect(document.body.querySelector('[role="dialog"]')).toBeNull();
+    await view.unmount();
+  });
+});

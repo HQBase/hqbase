@@ -108,7 +108,7 @@ describe("settings presentation", () => {
         defaultFromMailboxId={null}
         mailboxes={[]}
         users={[]}
-        onChanged={() => undefined}
+        onChanged={async () => undefined}
         onDefaultFromMailboxChange={() => undefined}
       />
     );
@@ -180,7 +180,7 @@ describe("settings presentation", () => {
         defaultFromMailboxId={mailbox.id}
         mailboxes={[mailbox]}
         users={[member]}
-        onChanged={() => undefined}
+        onChanged={async () => undefined}
         onDefaultFromMailboxChange={() => undefined}
       />
     );
@@ -196,6 +196,9 @@ describe("settings presentation", () => {
     expect(html).not.toContain(">Manage access<");
     expect(html).not.toContain("Apply to domain");
     expect(html).not.toContain("Set access by domain");
+    expect(html).toContain('aria-label="support@example.com status"');
+    expect(html).toContain('role="switch"');
+    expect(html).toContain('aria-checked="true"');
     expect(
       formatMailboxAccessSummary(
         mailbox.id,
@@ -221,7 +224,7 @@ describe("settings presentation", () => {
         defaultFromMailboxId={mailbox.id}
         mailboxes={[mailbox, secondDomainMailbox]}
         users={[member]}
-        onChanged={() => undefined}
+        onChanged={async () => undefined}
         onDefaultFromMailboxChange={() => undefined}
       />
     );
@@ -266,12 +269,14 @@ describe("settings presentation", () => {
     expect(html).toContain(">Receive<");
     expect(html).toContain(">Send<");
     expect(html).toContain(">DNS<");
-    expect(html).toContain(">Status<");
+    expect(html).toContain(">Enabled<");
     expect(html).toContain("example.com");
     expect(html).toContain("Ready");
     expect(html).toContain("Degraded");
     expect(html).toContain("Pending");
-    expect(html).toContain('aria-label="Disable example.com"');
+    expect(html).toContain('aria-label="example.com enabled"');
+    expect(html).toContain('role="switch"');
+    expect(html).toContain('aria-checked="true"');
   });
 
   it("replaces General and Upgrade with Debug as the final tab", () => {
@@ -295,7 +300,7 @@ describe("settings presentation", () => {
         updateStatus={null}
         users={[]}
         onDefaultFromMailboxChange={() => undefined}
-        onRefresh={() => undefined}
+        onRefresh={async () => undefined}
         onUpdateStarted={() => undefined}
         onUpdateStatusChange={() => undefined}
         updateProgress={null}

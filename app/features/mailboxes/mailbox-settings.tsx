@@ -41,7 +41,7 @@ type MailboxSettingsProps = {
   mailboxes: Mailbox[];
   users: WorkspaceUser[];
   onDefaultFromMailboxChange: (mailboxId: string) => void;
-  onChanged: () => void;
+  onChanged: () => Promise<void>;
 };
 
 export function MailboxSettings({
@@ -63,6 +63,7 @@ export function MailboxSettings({
   const [selectedMailboxIds, setSelectedMailboxIds] = React.useState<string[]>([]);
   const [aliasAddress, setAliasAddress] = React.useState("");
   const [pendingAction, setPendingAction] = React.useState<"mailbox" | "alias" | null>(null);
+  const [pendingMailboxId, setPendingMailboxId] = React.useState<string | null>(null);
   const accessPolicies = useMailboxAccessPolicies(canManage);
   const domains = mailboxDomains(mailboxes);
   const activeDomain = domains.includes(domainFilter) ? domainFilter : "all";
@@ -84,7 +85,7 @@ export function MailboxSettings({
       setDisplayName("");
       setCreateOpen(false);
       toast.success("Mailbox created.");
-      onChanged();
+      await onChanged();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Mailbox creation failed.");
     } finally {
@@ -92,9 +93,17 @@ export function MailboxSettings({
     }
   }
 
-  async function handleToggle(mailbox: Mailbox) {
-    await updateMailbox(mailbox.id, { isActive: !mailbox.isActive });
-    onChanged();
+  async function handleToggle(mailbox: Mailbox, isActive: boolean) {
+    setPendingMailboxId(mailbox.id);
+    try {
+      await updateMailbox(mailbox.id, { isActive });
+      toast.success(`${mailbox.address} ${isActive ? "enabled" : "disabled"}.`);
+      await onChanged();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Mailbox could not be updated.");
+    } finally {
+      setPendingMailboxId(null);
+    }
   }
 
   async function handleAlias(event: React.FormEvent<HTMLFormElement>) {
@@ -109,7 +118,7 @@ export function MailboxSettings({
       setAliasAddress("");
       setAliasMailbox(null);
       toast.success("Email address added.");
-      onChanged();
+      await onChanged();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Address creation failed.");
     } finally {
@@ -118,8 +127,12 @@ export function MailboxSettings({
   }
 
   async function handleRemoveAlias(mailbox: Mailbox, addressId: string) {
-    await removeMailboxAddress(mailbox.id, addressId);
-    onChanged();
+    try {
+      await removeMailboxAddress(mailbox.id, addressId);
+      await onChanged();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Address could not be removed.");
+    }
   }
 
   return (
@@ -220,11 +233,13 @@ export function MailboxSettings({
       <MailboxTable
         canManage={canManage}
         mailboxes={visibleMailboxes}
+        pendingMailboxId={pendingMailboxId}
         policies={accessPolicies}
         selectedIds={selectedMailboxIds}
         users={users}
         onOpenDetails={(mailbox) => setDetailsMailboxId(mailbox.id)}
         onSelectionChange={setSelectedMailboxIds}
+        onToggle={(mailbox, isActive) => void handleToggle(mailbox, isActive)}
       />
 
       <MailboxDetailsSheet
@@ -244,7 +259,6 @@ export function MailboxSettings({
           if (!open) setDetailsMailboxId(null);
         }}
         onRemoveAddress={(mailbox, addressId) => void handleRemoveAlias(mailbox, addressId)}
-        onToggle={(mailbox) => void handleToggle(mailbox)}
       />
 
       <MailboxAliasDialog
