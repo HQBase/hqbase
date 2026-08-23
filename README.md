@@ -60,6 +60,17 @@ and Cloudflare credentials in customer infrastructure. It includes:
 See the [product documentation](https://hqbase.io/docs/) for installation, daily use, architecture,
 and operations.
 
+## Made by the community
+
+We love seeing people build around HQBase. Independent clients give you more ways to use your
+workspace:
+
+- [Herald](https://github.com/awizemann/herald) — A native macOS email client for HQBase.
+
+HQBase has tested Herald for compatibility. It is made and maintained by independent community
+developers, so its releases, support, and behavior remain in their care rather than HQBase's.
+Please review the project and decide whether it is right for your workspace.
+
 ## Develop locally
 
 ### Start the application
