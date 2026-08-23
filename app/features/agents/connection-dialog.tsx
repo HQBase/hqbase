@@ -3,7 +3,7 @@ import { PiCheck, PiCopy, PiDownload, PiFileText } from "react-icons/pi";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Separator } from "@/components/ui/separator";
 import type { CurrentUser } from "@/features/auth/types";
 import { McpConnectionDetails } from "@/features/mcp/connection-dialog";
 import { cn } from "@/lib/cn";
@@ -26,41 +26,40 @@ export function AgentConnectionDetails({
   user: CurrentUser;
 }): React.ReactElement {
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-7">
       <ConnectionIdentity user={user} />
+      <section className="flex flex-col gap-5">
+        <div className="flex flex-col gap-1">
+          <h3 className="font-medium text-foreground">MCP</h3>
+          <p className="text-xs text-muted-foreground">
+            Connect an AI tool through HQBase&apos;s remote MCP server.
+          </p>
+        </div>
+        <McpConnectionDetails
+          fullEndpoint={fullEndpoint}
+          fullEndpointId={fullEndpointId}
+          readOnlyEndpoint={readOnlyEndpoint}
+          readOnlyEndpointId={readOnlyEndpointId}
+          showIdentity={false}
+          user={user}
+        />
+      </section>
 
-      <Tabs defaultValue="mcp">
-        <TabsList
-          aria-label="Connection method"
-          className="grid h-9 w-full grid-cols-2 rounded-full"
-        >
-          <TabsTrigger className="h-7 min-h-0 rounded-full px-2 text-xs" value="mcp">
-            MCP
-          </TabsTrigger>
-          <TabsTrigger className="h-7 min-h-0 rounded-full px-2 text-xs" value="agent-skill">
-            Agent Skill
-          </TabsTrigger>
-        </TabsList>
+      <ConnectionDivider label="or" />
 
-        <TabsContent className="mt-5" value="mcp">
-          <McpConnectionDetails
-            fullEndpoint={fullEndpoint}
-            fullEndpointId={fullEndpointId}
-            readOnlyEndpoint={readOnlyEndpoint}
-            readOnlyEndpointId={readOnlyEndpointId}
-            showIdentity={false}
-            user={user}
-          />
-        </TabsContent>
-        <TabsContent className="mt-5" value="agent-skill">
-          <AgentSkillDetails flat skillUrl={skillUrl} skillUrlId={skillUrlId} />
-        </TabsContent>
-      </Tabs>
+      <AgentSkillDetails
+        flat
+        description="Connect through the HQBase Mail API using a skill file."
+        skillUrl={skillUrl}
+        skillUrlId={skillUrlId}
+        title="Skill + API"
+      />
     </div>
   );
 }
 
 export function AgentSkillDetails({
+  action,
   description = "Install the skill or give its URL to an agent that can make HTTP requests.",
   flat = false,
   nextStep = "The agent reads the API and safety instructions, then gives you a short code and a link to approve in your normal browser. This URL grants no access and contains no account or mail data.",
@@ -68,6 +67,7 @@ export function AgentSkillDetails({
   skillUrlId,
   title = "Deployment-local Agent Skill"
 }: {
+  action?: React.ReactNode;
   description?: string;
   flat?: boolean;
   nextStep?: string;
@@ -89,19 +89,22 @@ export function AgentSkillDetails({
   return (
     <div className="flex flex-col gap-5 text-sm">
       <section className={cn("flex flex-col gap-4", !flat && "rounded-lg border bg-muted/20 p-3")}>
-        <div className="flex items-start gap-3">
-          <span
-            className={cn(
-              "mt-0.5 inline-flex size-8 shrink-0 items-center justify-center text-muted-foreground",
-              !flat && "rounded-md border bg-background"
-            )}
-          >
-            <PiFileText aria-hidden="true" className="size-4" />
-          </span>
-          <div className="min-w-0">
-            <h3 className="font-medium text-foreground">{title}</h3>
-            <p className="mt-0.5 text-xs text-muted-foreground">{description}</p>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div className="flex items-start gap-3">
+            <span
+              className={cn(
+                "mt-0.5 inline-flex size-8 shrink-0 items-center justify-center text-muted-foreground",
+                !flat && "rounded-md border bg-background"
+              )}
+            >
+              <PiFileText aria-hidden="true" className="size-4" />
+            </span>
+            <div className="min-w-0">
+              <h3 className="font-medium text-foreground">{title}</h3>
+              <p className="mt-0.5 text-xs text-muted-foreground">{description}</p>
+            </div>
           </div>
+          {action ? <div className="shrink-0">{action}</div> : null}
         </div>
 
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
@@ -152,6 +155,16 @@ export function AgentSkillDetails({
           <p>{nextStep}</p>
         </section>
       ) : null}
+    </div>
+  );
+}
+
+export function ConnectionDivider({ label }: { label: string }): React.ReactElement {
+  return (
+    <div className="flex items-center gap-3 text-xs text-muted-foreground">
+      <Separator className="flex-1" />
+      <span>{label}</span>
+      <Separator className="flex-1" />
     </div>
   );
 }

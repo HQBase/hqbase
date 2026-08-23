@@ -76,6 +76,25 @@ describe("agent creation form", () => {
     await view.unmount();
   });
 
+  it("opens a provisioner-only form from the connection guide", async () => {
+    const view = await renderComponent(
+      <Dialog>
+        <AgentCreateForm
+          domains={[{ id: "dom_example", name: "example.com", isEnabled: true }]}
+          mailboxes={[mailbox]}
+          profile="provisioner"
+          onCreated={() => undefined}
+        />
+      </Dialog>
+    );
+
+    expect(view.container.querySelector('[role="tablist"]')).toBeNull();
+    expect(view.container.textContent).toContain("Create provisioner agent");
+    expect(view.container.textContent).toContain("Allowed domain");
+    expect(view.container.textContent).toContain("Trusted provisioning");
+    await view.unmount();
+  });
+
   it("submits the default read-only profile for a new exact mailbox", async () => {
     vi.mocked(createAgent).mockResolvedValue({
       agent: {

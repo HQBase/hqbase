@@ -88,7 +88,15 @@ export function SettingsPage({
           <NotificationSettings notifications={notifications} />
         ) : null}
         {activeTab === "interface" ? <InterfaceSettings /> : null}
-        {activeTab === "mcp" ? <McpSettings user={currentUser} /> : null}
+        {activeTab === "mcp" ? (
+          <McpSettings
+            canManage={canManage}
+            domains={setup.domains}
+            mailboxes={mailboxes}
+            user={currentUser}
+            onChanged={onRefresh}
+          />
+        ) : null}
         {activeTab === "updates" && canManage ? (
           <UpdateSettings
             initialStatus={updateStatus}

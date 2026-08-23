@@ -76,7 +76,9 @@ describe("mobile application shell", () => {
   });
 
   it("keeps account and agentic-mailbox connections in Settings", () => {
-    expect(agentConnectionDetails.match(/h-7 min-h-0 rounded-full/g)).toHaveLength(2);
+    expect(agentConnectionDetails).toContain('label="or"');
+    expect(agentConnectionDetails).toContain('title="Skill + API"');
+    expect(agentConnectionDetails).not.toContain('aria-label="Connection method"');
     expect(mcpConnectionDetails).toContain("text-base sm:text-xs");
     expect(mcpConnectionDetails).toContain('value="read-only"');
     expect(mcpConnectionDetails).toContain('value="mail-actions"');
@@ -88,13 +90,16 @@ describe("mobile application shell", () => {
     expect(mcpSettings).toContain('value="agentic-mailbox"');
     expect(mcpSettings).not.toContain('value="mailbox-agent"');
     expect(mcpSettings).not.toContain('value="provisioner"');
+    expect(mcpSettings).toContain('profile="mailbox"');
+    expect(mcpSettings).toContain('profile="provisioner"');
+    expect(mcpSettings).toContain('label="Automate mailbox creation"');
 
     const mailboxAgentIndex = mcpSettings.indexOf('title="Mailbox agent"');
     const provisionerAgentIndex = mcpSettings.indexOf('title="Provisioner agent"');
 
     expect(mailboxAgentIndex).toBeGreaterThan(-1);
     expect(provisionerAgentIndex).toBeGreaterThan(mailboxAgentIndex);
-    expect(mcpSettings).toContain("<Separator />");
+    expect(mcpSettings).toContain("<ConnectionDivider");
     expect(mcpSettings).toContain("grid-cols-2");
   });
 

@@ -87,6 +87,10 @@ describe("settings presentation", () => {
   it("offers account and agentic-mailbox connection paths in Settings", () => {
     const html = renderToStaticMarkup(
       <McpSettings
+        canManage
+        domains={[{ id: "domain-1", name: "example.com", isEnabled: true }]}
+        mailboxes={[mailbox]}
+        onChanged={async () => undefined}
         user={{
           defaultFromMailboxId: null,
           email: "owner@example.com",
@@ -102,7 +106,9 @@ describe("settings presentation", () => {
     expect(html).toContain("Your account");
     expect(html).toContain("Agentic mailbox");
     expect(html).toContain("MCP");
-    expect(html).toContain("Agent Skill");
+    expect(html).toContain("Skill + API");
+    expect(html).toContain(">or<");
+    expect(html).not.toContain('aria-label="Connection method"');
   });
 
   it("renders mailbox content at the top level and opens creation from a dialog trigger", () => {

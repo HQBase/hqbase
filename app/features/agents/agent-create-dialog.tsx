@@ -36,31 +36,40 @@ import type {
 
 const newMailboxValue = "__new_mailbox__";
 
-type DomainOption = { id: string; name: string; isEnabled: boolean };
+export type AgentDomainOption = { id: string; name: string; isEnabled: boolean };
 
 export function AgentCreateDialog({
   domains,
   mailboxes,
+  profile,
   onCreated
 }: {
-  domains: DomainOption[];
+  domains: AgentDomainOption[];
   mailboxes: Mailbox[];
+  profile?: AgentProfile;
   onCreated: (result: AgentCredentialResult) => void;
 }): React.ReactElement {
   const [open, setOpen] = React.useState(false);
+  const createLabel =
+    profile === "mailbox"
+      ? "Create mailbox agent"
+      : profile === "provisioner"
+        ? "Create provisioner agent"
+        : "Create agent";
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <Button type="button">
           <PiPlus data-icon="inline-start" />
-          Create agent
+          {createLabel}
         </Button>
       </DialogTrigger>
       <DialogContent className="w-[min(94vw,600px)]">
         <AgentCreateForm
           domains={domains}
           mailboxes={mailboxes}
+          {...(profile ? { profile } : {})}
           onCreated={(result) => {
             setOpen(false);
             onCreated(result);
@@ -74,15 +83,17 @@ export function AgentCreateDialog({
 export function AgentCreateForm({
   domains,
   mailboxes,
+  profile: fixedProfile,
   onCreated
 }: {
-  domains: DomainOption[];
+  domains: AgentDomainOption[];
   mailboxes: Mailbox[];
+  profile?: AgentProfile;
   onCreated: (result: AgentCredentialResult) => void;
 }): React.ReactElement {
   const enabledDomains = domains.filter((domain) => domain.isEnabled);
   const activeMailboxes = mailboxes.filter((mailbox) => mailbox.isActive);
-  const [profile, setProfile] = React.useState<AgentProfile>("mailbox");
+  const [profile, setProfile] = React.useState<AgentProfile>(fixedProfile ?? "mailbox");
   const [name, setName] = React.useState("");
   const [mailboxChoice, setMailboxChoice] = React.useState(newMailboxValue);
   const [address, setAddress] = React.useState("");
@@ -146,7 +157,13 @@ export function AgentCreateForm({
   return (
     <>
       <DialogHeader>
-        <DialogTitle>Create agent</DialogTitle>
+        <DialogTitle>
+          {fixedProfile === "mailbox"
+            ? "Create mailbox agent"
+            : fixedProfile === "provisioner"
+              ? "Create provisioner agent"
+              : "Create agent"}
+        </DialogTitle>
         <DialogDescription>Give software restricted access to HQBase.</DialogDescription>
       </DialogHeader>
       <form className="flex flex-col gap-5" onSubmit={(event) => void submit(event)}>
@@ -165,10 +182,12 @@ export function AgentCreateForm({
         </FieldGroup>
 
         <Tabs value={profile} onValueChange={(value) => setProfile(value as AgentProfile)}>
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="mailbox">Mailbox agent</TabsTrigger>
-            <TabsTrigger value="provisioner">Provisioner</TabsTrigger>
-          </TabsList>
+          {fixedProfile ? null : (
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="mailbox">Mailbox agent</TabsTrigger>
+              <TabsTrigger value="provisioner">Provisioner</TabsTrigger>
+            </TabsList>
+          )}
 
           <TabsContent className="mt-5" value="mailbox">
             <FieldGroup>
@@ -304,7 +323,7 @@ export function AgentCreateForm({
           </DialogClose>
           <Button disabled={pending || !canSubmit} type="submit">
             {pending ? <Spinner data-icon="inline-start" /> : null}
-            {pending ? "Creating…" : "Create agent"}
+            {pending ? "Creating…" : fixedProfile ? "Create" : "Create agent"}
           </Button>
         </DialogFooter>
       </form>
