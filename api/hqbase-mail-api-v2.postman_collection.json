@@ -1,8 +1,8 @@
 {
   "info": {
     "_postman_id": "62c6dbf4-835d-4a3f-87df-77b7ddcf2db1",
-    "name": "HQBase Mail API v1",
-    "description": "Generated from api/hqbase-mail-api-v1.openapi.json. Set base_url, run Register public client, and use Postman's OAuth 2.0 Authorization Code flow with PKCE (S256). Auth URL: {{base_url}}/api/auth/oauth2/authorize. Token URL: {{base_url}}/api/auth/oauth2/token. Client ID: {{client_id}}. Scope: mail:read mail:write mail:send offline_access. Add authorization request parameter resource={{api_resource}}, then store the resulting token only in your local environment as access_token. Postman v2.1 HTTP collections cannot contain WebSocket requests. To receive change wakes, create a separate WebSocket request to {{ws_base_url}}/api/v1/events and add Authorization: Bearer {{access_token}}. Sending, replying, and forwarding are not idempotent.",
+    "name": "HQBase Mail API v2",
+    "description": "Generated from api/hqbase-mail-api-v2.openapi.json. For a tool acting for a person, set base_url, run Register public client, and use Postman's OAuth 2.0 Authorization Code flow with PKCE (S256). Auth URL: {{base_url}}/api/auth/oauth2/authorize. Token URL: {{base_url}}/api/auth/oauth2/token. Client ID: {{client_id}}. Scope: mail:read mail:write mail:send offline_access. Add authorization request parameter resource={{api_resource}}, then store the resulting token only in your local environment as access_token. For a mailbox agent, skip OAuth and set access_token to its one-time hqb_agent_ credential. Postman v2.1 HTTP collections cannot contain WebSocket requests. To receive change wakes, create a separate WebSocket request to {{ws_base_url}}/api/v2/events and add Authorization: Bearer {{access_token}}. Sending, replying, and forwarding are not idempotent.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "auth": {
@@ -28,7 +28,7 @@
     },
     {
       "key": "api_resource",
-      "value": "{{base_url}}/api/v1",
+      "value": "{{base_url}}/api/v2",
       "type": "string"
     },
     {
@@ -89,7 +89,7 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{base_url}}/.well-known/oauth-protected-resource/api/v1"
+              "raw": "{{base_url}}/.well-known/oauth-protected-resource/api/v2"
             }
           },
           "response": []
@@ -146,7 +146,7 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{base_url}}/api/v1/mailboxes",
+              "raw": "{{base_url}}/api/v2/mailboxes",
               "variable": []
             },
             "description": "List mailboxes"
@@ -164,7 +164,7 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{base_url}}/api/v1/changes",
+              "raw": "{{base_url}}/api/v2/changes",
               "variable": [],
               "query": [
                 {
@@ -196,14 +196,14 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{base_url}}/api/v1/messages",
+              "raw": "{{base_url}}/api/v2/messages",
               "variable": [],
               "query": [
                 {
                   "key": "folder",
                   "value": "inbox",
                   "disabled": false,
-                  "description": "Message folder to list. The `drafts` value remains for v1 compatibility, but current write paths do not store drafts as message rows. Use `/api/v1/drafts` for drafts."
+                  "description": "Message folder to list. Drafts are separate resources, not message rows. Use `/api/v2/drafts` to list drafts."
                 },
                 {
                   "key": "mailboxId",
@@ -241,7 +241,7 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{base_url}}/api/v1/messages/:id",
+              "raw": "{{base_url}}/api/v2/messages/:id",
               "variable": [
                 {
                   "key": "id",
@@ -259,7 +259,7 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{base_url}}/api/v1/messages/:id/thread",
+              "raw": "{{base_url}}/api/v2/messages/:id/thread",
               "variable": [
                 {
                   "key": "id",
@@ -277,7 +277,7 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{base_url}}/api/v1/messages/:id/html",
+              "raw": "{{base_url}}/api/v2/messages/:id/html",
               "variable": [
                 {
                   "key": "id",
@@ -303,7 +303,7 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{base_url}}/api/v1/messages/:id/inline/:attachmentId",
+              "raw": "{{base_url}}/api/v2/messages/:id/inline/:attachmentId",
               "variable": [
                 {
                   "key": "id",
@@ -325,7 +325,7 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{base_url}}/api/v1/attachments/:id",
+              "raw": "{{base_url}}/api/v2/attachments/:id",
               "variable": [
                 {
                   "key": "id",
@@ -343,7 +343,7 @@
             "method": "POST",
             "header": [],
             "url": {
-              "raw": "{{base_url}}/api/v1/messages/:id/remote-media/trust",
+              "raw": "{{base_url}}/api/v2/messages/:id/remote-media/trust",
               "variable": [
                 {
                   "key": "id",
@@ -361,7 +361,7 @@
             "method": "POST",
             "header": [],
             "url": {
-              "raw": "{{base_url}}/api/v1/messages/:id/:action",
+              "raw": "{{base_url}}/api/v2/messages/:id/:action",
               "variable": [
                 {
                   "key": "id",
@@ -388,7 +388,7 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{base_url}}/api/v1/conversations",
+              "raw": "{{base_url}}/api/v2/conversations",
               "variable": [],
               "query": [
                 {
@@ -432,7 +432,7 @@
               }
             ],
             "url": {
-              "raw": "{{base_url}}/api/v1/conversations/:id/:action",
+              "raw": "{{base_url}}/api/v2/conversations/:id/:action",
               "variable": [
                 {
                   "key": "id",
@@ -468,7 +468,7 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{base_url}}/api/v1/drafts",
+              "raw": "{{base_url}}/api/v2/drafts",
               "variable": [],
               "query": [
                 {
@@ -500,7 +500,7 @@
               }
             ],
             "url": {
-              "raw": "{{base_url}}/api/v1/drafts",
+              "raw": "{{base_url}}/api/v2/drafts",
               "variable": []
             },
             "description": "Create a draft",
@@ -522,7 +522,7 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{base_url}}/api/v1/drafts/changes",
+              "raw": "{{base_url}}/api/v2/drafts/changes",
               "variable": [],
               "query": [
                 {
@@ -549,7 +549,7 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{base_url}}/api/v1/drafts/:id",
+              "raw": "{{base_url}}/api/v2/drafts/:id",
               "variable": [
                 {
                   "key": "id",
@@ -572,7 +572,7 @@
               }
             ],
             "url": {
-              "raw": "{{base_url}}/api/v1/drafts/:id",
+              "raw": "{{base_url}}/api/v2/drafts/:id",
               "variable": [
                 {
                   "key": "id",
@@ -599,7 +599,7 @@
             "method": "DELETE",
             "header": [],
             "url": {
-              "raw": "{{base_url}}/api/v1/drafts/:id",
+              "raw": "{{base_url}}/api/v2/drafts/:id",
               "variable": [
                 {
                   "key": "id",
@@ -617,7 +617,7 @@
             "method": "POST",
             "header": [],
             "url": {
-              "raw": "{{base_url}}/api/v1/drafts/:id/attachments",
+              "raw": "{{base_url}}/api/v2/drafts/:id/attachments",
               "variable": [
                 {
                   "key": "id",
@@ -645,7 +645,7 @@
             "method": "DELETE",
             "header": [],
             "url": {
-              "raw": "{{base_url}}/api/v1/drafts/:draftId/attachments/:id",
+              "raw": "{{base_url}}/api/v2/drafts/:draftId/attachments/:id",
               "variable": [
                 {
                   "key": "draftId",
@@ -677,7 +677,7 @@
               }
             ],
             "url": {
-              "raw": "{{base_url}}/api/v1/send",
+              "raw": "{{base_url}}/api/v2/send",
               "variable": []
             },
             "description": "Not idempotent. Do not retry blindly.",
@@ -704,7 +704,7 @@
               }
             ],
             "url": {
-              "raw": "{{base_url}}/api/v1/reply",
+              "raw": "{{base_url}}/api/v2/reply",
               "variable": []
             },
             "description": "Not idempotent. Do not retry blindly.",
@@ -731,7 +731,7 @@
               }
             ],
             "url": {
-              "raw": "{{base_url}}/api/v1/forward",
+              "raw": "{{base_url}}/api/v2/forward",
               "variable": []
             },
             "description": "Not idempotent. Do not retry blindly. Set includeOriginalAttachments to false to omit the source message's attachments.",

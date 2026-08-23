@@ -35,7 +35,8 @@ operationRoutes.get("/diagnostics", async (c) => {
       c.env.DB,
       sql`SELECT
        (SELECT COUNT(*) FROM "user" WHERE COALESCE(banned, 0) = 0) AS users,
-       (SELECT COUNT(*) FROM mailboxes WHERE is_active = 1) AS active_mailboxes,
+       (SELECT COUNT(*) FROM mailboxes WHERE is_active = 1 AND deleted_at IS NULL)
+         AS active_mailboxes,
        (SELECT COUNT(*) FROM operation_runs WHERE status = 'failed') AS failed_operations`
     ),
     getRows<{

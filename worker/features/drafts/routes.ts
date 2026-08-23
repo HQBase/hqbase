@@ -1,5 +1,5 @@
 import { type Context, Hono } from "hono";
-import { requireMailApiContext } from "../../auth/mail-api";
+import { requireMailApiPrincipal } from "../../auth/mail-api";
 import type { HonoApp } from "../../lib/env";
 import { AppError } from "../../lib/errors";
 import { readJson } from "../../lib/json";
@@ -13,8 +13,8 @@ import { draftSchema } from "./validation";
 
 export const draftRoutes = new Hono<HonoApp>();
 draftRoutes.get("/", async (c) => {
-  const auth = await requireMailApiContext(c.env, c.req.raw, "mail:send");
-  const page = await listAccessibleDraftPage(c.env, principal(auth), {
+  const auth = await requireMailApiPrincipal(c.env, c.req.raw, "mail:send");
+  const page = await listAccessibleDraftPage(c.env, draftPrincipal(auth), {
     cursor: c.req.query("cursor"),
     limit: parseDraftLimit(c.req.query("limit"), defaultDraftLimit, maxDraftLimit)
   });
@@ -25,7 +25,7 @@ draftRoutes.get("/", async (c) => {
   return response;
 });
 draftRoutes.get("/changes", async (c) => {
-  const auth = await requireMailApiContext(c.env, c.req.raw, "mail:send");
+  const auth = await requireMailApiPrincipal(c.env, c.req.raw, "mail:send");
   for (const name of ["mailboxId", "folder", "search", "updatedSince"]) {
     if (c.req.query(name) !== undefined) {
       throw new AppError(
@@ -36,77 +36,79 @@ draftRoutes.get("/changes", async (c) => {
     }
   }
   return c.json(
-    await listDraftChanges(c.env, principal(auth), {
+    await listDraftChanges(c.env, draftPrincipal(auth), {
       cursor: c.req.query("cursor"),
       limit: parseDraftLimit(c.req.query("limit"), defaultDraftChangeLimit, maxDraftChangeLimit)
     })
   );
 });
 draftRoutes.get("/:id", async (c) => {
-  const auth = await requireMailApiContext(c.env, c.req.raw, "mail:send");
-  return c.json(await getAccessibleDraft(c.env, principal(auth), c.req.param("id")));
+  const auth = await requireMailApiPrincipal(c.env, c.req.raw, "mail:send");
+  return c.json(await getAccessibleDraft(c.env, draftPrincipal(auth), c.req.param("id")));
 });
 draftRoutes.post("/", async (c) => {
-  const auth = await requireMailApiContext(c.env, c.req.raw, "mail:send");
+  const auth = await requireMailApiPrincipal(c.env, c.req.raw, "mail:send");
   const input = parseWith(draftSchema, await readJson(c.req.raw));
-  await requireDraftAccess(c.env, principal(auth), input);
-  const draft = await saveDraft(c.env.DB, auth.user.id, input);
-  scheduleDraftEvent(c, auth.user.id);
+  await requireDraftAccess(c.env, draftPrincipal(auth), input);
+  const draft = await saveDraft(c.env.DB, auth.principal.id, input);
+  scheduleDraftEvent(c, auth.principal.id);
   return c.json(draft, 201);
 });
 draftRoutes.patch("/:id", async (c) => {
-  const auth = await requireMailApiContext(c.env, c.req.raw, "mail:send");
-  await getAccessibleDraft(c.env, principal(auth), c.req.param("id"));
+  const auth = await requireMailApiPrincipal(c.env, c.req.raw, "mail:send");
+  await getAccessibleDraft(c.env, draftPrincipal(auth), c.req.param("id"));
   const input = parseWith(draftSchema, await readJson(c.req.raw));
-  await requireDraftAccess(c.env, principal(auth), input);
-  const draft = await saveDraft(c.env.DB, auth.user.id, { ...input, id: c.req.param("id") });
-  scheduleDraftEvent(c, auth.user.id);
+  await requireDraftAccess(c.env, draftPrincipal(auth), input);
+  const draft = await saveDraft(c.env.DB, auth.principal.id, { ...input, id: c.req.param("id") });
+  scheduleDraftEvent(c, auth.principal.id);
   return c.json(draft);
 });
 draftRoutes.delete("/:id", async (c) => {
-  const auth = await requireMailApiContext(c.env, c.req.raw, "mail:send");
-  await getAccessibleDraft(c.env, principal(auth), c.req.param("id"));
-  if (!(await deleteDraft(c.env.DB, c.env.MAIL_OBJECTS, auth.user.id, c.req.param("id"))))
+  const auth = await requireMailApiPrincipal(c.env, c.req.raw, "mail:send");
+  await getAccessibleDraft(c.env, draftPrincipal(auth), c.req.param("id"));
+  if (!(await deleteDraft(c.env.DB, c.env.MAIL_OBJECTS, auth.principal.id, c.req.param("id"))))
     throw new AppError("DRAFT_NOT_FOUND", "Draft not found.", 404);
-  scheduleDraftEvent(c, auth.user.id);
+  scheduleDraftEvent(c, auth.principal.id);
   return c.body(null, 204);
 });
 draftRoutes.post("/:id/attachments", async (c) => {
-  const auth = await requireMailApiContext(c.env, c.req.raw, "mail:send");
-  await getAccessibleDraft(c.env, principal(auth), c.req.param("id"));
+  const auth = await requireMailApiPrincipal(c.env, c.req.raw, "mail:send");
+  await getAccessibleDraft(c.env, draftPrincipal(auth), c.req.param("id"));
   const body = await c.req.raw.formData();
   const file = body.get("file");
   if (!(file instanceof File)) throw new AppError("FILE_REQUIRED", "Choose a file.", 400);
-  const added = await addDraftAttachment(c.env.DB, auth.user.id, c.req.param("id"), file);
+  const added = await addDraftAttachment(c.env.DB, auth.principal.id, c.req.param("id"), file);
   await c.env.MAIL_OBJECTS.put(added.r2Key, file.stream(), {
     httpMetadata: { contentType: added.attachment.contentType }
   });
-  scheduleDraftEvent(c, auth.user.id);
+  scheduleDraftEvent(c, auth.principal.id);
   return c.json(added.attachment, 201);
 });
 draftRoutes.delete("/:draftId/attachments/:id", async (c) => {
-  const auth = await requireMailApiContext(c.env, c.req.raw, "mail:send");
-  await getAccessibleDraft(c.env, principal(auth), c.req.param("draftId"));
+  const auth = await requireMailApiPrincipal(c.env, c.req.raw, "mail:send");
+  await getAccessibleDraft(c.env, draftPrincipal(auth), c.req.param("draftId"));
   if (
     !(await removeDraftAttachment(
       c.env.DB,
       c.env.MAIL_OBJECTS,
-      auth.user.id,
+      auth.principal.id,
       c.req.param("draftId"),
       c.req.param("id")
     ))
   )
     throw new AppError("ATTACHMENT_NOT_FOUND", "Attachment not found.", 404);
-  scheduleDraftEvent(c, auth.user.id);
+  scheduleDraftEvent(c, auth.principal.id);
   return c.body(null, 204);
 });
 
-function scheduleDraftEvent(c: Context<HonoApp>, userId: string): void {
-  c.executionCtx.waitUntil(ignoreMailEventFailure(publishUserMailEvent(c.env, userId, "drafts")));
+function scheduleDraftEvent(c: Context<HonoApp>, principalId: string): void {
+  c.executionCtx.waitUntil(
+    ignoreMailEventFailure(publishUserMailEvent(c.env, principalId, "drafts"))
+  );
 }
 
-function principal(auth: Awaited<ReturnType<typeof requireMailApiContext>>) {
-  return { role: auth.user.role, userId: auth.user.id };
+function draftPrincipal(auth: Awaited<ReturnType<typeof requireMailApiPrincipal>>) {
+  return { id: auth.principal.id, role: auth.principal.role };
 }
 
 function parseDraftLimit(

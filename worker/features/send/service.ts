@@ -6,8 +6,8 @@ import { drafts } from "../../db/schema";
 import type { WorkerEnv } from "../../lib/env";
 import { AppError } from "../../lib/errors";
 import { draftAttachmentObjects } from "../drafts/queries";
-import { findAddressIdentity } from "../mailboxes/address-queries";
 import { findMailboxForSending } from "../mailboxes/queries";
+import type { Mailbox } from "../mailboxes/types";
 import { ensureReplySubject } from "../messages/headers";
 import { sanitizeQuotedMessageHtml } from "../messages/html-sanitizer";
 import { isSafeInlineImage } from "../messages/inline-media";
@@ -26,9 +26,9 @@ import type { ReplyMessageInput, SendMessageInput } from "./validation";
 export async function sendNewMessage(
   env: WorkerEnv,
   input: SendMessageInput,
-  userId?: string
+  principalId?: string
 ): Promise<MessageSummary> {
-  await ensureActiveMailbox(env.DB, input.from);
+  const mailbox = await ensureActiveMailbox(env.DB, input.from);
 
   const timestamp = nowIso();
   const email = {
@@ -37,7 +37,7 @@ export async function sendNewMessage(
     subject: input.subject,
     text: input.text
   };
-  const attachments = await loadAttachments(env, input.attachmentIds, userId);
+  const attachments = await loadAttachments(env, input.attachmentIds, principalId);
   const sendResult = await env.MAIL_SENDER.send({
     ...email,
     ...(input.cc.length ? { cc: input.cc } : {}),
@@ -51,22 +51,23 @@ export async function sendNewMessage(
     ...input,
     inReplyTo: null,
     messageId: sendResult.messageId,
+    mailboxId: mailbox.id,
     references: [],
     sentAt: timestamp,
     subject: input.subject,
     threadId,
     storedAttachments: attachments,
     draftId: input.draftId ?? null,
-    userId: userId ?? null
+    principalId: principalId ?? null
   });
 }
 
 export async function replyToMessage(
   env: WorkerEnv,
   input: ReplyMessageInput,
-  userId?: string
+  principalId?: string
 ): Promise<MessageSummary> {
-  await ensureActiveMailbox(env.DB, input.from);
+  const mailbox = await ensureActiveMailbox(env.DB, input.from);
 
   const original = await getMessageDetail(env.DB, input.messageId);
   if (!original) {
@@ -78,7 +79,7 @@ export async function replyToMessage(
     (value): value is string => value !== null
   );
   const to = input.to?.length ? input.to : [original.fromAddress];
-  const attachments = await loadAttachments(env, input.attachmentIds, userId);
+  const attachments = await loadAttachments(env, input.attachmentIds, principalId);
   const quoted =
     input.html && original.htmlAvailable
       ? await loadQuotedMessageHtml(
@@ -117,16 +118,17 @@ export async function replyToMessage(
     ...(body.html ? { html: body.html } : {}),
     inReplyTo: original.messageId ?? original.id,
     messageId: sendResult.messageId,
+    mailboxId: mailbox.id,
     references,
     sentAt: timestamp,
     threadId: original.threadId,
     storedAttachments: outgoingAttachments,
     draftId: input.draftId ?? null,
-    userId: userId ?? null
+    principalId: principalId ?? null
   });
 }
 
-async function ensureActiveMailbox(db: D1Database, address: string): Promise<void> {
+async function ensureActiveMailbox(db: D1Database, address: string): Promise<Mailbox> {
   const mailbox = await findMailboxForSending(db, address);
   if (!mailbox) {
     throw new AppError("MAILBOX_NOT_FOUND", "Sending mailbox not found.", 404);
@@ -134,6 +136,7 @@ async function ensureActiveMailbox(db: D1Database, address: string): Promise<voi
   if (!mailbox.isActive) {
     throw new AppError("MAILBOX_DISABLED", "Disabled mailboxes cannot send email.", 400);
   }
+  return mailbox;
 }
 
 async function storeSentMessage(
@@ -148,19 +151,15 @@ async function storeSentMessage(
     html?: string | undefined;
     inReplyTo: string | null;
     messageId: string;
+    mailboxId: string;
     references: string[];
     sentAt: string;
     threadId: string;
     storedAttachments: StoredOutgoingAttachment[];
     draftId: string | null;
-    userId: string | null;
+    principalId: string | null;
   }
 ): Promise<MessageSummary> {
-  const mailbox = await findMailboxForSending(env.DB, input.from);
-  if (!mailbox) {
-    throw new AppError("MAILBOX_NOT_FOUND", "Sending mailbox not found.", 404);
-  }
-
   const htmlR2Key = input.html ? `sent/${input.sentAt.slice(0, 10)}/${newId("html")}.html` : null;
   if (input.html && htmlR2Key) {
     await env.MAIL_OBJECTS.put(htmlR2Key, input.html, {
@@ -169,11 +168,10 @@ async function storeSentMessage(
   }
 
   await touchThread(env.DB, input.threadId, input.sentAt);
-  const sendingIdentity = await findAddressIdentity(env.DB, input.from, "send");
   const message = await insertMessage(env.DB, {
     threadId: input.threadId,
     isUnassigned: false,
-    mailboxId: mailbox.id,
+    mailboxId: input.mailboxId,
     direction: "outbound",
     folder: "sent",
     fromAddress: input.from,
@@ -192,8 +190,7 @@ async function storeSentMessage(
     receivedAt: null,
     sentAt: input.sentAt,
     readAt: input.sentAt,
-    hasAttachments: input.storedAttachments.length > 0,
-    sentFromAddressId: sendingIdentity?.address.id ?? null
+    hasAttachments: input.storedAttachments.length > 0
   });
   for (const attachment of input.storedAttachments) {
     await insertAttachment(env.DB, {
@@ -205,10 +202,10 @@ async function storeSentMessage(
       r2Key: attachment.r2Key
     });
   }
-  if (input.draftId && input.userId) {
+  if (input.draftId && input.principalId) {
     await createDatabase(env.DB)
       .delete(drafts)
-      .where(and(eq(drafts.id, input.draftId), eq(drafts.userId, input.userId)))
+      .where(and(eq(drafts.id, input.draftId), eq(drafts.principalId, input.principalId)))
       .run();
   }
   return message;
@@ -225,12 +222,12 @@ type StoredOutgoingAttachment = StoredDraftAttachment & {
 async function loadAttachments(
   env: WorkerEnv,
   ids: string[],
-  userId?: string
+  principalId?: string
 ): Promise<StoredOutgoingAttachment[]> {
   if (ids.length === 0) return [];
-  if (!userId)
-    throw new AppError("ATTACHMENTS_FORBIDDEN", "Attachments require a user session.", 403);
-  return (await draftAttachmentObjects(env.DB, env.MAIL_OBJECTS, userId, ids)).map(
+  if (!principalId)
+    throw new AppError("ATTACHMENTS_FORBIDDEN", "Attachments require authentication.", 403);
+  return (await draftAttachmentObjects(env.DB, env.MAIL_OBJECTS, principalId, ids)).map(
     (attachment) => ({
       ...attachment,
       contentId: null,

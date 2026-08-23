@@ -13,6 +13,7 @@ const folders = [...mailFolders, draftFolder, { id: "settings", label: "Settings
 
 export const settingsTabs = [
   "mailboxes",
+  "agents",
   "users",
   "domains",
   "notifications",

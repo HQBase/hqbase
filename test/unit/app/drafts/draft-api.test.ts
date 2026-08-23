@@ -11,7 +11,7 @@ describe("draft API", () => {
       .mockResolvedValueOnce(
         Response.json([{ id: "drf_newer" }], {
           headers: {
-            link: '<https://hqbase.test/api/v1/drafts?cursor=previous>; rel=prev; title="Older, drafts", <https://hqbase.test/api/v1/drafts?limit=100&cursor=next>; type="application/json"; rel="alternate next"'
+            link: '<https://hqbase.test/api/v2/drafts?cursor=previous>; rel=prev; title="Older, drafts", <https://hqbase.test/api/v2/drafts?limit=100&cursor=next>; type="application/json"; rel="alternate next"'
           }
         })
       )
@@ -19,13 +19,13 @@ describe("draft API", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     await expect(listDrafts()).resolves.toEqual([{ id: "drf_newer" }, { id: "drf_older" }]);
-    expect(fetchMock).toHaveBeenNthCalledWith(1, "/api/v1/drafts?limit=100", {
+    expect(fetchMock).toHaveBeenNthCalledWith(1, "/api/v2/drafts?limit=100", {
       credentials: "include",
       method: "GET"
     });
     expect(fetchMock).toHaveBeenNthCalledWith(
       2,
-      "https://hqbase.test/api/v1/drafts?limit=100&cursor=next",
+      "https://hqbase.test/api/v2/drafts?limit=100&cursor=next",
       { credentials: "include", method: "GET" }
     );
   });
@@ -33,7 +33,7 @@ describe("draft API", () => {
   it("stops when a valid Link header has no next relation", async () => {
     const fetchMock = vi.fn<typeof fetch>().mockResolvedValueOnce(
       Response.json([{ id: "drf_only" }], {
-        headers: { link: "<https://hqbase.test/api/v1/drafts?cursor=previous>; rel=prev" }
+        headers: { link: "<https://hqbase.test/api/v2/drafts?cursor=previous>; rel=prev" }
       })
     );
     vi.stubGlobal("fetch", fetchMock);

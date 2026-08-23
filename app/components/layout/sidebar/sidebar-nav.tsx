@@ -59,7 +59,9 @@ export function SettingsNav({
         </span>
         {settingsTabs
           .filter((tab) => {
-            if ((tab === "domains" || tab === "updates") && !canManage) return false;
+            if ((tab === "agents" || tab === "domains" || tab === "updates") && !canManage) {
+              return false;
+            }
             return true;
           })
           .map((tab) => {

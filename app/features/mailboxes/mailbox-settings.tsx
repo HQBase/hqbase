@@ -1,5 +1,5 @@
 import * as React from "react";
-import { PiPlus } from "react-icons/pi";
+import { PiArrowCounterClockwise, PiPlus } from "react-icons/pi";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -27,9 +27,8 @@ import { useMailboxAccessPolicies } from "@/features/mailbox-access/mailbox-acce
 import { MailboxAccessPolicyDialog } from "@/features/mailbox-access/mailbox-access-policy";
 import { SettingsSection } from "@/features/settings/settings-section";
 import type { WorkspaceUser } from "@/features/users/types";
-import { addMailboxAddress, createMailbox, removeMailboxAddress, updateMailbox } from "./api";
+import { createMailbox, deleteMailbox, restoreMailbox, updateMailbox } from "./api";
 import { DefaultFromMailboxControl } from "./default-from-mailbox-control";
-import { MailboxAliasDialog } from "./mailbox-alias-dialog";
 import { MailboxDetailsSheet } from "./mailbox-details-sheet";
 import { mailboxDomains, mailboxMatchesDomain } from "./mailbox-filtering";
 import { MailboxSelectionBar, MailboxTable } from "./mailbox-table";
@@ -38,6 +37,7 @@ import type { Mailbox } from "./types";
 type MailboxSettingsProps = {
   canManage: boolean;
   defaultFromMailboxId: string | null;
+  deletedMailboxes: Mailbox[];
   mailboxes: Mailbox[];
   users: WorkspaceUser[];
   onDefaultFromMailboxChange: (mailboxId: string) => void;
@@ -47,6 +47,7 @@ type MailboxSettingsProps = {
 export function MailboxSettings({
   canManage,
   defaultFromMailboxId,
+  deletedMailboxes,
   mailboxes,
   users,
   onDefaultFromMailboxChange,
@@ -55,14 +56,13 @@ export function MailboxSettings({
   const [address, setAddress] = React.useState("");
   const [displayName, setDisplayName] = React.useState("");
   const [createOpen, setCreateOpen] = React.useState(false);
-  const [aliasMailbox, setAliasMailbox] = React.useState<Mailbox | null>(null);
+  const [deleteConfirmation, setDeleteConfirmation] = React.useState<Mailbox | null>(null);
   const [detailsMailboxId, setDetailsMailboxId] = React.useState<string | null>(null);
   const [accessMailboxId, setAccessMailboxId] = React.useState<string | null>(null);
   const [bulkAccessOpen, setBulkAccessOpen] = React.useState(false);
   const [domainFilter, setDomainFilter] = React.useState("all");
   const [selectedMailboxIds, setSelectedMailboxIds] = React.useState<string[]>([]);
-  const [aliasAddress, setAliasAddress] = React.useState("");
-  const [pendingAction, setPendingAction] = React.useState<"mailbox" | "alias" | null>(null);
+  const [createPending, setCreatePending] = React.useState(false);
   const [pendingMailboxId, setPendingMailboxId] = React.useState<string | null>(null);
   const accessPolicies = useMailboxAccessPolicies(canManage);
   const domains = mailboxDomains(mailboxes);
@@ -78,7 +78,7 @@ export function MailboxSettings({
 
   async function handleCreate(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setPendingAction("mailbox");
+    setCreatePending(true);
     try {
       await createMailbox({ address, displayName });
       setAddress("");
@@ -89,7 +89,7 @@ export function MailboxSettings({
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Mailbox creation failed.");
     } finally {
-      setPendingAction(null);
+      setCreatePending(false);
     }
   }
 
@@ -106,32 +106,31 @@ export function MailboxSettings({
     }
   }
 
-  async function handleAlias(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!aliasMailbox) return;
-    setPendingAction("alias");
+  async function handleDelete(): Promise<void> {
+    if (!deleteConfirmation) return;
+    setPendingMailboxId(deleteConfirmation.id);
     try {
-      await addMailboxAddress(aliasMailbox.id, {
-        address: aliasAddress,
-        displayName: aliasMailbox.displayName
-      });
-      setAliasAddress("");
-      setAliasMailbox(null);
-      toast.success("Email address added.");
+      await deleteMailbox(deleteConfirmation.id);
+      toast.success(`${deleteConfirmation.address} deleted. Mail history was kept.`);
+      setDeleteConfirmation(null);
       await onChanged();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Address creation failed.");
+      toast.error(error instanceof Error ? error.message : "Mailbox could not be deleted.");
     } finally {
-      setPendingAction(null);
+      setPendingMailboxId(null);
     }
   }
 
-  async function handleRemoveAlias(mailbox: Mailbox, addressId: string) {
+  async function handleRestore(mailbox: Mailbox): Promise<void> {
+    setPendingMailboxId(mailbox.id);
     try {
-      await removeMailboxAddress(mailbox.id, addressId);
+      await restoreMailbox(mailbox.id);
+      toast.success(`${mailbox.address} restored.`);
       await onChanged();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Address could not be removed.");
+      toast.error(error instanceof Error ? error.message : "Mailbox could not be restored.");
+    } finally {
+      setPendingMailboxId(null);
     }
   }
 
@@ -181,8 +180,8 @@ export function MailboxSettings({
                       Cancel
                     </Button>
                   </DialogClose>
-                  <Button disabled={pendingAction !== null} type="submit">
-                    {pendingAction === "mailbox" ? "Adding mailbox…" : "Add mailbox"}
+                  <Button disabled={createPending} type="submit">
+                    {createPending ? "Adding mailbox…" : "Add mailbox"}
                   </Button>
                 </DialogFooter>
               </form>
@@ -190,7 +189,7 @@ export function MailboxSettings({
           </Dialog>
         ) : null
       }
-      description="Shared addresses across your connected domains"
+      description="Shared mailboxes across your connected domains"
       title="Mailboxes"
     >
       <DefaultFromMailboxControl
@@ -242,14 +241,49 @@ export function MailboxSettings({
         onToggle={(mailbox, isActive) => void handleToggle(mailbox, isActive)}
       />
 
+      {canManage && deletedMailboxes.length > 0 ? (
+        <section className="space-y-3" aria-labelledby="deleted-mailboxes-heading">
+          <div>
+            <h3 className="font-medium" id="deleted-mailboxes-heading">
+              Deleted mailboxes
+            </h3>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Mail is kept until you restore the mailbox.
+            </p>
+          </div>
+          <div className="divide-y rounded-lg border">
+            {deletedMailboxes.map((mailbox) => (
+              <div className="flex items-center justify-between gap-4 px-3 py-3" key={mailbox.id}>
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium">{mailbox.address}</p>
+                  <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                    {mailbox.displayName}
+                  </p>
+                </div>
+                <Button
+                  disabled={pendingMailboxId !== null}
+                  size="sm"
+                  type="button"
+                  variant="outline"
+                  onClick={() => void handleRestore(mailbox)}
+                >
+                  <PiArrowCounterClockwise data-icon="inline-start" />
+                  {pendingMailboxId === mailbox.id ? "Restoring…" : "Restore"}
+                </Button>
+              </div>
+            ))}
+          </div>
+        </section>
+      ) : null}
+
       <MailboxDetailsSheet
         canManage={canManage}
         mailbox={detailsMailbox}
         policies={accessPolicies}
         users={users}
-        onAddAddress={(mailbox) => {
+        onDelete={(mailbox) => {
           setDetailsMailboxId(null);
-          setAliasMailbox(mailbox);
+          setDeleteConfirmation(mailbox);
         }}
         onManageAccess={(mailbox) => {
           setDetailsMailboxId(null);
@@ -258,20 +292,38 @@ export function MailboxSettings({
         onOpenChange={(open) => {
           if (!open) setDetailsMailboxId(null);
         }}
-        onRemoveAddress={(mailbox, addressId) => void handleRemoveAlias(mailbox, addressId)}
       />
 
-      <MailboxAliasDialog
-        address={aliasAddress}
-        mailbox={aliasMailbox}
-        pending={pendingAction === "alias"}
-        onAddressChange={setAliasAddress}
-        onClose={() => {
-          setAliasMailbox(null);
-          setAliasAddress("");
-        }}
-        onSubmit={(event) => void handleAlias(event)}
-      />
+      <Dialog
+        open={deleteConfirmation !== null}
+        onOpenChange={(open) => !open && setDeleteConfirmation(null)}
+      >
+        <DialogContent className="w-[min(92vw,480px)]">
+          <DialogHeader>
+            <DialogTitle>Delete mailbox?</DialogTitle>
+            <DialogDescription>
+              {deleteConfirmation?.address} will leave the inbox and stop receiving and sending. Its
+              mail stays stored. Linked agents will be disabled and their credentials will stop
+              working.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <DialogClose asChild>
+              <Button type="button" variant="outline">
+                Cancel
+              </Button>
+            </DialogClose>
+            <Button
+              disabled={pendingMailboxId !== null}
+              type="button"
+              variant="destructive"
+              onClick={() => void handleDelete()}
+            >
+              {pendingMailboxId === deleteConfirmation?.id ? "Deleting…" : "Delete mailbox"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <MailboxAccessPolicyDialog
         mailbox={accessMailbox}

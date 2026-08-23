@@ -3,9 +3,12 @@ import { cloudflareTest, readD1Migrations } from "@cloudflare/vitest-pool-worker
 import { defineConfig } from "vitest/config";
 
 export default defineConfig(async () => {
-  const migrations = await readD1Migrations(
-    fileURLToPath(new URL("./migrations", import.meta.url))
-  );
+  const migrations = [
+    ...(await readD1Migrations(fileURLToPath(new URL("./migrations", import.meta.url)))),
+    ...(await readD1Migrations(
+      fileURLToPath(new URL("./migrations-after-deploy", import.meta.url))
+    ))
+  ];
 
   return {
     plugins: [

@@ -13,7 +13,7 @@ describe("device authorization review", () => {
         onAllow={() => undefined}
         onDeny={() => undefined}
         pending={null}
-        resource="https://mail.example.com/api/v1"
+        resource="https://mail.example.com/api/v2"
         scopes={["mail:read", "mail:send"]}
         userCode="ABCD-EFGH"
         verified
@@ -23,7 +23,7 @@ describe("device authorization review", () => {
     expect(html).toContain("Connect Mailbox Agent");
     expect(html).toContain("ABCD-EFGH");
     expect(html).toContain("owner@example.com");
-    expect(html).toContain("https://mail.example.com/api/v1");
+    expect(html).toContain("https://mail.example.com/api/v2");
     expect(html).toContain("Read allowed mailboxes");
     expect(html).toContain("Manage drafts and attachments");
     expect(html).toContain(">Deny<");

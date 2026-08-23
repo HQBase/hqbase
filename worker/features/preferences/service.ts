@@ -1,7 +1,7 @@
 import { requireMailboxAccess } from "../../auth/mailbox-access";
 import { AppError } from "../../lib/errors";
 import type { WorkspaceRole } from "../../lib/validation";
-import { findMailboxById } from "../mailboxes/queries";
+import { findMailboxById, findMailboxForSending } from "../mailboxes/queries";
 import { setDefaultFromMailboxId } from "./queries";
 
 export async function updateDefaultFromMailbox(
@@ -14,13 +14,11 @@ export async function updateDefaultFromMailbox(
 ): Promise<void> {
   await requireMailboxAccess(db, input.userId, input.role, input.mailboxId, "agent");
   const mailbox = await findMailboxById(db, input.mailboxId);
-  const primaryCanSend =
-    mailbox?.addresses.length === 0 ||
-    mailbox?.addresses.some((address) => address.isPrimary && address.sendEnabled);
-  if (!mailbox?.isActive || !primaryCanSend) {
+  const sendable = mailbox ? await findMailboxForSending(db, mailbox.address) : null;
+  if (!mailbox?.isActive || mailbox.deletedAt || !sendable) {
     throw new AppError(
       "MAILBOX_NOT_SENDABLE",
-      "Choose an active mailbox with a send-enabled primary address.",
+      "Choose an active mailbox on a domain that can send email.",
       400
     );
   }

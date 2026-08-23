@@ -1,13 +1,12 @@
 import { env, runDurableObjectAlarm, runInDurableObject, SELF } from "cloudflare:test";
 import { beforeAll, describe, expect, it, vi } from "vitest";
-import mailApiOpenApi from "../../../api/hqbase-mail-api-v1.openapi.json";
 import { createAuth } from "../../../worker/auth/auth";
 import { mailEventInternalHeaders } from "../../../worker/features/events/durable-object";
 import { applyCurrentMigrations } from "./current-migrations";
 import { tokenRow } from "./mail-api-token-fixture";
 
 const origin = "https://hqbase.test";
-const apiResource = `${origin}/api/v1`;
+const apiResource = `${origin}/api/v2`;
 const readToken = "hqb_access_mail-api-read-token";
 const writeToken = "hqb_access_mail-api-write-token";
 const fullToken = "hqb_access_mail-api-full-token";
@@ -17,7 +16,7 @@ const scopes = ["mail:read", "mail:write", "mail:send"];
 let cookie = "";
 let userId = "";
 
-describe("HQBase Mail API v1", () => {
+describe("HQBase Mail API v2", () => {
   beforeAll(async () => {
     await applyCurrentMigrations();
 
@@ -110,24 +109,18 @@ describe("HQBase Mail API v1", () => {
 
     await env.DB.batch([
       env.DB.prepare(
-        `INSERT INTO mailboxes (id, address, display_name, is_active, created_at, updated_at)
-         VALUES ('mbx_api', 'support@example.com', 'Support', 1, ?, ?)`
-      ).bind(now.toISOString(), now.toISOString()),
-      env.DB.prepare(
         `INSERT INTO mail_domains
          (id, name, receiving_status, sending_status, dns_status, is_enabled, created_at, updated_at)
          VALUES ('dom_api', 'example.com', 'ready', 'ready', 'ready', 1, ?, ?)`
       ).bind(now.toISOString(), now.toISOString()),
       env.DB.prepare(
-        `INSERT INTO mailbox_addresses
-         (id, mailbox_id, mail_domain_id, local_part, address, display_name,
-          receive_enabled, send_enabled, is_primary, created_at, updated_at)
-         VALUES ('addr_api', 'mbx_api', 'dom_api', 'support', 'support@example.com', 'Support',
-                 1, 1, 1, ?, ?)`
+        `INSERT INTO mailboxes
+         (id, address, mail_domain_id, display_name, is_active, created_at, updated_at)
+         VALUES ('mbx_api', 'support@example.com', 'dom_api', 'Support', 1, ?, ?)`
       ).bind(now.toISOString(), now.toISOString()),
       env.DB.prepare(
         `INSERT INTO mailbox_grants
-         (mailbox_id, user_id, access_level, created_by, created_at, updated_at)
+         (mailbox_id, principal_id, access_level, created_by_principal_id, created_at, updated_at)
          VALUES ('mbx_api', ?, 'agent', ?, ?, ?)`
       ).bind(userId, userId, now.toISOString(), now.toISOString()),
       env.DB.prepare(
@@ -234,7 +227,7 @@ describe("HQBase Mail API v1", () => {
   });
 
   it("publishes protected-resource metadata and a scoped authentication challenge", async () => {
-    const metadata = await SELF.fetch(`${origin}/.well-known/oauth-protected-resource/api/v1`);
+    const metadata = await SELF.fetch(`${origin}/.well-known/oauth-protected-resource/api/v2`);
     expect(metadata.status).toBe(200);
     await expect(metadata.json()).resolves.toMatchObject({
       resource: apiResource,
@@ -244,85 +237,156 @@ describe("HQBase Mail API v1", () => {
       resource_documentation: `${origin}/skills/hqbase-mail/SKILL.md`
     });
 
-    const rejected = await SELF.fetch(`${origin}/api/v1/messages`);
+    const retiredMetadata = await SELF.fetch(
+      `${origin}/.well-known/oauth-protected-resource/api/v1`
+    );
+    expect(retiredMetadata.status).toBe(404);
+    await expect(retiredMetadata.json()).resolves.toEqual({
+      error: { code: "NOT_FOUND", message: "Mail API v1 is no longer available." }
+    });
+
+    const rejected = await SELF.fetch(`${origin}/api/v2/messages`);
     expect(rejected.status).toBe(401);
     expect(rejected.headers.get("www-authenticate")).toContain(
-      `resource_metadata="${origin}/.well-known/oauth-protected-resource/api/v1"`
+      `resource_metadata="${origin}/.well-known/oauth-protected-resource/api/v2"`
     );
     expect(rejected.headers.get("www-authenticate")).toContain('scope="mail:read"');
     expect(rejected.headers.get("x-request-id")).toBeTruthy();
   });
 
-  it("publishes an instance-adjusted Agent Skill and OpenAPI discovery", async () => {
-    const skill = await SELF.fetch(`${origin}/skills/hqbase-mail/SKILL.md`);
-    expect(skill.status).toBe(200);
-    expect(skill.headers.get("content-type")).toContain("text/markdown");
-    expect(skill.headers.get("access-control-allow-origin")).toBe("*");
-    const instructions = await skill.text();
-    expect(instructions).toMatch(
-      /^---\nname: hqbase-mail\ndescription: [^\n]+\n---\n\n# HQBase Mail/
+  it("publishes separate connection skills, OpenAPI, and retirement notices", async () => {
+    const humanSkill = await SELF.fetch(`${origin}/skills/hqbase-mail/SKILL.md`);
+    expect(humanSkill.status).toBe(200);
+    expect(humanSkill.headers.get("content-type")).toContain("text/markdown");
+    expect(humanSkill.headers.get("access-control-allow-origin")).toBe("*");
+    const humanInstructions = await humanSkill.text();
+    expect(humanInstructions).toMatch(
+      /^---\nname: hqbase-mail\ndescription: [^\n]+\n---\n\n# HQBase Mail for Your Account/
     );
-    expect(instructions).toContain(`- Instance origin: ${origin}`);
-    expect(instructions).toContain(`- API base URL: ${apiResource}`);
-    expect(instructions).toContain(`- OpenAPI contract: ${origin}/api/v1/openapi.json`);
-    expect(instructions).toContain(`resource=${apiResource}`);
-    expect(instructions).toContain("urn:ietf:params:oauth:grant-type:device_code");
-    expect(instructions).toContain("verification_uri_complete");
-    expect(instructions).toContain("authorization_pending");
-    expect(instructions).toContain("Prefer Device Authorization");
-    expect(instructions).toContain(
+    expect(humanInstructions).toContain(`- Instance origin: ${origin}`);
+    expect(humanInstructions).toContain(`- API base URL: ${apiResource}`);
+    expect(humanInstructions).toContain(`- OpenAPI contract: ${origin}/api/v2/openapi.json`);
+    expect(humanInstructions).toContain(`resource=${apiResource}`);
+    expect(humanInstructions).toContain("urn:ietf:params:oauth:grant-type:device_code");
+    expect(humanInstructions).toContain("verification_uri_complete");
+    expect(humanInstructions).toContain("authorization_pending");
+    expect(humanInstructions).toContain("Prefer Device Authorization");
+    expect(humanInstructions).toContain(
       "Do not open, navigate to, or interact with the verification URL in Cloud Browser"
     );
-    expect(instructions).toContain("The person must open it themselves in a browser they control");
-    expect(instructions).toContain("Sending, replying, and forwarding are not idempotent");
-    expect(instructions).toContain(
-      "get a checkpoint from `GET https://hqbase.test/api/v1/changes`"
+    expect(humanInstructions).toContain(
+      "The person must open it themselves in a browser they control"
     );
-    expect(instructions).toContain("List mailboxes before each change cycle");
-    expect(instructions).toContain("`application_type` set to `native`");
-    expect(instructions).toContain("RFC 8252");
-    expect(instructions).toContain("app-claimed HTTPS, loopback HTTP, and private-use schemes");
-    for (const [path, pathItem] of Object.entries(mailApiOpenApi.paths)) {
-      for (const method of ["get", "post", "patch", "delete"] as const) {
-        if (method in pathItem) {
-          expect(instructions).toContain(`\`${method.toUpperCase()} ${path}\``);
-        }
-      }
+    expect(humanInstructions).toContain("Sending, replying, and forwarding are not idempotent");
+    expect(humanInstructions).toContain(
+      "get a checkpoint from `GET https://hqbase.test/api/v2/changes`"
+    );
+    expect(humanInstructions).not.toContain("credentials currently start with `hqb_agent_`");
+
+    const mailboxSkill = await SELF.fetch(`${origin}/skills/hqbase-mailbox/SKILL.md`);
+    expect(mailboxSkill.status).toBe(200);
+    const mailboxInstructions = await mailboxSkill.text();
+    expect(mailboxInstructions).toMatch(
+      /^---\nname: hqbase-mailbox\ndescription: [^\n]+\n---\n\n# HQBase Mailbox Agent/
+    );
+    expect(mailboxInstructions).toContain(`- API base URL: ${apiResource}`);
+    expect(mailboxInstructions).toContain("credentials currently start with `hqb_agent_`");
+    expect(mailboxInstructions).toContain("only with the Mail API");
+    expect(mailboxInstructions).not.toContain("device_authorization_endpoint");
+
+    const provisionerSkill = await SELF.fetch(`${origin}/skills/hqbase-provisioner/SKILL.md`);
+    expect(provisionerSkill.status).toBe(200);
+    const provisionerInstructions = await provisionerSkill.text();
+    expect(provisionerInstructions).toMatch(
+      /^---\nname: hqbase-provisioner\ndescription: [^\n]+\n---\n\n# HQBase Provisioner/
+    );
+    expect(provisionerInstructions).toContain(`- Management API base URL: ${origin}/management/v1`);
+    expect(provisionerInstructions).toContain(
+      `- Child mailbox skill: ${origin}/skills/hqbase-mailbox/SKILL.md`
+    );
+    expect(provisionerInstructions).toContain(
+      `POST ${origin}/management/v1/agents/{agent-id}/credential`
+    );
+    expect(provisionerInstructions).toContain(`DELETE ${origin}/management/v1/agents/{agent-id}`);
+    expect(provisionerInstructions).toContain("cannot read or send mail");
+    expect(provisionerInstructions).not.toContain("device_authorization_endpoint");
+
+    for (const instructions of [humanInstructions, mailboxInstructions]) {
+      expect(instructions).toContain("Sending, replying, and forwarding are not idempotent");
+      expect(instructions).toContain(
+        "get a checkpoint from `GET https://hqbase.test/api/v2/changes`"
+      );
+      expect(instructions).toContain("List mailboxes before each change cycle");
     }
 
-    const openApi = await SELF.fetch(`${origin}/api/v1/openapi.json`);
+    const openApi = await SELF.fetch(`${origin}/api/v2/openapi.json`);
     expect(openApi.status).toBe(200);
     expect(openApi.headers.get("content-type")).toContain("application/json");
     const document = (await openApi.json()) as {
+      components: {
+        securitySchemes: {
+          agentBearer: { bearerFormat: string; scheme: string; type: string };
+        };
+      };
       externalDocs: { url: string };
+      paths: Record<
+        string,
+        {
+          get?: {
+            security?: Array<Record<string, string[]>>;
+            "x-hqbase-agent-capabilities"?: string[];
+          };
+          post?: { security?: Array<Record<string, string[]>> };
+        }
+      >;
       servers: Array<{ url: string }>;
     };
     expect(document.servers).toEqual([{ url: origin, description: "This HQBase installation" }]);
     expect(document.externalDocs.url).toBe(`${origin}/skills/hqbase-mail/SKILL.md`);
-
-    const head = await SELF.fetch(`${origin}/skills/hqbase-mail/SKILL.md`, { method: "HEAD" });
-    expect(head.status).toBe(200);
-    expect(await head.text()).toBe("");
-
-    const rejectedMethod = await SELF.fetch(`${origin}/skills/hqbase-mail/SKILL.md`, {
-      method: "POST"
+    expect(document.components.securitySchemes.agentBearer).toMatchObject({
+      type: "http",
+      scheme: "bearer",
+      bearerFormat: "hqb_agent_<secret>"
     });
-    expect(rejectedMethod.status).toBe(405);
-    expect(rejectedMethod.headers.get("allow")).toBe("GET, HEAD");
+    expect(document.paths["/api/v2/messages"]?.get?.security).toContainEqual({ agentBearer: [] });
+    expect(document.paths["/api/v2/messages"]?.get).toMatchObject({
+      "x-hqbase-agent-capabilities": ["mail:read"]
+    });
+    expect(
+      document.paths["/api/v2/messages/{id}/remote-media/trust"]?.post?.security
+    ).not.toContainEqual({ agentBearer: [] });
 
-    for (const legacyPath of ["/AGENTS.md", "/agents.md"]) {
-      const redirect = await SELF.fetch(`${origin}${legacyPath}`, { redirect: "manual" });
-      expect(redirect.status).toBe(308);
-      expect(redirect.headers.get("location")).toBe(`${origin}/skills/hqbase-mail/SKILL.md`);
+    for (const skillPath of [
+      "/skills/hqbase-mail/SKILL.md",
+      "/skills/hqbase-mailbox/SKILL.md",
+      "/skills/hqbase-provisioner/SKILL.md"
+    ]) {
+      const head = await SELF.fetch(`${origin}${skillPath}`, { method: "HEAD" });
+      expect(head.status).toBe(200);
+      expect(await head.text()).toBe("");
+
+      const rejectedMethod = await SELF.fetch(`${origin}${skillPath}`, { method: "POST" });
+      expect(rejectedMethod.status).toBe(405);
+      expect(rejectedMethod.headers.get("allow")).toBe("GET, HEAD");
+    }
+
+    for (const retiredPath of ["/AGENTS.md", "/agents.md"]) {
+      const retired = await SELF.fetch(`${origin}${retiredPath}`, { redirect: "manual" });
+      expect(retired.status).toBe(200);
+      expect(retired.headers.get("location")).toBeNull();
+      expect(await retired.text()).toContain("Open **Settings → Connect AI agents** in HQBase");
     }
   });
 
-  it("accepts the web session on v1 while legacy mail routes remain cookie-only", async () => {
-    const versioned = await SELF.fetch(`${origin}/api/v1/mailboxes`, { headers: { cookie } });
+  it("accepts the web session on v2 while v1 is absent and legacy routes remain cookie-only", async () => {
+    const versioned = await SELF.fetch(`${origin}/api/v2/mailboxes`, { headers: { cookie } });
     expect(versioned.status, await versioned.clone().text()).toBe(200);
     await expect(versioned.json()).resolves.toMatchObject([
       { id: "mbx_api", accessLevel: "agent" }
     ]);
+
+    const retiredV1 = await SELF.fetch(`${origin}/api/v1/mailboxes`, { headers: { cookie } });
+    expect(retiredV1.status).toBe(404);
 
     const legacyCookie = await SELF.fetch(`${origin}/api/messages`, { headers: { cookie } });
     expect(legacyCookie.status).toBe(200);
@@ -331,17 +395,17 @@ describe("HQBase Mail API v1", () => {
   });
 
   it("opens an access-scoped wake-only WebSocket", async () => {
-    const missingUpgrade = await apiFetch("/api/v1/events", readToken);
+    const missingUpgrade = await apiFetch("/api/v2/events", readToken);
     expect(missingUpgrade.status).toBe(426);
     expect(missingUpgrade.headers.get("upgrade")).toBe("websocket");
 
-    const insufficientScope = await apiFetch("/api/v1/events", writeToken, {
+    const insufficientScope = await apiFetch("/api/v2/events", writeToken, {
       headers: { upgrade: "websocket" }
     });
     expect(insufficientScope.status).toBe(403);
     expect(insufficientScope.headers.get("www-authenticate")).toContain('scope="mail:read"');
 
-    const invalidOrigin = await SELF.fetch(`${origin}/api/v1/events`, {
+    const invalidOrigin = await SELF.fetch(`${origin}/api/v2/events`, {
       headers: { cookie, origin: "https://other.example", upgrade: "websocket" }
     });
     expect(invalidOrigin.status).toBe(403);
@@ -349,7 +413,7 @@ describe("HQBase Mail API v1", () => {
       error: { code: "ORIGIN_FORBIDDEN" }
     });
 
-    const missingOrigin = await SELF.fetch(`${origin}/api/v1/events`, {
+    const missingOrigin = await SELF.fetch(`${origin}/api/v2/events`, {
       headers: { cookie, upgrade: "websocket" }
     });
     expect(missingOrigin.status).toBe(403);
@@ -413,7 +477,7 @@ describe("HQBase Mail API v1", () => {
       const closingReadyState = closingSocket.readyState;
 
       const response = await instance.fetch(
-        new Request(`${origin}/api/v1/events`, {
+        new Request(`${origin}/api/v2/events`, {
           headers: {
             [mailEventInternalHeaders.requestId]: "request_reconnect_test",
             [mailEventInternalHeaders.topics]: "messages,mailboxes",
@@ -473,23 +537,23 @@ describe("HQBase Mail API v1", () => {
   });
 
   it("reads mail with an audience-bound bearer token without exposing storage keys", async () => {
-    const list = await apiFetch("/api/v1/messages", readToken);
+    const list = await apiFetch("/api/v2/messages", readToken);
     expect(list.status, await list.clone().text()).toBe(200);
     await expect(list.json()).resolves.toMatchObject([{ id: "msg_api" }]);
 
-    const detail = await apiFetch("/api/v1/messages/msg_api", readToken);
+    const detail = await apiFetch("/api/v2/messages/msg_api", readToken);
     expect(detail.status).toBe(200);
     const payload = (await detail.json()) as { attachments: Array<Record<string, unknown>> };
     expect(payload.attachments[0]).toMatchObject({ id: "att_api", filename: "hello.txt" });
     expect(payload.attachments[0]).not.toHaveProperty("r2Key");
 
-    const attachment = await apiFetch("/api/v1/attachments/att_api", readToken);
+    const attachment = await apiFetch("/api/v2/attachments/att_api", readToken);
     expect(attachment.status).toBe(200);
     expect(await attachment.text()).toBe("hello");
   });
 
   it("returns visible content before and after separately classified reply history", async () => {
-    const response = await apiFetch("/api/v1/messages/msg_api/html", readToken);
+    const response = await apiFetch("/api/v2/messages/msg_api/html", readToken);
     expect(response.status, await response.clone().text()).toBe(200);
     const payload = (await response.json()) as {
       afterQuotedHtml: string | null;
@@ -511,7 +575,7 @@ describe("HQBase Mail API v1", () => {
       upgrade: "websocket"
     });
     const changed = nextSocketFrame(socket);
-    const archived = await apiFetch("/api/v1/messages/msg_api/archive", writeToken, {
+    const archived = await apiFetch("/api/v2/messages/msg_api/archive", writeToken, {
       method: "POST"
     });
     expect(archived.status, await archived.clone().text()).toBe(200);
@@ -519,7 +583,7 @@ describe("HQBase Mail API v1", () => {
     await expect(changed).resolves.toEqual({ type: "changed", topic: "messages" });
     await closeEventSocket(socket);
 
-    const unarchived = await apiFetch("/api/v1/messages/msg_api/unarchive", writeToken, {
+    const unarchived = await apiFetch("/api/v2/messages/msg_api/unarchive", writeToken, {
       method: "POST"
     });
     expect(unarchived.status, await unarchived.clone().text()).toBe(200);
@@ -528,13 +592,13 @@ describe("HQBase Mail API v1", () => {
       env.DB.prepare("SELECT archived_at, trashed_at FROM messages WHERE id = 'msg_api'").first()
     ).resolves.toEqual({ archived_at: null, trashed_at: null });
 
-    const trashed = await apiFetch("/api/v1/messages/msg_api/trash", writeToken, {
+    const trashed = await apiFetch("/api/v2/messages/msg_api/trash", writeToken, {
       method: "POST"
     });
     expect(trashed.status, await trashed.clone().text()).toBe(200);
     await expect(trashed.json()).resolves.toMatchObject({ folder: "trash" });
 
-    const restored = await apiFetch("/api/v1/messages/msg_api/restore", writeToken, {
+    const restored = await apiFetch("/api/v2/messages/msg_api/restore", writeToken, {
       method: "POST"
     });
     expect(restored.status, await restored.clone().text()).toBe(200);
@@ -545,7 +609,7 @@ describe("HQBase Mail API v1", () => {
   });
 
   it("keeps a draft attachment's multipart MIME type", async () => {
-    const created = await apiFetch("/api/v1/drafts", fullToken, {
+    const created = await apiFetch("/api/v2/drafts", fullToken, {
       body: JSON.stringify({ mailboxId: "mbx_api", from: "support@example.com" }),
       headers: { "content-type": "application/json" },
       method: "POST"
@@ -560,7 +624,7 @@ describe("HQBase Mail API v1", () => {
       })
     );
 
-    const uploaded = await apiFetch(`/api/v1/drafts/${draft.id}/attachments`, fullToken, {
+    const uploaded = await apiFetch(`/api/v2/drafts/${draft.id}/attachments`, fullToken, {
       body: form,
       method: "POST"
     });
@@ -571,14 +635,14 @@ describe("HQBase Mail API v1", () => {
       sizeBytes: 4
     });
 
-    const stored = await apiFetch(`/api/v1/drafts/${draft.id}`, fullToken);
+    const stored = await apiFetch(`/api/v2/drafts/${draft.id}`, fullToken);
     await expect(stored.json()).resolves.toMatchObject({
       attachments: [{ contentType: "image/png", filename: "pixel.png", sizeBytes: 4 }]
     });
   });
 
   it("forwards an accessible message with its original attachments", async () => {
-    const response = await apiFetch("/api/v1/forward", fullToken, {
+    const response = await apiFetch("/api/v2/forward", fullToken, {
       body: JSON.stringify({
         messageId: "msg_api",
         from: "support@example.com",
@@ -591,7 +655,7 @@ describe("HQBase Mail API v1", () => {
     });
     expect(response.status, await response.clone().text()).toBe(201);
     const forwarded = (await response.json()) as { id: string };
-    const detail = await apiFetch(`/api/v1/messages/${forwarded.id}`, readToken);
+    const detail = await apiFetch(`/api/v2/messages/${forwarded.id}`, readToken);
     await expect(detail.json()).resolves.toMatchObject({
       attachments: [{ contentType: "text/plain", filename: "hello.txt", sizeBytes: 5 }],
       folder: "sent",
@@ -601,7 +665,7 @@ describe("HQBase Mail API v1", () => {
   });
 
   it("sends a web forward draft with its original attachments", async () => {
-    const created = await apiFetch("/api/v1/drafts", fullToken, {
+    const created = await apiFetch("/api/v2/drafts", fullToken, {
       body: JSON.stringify({
         mailboxId: "mbx_api",
         forwardOfMessageId: "msg_api",
@@ -617,7 +681,7 @@ describe("HQBase Mail API v1", () => {
     expect(created.status, await created.clone().text()).toBe(201);
     const draft = (await created.json()) as { id: string };
 
-    const response = await apiFetch("/api/v1/send", fullToken, {
+    const response = await apiFetch("/api/v2/send", fullToken, {
       body: JSON.stringify({
         from: "support@example.com",
         to: ["person@example.net"],
@@ -631,14 +695,14 @@ describe("HQBase Mail API v1", () => {
     });
     expect(response.status, await response.clone().text()).toBe(201);
     const forwarded = (await response.json()) as { id: string };
-    const detail = await apiFetch(`/api/v1/messages/${forwarded.id}`, readToken);
+    const detail = await apiFetch(`/api/v2/messages/${forwarded.id}`, readToken);
     await expect(detail.json()).resolves.toMatchObject({
       attachments: [{ contentType: "text/plain", filename: "hello.txt", sizeBytes: 5 }],
       folder: "sent",
       hasAttachments: true,
       subject: "Fwd: API message"
     });
-    const deletedDraft = await apiFetch(`/api/v1/drafts/${draft.id}`, fullToken);
+    const deletedDraft = await apiFetch(`/api/v2/drafts/${draft.id}`, fullToken);
     expect(deletedDraft.status).toBe(404);
   });
 
@@ -646,23 +710,23 @@ describe("HQBase Mail API v1", () => {
     try {
       for (const role of ["member", "admin"] as const) {
         await setUserRole(role);
-        const list = await apiFetch("/api/v1/messages?folder=catchall", readToken);
+        const list = await apiFetch("/api/v2/messages?folder=catchall", readToken);
         await expect(list.json()).resolves.toEqual([]);
         await expect(
-          apiFetch("/api/v1/messages/msg_api_unassigned", readToken)
+          apiFetch("/api/v2/messages/msg_api_unassigned", readToken)
         ).resolves.toMatchObject({ status: 403 });
       }
 
       await setUserRole("owner");
-      const list = await apiFetch("/api/v1/messages?folder=catchall", readToken);
+      const list = await apiFetch("/api/v2/messages?folder=catchall", readToken);
       await expect(list.json()).resolves.toMatchObject([{ id: "msg_api_unassigned" }]);
       await expect(
-        apiFetch("/api/v1/messages/msg_api_unassigned", readToken)
+        apiFetch("/api/v2/messages/msg_api_unassigned", readToken)
       ).resolves.toMatchObject({ status: 200 });
-      await expect(apiFetch("/api/v1/messages/msg_api_orphan", readToken)).resolves.toMatchObject({
+      await expect(apiFetch("/api/v2/messages/msg_api_orphan", readToken)).resolves.toMatchObject({
         status: 404
       });
-      await expect(apiFetch("/api/v1/messages/missing", readToken)).resolves.toMatchObject({
+      await expect(apiFetch("/api/v2/messages/missing", readToken)).resolves.toMatchObject({
         status: 404
       });
     } finally {
@@ -671,25 +735,25 @@ describe("HQBase Mail API v1", () => {
   });
 
   it("rejects wrong audiences, revoked tokens, and invalid bearer precedence", async () => {
-    await expect(apiFetch("/api/v1/messages", wrongAudienceToken)).resolves.toMatchObject({
+    await expect(apiFetch("/api/v2/messages", wrongAudienceToken)).resolves.toMatchObject({
       status: 401
     });
-    await expect(apiFetch("/api/v1/messages", revokedToken)).resolves.toMatchObject({
+    await expect(apiFetch("/api/v2/messages", revokedToken)).resolves.toMatchObject({
       status: 401
     });
-    const invalidOverCookie = await SELF.fetch(`${origin}/api/v1/messages`, {
+    const invalidOverCookie = await SELF.fetch(`${origin}/api/v2/messages`, {
       headers: { authorization: "Bearer invalid", cookie }
     });
     expect(invalidOverCookie.status).toBe(401);
   });
 
   it("returns insufficient_scope before applying write or send actions", async () => {
-    const write = await apiFetch("/api/v1/messages/msg_api/read", readToken, { method: "POST" });
+    const write = await apiFetch("/api/v2/messages/msg_api/read", readToken, { method: "POST" });
     expect(write.status).toBe(403);
     expect(write.headers.get("www-authenticate")).toContain('error="insufficient_scope"');
     expect(write.headers.get("www-authenticate")).toContain('scope="mail:write"');
 
-    const send = await apiFetch("/api/v1/drafts", writeToken, {
+    const send = await apiFetch("/api/v2/drafts", writeToken, {
       body: JSON.stringify({}),
       headers: { "content-type": "application/json" },
       method: "POST"
@@ -703,7 +767,7 @@ describe("HQBase Mail API v1", () => {
       .bind(JSON.stringify(["mail:read"]))
       .run();
     try {
-      const narrowed = await apiFetch("/api/v1/drafts", fullToken);
+      const narrowed = await apiFetch("/api/v2/drafts", fullToken);
       expect(narrowed.status).toBe(403);
     } finally {
       await env.DB.prepare("UPDATE oauthConsent SET scopes = ? WHERE id = 'consent_api'")
@@ -711,7 +775,7 @@ describe("HQBase Mail API v1", () => {
         .run();
     }
 
-    const created = await apiFetch("/api/v1/drafts", fullToken, {
+    const created = await apiFetch("/api/v2/drafts", fullToken, {
       body: JSON.stringify({}),
       headers: { "content-type": "application/json" },
       method: "POST"
@@ -721,7 +785,7 @@ describe("HQBase Mail API v1", () => {
   });
 
   it("applies live mailbox grants and does not expose administration under v1", async () => {
-    const draftResponse = await apiFetch("/api/v1/drafts", fullToken, {
+    const draftResponse = await apiFetch("/api/v2/drafts", fullToken, {
       body: JSON.stringify({ mailboxId: "mbx_api", from: "support@example.com" }),
       headers: { "content-type": "application/json" },
       method: "POST"
@@ -729,32 +793,34 @@ describe("HQBase Mail API v1", () => {
     expect(draftResponse.status, await draftResponse.clone().text()).toBe(201);
     const mailboxDraft = (await draftResponse.json()) as { id: string };
 
-    await env.DB.prepare("DELETE FROM mailbox_grants WHERE mailbox_id = 'mbx_api' AND user_id = ?")
+    await env.DB.prepare(
+      "DELETE FROM mailbox_grants WHERE mailbox_id = 'mbx_api' AND principal_id = ?"
+    )
       .bind(userId)
       .run();
     try {
-      const hidden = await apiFetch("/api/v1/messages", readToken);
+      const hidden = await apiFetch("/api/v2/messages", readToken);
       await expect(hidden.json()).resolves.toEqual([]);
-      await expect(apiFetch("/api/v1/messages/msg_api", readToken)).resolves.toMatchObject({
+      await expect(apiFetch("/api/v2/messages/msg_api", readToken)).resolves.toMatchObject({
         status: 403
       });
-      const drafts = await apiFetch("/api/v1/drafts", fullToken);
+      const drafts = await apiFetch("/api/v2/drafts", fullToken);
       const visibleDrafts = (await drafts.json()) as Array<{ id: string }>;
       expect(visibleDrafts.map(({ id }) => id)).not.toContain(mailboxDraft.id);
-      const inaccessibleDraft = await apiFetch(`/api/v1/drafts/${mailboxDraft.id}`, fullToken);
+      const inaccessibleDraft = await apiFetch(`/api/v2/drafts/${mailboxDraft.id}`, fullToken);
       expect(inaccessibleDraft.status, await inaccessibleDraft.clone().text()).toBe(404);
     } finally {
       const now = new Date().toISOString();
       await env.DB.prepare(
         `INSERT INTO mailbox_grants
-         (mailbox_id, user_id, access_level, created_by, created_at, updated_at)
+         (mailbox_id, principal_id, access_level, created_by_principal_id, created_at, updated_at)
          VALUES ('mbx_api', ?, 'agent', ?, ?, ?)`
       )
         .bind(userId, userId, now, now)
         .run();
     }
 
-    const adminRoute = await apiFetch("/api/v1/users", fullToken);
+    const adminRoute = await apiFetch("/api/v2/users", fullToken);
     expect(adminRoute.status).toBe(404);
   });
 
@@ -821,7 +887,7 @@ describe("HQBase Mail API v1", () => {
     });
 
     it("keeps activity and id order across a page boundary that splits equal timestamps", async () => {
-      const { ids, pages } = await walkPages("/api/v1/messages?mailboxId=mbx_page&limit=2");
+      const { ids, pages } = await walkPages("/api/v2/messages?mailboxId=mbx_page&limit=2");
 
       expect(ids).toEqual(readableOrder);
       expect(new Set(ids).size).toBe(ids.length);
@@ -833,18 +899,18 @@ describe("HQBase Mail API v1", () => {
     });
 
     it("omits the Link header on the final page", async () => {
-      const single = await apiFetch("/api/v1/messages?mailboxId=mbx_page&limit=100", readToken);
+      const single = await apiFetch("/api/v2/messages?mailboxId=mbx_page&limit=100", readToken);
       expect(single.status).toBe(200);
       await expect(single.json()).resolves.toHaveLength(readableOrder.length);
       expect(single.headers.get("link")).toBeNull();
 
-      const firstOfTwo = await apiFetch("/api/v1/messages?mailboxId=mbx_page&limit=4", readToken);
+      const firstOfTwo = await apiFetch("/api/v2/messages?mailboxId=mbx_page&limit=4", readToken);
       expect(firstOfTwo.headers.get("link")).toMatch(/; rel="next"$/u);
     });
 
     it("preserves mailboxId, folder, search, and limit in the next page link", async () => {
       const response = await apiFetch(
-        "/api/v1/messages?mailboxId=mbx_page&folder=inbox&search=report&limit=1",
+        "/api/v2/messages?mailboxId=mbx_page&folder=inbox&search=report&limit=1",
         readToken
       );
       expect(response.status, await response.clone().text()).toBe(200);
@@ -852,7 +918,7 @@ describe("HQBase Mail API v1", () => {
       if (!next) throw new Error("Expected a next page link.");
 
       const url = new URL(next);
-      expect(url.origin + url.pathname).toBe(`${origin}/api/v1/messages`);
+      expect(url.origin + url.pathname).toBe(`${origin}/api/v2/messages`);
       expect(Object.fromEntries(url.searchParams)).toEqual({
         mailboxId: "mbx_page",
         folder: "inbox",
@@ -869,7 +935,7 @@ describe("HQBase Mail API v1", () => {
     });
 
     it("never lists an unreadable mailbox on any page", async () => {
-      const { ids } = await walkPages("/api/v1/messages?limit=50");
+      const { ids } = await walkPages("/api/v2/messages?limit=50");
 
       expect(ids).not.toContain("msg_secret_1");
       expect(ids).not.toContain("msg_secret_2");
@@ -879,7 +945,7 @@ describe("HQBase Mail API v1", () => {
     it("does not leak an unreadable mailbox through a cursor that points into it", async () => {
       // A well-formed message cursor positioned at msg_secret_1 inside the tied timestamp.
       const cursor = encodeMessageCursor(tie, "msg_secret_1");
-      const response = await apiFetch(`/api/v1/messages?limit=100&cursor=${cursor}`, readToken);
+      const response = await apiFetch(`/api/v2/messages?limit=100&cursor=${cursor}`, readToken);
       expect(response.status, await response.clone().text()).toBe(200);
       const ids = ((await response.json()) as Array<{ id: string }>).map((row) => row.id);
 
@@ -889,18 +955,18 @@ describe("HQBase Mail API v1", () => {
     });
 
     it("defaults the page to 100 messages and caps the page at 100", async () => {
-      const byDefault = await apiFetch("/api/v1/messages?mailboxId=mbx_bulk", readToken);
+      const byDefault = await apiFetch("/api/v2/messages?mailboxId=mbx_bulk", readToken);
       expect(byDefault.status).toBe(200);
       await expect(byDefault.json()).resolves.toHaveLength(100);
       expect(byDefault.headers.get("link")).toContain('rel="next"');
 
-      const atCap = await apiFetch("/api/v1/messages?mailboxId=mbx_bulk&limit=100", readToken);
+      const atCap = await apiFetch("/api/v2/messages?mailboxId=mbx_bulk&limit=100", readToken);
       await expect(atCap.json()).resolves.toHaveLength(100);
     });
 
     it("rejects an out-of-range or non-integer limit", async () => {
       for (const limit of ["0", "101", "abc", "-1", "1.5", ""]) {
-        const response = await apiFetch(`/api/v1/messages?limit=${limit}`, readToken);
+        const response = await apiFetch(`/api/v2/messages?limit=${limit}`, readToken);
         expect(response.status, `limit=${limit}`).toBe(400);
         await expect(response.json()).resolves.toMatchObject({
           error: { code: "INVALID_LIMIT", message: expect.any(String) }
@@ -917,7 +983,7 @@ describe("HQBase Mail API v1", () => {
 
       for (const cursor of ["not-a-cursor", "!!!", conversationCursor]) {
         const response = await apiFetch(
-          `/api/v1/messages?cursor=${encodeURIComponent(cursor)}`,
+          `/api/v2/messages?cursor=${encodeURIComponent(cursor)}`,
           readToken
         );
         expect(response.status, `cursor=${cursor}`).toBe(400);
@@ -966,15 +1032,16 @@ function encodeMessageCursor(activityAt: string, id: string): string {
 function mailboxRow(id: string, address: string): D1PreparedStatement {
   const stamp = "2025-01-01T00:00:00.000Z";
   return env.DB.prepare(
-    `INSERT INTO mailboxes (id, address, display_name, is_active, created_at, updated_at)
-     VALUES (?, ?, ?, 1, ?, ?)`
+    `INSERT INTO mailboxes
+     (id, address, mail_domain_id, display_name, is_active, created_at, updated_at)
+     VALUES (?, ?, 'dom_api', ?, 1, ?, ?)`
   ).bind(id, address, id, stamp, stamp);
 }
 
 function grantRow(mailboxId: string): D1PreparedStatement {
   const stamp = "2025-01-01T00:00:00.000Z";
   return env.DB.prepare(
-    `INSERT INTO mailbox_grants (mailbox_id, user_id, access_level, created_by, created_at, updated_at)
+    `INSERT INTO mailbox_grants (mailbox_id, principal_id, access_level, created_by_principal_id, created_at, updated_at)
      VALUES (?, ?, 'agent', ?, ?, ?)`
   ).bind(mailboxId, userId, userId, stamp, stamp);
 }
@@ -1034,7 +1101,7 @@ function extractSessionCookie(response: Response): string {
 }
 
 async function openEventSocket(headers: HeadersInit): Promise<WebSocket> {
-  const response = await SELF.fetch(`${origin}/api/v1/events`, { headers });
+  const response = await SELF.fetch(`${origin}/api/v2/events`, { headers });
   if (response.status !== 101) {
     throw new Error(`WebSocket upgrade failed (${response.status}): ${await response.text()}`);
   }

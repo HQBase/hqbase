@@ -43,11 +43,11 @@ describe("email HTML sanitizer", () => {
       attachments: [attachment],
       origin: "https://mail.example.com",
       html: '<img src="cid:signature-logo@example.com">',
-      inlineBasePath: "/api/v1/messages",
+      inlineBasePath: "/api/v2/messages",
       messageId: "msg-1"
     });
 
-    expect(result.html).toContain("https://mail.example.com/api/v1/messages/msg-1/inline/att-logo");
+    expect(result.html).toContain("https://mail.example.com/api/v2/messages/msg-1/inline/att-logo");
   });
 
   it("removes active content, unsafe links, redirects, and CSS resource loads", () => {

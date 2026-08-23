@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 
-import { requireMailApiContext } from "../../auth/mail-api";
+import { requireMailApiPrincipal } from "../../auth/mail-api";
 import { accessibleMessageScope } from "../../auth/mailbox-access";
 import type { HonoApp } from "../../lib/env";
 import { AppError } from "../../lib/errors";
@@ -10,7 +10,7 @@ import { defaultChangeLimit, listMessageChanges, maxChangeLimit } from "./change
 export const changeRoutes = new Hono<HonoApp>();
 
 changeRoutes.get("/", async (c) => {
-  const auth = await requireMailApiContext(c.env, c.req.raw, "mail:read");
+  const auth = await requireMailApiPrincipal(c.env, c.req.raw, "mail:read");
   for (const name of ["mailboxId", "folder", "search"]) {
     if (c.req.query(name) !== undefined) {
       throw new AppError(
@@ -20,7 +20,12 @@ changeRoutes.get("/", async (c) => {
       );
     }
   }
-  const scope = await accessibleMessageScope(c.env.DB, auth.user.id, auth.user.role, "read");
+  const scope = await accessibleMessageScope(
+    c.env.DB,
+    auth.principal.id,
+    auth.principal.role,
+    "read"
+  );
   return c.json(
     await listMessageChanges(c.env.DB, {
       cursor: c.req.query("cursor"),

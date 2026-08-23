@@ -16,7 +16,7 @@ import { DraftsPage } from "@/features/drafts/drafts-page";
 import { useDrafts } from "@/features/drafts/use-drafts";
 import { useMailEvents } from "@/features/events/use-mail-events";
 import { InboxPage } from "@/features/inbox/inbox-page";
-import { listMailboxes } from "@/features/mailboxes/api";
+import { listDeletedMailboxes, listMailboxes } from "@/features/mailboxes/api";
 import type { Mailbox } from "@/features/mailboxes/types";
 import { useMailSync } from "@/features/messages/use-mail-sync";
 import { SettingsPage } from "@/features/settings/settings-page";
@@ -48,6 +48,7 @@ export function App(): React.ReactElement {
   const [setup, setSetup] = React.useState<SetupStatus | null>(null);
   const [user, setUser] = React.useState<CurrentUser | null | undefined>(undefined);
   const [mailboxes, setMailboxes] = React.useState<Mailbox[]>([]);
+  const [deletedMailboxes, setDeletedMailboxes] = React.useState<Mailbox[]>([]);
   const [users, setUsers] = React.useState<WorkspaceUser[]>([]);
   const [mailboxId, setMailboxId] = React.useState("all");
   const [search, setSearch] = React.useState("");
@@ -88,9 +89,15 @@ export function App(): React.ReactElement {
     setMailboxes(nextMailboxes);
 
     if (currentUser.role === "owner" || currentUser.role === "admin") {
-      setUsers(await listUsers());
+      const [nextUsers, nextDeletedMailboxes] = await Promise.all([
+        listUsers(),
+        listDeletedMailboxes()
+      ]);
+      setUsers(nextUsers);
+      setDeletedMailboxes(nextDeletedMailboxes);
     } else {
       setUsers([]);
+      setDeletedMailboxes([]);
     }
   }, []);
 
@@ -121,24 +128,31 @@ export function App(): React.ReactElement {
     setUser(currentUser);
     if (!currentUser.passwordSetupRequired) await loadWorkspace(currentUser);
   }, [currentUserId, loadWorkspace]);
-  const refreshRealtimeState = React.useCallback(async () => {
-    const results = await Promise.allSettled([
-      refreshWorkspace(),
-      mailSync.refresh(),
-      draftState.refresh()
-    ]);
-    if (results.every((result) => result.status === "rejected")) {
-      const failure = results.find((result) => result.status === "rejected");
-      throw failure?.reason;
-    }
-  }, [draftState.refresh, mailSync.refresh, refreshWorkspace]);
+  const refreshRealtimeState = React.useCallback(
+    async (hardRefresh = false) => {
+      const results = await Promise.allSettled([
+        refreshWorkspace(),
+        hardRefresh ? mailSync.hardRefresh() : mailSync.refresh(),
+        draftState.refresh()
+      ]);
+      if (results.every((result) => result.status === "rejected")) {
+        const failure = results.find((result) => result.status === "rejected");
+        throw failure?.reason;
+      }
+    },
+    [draftState.refresh, mailSync.hardRefresh, mailSync.refresh, refreshWorkspace]
+  );
+  const hardRefreshRealtimeState = React.useCallback(
+    () => refreshRealtimeState(true),
+    [refreshRealtimeState]
+  );
 
   const connectionStatus = useMailEvents(currentUserId, {
     onDrafts: draftState.refresh,
     onFallbackPoll: refreshRealtimeState,
-    onMailboxes: refreshRealtimeState,
+    onMailboxes: hardRefreshRealtimeState,
     onMessages: mailSync.refresh,
-    onReconnect: refreshRealtimeState
+    onReconnect: hardRefreshRealtimeState
   });
 
   React.useEffect(() => {
@@ -149,11 +163,17 @@ export function App(): React.ReactElement {
   React.useEffect(() => {
     if (!user || isLoading || route.kind !== "settings") return;
     const canManage = user.role === "owner" || user.role === "admin";
-    const managementOnly = ["domains", "updates"].includes(route.tab);
+    const managementOnly = ["agents", "domains", "updates"].includes(route.tab);
     if (!canManage && managementOnly) {
       navigate({ kind: "settings", tab: "mailboxes" }, true);
     }
   }, [isLoading, navigate, route, user]);
+
+  React.useEffect(() => {
+    if (mailboxId !== "all" && !contentMailboxes.some((mailbox) => mailbox.id === mailboxId)) {
+      setMailboxId("all");
+    }
+  }, [contentMailboxes, mailboxId]);
 
   if (publicAuthenticationPath) {
     const params = new URLSearchParams(window.location.search);
@@ -259,6 +279,7 @@ export function App(): React.ReactElement {
                 canManage={user.role === "owner" || user.role === "admin"}
                 currentUser={user}
                 defaultFromMailboxId={user.defaultFromMailboxId}
+                deletedMailboxes={deletedMailboxes}
                 mailboxes={mailboxes}
                 notifications={mailSync.notifications}
                 setup={setup}

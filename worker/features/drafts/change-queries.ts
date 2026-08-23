@@ -3,7 +3,7 @@ import { sql } from "drizzle-orm";
 import { getRow, getRows } from "../../db/drizzle";
 import type { WorkerEnv } from "../../lib/env";
 import { AppError } from "../../lib/errors";
-import { type DraftPrincipal, filterAccessibleDrafts } from "./access";
+import { type DraftPrincipal, draftPrincipalId, filterAccessibleDrafts } from "./access";
 import {
   compareDraftChangeSequences,
   type DraftChangeCursor,
@@ -35,23 +35,24 @@ export async function listDraftChanges(
   principal: DraftPrincipal,
   input: { cursor?: string | undefined; limit: number }
 ): Promise<DraftChangePage> {
-  const currentHighWater = await getCurrentHighWater(env.DB, principal.userId);
+  const principalId = draftPrincipalId(principal);
+  const currentHighWater = await getCurrentHighWater(env.DB, principalId);
   if (!input.cursor) {
-    return emptyPage({ after: currentHighWater, highWater: null, userId: principal.userId });
+    return emptyPage({ after: currentHighWater, highWater: null, principalId });
   }
 
-  const cursor = decodeDraftChangeCursor(input.cursor, principal.userId);
+  const cursor = decodeDraftChangeCursor(input.cursor, principalId);
   validateCursorBounds(cursor, currentHighWater);
   const highWater = cursor.highWater ?? currentHighWater;
   if (compareDraftChangeSequences(cursor.after, highWater) === 0) {
-    return emptyPage({ after: highWater, highWater: null, userId: principal.userId });
+    return emptyPage({ after: highWater, highWater: null, principalId });
   }
 
   const journal = await getRows<DraftJournalRow>(
     env.DB,
     sql`SELECT CAST(sequence AS TEXT) AS sequence, draft_id, kind
         FROM draft_changes
-        WHERE user_id = ${principal.userId}
+        WHERE principal_id = ${principalId}
           AND sequence > CAST(${cursor.after} AS INTEGER)
           AND sequence <= CAST(${highWater} AS INTEGER)
         ORDER BY sequence ASC
@@ -59,7 +60,7 @@ export async function listDraftChanges(
   );
   const pageRows = journal.slice(0, input.limit);
   const hasMore = journal.length > input.limit;
-  const current = await getDraftsByIds(env.DB, principal.userId, [
+  const current = await getDraftsByIds(env.DB, principalId, [
     ...new Set(pageRows.filter((row) => row.kind === "upsert").map((row) => row.draft_id))
   ]);
   const accessible = await filterAccessibleDrafts(env, principal, current);
@@ -76,21 +77,21 @@ export async function listDraftChanges(
       ? encodeDraftChangeCursor({
           after: finalRow.sequence,
           highWater,
-          userId: principal.userId
+          principalId
         })
       : encodeDraftChangeCursor({
           after: highWater,
           highWater: null,
-          userId: principal.userId
+          principalId
         });
   return { changes, nextCursor, hasMore };
 }
 
-async function getCurrentHighWater(db: D1Database, userId: string): Promise<string> {
+async function getCurrentHighWater(db: D1Database, principalId: string): Promise<string> {
   const row = await getRow<{ sequence: string }>(
     db,
     sql`SELECT CAST(COALESCE(MAX(sequence), 0) AS TEXT) AS sequence
-        FROM draft_changes WHERE user_id = ${userId}`
+        FROM draft_changes WHERE principal_id = ${principalId}`
   );
   return row?.sequence ?? "0";
 }

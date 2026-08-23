@@ -1,6 +1,7 @@
 import { env, SELF } from "cloudflare:test";
 import { beforeAll, describe, expect, it } from "vitest";
 
+import { createAgentCredential } from "../../../worker/auth/agent-credential";
 import { createAuth } from "../../../worker/auth/auth";
 import {
   listAccessibleDraftPage,
@@ -12,10 +13,11 @@ import { applyCurrentMigrations } from "./current-migrations";
 import { tokenRow } from "./mail-api-token-fixture";
 
 const origin = "https://hqbase.test";
-const apiResource = `${origin}/api/v1`;
+const apiResource = `${origin}/api/v2`;
 const sendToken = "hqb_access_draft-sync-send-token";
 const readToken = "hqb_access_draft-sync-read-token";
 let userId = "";
+let agentToken = "";
 
 describe("HQBase Mail API draft synchronization", () => {
   beforeAll(async () => {
@@ -72,6 +74,11 @@ describe("HQBase Mail API draft synchronization", () => {
       )
     ]);
     await env.DB.batch([
+      env.DB.prepare(
+        `INSERT INTO mail_domains
+         (id, name, receiving_status, sending_status, dns_status, is_enabled, created_at, updated_at)
+         VALUES ('dom_draft_sync', 'example.com', 'ready', 'ready', 'ready', 1, ?, ?)`
+      ).bind(stamp, stamp),
       mailboxRow("mbx_draft_sync", "draft-sync@example.com", stamp),
       mailboxRow("mbx_draft_sync_secret", "secret-draft@example.com", stamp),
       grantRow("mbx_draft_sync", stamp),
@@ -94,14 +101,107 @@ describe("HQBase Mail API draft synchronization", () => {
       ...tokenRows,
       draftRow("drf_sync_historical", "mbx_draft_sync", "2026-08-22T00:00:00.000Z")
     ]);
+
+    const issued = await createAgentCredential();
+    agentToken = issued.token;
+    await env.DB.batch([
+      env.DB.prepare(
+        `INSERT INTO mail_domains
+         (id, name, receiving_status, sending_status, dns_status, is_enabled, created_at, updated_at)
+         VALUES ('dom_draft_agent', 'draft-agent.example.com', 'ready', 'ready', 'ready', 1, ?, ?)`
+      ).bind(stamp, stamp),
+      env.DB.prepare(
+        `INSERT INTO principals (id, type, name, status, created_at, updated_at)
+         VALUES ('agt_draft_sync', 'agent', 'Draft Agent', 'active', ?, ?)`
+      ).bind(stamp, stamp)
+    ]);
+    await env.DB.batch([
+      env.DB.prepare(
+        `INSERT INTO agents
+         (principal_id, profile, created_by_principal_id, mail_domain_id, mailbox_limit,
+          created_at, updated_at)
+         VALUES ('agt_draft_sync', 'mailbox', ?, 'dom_draft_agent', NULL, ?, ?)`
+      ).bind(userId, stamp, stamp),
+      env.DB.prepare(
+        `INSERT INTO agent_credentials
+         (id, principal_id, secret_hash, resource, scopes_json, created_at)
+         VALUES ('cred_draft_sync', 'agt_draft_sync', ?, 'mail', '["mail:send"]', ?)`
+      ).bind(issued.secretHash, stamp),
+      env.DB.prepare(
+        `INSERT INTO mailbox_grants
+         (mailbox_id, principal_id, access_level, created_by_principal_id, created_at, updated_at)
+         VALUES ('mbx_draft_sync', 'agt_draft_sync', 'agent', ?, ?, ?)`
+      ).bind(userId, stamp, stamp)
+    ]);
+  });
+
+  it("keeps an agent draft private through create, read, update, and delete", async () => {
+    const createdResponse = await apiMutation("/api/v2/drafts", agentToken, "POST", {
+      from: "draft-sync@example.com",
+      mailboxId: "mbx_draft_sync",
+      subject: "Agent draft",
+      text: "Private draft",
+      to: ["reader@example.com"]
+    });
+    expect(createdResponse.status, await createdResponse.clone().text()).toBe(201);
+    const created = await createdResponse.json<{ id: string; version: number }>();
+
+    const opened = await apiFetch(`/api/v2/drafts/${created.id}`, agentToken);
+    expect(opened.status, await opened.clone().text()).toBe(200);
+    await expect(opened.json()).resolves.toMatchObject({
+      id: created.id,
+      subject: "Agent draft",
+      version: 1
+    });
+
+    const form = new FormData();
+    form.set("file", new File(["agent attachment"], "agent.txt", { type: "text/plain" }));
+    const uploadedResponse = await SELF.fetch(`${origin}/api/v2/drafts/${created.id}/attachments`, {
+      body: form,
+      headers: { authorization: `Bearer ${agentToken}` },
+      method: "POST"
+    });
+    expect(uploadedResponse.status, await uploadedResponse.clone().text()).toBe(201);
+    const uploaded = await uploadedResponse.json<{ id: string }>();
+    const attachment = await env.DB.prepare("SELECT r2_key FROM draft_attachments WHERE id = ?")
+      .bind(uploaded.id)
+      .first<{ r2_key: string }>();
+    expect(attachment?.r2_key).toBe(`drafts/agt_draft_sync/${created.id}/${uploaded.id}`);
+
+    const hiddenFromPerson = await apiFetch(`/api/v2/drafts/${created.id}`, sendToken);
+    expect(hiddenFromPerson.status).toBe(404);
+
+    const updated = await apiMutation(`/api/v2/drafts/${created.id}`, agentToken, "PATCH", {
+      bcc: [],
+      cc: [],
+      forwardOfMessageId: null,
+      from: "draft-sync@example.com",
+      html: "",
+      mailboxId: "mbx_draft_sync",
+      replyToMessageId: null,
+      subject: "Updated agent draft",
+      text: "Private draft",
+      to: ["reader@example.com"],
+      version: created.version
+    });
+    expect(updated.status, await updated.clone().text()).toBe(200);
+    await expect(updated.json()).resolves.toMatchObject({
+      id: created.id,
+      subject: "Updated agent draft",
+      version: 2
+    });
+
+    const deleted = await apiMutation(`/api/v2/drafts/${created.id}`, agentToken, "DELETE");
+    expect(deleted.status, await deleted.clone().text()).toBe(204);
+    expect((await apiFetch(`/api/v2/drafts/${created.id}`, agentToken)).status).toBe(404);
   });
 
   it("starts with a checkpoint and does not replay historical drafts", async () => {
-    const first = await changePage(await apiFetch("/api/v1/drafts/changes", sendToken));
+    const first = await changePage(await apiFetch("/api/v2/drafts/changes", sendToken));
     expect(first).toMatchObject({ changes: [], hasMore: false });
 
     const next = await changePage(
-      await apiFetch(`/api/v1/drafts/changes?cursor=${first.nextCursor}`, sendToken)
+      await apiFetch(`/api/v2/drafts/changes?cursor=${first.nextCursor}`, sendToken)
     );
     expect(next).toMatchObject({ changes: [], hasMore: false });
   });
@@ -126,7 +226,7 @@ describe("HQBase Mail API draft synchronization", () => {
       .run();
 
     const pages: Array<Array<{ id: string; attachments: Array<{ id: string }> }>> = [];
-    let next: string | null = `${origin}/api/v1/drafts?limit=2`;
+    let next: string | null = `${origin}/api/v2/drafts?limit=2`;
     while (next) {
       if (pages.length > 20) throw new Error("Draft pagination did not terminate.");
       const response = await apiFetch(next.slice(origin.length), sendToken);
@@ -165,7 +265,7 @@ describe("HQBase Mail API draft synchronization", () => {
     await env.DB.prepare("DELETE FROM draft_attachments WHERE id = 'att_changes'").run();
 
     const upserts = await changePage(
-      await apiFetch(`/api/v1/drafts/changes?cursor=${cursor}`, sendToken)
+      await apiFetch(`/api/v2/drafts/changes?cursor=${cursor}`, sendToken)
     );
     expect(upserts.hasMore).toBe(false);
     expect(upserts.changes).toHaveLength(3);
@@ -178,7 +278,7 @@ describe("HQBase Mail API draft synchronization", () => {
 
     await env.DB.prepare("DELETE FROM drafts WHERE id = 'drf_changes'").run();
     const deletion = await changePage(
-      await apiFetch(`/api/v1/drafts/changes?cursor=${upserts.nextCursor}`, sendToken)
+      await apiFetch(`/api/v2/drafts/changes?cursor=${upserts.nextCursor}`, sendToken)
     );
     expect(deletion.changes).toEqual([{ type: "delete", draftId: "drf_changes" }]);
   });
@@ -193,7 +293,7 @@ describe("HQBase Mail API draft synchronization", () => {
     ]);
 
     const first = await changePage(
-      await apiFetch(`/api/v1/drafts/changes?cursor=${cursor}&limit=2`, sendToken)
+      await apiFetch(`/api/v2/drafts/changes?cursor=${cursor}&limit=2`, sendToken)
     );
     expect(first.hasMore).toBe(true);
     expect(first.changes.map(upsertId)).toEqual(["drf_cycle_1", "drf_cycle_2"]);
@@ -204,36 +304,36 @@ describe("HQBase Mail API draft synchronization", () => {
       .bind("2026-08-22T03:00:01.000Z", "drf_cycle_1")
       .run();
     const second = await changePage(
-      await apiFetch(`/api/v1/drafts/changes?cursor=${first.nextCursor}&limit=2`, sendToken)
+      await apiFetch(`/api/v2/drafts/changes?cursor=${first.nextCursor}&limit=2`, sendToken)
     );
     expect(second.hasMore).toBe(false);
     expect(second.changes.map(upsertId)).toEqual(["drf_cycle_3"]);
 
     const nextCycle = await changePage(
-      await apiFetch(`/api/v1/drafts/changes?cursor=${second.nextCursor}`, sendToken)
+      await apiFetch(`/api/v2/drafts/changes?cursor=${second.nextCursor}`, sendToken)
     );
     expect(nextCycle.changes.map(upsertId)).toEqual(["drf_cycle_1"]);
   });
 
-  it("applies live mailbox access to upserts and uses user-owned tombstones", async () => {
+  it("applies live mailbox access to upserts and uses principal-owned tombstones", async () => {
     const cursor = await checkpoint();
     const stamp = "2026-08-22T04:00:00.000Z";
     await draftRow("drf_access_revoked", "mbx_draft_sync", stamp).run();
     await env.DB.prepare(
-      "DELETE FROM mailbox_grants WHERE mailbox_id = 'mbx_draft_sync' AND user_id = ?"
+      "DELETE FROM mailbox_grants WHERE mailbox_id = 'mbx_draft_sync' AND principal_id = ?"
     )
       .bind(userId)
       .run();
 
     const hidden = await changePage(
-      await apiFetch(`/api/v1/drafts/changes?cursor=${cursor}`, sendToken)
+      await apiFetch(`/api/v2/drafts/changes?cursor=${cursor}`, sendToken)
     );
     expect(hidden.changes).toEqual([]);
 
     await grantRow("mbx_draft_sync", stamp).run();
     await env.DB.prepare("DELETE FROM drafts WHERE id = 'drf_access_revoked'").run();
     const deletion = await changePage(
-      await apiFetch(`/api/v1/drafts/changes?cursor=${hidden.nextCursor}`, sendToken)
+      await apiFetch(`/api/v2/drafts/changes?cursor=${hidden.nextCursor}`, sendToken)
     );
     expect(deletion.changes).toEqual([{ type: "delete", draftId: "drf_access_revoked" }]);
   });
@@ -254,7 +354,7 @@ describe("HQBase Mail API draft synchronization", () => {
       .bind("msg_draft_secret_target")
       .run();
 
-    const listed = await apiFetch("/api/v1/drafts?limit=100", sendToken);
+    const listed = await apiFetch("/api/v2/drafts?limit=100", sendToken);
     expect(listed.status, await listed.clone().text()).toBe(200);
     expect((await listed.json<Array<{ id: string }>>()).map((draft) => draft.id)).not.toContain(
       "drf_secret_target"
@@ -262,7 +362,7 @@ describe("HQBase Mail API draft synchronization", () => {
     await expect(
       requireDraftAccess(
         env,
-        { role: "member", userId },
+        { id: userId, role: "member" },
         {
           mailboxId: "mbx_draft_sync",
           from: "draft-sync@example.com",
@@ -274,12 +374,16 @@ describe("HQBase Mail API draft synchronization", () => {
 
     await env.DB.prepare(`UPDATE "user" SET banned = 1 WHERE id = ?`).bind(userId).run();
     try {
-      const page = await listAccessibleDraftPage(env, { role: "member", userId }, { limit: 100 });
+      const page = await listAccessibleDraftPage(
+        env,
+        { id: userId, role: "member" },
+        { limit: 100 }
+      );
       expect(page.drafts).toEqual([]);
       await expect(
         requireDraftAccess(
           env,
-          { role: "member", userId },
+          { id: userId, role: "member" },
           {
             mailboxId: null,
             from: "",
@@ -303,28 +407,28 @@ describe("HQBase Mail API draft synchronization", () => {
     );
 
     const page = await changePage(
-      await apiFetch(`/api/v1/drafts/changes?cursor=${cursor}&limit=100`, sendToken)
+      await apiFetch(`/api/v2/drafts/changes?cursor=${cursor}&limit=100`, sendToken)
     );
     expect(page.hasMore).toBe(false);
     expect(page.changes).toHaveLength(100);
   });
 
   it("validates scope, filters, limits, and foreign cursors", async () => {
-    const noSend = await apiFetch("/api/v1/drafts/changes", readToken);
+    const noSend = await apiFetch("/api/v2/drafts/changes", readToken);
     expect(noSend.status).toBe(403);
     expect(noSend.headers.get("www-authenticate")).toContain('scope="mail:send"');
 
     for (const path of [
-      "/api/v1/drafts?limit=0",
-      "/api/v1/drafts?limit=101",
-      "/api/v1/drafts/changes?limit=1.5"
+      "/api/v2/drafts?limit=0",
+      "/api/v2/drafts?limit=101",
+      "/api/v2/drafts/changes?limit=1.5"
     ]) {
       const response = await apiFetch(path, sendToken);
       expect(response.status, path).toBe(400);
       await expect(response.json()).resolves.toMatchObject({ error: { code: "INVALID_LIMIT" } });
     }
 
-    const filtered = await apiFetch("/api/v1/drafts/changes?updatedSince=now", sendToken);
+    const filtered = await apiFetch("/api/v2/drafts/changes?updatedSince=now", sendToken);
     expect(filtered.status).toBe(400);
     await expect(filtered.json()).resolves.toMatchObject({
       error: { code: "INVALID_DRAFT_CHANGE_FILTER" }
@@ -332,7 +436,7 @@ describe("HQBase Mail API draft synchronization", () => {
 
     const messageCursor = encodeChangeCursor({ after: "0", highWater: null });
     const listWithForeignCursor = await apiFetch(
-      `/api/v1/drafts?cursor=${encodeURIComponent(messageCursor)}`,
+      `/api/v2/drafts?cursor=${encodeURIComponent(messageCursor)}`,
       sendToken
     );
     expect(listWithForeignCursor.status).toBe(400);
@@ -343,11 +447,11 @@ describe("HQBase Mail API draft synchronization", () => {
     const future = encodeDraftChangeCursor({
       after: "9223372036854775807",
       highWater: null,
-      userId
+      principalId: userId
     });
     for (const value of [messageCursor, future]) {
       const response = await apiFetch(
-        `/api/v1/drafts/changes?cursor=${encodeURIComponent(value)}`,
+        `/api/v2/drafts/changes?cursor=${encodeURIComponent(value)}`,
         sendToken
       );
       expect(response.status, value).toBe(400);
@@ -369,7 +473,7 @@ type DraftChangePage = {
 };
 
 async function checkpoint(): Promise<string> {
-  return (await changePage(await apiFetch("/api/v1/drafts/changes", sendToken))).nextCursor;
+  return (await changePage(await apiFetch("/api/v2/drafts/changes", sendToken))).nextCursor;
 }
 
 async function changePage(response: Response): Promise<DraftChangePage> {
@@ -392,14 +496,16 @@ function nextPageUrl(response: Response): string | null {
 
 function mailboxRow(id: string, address: string, stamp: string): D1PreparedStatement {
   return env.DB.prepare(
-    `INSERT INTO mailboxes (id, address, display_name, is_active, created_at, updated_at)
-     VALUES (?, ?, ?, 1, ?, ?)`
+    `INSERT INTO mailboxes
+     (id, address, mail_domain_id, display_name, is_active, created_at, updated_at)
+     VALUES (?, ?, 'dom_draft_sync', ?, 1, ?, ?)`
   ).bind(id, address, id, stamp, stamp);
 }
 
 function grantRow(mailboxId: string, stamp: string): D1PreparedStatement {
   return env.DB.prepare(
-    `INSERT INTO mailbox_grants (mailbox_id, user_id, access_level, created_by, created_at, updated_at)
+    `INSERT INTO mailbox_grants
+     (mailbox_id, principal_id, access_level, created_by_principal_id, created_at, updated_at)
      VALUES (?, ?, 'agent', ?, ?, ?)`
   ).bind(mailboxId, userId, userId, stamp, stamp);
 }
@@ -430,7 +536,7 @@ function messageRow(
 function draftRow(id: string, mailboxId: string, stamp: string): D1PreparedStatement {
   return env.DB.prepare(
     `INSERT INTO drafts
-     (id, user_id, mailbox_id, from_address, to_json, cc_json, bcc_json, subject,
+     (id, principal_id, mailbox_id, from_address, to_json, cc_json, bcc_json, subject,
       text_body, html_body, created_at, updated_at)
      VALUES (?, ?, ?, 'draft-sync@example.com', '[]', '[]', '[]', ?, '', '', ?, ?)`
   ).bind(id, userId, mailboxId, id, stamp, stamp);
@@ -438,4 +544,20 @@ function draftRow(id: string, mailboxId: string, stamp: string): D1PreparedState
 
 function apiFetch(path: string, token: string): Promise<Response> {
   return SELF.fetch(`${origin}${path}`, { headers: { authorization: `Bearer ${token}` } });
+}
+
+function apiMutation(
+  path: string,
+  token: string,
+  method: "DELETE" | "PATCH" | "POST",
+  body?: object
+): Promise<Response> {
+  return SELF.fetch(`${origin}${path}`, {
+    ...(body ? { body: JSON.stringify(body) } : {}),
+    headers: {
+      authorization: `Bearer ${token}`,
+      ...(body ? { "content-type": "application/json" } : {})
+    },
+    method
+  });
 }

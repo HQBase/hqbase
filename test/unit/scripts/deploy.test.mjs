@@ -137,20 +137,25 @@ describe("HQBase release deployment", () => {
     }
   });
   it("rebases customer deployment paths onto the verified release source", () => {
-    expect(
-      normalizeConfig(
-        {
-          name: "customer-worker",
-          main: "../../../worker/index.ts",
-          compatibility_flags: ["nodejs_compat"],
-          assets: { directory: "../../../dist", binding: "ASSETS" },
-          d1_databases: [{ binding: "DB", migrations_dir: "../../../migrations" }],
-          vars: { HQBASE_WORKER_NAME: "customer-worker" }
-        },
-        "0.1.1",
-        "b".repeat(64)
-      )
-    ).toMatchObject({
+    const normalized = normalizeConfig(
+      {
+        name: "customer-worker",
+        main: "../../../worker/index.ts",
+        compatibility_flags: ["nodejs_compat"],
+        assets: { directory: "../../../dist", binding: "ASSETS" },
+        d1_databases: [
+          {
+            binding: "DB",
+            migrations_dir: "../../../migrations",
+            migrations_pattern: "../../../migrations/**/*.sql"
+          }
+        ],
+        vars: { HQBASE_WORKER_NAME: "customer-worker" }
+      },
+      "0.1.1",
+      "b".repeat(64)
+    );
+    expect(normalized).toMatchObject({
       main: "worker/index.ts",
       compatibility_flags: ["nodejs_compat", "global_fetch_strictly_public"],
       assets: { directory: "./dist", binding: "ASSETS" },
@@ -161,6 +166,7 @@ describe("HQBase release deployment", () => {
         HQBASE_WORKER_NAME: "customer-worker"
       }
     });
+    expect(normalized.d1_databases[0]).not.toHaveProperty("migrations_pattern");
   });
   it("creates an immutable active-version tag from the signed HQBase artifact", () => {
     expect(hqbaseReleaseTag("0.1.5", "a".repeat(64))).toBe(`hqbase:0.1.5:${"a".repeat(64)}`);
@@ -416,10 +422,13 @@ describe("HQBase release deployment", () => {
       not_found_handling: "single-page-application",
       run_worker_first: [
         "/api/*",
+        "/management/*",
         "/mcp",
         "/mcp/*",
         "/.well-known/*",
         "/skills/hqbase-mail/SKILL.md",
+        "/skills/hqbase-mailbox/SKILL.md",
+        "/skills/hqbase-provisioner/SKILL.md",
         "/AGENTS.md",
         "/agents.md"
       ]

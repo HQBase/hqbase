@@ -2,6 +2,7 @@ import { env, SELF } from "cloudflare:test";
 import { beforeAll, describe, expect, it } from "vitest";
 
 import { createAuth } from "../../../worker/auth/auth";
+import { messageEventUserIds } from "../../../worker/features/events/service";
 import {
   countUnreadMessages,
   listPushSubscriptionsForMailbox,
@@ -25,14 +26,20 @@ describe("notification persistence", () => {
            ('usr_banned', 'Banned', 'banned@login.example', 1, ?, ?, 'owner', 1)`
       ).bind(now, now, now, now, now, now, now, now),
       env.DB.prepare(
-        `INSERT INTO mailboxes (id, address, display_name, is_active, created_at, updated_at)
+        `INSERT INTO mail_domains
+         (id, name, receiving_status, sending_status, dns_status, is_enabled, created_at, updated_at)
+         VALUES ('dom_notifications', 'example.com', 'ready', 'ready', 'ready', 1, ?, ?)`
+      ).bind(now, now),
+      env.DB.prepare(
+        `INSERT INTO mailboxes
+         (id, address, mail_domain_id, display_name, is_active, created_at, updated_at)
          VALUES
-           ('mbx_one', 'support@example.com', 'Support', 1, ?, ?),
-           ('mbx_two', 'privacy@example.com', 'Privacy', 1, ?, ?)`
+           ('mbx_one', 'support@example.com', 'dom_notifications', 'Support', 1, ?, ?),
+           ('mbx_two', 'privacy@example.com', 'dom_notifications', 'Privacy', 1, ?, ?)`
       ).bind(now, now, now, now),
       env.DB.prepare(
         `INSERT INTO mailbox_grants
-         (mailbox_id, user_id, access_level, created_by, created_at, updated_at)
+         (mailbox_id, principal_id, access_level, created_by_principal_id, created_at, updated_at)
          VALUES ('mbx_one', 'usr_member', 'read', 'usr_owner', ?, ?)`
       ).bind(now, now),
       env.DB.prepare(
@@ -104,6 +111,22 @@ describe("notification persistence", () => {
     expect(subscriptions.map((row) => row.user_id).sort()).toEqual(["usr_member", "usr_owner"]);
   });
 
+  it("does not wake a principal whose only matching mailbox was deleted", async () => {
+    await env.DB.prepare("UPDATE mailboxes SET deleted_at = ? WHERE id = 'mbx_one'")
+      .bind("2026-08-23T16:00:00.000Z")
+      .run();
+    try {
+      await expect(
+        messageEventUserIds(env.DB, [
+          { isUnassigned: false, mailboxId: "mbx_one" },
+          { isUnassigned: false, mailboxId: "mbx_two" }
+        ])
+      ).resolves.toEqual(["usr_owner"]);
+    } finally {
+      await env.DB.prepare("UPDATE mailboxes SET deleted_at = NULL WHERE id = 'mbx_one'").run();
+    }
+  });
+
   it("moves an endpoint to the current signed-in user and scopes removal by ownership", async () => {
     const endpoint = "https://push.example/shared-device";
     await savePushSubscription(env.DB, "usr_owner", subscription(endpoint));
@@ -146,7 +169,7 @@ describe("notification persistence", () => {
     expect(user).not.toBeNull();
     await env.DB.prepare(
       `INSERT INTO mailbox_grants
-       (mailbox_id, user_id, access_level, created_by, created_at, updated_at)
+       (mailbox_id, principal_id, access_level, created_by_principal_id, created_at, updated_at)
        VALUES ('mbx_one', ?, 'read', 'usr_owner', ?, ?)`
     )
       .bind(user?.id, "2026-07-29T12:00:00.000Z", "2026-07-29T12:00:00.000Z")

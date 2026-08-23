@@ -120,7 +120,7 @@ export async function listPushSubscriptionsForMailbox(
            OR EXISTS (
              SELECT 1
              FROM mailbox_grants grant_row
-             WHERE grant_row.user_id = subscription.user_id
+             WHERE grant_row.principal_id = subscription.user_id
                AND grant_row.mailbox_id = ${mailboxId}
                AND grant_row.access_level IN ('read', 'agent', 'manager')
            )

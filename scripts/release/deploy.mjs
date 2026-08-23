@@ -4,6 +4,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 
+import { applyMigrationPhase } from "../d1-migrations.mjs";
 import { recordWorkerDeployedForConfig } from "../hqbase/manifest.mjs";
 import { windowsSystem32Executable } from "../windows-system32.mjs";
 import { inspectActiveRelease } from "./active-version.mjs";
@@ -90,9 +91,10 @@ export async function deploy(options = {}) {
       return;
     }
     if (!activeRelease) {
-      applyMigrations(source);
+      applyMigrationPhase(source, "normal", { target: "remote" });
       deploySource(source, { releaseTag });
       recordWorkerDeployed();
+      applyMigrationPhase(source, "after-deploy", { target: "remote" });
       executeSql(
         source,
         `UPDATE release_state SET installed_version = ${quote(manifest.version)}, installed_schema_version = ${manifest.schemaVersion}, updated_at = datetime('now') WHERE singleton = 1`
@@ -110,7 +112,7 @@ export async function deploy(options = {}) {
       );
     }
     if (activeRelease.version === manifest.version && activeRelease.tag === releaseTag) {
-      recordWorkerDeployed();
+      completeActiveReleaseRetry(source, manifest, recordWorkerDeployed);
       console.log(`HQBase ${manifest.version} is already the active signed release.`);
       return;
     }
@@ -139,8 +141,8 @@ export async function deploy(options = {}) {
     if (!bookmark || !workerVersion) {
       throw new Error("Could not establish the update recovery checkpoint.");
     }
-    recovery = { bookmark, workerVersion, name: config.name };
-    applyMigrations(source);
+    recovery = { bookmark, cleanupComplete: false, configFile, workerVersion, name: config.name };
+    applyMigrationPhase(source, "normal", { target: "remote" });
     const updateId = randomUUID();
     executeSql(
       source,
@@ -178,6 +180,8 @@ export async function deploy(options = {}) {
       ],
       source
     );
+    applyMigrationPhase(source, "after-deploy", { target: "remote" });
+    recovery.cleanupComplete = true;
     executeSql(
       source,
       `UPDATE release_state SET installed_version = ${quote(manifest.version)}, installed_schema_version = ${manifest.schemaVersion}, updated_at = datetime('now') WHERE singleton = 1; UPDATE update_history SET state = 'verified', completed_at = datetime('now') WHERE id = ${quote(updateId)}`
@@ -240,38 +244,45 @@ export function deployConfiguration(source, workerName, releaseTag, options = {}
   return after;
 }
 
+export function completeActiveReleaseRetry(source, manifest, recordWorkerDeployed, options = {}) {
+  const applyMigrations = options.applyMigrationPhase ?? applyMigrationPhase;
+  const updateReleaseState = options.executeSql ?? executeSql;
+  recordWorkerDeployed();
+  applyMigrations(source, "normal", { target: "remote" });
+  applyMigrations(source, "after-deploy", { target: "remote" });
+  updateReleaseState(
+    source,
+    `UPDATE release_state SET installed_version = ${quote(manifest.version)}, installed_schema_version = ${manifest.schemaVersion}, updated_at = datetime('now') WHERE singleton = 1; UPDATE update_history SET state = 'verified', completed_at = datetime('now') WHERE state IN ('started', 'deployed') AND id = (SELECT id FROM update_history WHERE to_version = ${quote(manifest.version)} AND state IN ('started', 'deployed') ORDER BY started_at DESC, rowid DESC LIMIT 1)`
+  );
+}
+
 function sourceDeploy(cwd) {
   run("pnpm", ["build"], cwd);
-  run("pnpm", ["db:migrate:remote"], cwd);
+  applyMigrationPhase(cwd, "normal", { target: "remote" });
   deploySource(cwd);
+  applyMigrationPhase(cwd, "after-deploy", { target: "remote" });
   run("pnpm", ["hqbase", "postdeploy"], cwd);
 }
 
-function applyMigrations(cwd) {
-  run(
-    "pnpm",
-    [
-      "exec",
-      "wrangler",
-      "d1",
-      "migrations",
-      "apply",
-      "DB",
-      "--remote",
-      "--config",
-      "wrangler.jsonc"
-    ],
-    cwd
+export function reportRecovery(recovery) {
+  if (recovery.cleanupComplete) {
+    console.error(
+      "Recovery: rerun the same signed HQBase deployment. Schema cleanup completed, and the retry will finish release bookkeeping."
+    );
+    return;
+  }
+  const config = shellQuote(recovery.configFile);
+  console.error("Run these recovery commands in order:");
+  console.error(
+    `Worker recovery: pnpm exec wrangler versions deploy ${shellQuote(`${recovery.workerVersion}@100%`)} --name ${shellQuote(recovery.name)} --config ${config}`
+  );
+  console.error(
+    `D1 recovery: pnpm exec wrangler d1 time-travel restore DB --bookmark ${shellQuote(recovery.bookmark)} --config ${config}`
   );
 }
 
-function reportRecovery(recovery) {
-  console.error(
-    `D1 recovery: pnpm exec wrangler d1 time-travel restore DB --bookmark ${recovery.bookmark} --config wrangler.jsonc`
-  );
-  console.error(
-    `Worker recovery: pnpm exec wrangler versions deploy ${recovery.workerVersion}@100% --name ${recovery.name} --config wrangler.jsonc`
-  );
+function shellQuote(value) {
+  return `'${String(value).replaceAll("'", "'\\''")}'`;
 }
 
 function findString(value, ...keys) {

@@ -35,6 +35,11 @@ describe("application routing", () => {
     }
   });
 
+  it("gives agent management its own settings route", () => {
+    expect(readAppRoute("/settings/agents")).toEqual({ kind: "settings", tab: "agents" });
+    expect(appRoutePath({ kind: "settings", tab: "agents" })).toBe("/settings/agents");
+  });
+
   it("keeps OAuth return aliases and the retired General tab compatible", () => {
     expect(readAppRoute("/?cloudflare=connected&settings=domains")).toEqual({
       kind: "settings",

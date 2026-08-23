@@ -11,9 +11,11 @@ import { flushHookEffects, renderComponent } from "../render-hook";
 const mailbox: Mailbox = {
   id: "mailbox-1",
   address: "support@example.com",
-  addresses: [],
+  mailDomainId: "domain-1",
   displayName: "Support",
+  kind: "human",
   isActive: true,
+  deletedAt: null,
   accessLevel: "manager",
   createdAt: "2026-08-23T00:00:00.000Z",
   updatedAt: "2026-08-23T00:00:00.000Z"

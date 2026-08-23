@@ -77,9 +77,6 @@ export function DefaultFromMailboxControl({
 function defaultFromMailboxOptions(mailboxes: Mailbox[]): Mailbox[] {
   return mailboxes.filter(
     (mailbox) =>
-      mailbox.isActive &&
-      (mailbox.accessLevel === "agent" || mailbox.accessLevel === "manager") &&
-      (mailbox.addresses.length === 0 ||
-        mailbox.addresses.some((address) => address.isPrimary && address.sendEnabled))
+      mailbox.isActive && (mailbox.accessLevel === "agent" || mailbox.accessLevel === "manager")
   );
 }

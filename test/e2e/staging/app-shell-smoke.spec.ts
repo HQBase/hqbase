@@ -37,14 +37,14 @@ test("deployed HQBase PWA shell is ready", async ({ page, request }) => {
   }).toPass({ intervals: [2_000, 5_000, 10_000], timeout: 60_000 });
 });
 
-test("deployed HQBase publishes the v1 Mail API OAuth resource", async ({ request }) => {
+test("deployed HQBase publishes the v2 Mail API OAuth resource", async ({ request }) => {
   const origin = new URL(stagingUrl).origin;
   const metadata = await getSuccessfulResponseBody(
     request,
-    "/.well-known/oauth-protected-resource/api/v1"
+    "/.well-known/oauth-protected-resource/api/v2"
   );
   expect(JSON.parse(metadata)).toMatchObject({
-    resource: `${origin}/api/v1`,
+    resource: `${origin}/api/v2`,
     authorization_servers: [`${origin}/api/auth`],
     scopes_supported: ["mail:read", "mail:write", "mail:send"]
   });
@@ -65,6 +65,21 @@ test("deployed HQBase publishes the v1 Mail API OAuth resource", async ({ reques
   expect(skillText).toContain(
     "Do not open, navigate to, or interact with the verification URL in Cloud Browser"
   );
+
+  const mailboxSkill = await getSuccessfulResponseBody(request, "/skills/hqbase-mailbox/SKILL.md");
+  expect(mailboxSkill).toMatch(/^---\nname: hqbase-mailbox\ndescription: [^\n]+\n---/);
+  expect(mailboxSkill).toContain(`${origin}/api/v2/openapi.json`);
+
+  const provisionerSkill = await getSuccessfulResponseBody(
+    request,
+    "/skills/hqbase-provisioner/SKILL.md"
+  );
+  expect(provisionerSkill).toMatch(/^---\nname: hqbase-provisioner\ndescription: [^\n]+\n---/);
+  expect(provisionerSkill).toContain(`${origin}/management/v1`);
+  expect(provisionerSkill).toContain(`DELETE ${origin}/management/v1/agents/{agent-id}`);
+
+  const retiredInstructions = await getSuccessfulResponseBody(request, "/agents.md");
+  expect(retiredInstructions).toContain("Settings → Connect AI agents");
 });
 
 test("customer-managed OAuth starts directly with the exact staging callback", async ({

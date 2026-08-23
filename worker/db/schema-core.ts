@@ -22,13 +22,33 @@ export const hqbaseSchemaState = sqliteTable("hqbase_schema_state", {
   updatedAt: text("updated_at").notNull()
 });
 
+export const principals = sqliteTable(
+  "principals",
+  {
+    id: text("id").primaryKey().notNull(),
+    type: text("type", { enum: ["user", "agent"] }).notNull(),
+    name: text("name").notNull(),
+    status: text("status", { enum: ["active", "disabled"] })
+      .default("active")
+      .notNull(),
+    createdAt: text("created_at").notNull(),
+    updatedAt: text("updated_at").notNull()
+  },
+  (table) => [
+    check("principals_type_check", sql`${table.type} IN ('user', 'agent')`),
+    check("principals_status_check", sql`${table.status} IN ('active', 'disabled')`)
+  ]
+);
+
 export const auditEvents = sqliteTable(
   "audit_events",
   {
     id: text("id").primaryKey().notNull(),
     occurredAt: text("occurred_at").notNull(),
     correlationId: text("correlation_id").notNull(),
-    actorType: text("actor_type", { enum: ["user", "system", "operator"] }).notNull(),
+    actorType: text("actor_type", {
+      enum: ["user", "agent", "system", "operator"]
+    }).notNull(),
     actorId: text("actor_id"),
     action: text("action").notNull(),
     resourceType: text("resource_type").notNull(),
@@ -42,7 +62,7 @@ export const auditEvents = sqliteTable(
   (table) => [
     check(
       "audit_events_actor_type_check",
-      sql`${table.actorType} IN ('user', 'system', 'operator')`
+      sql`${table.actorType} IN ('user', 'agent', 'system', 'operator')`
     ),
     check("audit_events_outcome_check", sql`${table.outcome} IN ('success', 'denied', 'failure')`),
     index("audit_events_time_idx").on(sql`${table.occurredAt} DESC`),

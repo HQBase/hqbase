@@ -26,9 +26,11 @@ const setup = {
 const mailbox: Mailbox = {
   id: "mailbox-1",
   address: "support@example.com",
-  addresses: [],
+  mailDomainId: "domain-1",
   displayName: "Support",
+  kind: "human",
   isActive: true,
+  deletedAt: null,
   accessLevel: "manager",
   createdAt: "2026-07-20T00:00:00.000Z",
   updatedAt: "2026-07-20T00:00:00.000Z"
@@ -38,6 +40,7 @@ const secondDomainMailbox: Mailbox = {
   ...mailbox,
   id: "mailbox-2",
   address: "privacy@example.net",
+  mailDomainId: "domain-2",
   displayName: "Privacy"
 };
 
@@ -81,7 +84,7 @@ const notifications = {
 };
 
 describe("settings presentation", () => {
-  it("offers MCP and the deployment-local Agent Skill on the MCP page", () => {
+  it("offers account and agentic-mailbox connection paths in Settings", () => {
     const html = renderToStaticMarkup(
       <McpSettings
         user={{
@@ -95,10 +98,11 @@ describe("settings presentation", () => {
       />
     );
 
-    expect(html).toContain("Connecting as");
+    expect(html).toContain("Connect AI agents");
+    expect(html).toContain("Your account");
+    expect(html).toContain("Agentic mailbox");
     expect(html).toContain("MCP");
     expect(html).toContain("Agent Skill");
-    expect(html).not.toContain("Connect AI agent");
   });
 
   it("renders mailbox content at the top level and opens creation from a dialog trigger", () => {
@@ -106,6 +110,7 @@ describe("settings presentation", () => {
       <MailboxSettings
         canManage
         defaultFromMailboxId={null}
+        deletedMailboxes={[]}
         mailboxes={[]}
         users={[]}
         onChanged={async () => undefined}
@@ -119,6 +124,25 @@ describe("settings presentation", () => {
     expect(html).toContain("No mailboxes yet.");
     expect(html).not.toContain("Set access by domain");
     expect(html).not.toContain("support@example.com");
+  });
+
+  it("offers restore for deleted mailboxes while their mail is kept", () => {
+    const html = renderToStaticMarkup(
+      <MailboxSettings
+        canManage
+        defaultFromMailboxId={null}
+        deletedMailboxes={[{ ...mailbox, deletedAt: "2026-08-23T12:00:00.000Z" }]}
+        mailboxes={[]}
+        users={[]}
+        onChanged={async () => undefined}
+        onDefaultFromMailboxChange={() => undefined}
+      />
+    );
+
+    expect(html).toContain("Deleted mailboxes");
+    expect(html).toContain("Mail is kept until you restore the mailbox.");
+    expect(html).toContain("support@example.com");
+    expect(html).toContain("Restore");
   });
 
   it("keeps the user creation form out of the tab content", () => {
@@ -178,6 +202,7 @@ describe("settings presentation", () => {
       <MailboxSettings
         canManage
         defaultFromMailboxId={mailbox.id}
+        deletedMailboxes={[]}
         mailboxes={[mailbox]}
         users={[member]}
         onChanged={async () => undefined}
@@ -214,7 +239,7 @@ describe("settings presentation", () => {
         [member],
         false
       )
-    ).toBe("Owners · Manager, Avery Stone · Agent");
+    ).toBe("Owners · Manager, Avery Stone · Handle mail");
   });
 
   it("shows the domain filter only when there are multiple domains", () => {
@@ -222,6 +247,7 @@ describe("settings presentation", () => {
       <MailboxSettings
         canManage
         defaultFromMailboxId={mailbox.id}
+        deletedMailboxes={[]}
         mailboxes={[mailbox, secondDomainMailbox]}
         users={[member]}
         onChanged={async () => undefined}
@@ -294,6 +320,7 @@ describe("settings presentation", () => {
         canManage
         currentUser={user as never}
         defaultFromMailboxId={null}
+        deletedMailboxes={[]}
         mailboxes={[]}
         notifications={notifications}
         setup={setup}

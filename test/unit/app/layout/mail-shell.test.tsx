@@ -28,9 +28,11 @@ const unread = {
 const mailbox: Mailbox = {
   id: "mailbox-1",
   address: "support@example.com",
-  addresses: [],
+  mailDomainId: "domain-1",
   displayName: "Support",
+  kind: "human",
   isActive: true,
+  deletedAt: null,
   accessLevel: "manager",
   createdAt: "2026-07-30T12:00:00.000Z",
   updatedAt: "2026-07-30T12:00:00.000Z"
@@ -238,9 +240,11 @@ describe("mail shell", () => {
 
     expect(html).toContain('aria-label="Settings navigation"');
     expect(html).toContain("Mailboxes");
+    expect(html).toContain("Agents");
     expect(html).toContain("Notifications");
     expect(html).toContain("Debug");
     expect(html).toContain('href="/settings/notifications"');
+    expect(html).toContain('href="/settings/agents"');
     expect(html).toContain('aria-current="page"');
     expect(html).not.toContain("Your mail");
   });

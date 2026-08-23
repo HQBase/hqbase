@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 
 import { configPath } from "./manifest.mjs";
 
-const discoveryPath = "/api/v1/openapi.json";
+const discoveryPaths = ["/api/v2/openapi.json", "/api/v1/openapi.json"];
 const defaultProbeTimeoutMs = 5_000;
 
 export function setCanonicalPortal({ hostname, manifest, runCommand, zoneId }) {
@@ -97,21 +97,25 @@ export function createDomainProbe(
 
 export async function probeServiceOrigin({ origin, probe, retry }) {
   const { attempts, delayMs } = retry;
-  let lastError = null;
+  let lastFailures = [];
   for (let attempt = 1; attempt <= attempts; attempt += 1) {
-    try {
-      const advertised = await probe(`${origin}${discoveryPath}`);
-      if (typeof advertised === "string" && advertised) return advertised.replace(/\/$/, "");
-      lastError = new Error("the installation did not advertise a service origin");
-    } catch (error) {
-      lastError = error;
+    const failures = [];
+    for (const path of discoveryPaths) {
+      try {
+        const advertised = await probe(`${origin}${path}`);
+        if (typeof advertised === "string" && advertised) return advertised.replace(/\/$/, "");
+        failures.push(`${path}: the installation did not advertise a service origin`);
+      } catch (error) {
+        failures.push(`${path}: ${error instanceof Error ? error.message : String(error)}`);
+      }
     }
+    lastFailures = failures;
     if (attempt < attempts) {
       await new Promise((resolve) => setTimeout(resolve, delayMs));
     }
   }
   throw new Error(
-    `Refusing to continue: ${origin} did not serve a healthy HQBase installation (${lastError?.message ?? "no response"}). DNS or the certificate is not ready.`
+    `Refusing to continue: ${origin} did not serve a healthy HQBase installation (${lastFailures.join("; ") || "no response"}). DNS or the certificate is not ready.`
   );
 }
 

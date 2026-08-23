@@ -16,8 +16,8 @@ type MessageAccessTarget = {
 
 export async function requireMessageAccess(
   db: D1Database,
-  userId: string,
-  role: WorkspaceRole,
+  principalId: string,
+  role: WorkspaceRole | null,
   messageId: string,
   required: MailboxAccessLevel
 ): Promise<MailboxAccessLevel> {
@@ -25,13 +25,13 @@ export async function requireMessageAccess(
     db,
     sql`SELECT mailbox_id, is_unassigned FROM messages WHERE id = ${messageId}`
   );
-  return requireAccessTarget(db, userId, role, target, required, "MESSAGE_NOT_FOUND");
+  return requireAccessTarget(db, principalId, role, target, required, "MESSAGE_NOT_FOUND");
 }
 
 export async function requireAttachmentAccess(
   db: D1Database,
-  userId: string,
-  role: WorkspaceRole,
+  principalId: string,
+  role: WorkspaceRole | null,
   attachmentId: string,
   required: MailboxAccessLevel
 ): Promise<MailboxAccessLevel> {
@@ -42,13 +42,13 @@ export async function requireAttachmentAccess(
        JOIN messages message ON message.id = attachment.message_id
        WHERE attachment.id = ${attachmentId}`
   );
-  return requireAccessTarget(db, userId, role, target, required, "ATTACHMENT_NOT_FOUND");
+  return requireAccessTarget(db, principalId, role, target, required, "ATTACHMENT_NOT_FOUND");
 }
 
 async function requireAccessTarget(
   db: D1Database,
-  userId: string,
-  role: WorkspaceRole,
+  principalId: string,
+  role: WorkspaceRole | null,
   target: MessageAccessTarget | null,
   required: MailboxAccessLevel,
   notFoundCode: "ATTACHMENT_NOT_FOUND" | "MESSAGE_NOT_FOUND"
@@ -65,5 +65,5 @@ async function requireAccessTarget(
     const resource = notFoundCode === "MESSAGE_NOT_FOUND" ? "Message" : "Attachment";
     throw new AppError(notFoundCode, `${resource} not found.`, 404);
   }
-  return requireMailboxAccess(db, userId, role, target.mailbox_id, required);
+  return requireMailboxAccess(db, principalId, role, target.mailbox_id, required);
 }

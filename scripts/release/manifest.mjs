@@ -119,10 +119,11 @@ export function normalizeConfig(config, version, artifactSha256) {
       ...(artifactSha256 ? { HQBASE_RELEASE_ARTIFACT_SHA256: artifactSha256 } : {}),
       HQBASE_WORKER_NAME: workerNameFromConfig(config)
     },
-    d1_databases: config.d1_databases?.map((binding) => ({
-      ...binding,
-      migrations_dir: "migrations"
-    }))
+    d1_databases: config.d1_databases?.map((binding) => {
+      const normalized = { ...binding, migrations_dir: "migrations" };
+      delete normalized.migrations_pattern;
+      return normalized;
+    })
   };
 }
 

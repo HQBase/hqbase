@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { CurrentUser } from "@/features/auth/types";
 import { McpConnectionDetails } from "@/features/mcp/connection-dialog";
+import { cn } from "@/lib/cn";
 
 export function AgentConnectionDetails({
   fullEndpoint,
@@ -25,7 +26,7 @@ export function AgentConnectionDetails({
   user: CurrentUser;
 }): React.ReactElement {
   return (
-    <>
+    <div className="flex flex-col gap-6">
       <ConnectionIdentity user={user} />
 
       <Tabs defaultValue="mcp">
@@ -41,7 +42,7 @@ export function AgentConnectionDetails({
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent className="mt-3" value="mcp">
+        <TabsContent className="mt-5" value="mcp">
           <McpConnectionDetails
             fullEndpoint={fullEndpoint}
             fullEndpointId={fullEndpointId}
@@ -51,20 +52,28 @@ export function AgentConnectionDetails({
             user={user}
           />
         </TabsContent>
-        <TabsContent className="mt-3" value="agent-skill">
-          <AgentSkillDetails skillUrl={skillUrl} skillUrlId={skillUrlId} />
+        <TabsContent className="mt-5" value="agent-skill">
+          <AgentSkillDetails flat skillUrl={skillUrl} skillUrlId={skillUrlId} />
         </TabsContent>
       </Tabs>
-    </>
+    </div>
   );
 }
 
 export function AgentSkillDetails({
+  description = "Install the skill or give its URL to an agent that can make HTTP requests.",
+  flat = false,
+  nextStep = "The agent reads the API and safety instructions, then gives you a short code and a link to approve in your normal browser. This URL grants no access and contains no account or mail data.",
   skillUrl,
-  skillUrlId
+  skillUrlId,
+  title = "Deployment-local Agent Skill"
 }: {
+  description?: string;
+  flat?: boolean;
+  nextStep?: string;
   skillUrl: string;
   skillUrlId: string;
+  title?: string;
 }): React.ReactElement {
   const [copied, setCopied] = React.useState(false);
 
@@ -78,17 +87,20 @@ export function AgentSkillDetails({
   }
 
   return (
-    <div className="flex flex-col gap-3 text-sm">
-      <section className="flex flex-col gap-3 rounded-lg border bg-muted/20 p-3">
+    <div className="flex flex-col gap-5 text-sm">
+      <section className={cn("flex flex-col gap-4", !flat && "rounded-lg border bg-muted/20 p-3")}>
         <div className="flex items-start gap-3">
-          <span className="mt-0.5 inline-flex size-8 shrink-0 items-center justify-center rounded-md border bg-background text-muted-foreground">
+          <span
+            className={cn(
+              "mt-0.5 inline-flex size-8 shrink-0 items-center justify-center text-muted-foreground",
+              !flat && "rounded-md border bg-background"
+            )}
+          >
             <PiFileText aria-hidden="true" className="size-4" />
           </span>
           <div className="min-w-0">
-            <p className="font-medium text-foreground">Deployment-local Agent Skill</p>
-            <p className="mt-0.5 text-xs text-muted-foreground">
-              Install the skill or give its URL to an agent that can make HTTP requests.
-            </p>
+            <h3 className="font-medium text-foreground">{title}</h3>
+            <p className="mt-0.5 text-xs text-muted-foreground">{description}</p>
           </div>
         </div>
 
@@ -97,6 +109,7 @@ export function AgentSkillDetails({
             Agent Skill URL
           </label>
           <Input
+            aria-label="Agent Skill URL"
             className="min-w-0 font-mono text-base sm:text-xs"
             id={skillUrlId}
             readOnly
@@ -128,21 +141,24 @@ export function AgentSkillDetails({
         </div>
       </section>
 
-      <section className="flex flex-col gap-1 rounded-lg border px-3 py-2.5 text-xs leading-4 text-muted-foreground">
-        <p className="font-medium text-foreground">What happens next</p>
-        <p>
-          The agent reads the API and safety instructions, then gives you a short code and a link to
-          approve in your normal browser. This URL grants no access and contains no account or mail
-          data.
-        </p>
-      </section>
+      {nextStep ? (
+        <section
+          className={cn(
+            "flex flex-col gap-1 text-xs leading-4 text-muted-foreground",
+            !flat && "rounded-lg border px-3 py-2.5"
+          )}
+        >
+          <p className="font-medium text-foreground">What happens next</p>
+          <p>{nextStep}</p>
+        </section>
+      ) : null}
     </div>
   );
 }
 
 function ConnectionIdentity({ user }: { user: CurrentUser }): React.ReactElement {
   return (
-    <section className="rounded-lg border bg-muted/30 px-3 py-2.5 text-sm">
+    <section className="flex flex-col gap-1 text-sm">
       <p className="text-xs font-medium text-muted-foreground">Connecting as</p>
       <div className="flex flex-wrap items-baseline gap-x-2">
         <p className="font-medium">{user.name}</p>
@@ -150,7 +166,7 @@ function ConnectionIdentity({ user }: { user: CurrentUser }): React.ReactElement
           {user.email} · {user.role}
         </p>
       </div>
-      <p className="mt-1 text-xs leading-4 text-muted-foreground">
+      <p className="text-xs leading-4 text-muted-foreground">
         After consent, HQBase rechecks this user&apos;s current workspace role and live mailbox
         grants.
       </p>

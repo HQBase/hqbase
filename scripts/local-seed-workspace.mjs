@@ -1,12 +1,4 @@
-import {
-  domain,
-  domains,
-  extraAddresses,
-  mailboxes,
-  owner,
-  seedVersion,
-  users
-} from "./local-seed-data.mjs";
+import { domain, domains, mailboxes, owner, seedVersion, users } from "./local-seed-data.mjs";
 import { upsert } from "./local-seed-sql.mjs";
 
 export function buildWorkspaceSeedLines(passwordHash, timeline) {
@@ -52,25 +44,6 @@ export function buildWorkspaceSeedLines(passwordHash, timeline) {
     )
   );
 
-  for (const mailbox of mailboxes) {
-    lines.push(
-      upsert(
-        "mailboxes",
-        ["id", "address", "display_name", "is_active", "created_at", "updated_at"],
-        [
-          mailbox.id,
-          mailbox.address,
-          mailbox.displayName,
-          1,
-          timeline.workspaceCreated,
-          timeline.now
-        ],
-        ["id"],
-        ["address", "display_name", "is_active", "updated_at"]
-      )
-    );
-  }
-
   for (const entry of domains) {
     lines.push(
       upsert(
@@ -95,7 +68,7 @@ export function buildWorkspaceSeedLines(passwordHash, timeline) {
           "ready",
           "ready",
           entry.catchAllPolicy,
-          entry.id === domains[1].id ? mailboxes[2].id : null,
+          null,
           1,
           timeline.workspaceCreated,
           timeline.workspaceCreated,
@@ -108,7 +81,6 @@ export function buildWorkspaceSeedLines(passwordHash, timeline) {
           "sending_status",
           "dns_status",
           "catch_all_policy",
-          "catch_all_mailbox_id",
           "is_enabled",
           "verified_at",
           "updated_at"
@@ -120,136 +92,190 @@ export function buildWorkspaceSeedLines(passwordHash, timeline) {
   for (const mailbox of mailboxes) {
     lines.push(
       upsert(
-        "mailbox_addresses",
+        "mailboxes",
         [
           "id",
-          "mailbox_id",
-          "mail_domain_id",
-          "local_part",
           "address",
+          "mail_domain_id",
           "display_name",
-          "receive_enabled",
-          "send_enabled",
-          "is_primary",
+          "is_active",
           "created_at",
           "updated_at"
         ],
         [
-          mailbox.addressId,
           mailbox.id,
-          mailbox.domainId,
-          mailbox.address.split("@")[0],
           mailbox.address,
+          mailbox.domainId,
           mailbox.displayName,
           1,
-          1,
-          1,
           timeline.workspaceCreated,
           timeline.now
         ],
         ["id"],
-        [
-          "mailbox_id",
-          "mail_domain_id",
-          "local_part",
-          "address",
-          "display_name",
-          "receive_enabled",
-          "send_enabled",
-          "is_primary",
-          "updated_at"
-        ]
-      )
-    );
-  }
-
-  for (const address of extraAddresses) {
-    lines.push(
-      upsert(
-        "mailbox_addresses",
-        [
-          "id",
-          "mailbox_id",
-          "mail_domain_id",
-          "local_part",
-          "address",
-          "display_name",
-          "receive_enabled",
-          "send_enabled",
-          "is_primary",
-          "created_at",
-          "updated_at"
-        ],
-        [
-          address.id,
-          address.mailboxId,
-          address.domainId,
-          address.localPart,
-          address.address,
-          address.displayName,
-          1,
-          1,
-          0,
-          timeline.workspaceCreated,
-          timeline.now
-        ],
-        ["id"],
-        [
-          "mailbox_id",
-          "mail_domain_id",
-          "local_part",
-          "address",
-          "display_name",
-          "receive_enabled",
-          "send_enabled",
-          "is_primary",
-          "updated_at"
-        ]
+        ["address", "mail_domain_id", "display_name", "is_active", "updated_at"]
       )
     );
   }
 
   lines.push(
     upsert(
+      "mail_domains",
+      [
+        "id",
+        "name",
+        "receiving_status",
+        "sending_status",
+        "dns_status",
+        "catch_all_policy",
+        "catch_all_mailbox_id",
+        "is_enabled",
+        "verified_at",
+        "created_at",
+        "updated_at"
+      ],
+      [
+        domains[1].id,
+        domains[1].name,
+        "ready",
+        "ready",
+        "ready",
+        domains[1].catchAllPolicy,
+        mailboxes[2].id,
+        1,
+        timeline.workspaceCreated,
+        timeline.workspaceCreated,
+        timeline.now
+      ],
+      ["id"],
+      ["catch_all_mailbox_id", "updated_at"]
+    )
+  );
+
+  lines.push(
+    upsert(
       "mailbox_grants",
-      ["mailbox_id", "user_id", "access_level", "created_by", "created_at", "updated_at"],
+      [
+        "mailbox_id",
+        "principal_id",
+        "access_level",
+        "created_by_principal_id",
+        "created_at",
+        "updated_at"
+      ],
       [mailboxes[1].id, owner.id, "manager", owner.id, timeline.workspaceCreated, timeline.now],
-      ["mailbox_id", "user_id"],
+      ["mailbox_id", "principal_id"],
       ["access_level", "updated_at"]
     ),
     upsert(
       "mailbox_grants",
-      ["mailbox_id", "user_id", "access_level", "created_by", "created_at", "updated_at"],
+      [
+        "mailbox_id",
+        "principal_id",
+        "access_level",
+        "created_by_principal_id",
+        "created_at",
+        "updated_at"
+      ],
       [mailboxes[0].id, users[1].id, "manager", owner.id, timeline.workspaceCreated, timeline.now],
-      ["mailbox_id", "user_id"],
+      ["mailbox_id", "principal_id"],
       ["access_level", "updated_at"]
     ),
     upsert(
       "mailbox_grants",
-      ["mailbox_id", "user_id", "access_level", "created_by", "created_at", "updated_at"],
+      [
+        "mailbox_id",
+        "principal_id",
+        "access_level",
+        "created_by_principal_id",
+        "created_at",
+        "updated_at"
+      ],
       [mailboxes[2].id, users[1].id, "agent", owner.id, timeline.workspaceCreated, timeline.now],
-      ["mailbox_id", "user_id"],
+      ["mailbox_id", "principal_id"],
       ["access_level", "updated_at"]
     ),
     upsert(
       "mailbox_grants",
-      ["mailbox_id", "user_id", "access_level", "created_by", "created_at", "updated_at"],
+      [
+        "mailbox_id",
+        "principal_id",
+        "access_level",
+        "created_by_principal_id",
+        "created_at",
+        "updated_at"
+      ],
       [mailboxes[0].id, users[2].id, "agent", owner.id, timeline.workspaceCreated, timeline.now],
-      ["mailbox_id", "user_id"],
+      ["mailbox_id", "principal_id"],
       ["access_level", "updated_at"]
     ),
     upsert(
       "mailbox_grants",
-      ["mailbox_id", "user_id", "access_level", "created_by", "created_at", "updated_at"],
+      [
+        "mailbox_id",
+        "principal_id",
+        "access_level",
+        "created_by_principal_id",
+        "created_at",
+        "updated_at"
+      ],
       [mailboxes[3].id, users[3].id, "read", owner.id, timeline.workspaceCreated, timeline.now],
-      ["mailbox_id", "user_id"],
+      ["mailbox_id", "principal_id"],
       ["access_level", "updated_at"]
     ),
     upsert(
       "mailbox_grants",
-      ["mailbox_id", "user_id", "access_level", "created_by", "created_at", "updated_at"],
+      [
+        "mailbox_id",
+        "principal_id",
+        "access_level",
+        "created_by_principal_id",
+        "created_at",
+        "updated_at"
+      ],
       [mailboxes[4].id, owner.id, "manager", owner.id, timeline.workspaceCreated, timeline.now],
-      ["mailbox_id", "user_id"],
+      ["mailbox_id", "principal_id"],
+      ["access_level", "updated_at"]
+    ),
+    upsert(
+      "mailbox_grants",
+      [
+        "mailbox_id",
+        "principal_id",
+        "access_level",
+        "created_by_principal_id",
+        "created_at",
+        "updated_at"
+      ],
+      [mailboxes[6].id, users[1].id, "manager", owner.id, timeline.workspaceCreated, timeline.now],
+      ["mailbox_id", "principal_id"],
+      ["access_level", "updated_at"]
+    ),
+    upsert(
+      "mailbox_grants",
+      [
+        "mailbox_id",
+        "principal_id",
+        "access_level",
+        "created_by_principal_id",
+        "created_at",
+        "updated_at"
+      ],
+      [mailboxes[6].id, users[2].id, "agent", owner.id, timeline.workspaceCreated, timeline.now],
+      ["mailbox_id", "principal_id"],
+      ["access_level", "updated_at"]
+    ),
+    upsert(
+      "mailbox_grants",
+      [
+        "mailbox_id",
+        "principal_id",
+        "access_level",
+        "created_by_principal_id",
+        "created_at",
+        "updated_at"
+      ],
+      [mailboxes[7].id, users[1].id, "agent", owner.id, timeline.workspaceCreated, timeline.now],
+      ["mailbox_id", "principal_id"],
       ["access_level", "updated_at"]
     ),
     upsert(

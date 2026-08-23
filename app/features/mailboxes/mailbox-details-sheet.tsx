@@ -1,5 +1,5 @@
 import type * as React from "react";
-import { PiCaretDown, PiPlus, PiUsers } from "react-icons/pi";
+import { PiTrash, PiUsers } from "react-icons/pi";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
@@ -16,22 +16,19 @@ export function MailboxDetailsSheet({
   mailbox,
   policies,
   users,
-  onAddAddress,
+  onDelete,
   onManageAccess,
-  onOpenChange,
-  onRemoveAddress
+  onOpenChange
 }: {
   canManage: boolean;
   mailbox: Mailbox | null;
   policies: MailboxAccessPolicies;
   users: WorkspaceUser[];
-  onAddAddress: (mailbox: Mailbox) => void;
+  onDelete: (mailbox: Mailbox) => void;
   onManageAccess: (mailbox: Mailbox) => void;
   onOpenChange: (open: boolean) => void;
-  onRemoveAddress: (mailbox: Mailbox, addressId: string) => void;
 }): React.ReactElement {
   const people = mailbox ? getMailboxAccessEntries(mailbox.id, policies.grants, users) : [];
-  const additionalAddresses = mailbox?.addresses.filter((address) => !address.isPrimary) ?? [];
 
   return (
     <Sheet open={mailbox !== null} onOpenChange={onOpenChange}>
@@ -100,67 +97,25 @@ export function MailboxDetailsSheet({
             </div>
           </section>
 
-          <details className="group border-t pt-5">
-            <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between rounded-md text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-              More settings
-              <PiCaretDown className="size-4 text-muted-foreground transition-transform group-open:rotate-180 motion-reduce:transition-none" />
-            </summary>
-            <div className="mt-3 space-y-5 rounded-md bg-muted/35 p-4">
-              <section aria-labelledby="additional-addresses-heading">
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <h4 className="text-sm font-medium" id="additional-addresses-heading">
-                      Additional email addresses
-                    </h4>
-                    <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-                      Mail sent to these addresses arrives in this mailbox. They can also be used
-                      when sending.
-                    </p>
-                  </div>
-                  {canManage && mailbox ? (
-                    <Button
-                      aria-label={`Add an email address to ${mailbox.address}`}
-                      className="shrink-0"
-                      size="sm"
-                      type="button"
-                      variant="outline"
-                      onClick={() => onAddAddress(mailbox)}
-                    >
-                      <PiPlus data-icon="inline-start" />
-                      Add
-                    </Button>
-                  ) : null}
-                </div>
-                {additionalAddresses.length ? (
-                  <ul className="mt-3 divide-y rounded-md border bg-background">
-                    {additionalAddresses.map((address) => (
-                      <li
-                        className="flex min-h-11 items-center justify-between gap-3 px-3 py-2"
-                        key={address.id}
-                      >
-                        <span className="min-w-0 truncate text-sm">{address.address}</span>
-                        {canManage && mailbox ? (
-                          <Button
-                            aria-label={`Remove ${address.address}`}
-                            size="sm"
-                            type="button"
-                            variant="ghost"
-                            onClick={() => onRemoveAddress(mailbox, address.id)}
-                          >
-                            Remove
-                          </Button>
-                        ) : null}
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p className="mt-3 text-xs text-muted-foreground">
-                    No additional email addresses.
-                  </p>
-                )}
-              </section>
-            </div>
-          </details>
+          {canManage && mailbox ? (
+            <section className="border-t pt-5" aria-labelledby="delete-mailbox-heading">
+              <h3 className="font-medium" id="delete-mailbox-heading">
+                Delete mailbox
+              </h3>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Hide this mailbox and stop new mail without deleting its history.
+              </p>
+              <Button
+                className="mt-4"
+                type="button"
+                variant="destructive"
+                onClick={() => onDelete(mailbox)}
+              >
+                <PiTrash data-icon="inline-start" />
+                Delete mailbox
+              </Button>
+            </section>
+          ) : null}
         </div>
       </SheetContent>
     </Sheet>

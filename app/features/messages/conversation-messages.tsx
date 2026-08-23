@@ -108,7 +108,7 @@ export function ConversationMessages({
                 {message.attachments.map((attachment) => (
                   <a
                     className="flex w-fit max-w-full items-center gap-2 rounded-md border bg-card px-3 py-2 text-xs [@media(hover:hover)]:hover:bg-muted"
-                    href={`/api/v1/attachments/${attachment.id}`}
+                    href={`/api/v2/attachments/${attachment.id}`}
                     key={attachment.id}
                   >
                     <PiDownloadSimple className="size-3.5" />

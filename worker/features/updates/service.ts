@@ -51,7 +51,7 @@ export async function getUpdateStatus(
   return {
     product: "hqbase",
     installedVersion,
-    installedSchemaVersion: 2,
+    installedSchemaVersion: 3,
     channel: "stable",
     checkedAt: new Date().toISOString(),
     available: compareVersions(release.version, installedVersion) > 0,
