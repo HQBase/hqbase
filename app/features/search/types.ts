@@ -60,3 +60,18 @@ export function groupSearchResults(results: WorkspaceSearchResults): GlobalSearc
   ];
   return groups.filter((group) => group.results.length > 0);
 }
+
+export function globalSearchResultPath(result: GlobalSearchResult): string {
+  switch (result.kind) {
+    case "conversation": {
+      const folder = result.folder === "catchall" ? "catch-all" : result.folder;
+      return `/mail/${folder}/${encodeURIComponent(result.id)}`;
+    }
+    case "contact":
+      return `/contacts/${encodeURIComponent(result.id)}`;
+    case "draft":
+      return `/mail/drafts/${encodeURIComponent(result.id)}`;
+    case "destination":
+      return result.path;
+  }
+}

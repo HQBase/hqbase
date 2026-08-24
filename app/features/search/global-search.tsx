@@ -111,7 +111,7 @@ export function GlobalSearch({
       setActiveIndex(-1);
       return;
     }
-    if (event.key !== "Enter" || !trimmedQuery) return;
+    if (event.key !== "Enter") return;
     event.preventDefault();
     const selected = listOpen && activeIndex >= 0 ? flatResults[activeIndex] : undefined;
     if (selected) choose(selected);

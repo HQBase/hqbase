@@ -3,7 +3,11 @@ import * as React from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { GlobalSearch } from "@/features/search/global-search";
-import type { GlobalSearchResult, WorkspaceSearchResults } from "@/features/search/types";
+import {
+  type GlobalSearchResult,
+  globalSearchResultPath,
+  type WorkspaceSearchResults
+} from "@/features/search/types";
 import { flushHookEffects, renderComponent } from "../render-hook";
 
 const mocks = vi.hoisted(() => ({ searchWorkspace: vi.fn() }));
@@ -87,7 +91,37 @@ describe("global search", () => {
 
     expect(onSubmit).toHaveBeenCalledWith("exact query");
     expect(mocks.searchWorkspace).not.toHaveBeenCalled();
+
+    await setInput(input, "");
+    await flushHookEffects(() =>
+      input.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, key: "Enter" }))
+    );
+    expect(onSubmit).toHaveBeenLastCalledWith("");
     await view.unmount();
+  });
+
+  it("builds canonical paths for selectable results", () => {
+    expect(
+      globalSearchResultPath({
+        kind: "contact",
+        email: "pat+search@example.net",
+        id: "pat+search@example.net",
+        lastContactAt: null,
+        name: "Pat",
+        saved: true,
+        source: "saved"
+      })
+    ).toBe("/contacts/pat%2Bsearch%40example.net");
+    expect(
+      globalSearchResultPath({
+        kind: "draft",
+        from: "team@example.com",
+        id: "draft/one",
+        subject: "Draft",
+        to: [],
+        updatedAt: "2026-08-24T00:00:00.000Z"
+      })
+    ).toBe("/mail/drafts/draft%2Fone");
   });
 });
 
