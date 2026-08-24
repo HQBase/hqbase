@@ -13,6 +13,7 @@ const fullToken = "hqb_access_mcp-hqbase-full-token";
 const fullScopes = ["mail:read", "mail:write", "mail:send"];
 const readToolNames = [
   "list_mailboxes",
+  "list_labels",
   "search_messages",
   "list_conversations",
   "get_message",
@@ -71,6 +72,11 @@ describe("HQBase MCP server", () => {
          (mailbox_id, principal_id, access_level, created_by_principal_id, created_at, updated_at)
          VALUES ('mbx_allowed', ?, 'agent', ?, ?, ?)`
       ).bind(userId, userId, now.toISOString(), now.toISOString()),
+      env.DB.prepare(
+        `INSERT INTO labels
+         (id, name, color, created_by_user_id, created_at, updated_at)
+         VALUES ('lbl_mcp_customer', 'Customer', 'blue', ?, ?, ?)`
+      ).bind(userId, now.toISOString(), now.toISOString()),
       env.DB.prepare(
         `INSERT INTO oauthClient
          (id, clientId, disabled, redirectUris, public, requirePKCE, createdAt, updatedAt)
@@ -307,11 +313,14 @@ describe("HQBase MCP server", () => {
     expect(await listToolNames(readProfileFullToken)).toEqual(readToolNames);
     expect(await listToolNames(fullToken, "/mcp/full")).toEqual([
       "list_mailboxes",
+      "list_labels",
       "search_messages",
       "list_conversations",
       "get_message",
       "get_thread",
       "get_attachment",
+      "add_label",
+      "remove_label",
       "update_message",
       "update_conversation",
       "list_drafts",
@@ -366,6 +375,34 @@ describe("HQBase MCP server", () => {
       })
     ]);
     expect(mailboxes[0]).not.toHaveProperty("addresses");
+  });
+
+  it("lists, adds, filters, and removes shared labels", async () => {
+    await expect(callTool("list_labels", {}, readToken)).resolves.toEqual([
+      expect.objectContaining({ color: "blue", id: "lbl_mcp_customer", name: "Customer" })
+    ]);
+
+    await expect(
+      callTool(
+        "add_label",
+        { labelId: "lbl_mcp_customer", messageId: "msg_mcp_allowed", target: "message" },
+        fullToken,
+        "/mcp/full"
+      )
+    ).resolves.toMatchObject({ affected: 1, assigned: true, labelId: "lbl_mcp_customer" });
+    await expect(
+      callTool("search_messages", { labelId: "lbl_mcp_customer" }, readToken)
+    ).resolves.toMatchObject([
+      { id: "msg_mcp_allowed", labels: [expect.objectContaining({ id: "lbl_mcp_customer" })] }
+    ]);
+    await expect(
+      callTool(
+        "remove_label",
+        { labelId: "lbl_mcp_customer", messageId: "msg_mcp_allowed", target: "message" },
+        fullToken,
+        "/mcp/full"
+      )
+    ).resolves.toMatchObject({ affected: 1, assigned: false, labelId: "lbl_mcp_customer" });
   });
 
   it("reads permitted threads and returns bounded embedded attachments", async () => {

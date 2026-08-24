@@ -23,9 +23,11 @@ import type {
 const conversationCursorVersion = 1;
 
 export type ListConversationFilters = {
+  correspondentEmail?: string | undefined;
   cursor?: string | undefined;
   folder?: ConversationFolder | undefined;
   limit?: number | undefined;
+  labelId?: string | undefined;
   mailboxId?: string | undefined;
   scope: MessageScope;
   search?: string | undefined;
@@ -77,6 +79,29 @@ export async function listConversationPage(
            OR accessible.snippet LIKE ${like} ESCAPE '\\'
            OR accessible.text_body LIKE ${like} ESCAPE '\\')`
     );
+  }
+  if (filters.correspondentEmail) {
+    eligibilityWhere.push(sql`(
+      lower(accessible.from_address) = ${filters.correspondentEmail}
+      OR EXISTS (
+        SELECT 1 FROM json_each(accessible.to_json) recipient
+        WHERE lower(trim(CAST(recipient.value AS TEXT))) = ${filters.correspondentEmail}
+      )
+      OR EXISTS (
+        SELECT 1 FROM json_each(accessible.cc_json) recipient
+        WHERE lower(trim(CAST(recipient.value AS TEXT))) = ${filters.correspondentEmail}
+      )
+      OR EXISTS (
+        SELECT 1 FROM json_each(accessible.bcc_json) recipient
+        WHERE lower(trim(CAST(recipient.value AS TEXT))) = ${filters.correspondentEmail}
+      )
+    )`);
+  }
+  if (filters.labelId) {
+    eligibilityWhere.push(sql`EXISTS (
+      SELECT 1 FROM message_labels assignment
+      WHERE assignment.message_id = accessible.id AND assignment.label_id = ${filters.labelId}
+    )`);
   }
 
   const cursor = filters.cursor ? decodeConversationCursor(filters.cursor) : null;

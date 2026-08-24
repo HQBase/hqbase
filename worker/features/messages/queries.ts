@@ -30,6 +30,7 @@ export const maxMessageLimit = 100;
 export type ListMessageFilters = {
   cursor?: string | undefined;
   folder?: string | undefined;
+  labelId?: string | undefined;
   limit?: number | undefined;
   mailboxId?: string | undefined;
   search?: string | undefined;
@@ -158,6 +159,12 @@ export async function listMessagePage(
            OR to_json LIKE ${like} ESCAPE '\\' OR snippet LIKE ${like} ESCAPE '\\'
            OR text_body LIKE ${like} ESCAPE '\\')`
     );
+  }
+  if (filters.labelId) {
+    where.push(sql`EXISTS (
+      SELECT 1 FROM message_labels assignment
+      WHERE assignment.message_id = messages.id AND assignment.label_id = ${filters.labelId}
+    )`);
   }
 
   const cursor = filters.cursor ? decodeMessageCursor(filters.cursor) : null;
