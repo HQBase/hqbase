@@ -2,11 +2,12 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 const outputDirectory = "api";
-const openApiLocation = path.join(outputDirectory, "hqbase-mail-api-v2.openapi.json");
+const v1OpenApiLocation = path.join(outputDirectory, "hqbase-mail-api-v1.openapi.json");
+const v2OpenApiLocation = path.join(outputDirectory, "hqbase-mail-api-v2.openapi.json");
+const v1OpenApiDocument = JSON.parse(await readFile(v1OpenApiLocation, "utf8"));
 const v2OpenApiDocument = withAgentAuthentication(
-  JSON.parse(await readFile(openApiLocation, "utf8"))
+  JSON.parse(await readFile(v2OpenApiLocation, "utf8"))
 );
-const v1OpenApiDocument = withV1Compatibility(v2OpenApiDocument);
 validateOpenApi(v1OpenApiDocument, 1);
 validateOpenApi(v2OpenApiDocument, 2);
 const outputs = {
@@ -70,7 +71,7 @@ function buildCollection(document, version) {
           ? "62c6dbf4-835d-4a3f-87df-77b7ddcf2db1"
           : "72c6dbf4-835d-4a3f-87df-77b7ddcf2db2",
       name: `HQBase Mail API v${version}`,
-      description: `Generated from api/hqbase-mail-api-v${version}.openapi.json. For a tool acting for a person, set base_url, run Register public client, and use Postman's OAuth 2.0 Authorization Code flow with PKCE (S256). Auth URL: {{base_url}}/api/auth/oauth2/authorize. Token URL: {{base_url}}/api/auth/oauth2/token. Client ID: {{client_id}}. Scope: mail:read mail:write mail:send offline_access. Add authorization request parameter resource={{api_resource}}, then store the resulting token only in your local environment as access_token.${version === 2 ? " For a mailbox agent, skip OAuth and set access_token to its one-time hqb_agent_ credential." : ""} Postman v2.1 HTTP collections cannot contain WebSocket requests. To receive change wakes, create a separate WebSocket request to {{ws_base_url}}${apiBasePath}/events and add Authorization: Bearer {{access_token}}. Sending, replying, and forwarding are not idempotent.`,
+      description: `Generated from api/hqbase-mail-api-v${version}.openapi.json. ${version === 2 ? "For a tool acting for a person, set" : "Set"} base_url, run Register public client, and use Postman's OAuth 2.0 Authorization Code flow with PKCE (S256). Auth URL: {{base_url}}/api/auth/oauth2/authorize. Token URL: {{base_url}}/api/auth/oauth2/token. Client ID: {{client_id}}. Scope: mail:read mail:write mail:send offline_access. Add authorization request parameter resource={{api_resource}}, then store the resulting token only in your local environment as access_token.${version === 2 ? " For a mailbox agent, skip OAuth and set access_token to its one-time hqb_agent_ credential." : ""} Postman v2.1 HTTP collections cannot contain WebSocket requests. To receive change wakes, create a separate WebSocket request to {{ws_base_url}}${apiBasePath}/events and add Authorization: Bearer {{access_token}}. Sending, replying, and forwarding are not idempotent.`,
       schema: "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
     },
     auth: {
@@ -90,79 +91,6 @@ function buildCollection(document, version) {
     ],
     item: [oauthSetupFolder(version), ...folders.values()]
   };
-}
-
-function withV1Compatibility(document) {
-  const result = JSON.parse(JSON.stringify(document).replaceAll("/api/v2", "/api/v1"));
-  result.info.version = "1.0.0";
-  result.info.description =
-    "Supported v1 compatibility API for existing HQBase clients. Each mailbox contains one primary address backed by the one-address mailbox model.";
-
-  delete result.components.securitySchemes.agentBearer;
-  for (const pathItem of Object.values(result.paths ?? {})) {
-    for (const method of ["get", "post", "patch", "delete"]) {
-      const operation = pathItem[method];
-      if (!operation) continue;
-      operation.security = (operation.security ?? []).filter(
-        (requirement) => !("agentBearer" in requirement)
-      );
-      delete operation["x-hqbase-agent-capabilities"];
-    }
-  }
-
-  const current = result.components.schemas.Mailbox.properties;
-  result.components.schemas.Mailbox = {
-    type: "object",
-    required: [
-      "id",
-      "address",
-      "addresses",
-      "displayName",
-      "isActive",
-      "accessLevel",
-      "createdAt",
-      "updatedAt"
-    ],
-    properties: {
-      id: current.id,
-      address: current.address,
-      addresses: {
-        type: "array",
-        items: { $ref: "#/components/schemas/MailboxAddress" },
-        minItems: 1,
-        maxItems: 1
-      },
-      displayName: current.displayName,
-      isActive: current.isActive,
-      accessLevel: current.accessLevel,
-      createdAt: current.createdAt,
-      updatedAt: current.updatedAt
-    }
-  };
-  result.components.schemas.MailboxAddress = {
-    type: "object",
-    required: [
-      "id",
-      "mailboxId",
-      "mailDomainId",
-      "address",
-      "displayName",
-      "receiveEnabled",
-      "sendEnabled",
-      "isPrimary"
-    ],
-    properties: {
-      id: { type: "string" },
-      mailboxId: { type: "string" },
-      mailDomainId: { type: "string" },
-      address: { type: "string", format: "email" },
-      displayName: { type: "string" },
-      receiveEnabled: { type: "boolean" },
-      sendEnabled: { type: "boolean" },
-      isPrimary: { type: "boolean" }
-    }
-  };
-  return result;
 }
 
 function withAgentAuthentication(document) {

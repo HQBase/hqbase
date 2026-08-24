@@ -3,7 +3,7 @@
   "info": {
     "title": "HQBase Mail API",
     "version": "1.0.0",
-    "description": "Supported v1 compatibility API for existing HQBase clients. Each mailbox contains one primary address backed by the one-address mailbox model."
+    "description": "Stable v1 mail API for HQBase clients, automations, and agents. Additive fields may be introduced within v1; clients must ignore unknown response fields. Administrative APIs are not part of this contract."
   },
   "servers": [
     {
@@ -401,7 +401,7 @@
               "type": "string",
               "enum": ["inbox", "sent", "drafts", "archived", "trash", "catchall"]
             },
-            "description": "Message folder to list. Drafts are separate resources, not message rows. Use `/api/v1/drafts` to list drafts."
+            "description": "Message folder to list. The `drafts` value remains for v1 compatibility, but current write paths do not store drafts as message rows. Use `/api/v1/drafts` for drafts."
           },
           {
             "in": "query",
@@ -2518,6 +2518,46 @@
           }
         }
       },
+      "MailboxAddress": {
+        "type": "object",
+        "required": [
+          "id",
+          "mailboxId",
+          "mailDomainId",
+          "address",
+          "displayName",
+          "receiveEnabled",
+          "sendEnabled",
+          "isPrimary"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "mailboxId": {
+            "type": "string"
+          },
+          "mailDomainId": {
+            "type": "string"
+          },
+          "address": {
+            "type": "string",
+            "format": "email"
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "receiveEnabled": {
+            "type": "boolean"
+          },
+          "sendEnabled": {
+            "type": "boolean"
+          },
+          "isPrimary": {
+            "type": "boolean"
+          }
+        }
+      },
       "Mailbox": {
         "type": "object",
         "required": [
@@ -3367,46 +3407,6 @@
           "includeOriginalAttachments": {
             "type": "boolean",
             "default": true
-          }
-        }
-      },
-      "MailboxAddress": {
-        "type": "object",
-        "required": [
-          "id",
-          "mailboxId",
-          "mailDomainId",
-          "address",
-          "displayName",
-          "receiveEnabled",
-          "sendEnabled",
-          "isPrimary"
-        ],
-        "properties": {
-          "id": {
-            "type": "string"
-          },
-          "mailboxId": {
-            "type": "string"
-          },
-          "mailDomainId": {
-            "type": "string"
-          },
-          "address": {
-            "type": "string",
-            "format": "email"
-          },
-          "displayName": {
-            "type": "string"
-          },
-          "receiveEnabled": {
-            "type": "boolean"
-          },
-          "sendEnabled": {
-            "type": "boolean"
-          },
-          "isPrimary": {
-            "type": "boolean"
           }
         }
       }

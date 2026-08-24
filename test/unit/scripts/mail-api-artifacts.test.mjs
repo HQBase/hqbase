@@ -79,6 +79,9 @@ describe("Mail API public artifacts", () => {
   it("publishes the v1 mailbox schema without reviving alias storage", () => {
     expect(v1OpenApi.openapi).toBe("3.1.0");
     expect(v1OpenApi.info.version).toBe("1.0.0");
+    expect(v1OpenApi.info.description).toBe(
+      "Stable v1 mail API for HQBase clients, automations, and agents. Additive fields may be introduced within v1; clients must ignore unknown response fields. Administrative APIs are not part of this contract."
+    );
     expect(Object.keys(v1OpenApi.paths).every((path) => path.startsWith("/api/v1/"))).toBe(true);
     expect(v1OpenApi.components.securitySchemes.agentBearer).toBeUndefined();
     expect(v1OpenApi.components.schemas.Mailbox.required).toEqual([
@@ -99,6 +102,13 @@ describe("Mail API public artifacts", () => {
       items: { $ref: "#/components/schemas/MailboxAddress" }
     });
     expect(v1OpenApi.components.schemas.MailboxAddress).toBeDefined();
+    expect(
+      v1OpenApi.paths["/api/v1/messages"].get.parameters.find(
+        (parameter) => parameter.name === "folder"
+      ).description
+    ).toBe(
+      "Message folder to list. The `drafts` value remains for v1 compatibility, but current write paths do not store drafts as message rows. Use `/api/v1/drafts` for drafts."
+    );
     expect(JSON.stringify(v1OpenApi)).not.toContain("agentBearer");
     expect(JSON.stringify(v1OpenApi)).not.toContain("x-hqbase-agent-capabilities");
     expect(JSON.stringify(v1OpenApi)).not.toContain("r2Key");
@@ -138,6 +148,8 @@ describe("Mail API public artifacts", () => {
 
   it("generates v1 OAuth and event setup for existing clients", () => {
     const serialized = JSON.stringify(v1Postman);
+    expect(v1Postman.info.description).toContain("hqbase-mail-api-v1.openapi.json. Set base_url");
+    expect(v1Postman.info.description).not.toContain("For a tool acting for a person");
     expect(serialized).not.toContain("/api/v2");
     expect(serialized).toContain("/.well-known/oauth-protected-resource/api/v1");
     expect(serialized).toContain("{{ws_base_url}}/api/v1/events");
