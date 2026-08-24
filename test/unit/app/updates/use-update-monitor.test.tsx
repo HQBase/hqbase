@@ -26,6 +26,7 @@ const status: UpdateStatus = {
     version: "0.1.23",
     schemaVersion: 5,
     publishedAt: "2026-07-29T00:00:00.000Z",
+    notes: ["Add the next update."],
     notesUrl: "https://github.com/HQBase/hqbase/releases/tag/v0.1.23"
   }
 };

@@ -10,6 +10,7 @@ export type UpdateStatus = {
     version: string;
     schemaVersion: number;
     publishedAt: string;
+    notes: string[];
     notesUrl: string;
   };
 };

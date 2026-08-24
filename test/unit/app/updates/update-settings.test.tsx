@@ -15,6 +15,7 @@ const availableStatus: UpdateStatus = {
     version: "0.2.0",
     schemaVersion: 10,
     publishedAt: "2026-07-13T12:00:00.000Z",
+    notes: ["Add contact suggestions.", "Fix draft recipient validation."],
     notesUrl: "https://example.com/releases/0.2.0"
   }
 };
@@ -40,7 +41,10 @@ describe("update settings", () => {
     expect(html).toContain("Available");
     expect(html).toContain("0.2.0");
     expect(html).not.toContain("HQBase 0.2.0");
-    expect(html).not.toContain("Read release notes");
+    expect(html).toContain("What’s changing");
+    expect(html).toContain("Add contact suggestions.");
+    expect(html).toContain("Fix draft recipient validation.");
+    expect(html).toContain("Read complete release notes");
     expect(html).not.toContain("Schema 10");
   });
 

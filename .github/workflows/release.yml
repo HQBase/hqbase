@@ -98,13 +98,10 @@ jobs:
         run: |
           node --input-type=module -e '
             import { readFileSync, writeFileSync } from "node:fs";
+            import { extractReleaseNotes } from "./scripts/release/notes.mjs";
             const version = process.env.HQBASE_RELEASE_VERSION;
             const changelog = readFileSync("CHANGELOG.md", "utf8");
-            const start = changelog.indexOf(`## ${version}\n`);
-            if (start < 0) throw new Error(`Missing changelog entry for ${version}`);
-            const bodyStart = start + `## ${version}\n`.length;
-            const next = changelog.indexOf("\n## ", bodyStart);
-            const body = changelog.slice(bodyStart, next < 0 ? undefined : next).trim();
+            const body = extractReleaseNotes(changelog, version);
             writeFileSync("release/notes.md", `${body}\n`);
           '
       - name: Preserve the exact candidate for staging

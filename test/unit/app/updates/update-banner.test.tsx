@@ -8,7 +8,7 @@ describe("update banner", () => {
     const status = {
       installedVersion: "0.1.0",
       available: true,
-      release: { version: "0.2.0" }
+      release: { version: "0.2.0", notes: ["Add contact suggestions."] }
     } as UpdateStatus;
     const html = renderToStaticMarkup(
       <UpdateBanner inProgress={false} ready={false} status={status} onOpen={() => undefined} />
@@ -16,6 +16,7 @@ describe("update banner", () => {
     expect(html).toContain("Update available");
     expect(html).toContain("0.2.0");
     expect(html).toContain("Review update");
+    expect(html).toContain("Add contact suggestions.");
     expect(html).toContain('role="status"');
     expect(html).toContain("bg-muted/45");
     expect(html).not.toContain("blue-");
@@ -25,7 +26,7 @@ describe("update banner", () => {
     const status = {
       installedVersion: "0.1.0",
       available: true,
-      release: { version: "0.2.0" }
+      release: { version: "0.2.0", notes: [] }
     } as UpdateStatus;
     const html = renderToStaticMarkup(
       <UpdateBanner inProgress ready={false} status={status} onOpen={() => undefined} />
@@ -48,7 +49,7 @@ describe("update banner", () => {
     const status = {
       installedVersion: "0.1.0",
       available: true,
-      release: { version: "0.2.0" }
+      release: { version: "0.2.0", notes: [] }
     } as UpdateStatus;
     const html = renderToStaticMarkup(
       <UpdateBanner inProgress ready status={status} onOpen={() => undefined} />

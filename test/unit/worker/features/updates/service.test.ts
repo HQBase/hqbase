@@ -14,6 +14,7 @@ const payload = Buffer.from(
     schemaVersion: 2,
     minVersion: "0.0.1",
     publishedAt: "2026-07-12T00:00:00.000Z",
+    notes: ["Add a signed changelog."],
     notesUrl: "https://github.com/HQBase/hqbase/releases/tag/v0.1.0",
     artifact: {
       url: "https://github.com/HQBase/hqbase/releases/download/v0.1.0/hqbase-0.1.0.tar.gz",
@@ -41,6 +42,7 @@ describe("HQBase updates", () => {
       available: false,
       compatible: true
     });
+    expect(status.release.notes).toEqual(["Add a signed changelog."]);
     expect(compareVersions("0.2.0", "0.1.9")).toBeGreaterThan(0);
   });
   it("rejects a tampered manifest", async () => {

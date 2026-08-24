@@ -42,7 +42,7 @@ describe("HQBase release deployment", () => {
       signature: sign(null, Buffer.from(payload, "base64url"), privateKey).toString("base64url")
     };
     const encoded = publicKey.export({ type: "spki", format: "der" }).toString("base64");
-    expect(verifyManifest(envelope, encoded)).toMatchObject({ version: "1.2.3" });
+    expect(verifyManifest(envelope, encoded)).toMatchObject({ version: "1.2.3", notes: [] });
     const invalidSignature = `${envelope.signature.startsWith("A") ? "B" : "A"}${envelope.signature.slice(1)}`;
     expect(() => verifyManifest({ ...envelope, signature: invalidSignature }, encoded)).toThrow(
       "signature"
