@@ -85,7 +85,7 @@ describe("compose signature", () => {
     const view = await renderComponent(
       <ComposeSignature
         from="support@example.com"
-        signature={{ ...automatic, mode: "selected", id: null, name: "Old footer" }}
+        signature={{ ...automatic, mode: "selected", id: "sig_deleted", name: "Old footer" }}
         onManage={() => undefined}
         onSelectionChange={() => undefined}
       />

@@ -142,11 +142,14 @@ function signatureOptions(
   ];
   if (
     current.mode === "selected" &&
-    current.id === null &&
     current.name &&
     !signatures.some((signature) => signature.id === current.id)
   ) {
-    options.push({ disabled: true, label: `${current.name} · Saved copy`, value: "snapshot" });
+    options.push({
+      disabled: true,
+      label: `${current.name} · Saved copy`,
+      value: current.id ? `selected:${current.id}` : "snapshot"
+    });
   }
   options.push(
     { label: "No signature", value: "none" },
