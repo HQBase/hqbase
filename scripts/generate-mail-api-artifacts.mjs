@@ -3,14 +3,19 @@ import path from "node:path";
 
 const outputDirectory = "api";
 const openApiLocation = path.join(outputDirectory, "hqbase-mail-api-v2.openapi.json");
-const openApiDocument = withAgentAuthentication(
+const v2OpenApiDocument = withAgentAuthentication(
   JSON.parse(await readFile(openApiLocation, "utf8"))
 );
-validateOpenApi(openApiDocument);
+const v1OpenApiDocument = withV1Compatibility(v2OpenApiDocument);
+validateOpenApi(v1OpenApiDocument, 1);
+validateOpenApi(v2OpenApiDocument, 2);
 const outputs = {
-  "hqbase-mail-api-v2.openapi.json": openApiDocument,
-  "hqbase-mail-api-v2.postman_collection.json": buildCollection(openApiDocument),
-  "hqbase-mail-api-v2.postman_environment.json": buildEnvironment()
+  "hqbase-mail-api-v1.openapi.json": v1OpenApiDocument,
+  "hqbase-mail-api-v1.postman_collection.json": buildCollection(v1OpenApiDocument, 1),
+  "hqbase-mail-api-v1.postman_environment.json": buildEnvironment(1),
+  "hqbase-mail-api-v2.openapi.json": v2OpenApiDocument,
+  "hqbase-mail-api-v2.postman_collection.json": buildCollection(v2OpenApiDocument, 2),
+  "hqbase-mail-api-v2.postman_environment.json": buildEnvironment(2)
 };
 const serialized = Object.fromEntries(
   Object.entries(outputs).map(([name, value]) => [name, `${JSON.stringify(value, null, 2)}\n`])
@@ -41,12 +46,13 @@ if (process.argv.includes("--write")) {
   console.log("Verified generated HQBase Mail API artifacts.");
 }
 
-function buildCollection(document) {
+function buildCollection(document, version) {
+  const apiBasePath = `/api/v${version}`;
   const folders = new Map();
   for (const [route, pathItem] of Object.entries(document.paths)) {
     // Postman v2.1 HTTP collections cannot contain a real WebSocket request.
     // Keep the socket in OpenAPI and provide manual connection details below.
-    if (route === "/api/v2/events") continue;
+    if (route === `${apiBasePath}/events`) continue;
     for (const method of ["get", "post", "patch", "delete"]) {
       const operation = pathItem[method];
       if (!operation) continue;
@@ -59,10 +65,12 @@ function buildCollection(document) {
 
   return {
     info: {
-      _postman_id: "62c6dbf4-835d-4a3f-87df-77b7ddcf2db1",
-      name: "HQBase Mail API v2",
-      description:
-        "Generated from api/hqbase-mail-api-v2.openapi.json. For a tool acting for a person, set base_url, run Register public client, and use Postman's OAuth 2.0 Authorization Code flow with PKCE (S256). Auth URL: {{base_url}}/api/auth/oauth2/authorize. Token URL: {{base_url}}/api/auth/oauth2/token. Client ID: {{client_id}}. Scope: mail:read mail:write mail:send offline_access. Add authorization request parameter resource={{api_resource}}, then store the resulting token only in your local environment as access_token. For a mailbox agent, skip OAuth and set access_token to its one-time hqb_agent_ credential. Postman v2.1 HTTP collections cannot contain WebSocket requests. To receive change wakes, create a separate WebSocket request to {{ws_base_url}}/api/v2/events and add Authorization: Bearer {{access_token}}. Sending, replying, and forwarding are not idempotent.",
+      _postman_id:
+        version === 1
+          ? "62c6dbf4-835d-4a3f-87df-77b7ddcf2db1"
+          : "72c6dbf4-835d-4a3f-87df-77b7ddcf2db2",
+      name: `HQBase Mail API v${version}`,
+      description: `Generated from api/hqbase-mail-api-v${version}.openapi.json. For a tool acting for a person, set base_url, run Register public client, and use Postman's OAuth 2.0 Authorization Code flow with PKCE (S256). Auth URL: {{base_url}}/api/auth/oauth2/authorize. Token URL: {{base_url}}/api/auth/oauth2/token. Client ID: {{client_id}}. Scope: mail:read mail:write mail:send offline_access. Add authorization request parameter resource={{api_resource}}, then store the resulting token only in your local environment as access_token.${version === 2 ? " For a mailbox agent, skip OAuth and set access_token to its one-time hqb_agent_ credential." : ""} Postman v2.1 HTTP collections cannot contain WebSocket requests. To receive change wakes, create a separate WebSocket request to {{ws_base_url}}${apiBasePath}/events and add Authorization: Bearer {{access_token}}. Sending, replying, and forwarding are not idempotent.`,
       schema: "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
     },
     auth: {
@@ -72,7 +80,7 @@ function buildCollection(document) {
     variable: [
       { key: "base_url", value: "https://mail.example.com", type: "string" },
       { key: "ws_base_url", value: "wss://mail.example.com", type: "string" },
-      { key: "api_resource", value: "{{base_url}}/api/v2", type: "string" },
+      { key: "api_resource", value: `{{base_url}}${apiBasePath}`, type: "string" },
       { key: "client_id", value: "", type: "string" },
       { key: "access_token", value: "", type: "string" },
       { key: "id", value: "msg_example", type: "string" },
@@ -80,8 +88,81 @@ function buildCollection(document) {
       { key: "draftId", value: "drf_example", type: "string" },
       { key: "action", value: "read", type: "string" }
     ],
-    item: [oauthSetupFolder(), ...folders.values()]
+    item: [oauthSetupFolder(version), ...folders.values()]
   };
+}
+
+function withV1Compatibility(document) {
+  const result = JSON.parse(JSON.stringify(document).replaceAll("/api/v2", "/api/v1"));
+  result.info.version = "1.0.0";
+  result.info.description =
+    "Supported v1 compatibility API for existing HQBase clients. Each mailbox contains one primary address backed by the one-address mailbox model.";
+
+  delete result.components.securitySchemes.agentBearer;
+  for (const pathItem of Object.values(result.paths ?? {})) {
+    for (const method of ["get", "post", "patch", "delete"]) {
+      const operation = pathItem[method];
+      if (!operation) continue;
+      operation.security = (operation.security ?? []).filter(
+        (requirement) => !("agentBearer" in requirement)
+      );
+      delete operation["x-hqbase-agent-capabilities"];
+    }
+  }
+
+  const current = result.components.schemas.Mailbox.properties;
+  result.components.schemas.Mailbox = {
+    type: "object",
+    required: [
+      "id",
+      "address",
+      "addresses",
+      "displayName",
+      "isActive",
+      "accessLevel",
+      "createdAt",
+      "updatedAt"
+    ],
+    properties: {
+      id: current.id,
+      address: current.address,
+      addresses: {
+        type: "array",
+        items: { $ref: "#/components/schemas/MailboxAddress" },
+        minItems: 1,
+        maxItems: 1
+      },
+      displayName: current.displayName,
+      isActive: current.isActive,
+      accessLevel: current.accessLevel,
+      createdAt: current.createdAt,
+      updatedAt: current.updatedAt
+    }
+  };
+  result.components.schemas.MailboxAddress = {
+    type: "object",
+    required: [
+      "id",
+      "mailboxId",
+      "mailDomainId",
+      "address",
+      "displayName",
+      "receiveEnabled",
+      "sendEnabled",
+      "isPrimary"
+    ],
+    properties: {
+      id: { type: "string" },
+      mailboxId: { type: "string" },
+      mailDomainId: { type: "string" },
+      address: { type: "string", format: "email" },
+      displayName: { type: "string" },
+      receiveEnabled: { type: "boolean" },
+      sendEnabled: { type: "boolean" },
+      isPrimary: { type: "boolean" }
+    }
+  };
+  return result;
 }
 
 function withAgentAuthentication(document) {
@@ -115,21 +196,22 @@ function withAgentAuthentication(document) {
   return result;
 }
 
-function validateOpenApi(document) {
-  if (document.openapi !== "3.1.0" || document.info?.version !== "2.0.0") {
-    throw new Error("The Mail API contract must remain an OpenAPI 3.1 v2 document.");
+function validateOpenApi(document, version) {
+  if (document.openapi !== "3.1.0" || document.info?.version !== `${version}.0.0`) {
+    throw new Error(`The Mail API v${version} contract must remain OpenAPI 3.1.`);
   }
+  const apiBasePath = `/api/v${version}`;
   const requiredPaths = [
-    "/api/v2/mailboxes",
-    "/api/v2/messages",
-    "/api/v2/changes",
-    "/api/v2/events",
-    "/api/v2/conversations",
-    "/api/v2/drafts",
-    "/api/v2/drafts/changes",
-    "/api/v2/send",
-    "/api/v2/reply",
-    "/api/v2/forward"
+    `${apiBasePath}/mailboxes`,
+    `${apiBasePath}/messages`,
+    `${apiBasePath}/changes`,
+    `${apiBasePath}/events`,
+    `${apiBasePath}/conversations`,
+    `${apiBasePath}/drafts`,
+    `${apiBasePath}/drafts/changes`,
+    `${apiBasePath}/send`,
+    `${apiBasePath}/reply`,
+    `${apiBasePath}/forward`
   ];
   for (const route of requiredPaths) {
     if (!document.paths?.[route]) throw new Error(`Mail API contract is missing ${route}.`);
@@ -139,7 +221,7 @@ function validateOpenApi(document) {
   }
 }
 
-function oauthSetupFolder() {
+function oauthSetupFolder(version) {
   return {
     name: "OAuth setup",
     item: [
@@ -151,7 +233,7 @@ function oauthSetupFolder() {
       simpleRequest(
         "Mail API protected-resource metadata",
         "GET",
-        "{{base_url}}/.well-known/oauth-protected-resource/api/v2"
+        `{{base_url}}/.well-known/oauth-protected-resource/api/v${version}`
       ),
       {
         name: "Register public client",
@@ -252,14 +334,22 @@ function postmanRequest(route, method, operation) {
   return { name: operation.summary, request, response: [] };
 }
 
-function buildEnvironment() {
+function buildEnvironment(version) {
   return {
-    id: "0757b49e-e97e-4ef6-bef1-e3b5f06ac106",
-    name: "HQBase Mail API v2 - local secrets",
+    id:
+      version === 1
+        ? "0757b49e-e97e-4ef6-bef1-e3b5f06ac106"
+        : "1757b49e-e97e-4ef6-bef1-e3b5f06ac107",
+    name: `HQBase Mail API v${version} - local secrets`,
     values: [
       { key: "base_url", value: "https://mail.example.com", enabled: true, type: "default" },
       { key: "ws_base_url", value: "wss://mail.example.com", enabled: true, type: "default" },
-      { key: "api_resource", value: "{{base_url}}/api/v2", enabled: true, type: "default" },
+      {
+        key: "api_resource",
+        value: `{{base_url}}/api/v${version}`,
+        enabled: true,
+        type: "default"
+      },
       { key: "client_id", value: "", enabled: true, type: "default" },
       { key: "access_token", value: "", enabled: true, type: "secret" }
     ],

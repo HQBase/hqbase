@@ -78,6 +78,7 @@ apiRoutes.route("/api/attachments", attachmentRoutes);
 apiRoutes.route("/api/users", userRoutes);
 apiRoutes.route("/api/updates", updateRoutes);
 apiRoutes.route("/api", sendRoutes);
+apiRoutes.route("/api/v1", mailApiRoutes);
 apiRoutes.route("/api/v2", mailApiRoutes);
 apiRoutes.route("/management/v1/agents", agentManagementRoutes);
 

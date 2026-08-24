@@ -1,20 +1,19 @@
 import type { WorkerEnv } from "../lib/env";
-import { AppError, errorBody } from "../lib/errors";
+import { AppError } from "../lib/errors";
 
 import {
   AgentBearerError,
   agentCredentialPrefix,
   authenticateAgentBearer
 } from "./agent-credential";
-import { authOrigin, mailApiResource } from "./auth";
+import { authOrigin, mailApiResource, mailApiV1Resource } from "./auth";
 import { authenticateOAuthBearer, OAuthBearerError } from "./oauth-principal";
 import { type AgentPrincipal, type HumanPrincipal, humanPrincipal } from "./principal";
 import { type AuthContext, requireAuthContext } from "./session";
 
 const mailApiScopes = ["mail:read", "mail:write", "mail:send"] as const;
 export type MailApiScope = (typeof mailApiScopes)[number];
-const retiredMailApiMetadataPath = "/.well-known/oauth-protected-resource/api/v1";
-const mailApiMetadataPath = "/.well-known/oauth-protected-resource/api/v2";
+const mailApiMetadataPrefix = "/.well-known/oauth-protected-resource";
 const agentSkillPath = "/skills/hqbase-mail/SKILL.md";
 
 export type MailApiPrincipal =
@@ -103,7 +102,7 @@ export async function requireMailApiPrincipal(
     }
   }
 
-  if (isAgentBearer(request)) {
+  if (mailApiBasePath(request) === "/api/v2" && isAgentBearer(request)) {
     try {
       const result = await authenticateAgentBearer(request, env, {
         allowedScopes: mailApiScopes,
@@ -142,7 +141,7 @@ export async function requireMailApiPrincipal(
   try {
     const principal = await authenticateOAuthBearer(request, env, {
       allowedScopes: mailApiScopes,
-      resource: mailApiResource(env, request)
+      resource: mailApiResourceForRequest(env, request)
     });
     if (!principal.scopes.has(requiredScope)) {
       throw new MailApiAuthError(
@@ -194,8 +193,14 @@ function mailScopes(scopes: ReadonlySet<string>): ReadonlySet<MailApiScope> {
 }
 
 export function isVersionedMailApiRequest(request: Request): boolean {
+  return mailApiBasePath(request) !== null;
+}
+
+export function mailApiBasePath(request: Request): "/api/v1" | "/api/v2" | null {
   const pathname = new URL(request.url).pathname;
-  return pathname === "/api/v2" || pathname.startsWith("/api/v2/");
+  if (pathname === "/api/v1" || pathname.startsWith("/api/v1/")) return "/api/v1";
+  if (pathname === "/api/v2" || pathname.startsWith("/api/v2/")) return "/api/v2";
+  return null;
 }
 
 export function mailApiChallenge(
@@ -203,8 +208,9 @@ export function mailApiChallenge(
   request: Request,
   error: MailApiAuthError
 ): string {
+  const basePath = mailApiBasePath(request) ?? "/api/v2";
   const parameters = [
-    `resource_metadata="${authOrigin(env, request)}${mailApiMetadataPath}"`,
+    `resource_metadata="${authOrigin(env, request)}${mailApiMetadataPrefix}${basePath}"`,
     `scope="${error.requiredScope}"`
   ];
   if (error.authError) parameters.push(`error="${error.authError}"`);
@@ -213,21 +219,13 @@ export function mailApiChallenge(
 
 export function handleMailApiMetadata(request: Request, env: WorkerEnv): Response | null {
   const pathname = new URL(request.url).pathname;
-  if (pathname === retiredMailApiMetadataPath) {
-    return Response.json(errorBody("NOT_FOUND", "Mail API v1 is no longer available."), {
-      status: 404,
-      headers: {
-        "access-control-allow-origin": "*",
-        "cache-control": "no-store",
-        "x-content-type-options": "nosniff"
-      }
-    });
-  }
-  if (pathname !== mailApiMetadataPath) return null;
+  const basePath = pathname.slice(mailApiMetadataPrefix.length);
+  if (basePath !== "/api/v1" && basePath !== "/api/v2") return null;
   const origin = authOrigin(env, request);
   return Response.json(
     {
-      resource: mailApiResource(env, request),
+      resource:
+        basePath === "/api/v1" ? mailApiV1Resource(env, request) : mailApiResource(env, request),
       authorization_servers: [`${origin}/api/auth`],
       scopes_supported: mailApiScopes,
       bearer_methods_supported: ["header"],
@@ -242,4 +240,10 @@ export function handleMailApiMetadata(request: Request, env: WorkerEnv): Respons
       }
     }
   );
+}
+
+function mailApiResourceForRequest(env: WorkerEnv, request: Request): string {
+  return mailApiBasePath(request) === "/api/v1"
+    ? mailApiV1Resource(env, request)
+    : mailApiResource(env, request);
 }

@@ -89,6 +89,11 @@ describe("agent mailboxes", () => {
     });
     expect(messages.map(({ id }) => id)).toEqual(["msg_agent_support"]);
 
+    const v1Agent = await SELF.fetch(`${origin}/api/v1/mailboxes`, {
+      headers: { authorization: `Bearer ${requiredCredential(created)}` }
+    });
+    expect(v1Agent.status).toBe(401);
+
     const writeDenied = await SELF.fetch(`${origin}/api/v2/messages/msg_agent_support/archive`, {
       headers: { authorization: `Bearer ${requiredCredential(created)}` },
       method: "POST"

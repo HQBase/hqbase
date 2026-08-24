@@ -86,11 +86,6 @@ ALTER TABLE messages DROP COLUMN sent_from_address_id;
 DROP TABLE mailbox_addresses;
 DROP TABLE mailbox_address_migration;
 
--- Better Auth seeds resources in insert-only mode. Remove the retired v1 resource and its
--- per-client links. Existing clients can reconnect and approve the v2 audience.
-DELETE FROM oauthResource
-WHERE identifier LIKE '%/api/v1';
-
 UPDATE release_state
 SET installed_schema_version = 3,
     updated_at = datetime('now')

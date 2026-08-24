@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { isVersionedMailApiRequest, requireMailApiPrincipal } from "../../auth/mail-api";
+import { mailApiBasePath, requireMailApiPrincipal } from "../../auth/mail-api";
 import { accessibleMessageScope } from "../../auth/mailbox-access";
 import type { HonoApp } from "../../lib/env";
 import { AppError } from "../../lib/errors";
@@ -126,7 +126,7 @@ messageRoutes.get("/:id/html", async (c) => {
     allowRemoteImages: trusted || c.req.query("loadRemoteImages") === "1",
     attachments: message.attachments,
     html: await object.text(),
-    inlineBasePath: isVersionedMailApiRequest(c.req.raw) ? "/api/v2/messages" : "/api/messages",
+    inlineBasePath: `${mailApiBasePath(c.req.raw) ?? "/api"}/messages`,
     messageId: message.id,
     origin: new URL(c.req.url).origin
   });
