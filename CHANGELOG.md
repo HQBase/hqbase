@@ -4,6 +4,15 @@
 
 ### New
 
+- Add managed email signatures with personal, mailbox, and domain defaults, automatic selection,
+  per-draft snapshots, composer preview, and Mail API and MCP support.
+- Add contacts with private notes, complete accessible mail history, and recipient suggestions in
+  To, Cc, and Bcc fields.
+- Add shared labels with management, per-conversation assignment, folder-wide filtering, and Mail
+  API and MCP operations for people and agents.
+- Show live results from mail, contacts, drafts, and destinations while a user types in global
+  search. Pressing Enter still applies the search to Inbox.
+- Show the signed release changelog before a user installs an available update.
 - Add mailbox agents with explicit mailbox access and revocable credentials, plus provisioner
   agents that can create and deprovision dedicated mailbox agents within a domain and quota.
 - Let owners and admins delete a mailbox without deleting its mail, then restore it later. Deleting
@@ -11,6 +20,11 @@
 
 ### Changed
 
+- Show sender, subject, message preview, time, star, and labels in the smallest Inbox layout.
+- Let users move and resize the desktop composer, keep it at the bottom right by default, and use
+  smaller controls and more subtle recipient-field outlines throughout the app.
+- Replace standard select fields with consistent dropdown controls, while keeping the compact
+  header mailbox selector distinct and removing message counts from its menu.
 - Give every mailbox one email address. Existing additional addresses become separate mailboxes
   with the same access and retention settings. An address that could not both send and receive
   becomes a disabled mailbox.
@@ -18,6 +32,11 @@
   Mail API v1 paths, OAuth grants, tokens, discovery, and response schemas available for existing
   clients. V1 represents each separate mailbox with one primary item in its compatibility
   `addresses` list.
+
+### Fixed
+
+- Validate incomplete recipient addresses when the user leaves the field instead of repeatedly
+  reporting an error while the user types.
 
 ## 1.2.0
 
