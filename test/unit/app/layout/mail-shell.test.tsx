@@ -423,8 +423,9 @@ describe("mail shell", () => {
     expect(html).toContain('aria-modal="false"');
     expect(html).toContain("fixed inset-0");
     expect(html).toContain("md:bottom-0");
+    expect(html).toContain("md:resize");
     expect(html).toContain('aria-label="Minimize compose"');
-    expect(html).toContain('aria-label="Expand compose"');
+    expect(html).not.toContain('aria-label="Expand compose"');
     expect(html).toContain('aria-label="Close compose"');
     expect(html).toContain("Draft fields");
   });
