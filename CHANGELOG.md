@@ -14,9 +14,10 @@
 - Give every mailbox one email address. Existing additional addresses become separate mailboxes
   with the same access and retention settings. An address that could not both send and receive
   becomes a disabled mailbox.
-- Add Mail API v2 for the direct one-address mailbox model. Keep Mail API v1 paths, OAuth grants,
-  tokens, discovery, and response schemas available for existing clients. V1 represents each
-  separate mailbox with one primary item in its compatibility `addresses` list.
+- Add Mail API v2 as the default for new clients and the direct one-address mailbox model. Keep
+  Mail API v1 paths, OAuth grants, tokens, discovery, and response schemas available for existing
+  clients. V1 represents each separate mailbox with one primary item in its compatibility
+  `addresses` list.
 
 ## 1.2.0
 
