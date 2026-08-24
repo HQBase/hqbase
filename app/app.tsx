@@ -12,6 +12,7 @@ import {
   TemporaryPasswordSetupPage
 } from "@/features/auth/password-setup-page";
 import type { CurrentUser } from "@/features/auth/types";
+import { ContactsPage } from "@/features/contacts/contacts-page";
 import { DraftsPage } from "@/features/drafts/drafts-page";
 import { useDrafts } from "@/features/drafts/use-drafts";
 import { useMailEvents } from "@/features/events/use-mail-events";
@@ -53,12 +54,20 @@ export function App(): React.ReactElement {
   const [mailboxId, setMailboxId] = React.useState("all");
   const [search, setSearch] = React.useState("");
   const [composeOpen, setComposeOpen] = React.useState(false);
+  const [composeTo, setComposeTo] = React.useState("");
   const [isLoading, setIsLoading] = React.useState(true);
   const { navigate, route } = useAppRoute(setup?.isComplete);
   const activeFolder: FolderId =
-    route.kind === "settings" ? "settings" : route.kind === "drafts" ? "drafts" : route.folder;
+    route.kind === "settings"
+      ? "settings"
+      : route.kind === "contacts"
+        ? "contacts"
+        : route.kind === "drafts"
+          ? "drafts"
+          : route.folder;
   const selectedId = route.kind === "mail" ? route.messageId : null;
   const selectedDraftId = route.kind === "drafts" ? route.draftId : null;
+  const selectedContactId = route.kind === "contacts" ? route.contactId : null;
   const settingsTab: SettingsTabId = route.kind === "settings" ? route.tab : "mailboxes";
   const currentUserId = user?.passwordSetupRequired ? null : (user?.id ?? null);
   const draftState = useDrafts(currentUserId);
@@ -253,15 +262,18 @@ export function App(): React.ReactElement {
           navigate({ kind: "settings", tab: "updates" });
         }}
         onCompose={() => {
+          setComposeTo("");
           setComposeOpen(true);
         }}
         onFolderChange={(folder) => {
           navigate(
             folder === "settings"
               ? { kind: "settings", tab: "mailboxes" }
-              : folder === "drafts"
-                ? { kind: "drafts", draftId: null }
-                : { kind: "mail", folder, messageId: null }
+              : folder === "contacts"
+                ? { kind: "contacts", contactId: null }
+                : folder === "drafts"
+                  ? { kind: "drafts", draftId: null }
+                  : { kind: "mail", folder, messageId: null }
           );
         }}
         onSettingsTabChange={(tab) => navigate({ kind: "settings", tab })}
@@ -273,7 +285,20 @@ export function App(): React.ReactElement {
       >
         <div className="flex h-full flex-col">
           <div className="min-h-0 flex-1">
-            {activeFolder === "settings" ? (
+            {activeFolder === "contacts" ? (
+              <ContactsPage
+                selectedId={selectedContactId}
+                onBack={() => navigate({ kind: "contacts", contactId: null })}
+                onCompose={(email) => {
+                  setComposeTo(email);
+                  setComposeOpen(true);
+                }}
+                onOpenConversation={(messageId) =>
+                  navigate({ kind: "mail", folder: "inbox", messageId })
+                }
+                onSelect={(contactId) => navigate({ kind: "contacts", contactId })}
+              />
+            ) : activeFolder === "settings" ? (
               <SettingsPage
                 activeTab={settingsTab}
                 canManage={user.role === "owner" || user.role === "admin"}
@@ -351,10 +376,14 @@ export function App(): React.ReactElement {
         <React.Suspense fallback={null}>
           <ComposeDialog
             defaultFromMailboxId={user.defaultFromMailboxId}
+            initialTo={composeTo}
             mailboxes={contentMailboxes}
             mode="new"
             open={composeOpen}
-            onOpenChange={setComposeOpen}
+            onOpenChange={(open) => {
+              setComposeOpen(open);
+              if (!open) setComposeTo("");
+            }}
             onDraftsChange={() => void draftState.refresh().catch(() => undefined)}
             onSent={() => void mailSync.refresh().catch(() => undefined)}
           />

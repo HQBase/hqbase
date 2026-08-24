@@ -5,6 +5,7 @@ import type { Draft } from "@/features/drafts/types";
 import type { SendingIdentity } from "./compose-fields";
 import {
   type DraftSaveState,
+  hasInvalidRecipients,
   normalizeDraftHtml,
   serializeDraft,
   splitRecipients
@@ -86,6 +87,10 @@ export function useDraftAutosave(options: DraftAutosaveOptions) {
     latestSnapshot.current = snapshot;
     if (snapshot === lastSaved.current) {
       setSaveState("saved");
+      return;
+    }
+    if (hasInvalidRecipients(to, cc, bcc)) {
+      setSaveState("local");
       return;
     }
     setSaveState("saving");

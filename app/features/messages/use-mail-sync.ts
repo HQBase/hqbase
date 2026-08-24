@@ -79,7 +79,7 @@ export function useMailSync({ activeFolder, mailboxId, search, userId }: MailSyn
 
       const [notificationResult, conversationResult] = await Promise.allSettled([
         refreshNotifications(),
-        activeFolder === "settings" || activeFolder === "drafts"
+        activeFolder === "settings" || activeFolder === "contacts" || activeFolder === "drafts"
           ? Promise.resolve<null>(null)
           : listConversations({
               folder: activeFolder,
@@ -187,7 +187,13 @@ export function useMailSync({ activeFolder, mailboxId, search, userId }: MailSyn
   }, [refresh, userId]);
 
   const loadMore = React.useCallback((): Promise<void> => {
-    if (!userId || !nextCursor || activeFolder === "settings" || activeFolder === "drafts") {
+    if (
+      !userId ||
+      !nextCursor ||
+      activeFolder === "settings" ||
+      activeFolder === "contacts" ||
+      activeFolder === "drafts"
+    ) {
       return Promise.resolve();
     }
     if (

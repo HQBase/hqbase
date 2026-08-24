@@ -4,6 +4,8 @@ import {
   defaultSendingIdentity,
   findDraftForComposer,
   forwardedMessage,
+  hasInvalidRecipients,
+  invalidRecipients,
   normalizeDraftHtml,
   readDraftRecovery,
   replyRecipients,
@@ -24,6 +26,9 @@ describe("composer state", () => {
       "two@example.com",
       "three@example.com"
     ]);
+    expect(invalidRecipients("one@example.com, unfinished")).toEqual(["unfinished"]);
+    expect(hasInvalidRecipients("one@example.com", "", "two@example.com")).toBe(false);
+    expect(hasInvalidRecipients("one@example.com", "unfinished", "")).toBe(true);
   });
 
   it("exposes one identity for every authorized active mailbox", () => {

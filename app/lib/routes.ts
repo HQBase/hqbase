@@ -9,7 +9,12 @@ export const mailFolders = [
 
 export const draftFolder = { id: "drafts", label: "Drafts", path: "drafts" } as const;
 
-const folders = [...mailFolders, draftFolder, { id: "settings", label: "Settings" }] as const;
+const folders = [
+  ...mailFolders,
+  draftFolder,
+  { id: "contacts", label: "Contacts" },
+  { id: "settings", label: "Settings" }
+] as const;
 
 export const settingsTabs = [
   "mailboxes",
@@ -18,6 +23,8 @@ export const settingsTabs = [
   "domains",
   "notifications",
   "interface",
+  "labels",
+  "signatures",
   "mcp",
   "updates",
   "debug"
@@ -30,6 +37,7 @@ export type SettingsTabId = (typeof settingsTabs)[number];
 export type AppRoute =
   | { kind: "mail"; folder: MailFolderId; messageId: string | null }
   | { kind: "drafts"; draftId: string | null }
+  | { kind: "contacts"; contactId: string | null }
   | { kind: "settings"; tab: SettingsTabId };
 
 const publicAuthenticationPaths = new Set(["/forgot-password", "/reset-password", "/set-password"]);
@@ -57,6 +65,13 @@ export function readAppRoute(input: string | URL): AppRoute {
   if (segments[0] === "settings") {
     const tab = readSettingsTab(segments[1]) ?? legacySettingsTabs[segments[1] ?? ""];
     return { kind: "settings", tab: tab ?? "mailboxes" };
+  }
+
+  if (segments[0] === "contacts") {
+    return {
+      kind: "contacts",
+      contactId: segments[1] ? decodePathSegment(segments[1]) : null
+    };
   }
 
   // Drafts canonical: /mail/drafts[/draftId], legacy: /drafts[/draftId]
@@ -96,6 +111,9 @@ export function readAppRoute(input: string | URL): AppRoute {
 
 export function appRoutePath(route: AppRoute): string {
   if (route.kind === "settings") return `/settings/${route.tab}`;
+  if (route.kind === "contacts") {
+    return route.contactId ? `/contacts/${encodeURIComponent(route.contactId)}` : "/contacts";
+  }
   if (route.kind === "drafts") {
     const base = `/mail/${draftFolder.path}`;
     return route.draftId ? `${base}/${encodeURIComponent(route.draftId)}` : base;

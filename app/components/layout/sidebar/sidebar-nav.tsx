@@ -10,8 +10,18 @@ import { inboxUnreadForMailbox, mailboxUnreadLabel } from "@/features/notificati
 import { cn } from "@/lib/cn";
 import type { FolderId, SettingsTabId } from "@/lib/routes";
 import { appRoutePath, draftFolder, mailFolders, settingsTabs } from "@/lib/routes";
-import { icons, PiNotePencil, settingsTabIcons, settingsTabLabels } from "./constants";
-import { DrawerMailFooter, DrawerSettingsFooter } from "./sidebar-drawer-extras";
+import {
+  icons,
+  PiAddressBook,
+  PiNotePencil,
+  settingsTabIcons,
+  settingsTabLabels
+} from "./constants";
+import {
+  DrawerContactsFooter,
+  DrawerMailFooter,
+  DrawerSettingsFooter
+} from "./sidebar-drawer-extras";
 import { isModifiedNavigation } from "./sidebar-helpers";
 
 export function SettingsNav({
@@ -230,6 +240,70 @@ export function MailNav({
         })}
         {isDrawer ? (
           <DrawerMailFooter user={user} onFolderChange={onFolderChange} onSignedOut={onSignedOut} />
+        ) : null}
+      </nav>
+    </>
+  );
+}
+
+export function ContactsNav({
+  isDrawer,
+  onFolderChange,
+  onCompose,
+  user,
+  onSignedOut
+}: {
+  isDrawer: boolean;
+  onFolderChange: (folder: FolderId) => void;
+  onCompose: (() => void) | undefined;
+  user: CurrentUser;
+  onSignedOut: () => void;
+}): React.ReactElement {
+  return (
+    <>
+      {onCompose ? (
+        <Button
+          className="btn-liquid-glass mb-4 h-10 w-full justify-start gap-3 rounded-full px-3.5 text-sm font-medium"
+          onClick={onCompose}
+          type="button"
+          variant="ghost"
+        >
+          <PiNotePencil className="size-4" />
+          <span className="leading-none">New email</span>
+        </Button>
+      ) : null}
+      <nav aria-label="Contacts navigation" className="flex min-h-0 flex-1 flex-col gap-0.5">
+        <span className="mb-1 px-3.5 text-[10px] font-medium uppercase tracking-[0.12em] text-tertiary">
+          Contacts
+        </span>
+        <Button
+          asChild
+          className={cn(
+            "h-8 justify-start gap-3 rounded-[16px] bg-selected px-3.5 text-[13px] font-medium leading-none text-foreground dark:font-normal [&_svg]:size-4 [&_svg]:shrink-0",
+            isDrawer && "h-11 rounded-[16px] text-sm"
+          )}
+          variant="ghost"
+        >
+          <a
+            aria-current="page"
+            data-navigation-item
+            href={appRoutePath({ kind: "contacts", contactId: null })}
+            onClick={(event) => {
+              if (isModifiedNavigation(event)) return;
+              event.preventDefault();
+              onFolderChange("contacts");
+            }}
+          >
+            <PiAddressBook />
+            <span className="min-w-0 flex-1 truncate leading-none">All contacts</span>
+          </a>
+        </Button>
+        {isDrawer ? (
+          <DrawerContactsFooter
+            user={user}
+            onFolderChange={onFolderChange}
+            onSignedOut={onSignedOut}
+          />
         ) : null}
       </nav>
     </>

@@ -2,6 +2,7 @@ import type * as React from "react";
 import { DropdownSelect } from "@/components/ui/dropdown-select";
 import { Input } from "@/components/ui/input";
 import type { ComposeMode } from "./compose-state";
+import { RecipientField } from "./recipient-field";
 
 export type SendingIdentity = { mailboxId: string; address: string };
 export function ComposeFields(props: {
@@ -35,30 +36,21 @@ export function ComposeFields(props: {
         />
       </Row>
       <Row label="To">
-        <Input
-          aria-label="To"
+        <RecipientField
           autoFocus={props.mode !== "reply"}
-          data-compose-autofocus={props.mode !== "reply" ? "" : undefined}
+          label="To"
           required
           value={props.to}
-          onChange={(event) => props.setTo(event.target.value)}
+          onChange={props.setTo}
         />
       </Row>
       <div className="grid grid-cols-1 border-b sm:grid-cols-2 sm:divide-x">
         <Row label="Cc" border={false}>
-          <Input
-            aria-label="Cc"
-            value={props.cc}
-            onChange={(event) => props.setCc(event.target.value)}
-          />
+          <RecipientField label="Cc" value={props.cc} onChange={props.setCc} />
         </Row>
         <div className="sm:pl-4">
           <Row label="Bcc" border={false}>
-            <Input
-              aria-label="Bcc"
-              value={props.bcc}
-              onChange={(event) => props.setBcc(event.target.value)}
-            />
+            <RecipientField label="Bcc" value={props.bcc} onChange={props.setBcc} />
           </Row>
         </div>
       </div>

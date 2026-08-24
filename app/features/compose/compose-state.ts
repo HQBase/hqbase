@@ -1,4 +1,5 @@
 import type * as React from "react";
+import { z } from "zod";
 import type { Draft } from "@/features/drafts/types";
 import type { Mailbox } from "@/features/mailboxes/types";
 import type { MessageDetail } from "@/features/messages/types";
@@ -6,11 +7,12 @@ import { formatDateTime } from "@/lib/format";
 import type { SendingIdentity } from "./compose-fields";
 
 export type ComposeMode = "new" | "reply" | "forward";
-export type DraftSaveState = "saved" | "saving" | "error";
+export type DraftSaveState = "saved" | "saving" | "local" | "error";
 
 export type ComposeDialogProps = {
   defaultFromMailboxId?: string | null;
   draftId?: Draft["id"] | null;
+  initialTo?: string;
   mailboxes: Mailbox[];
   message?: MessageDetail | null;
   mode?: ComposeMode;
@@ -44,6 +46,18 @@ export const splitRecipients = (value: string) =>
     .split(/[,\n]/)
     .map((part) => part.trim())
     .filter(Boolean);
+
+const recipientSchema = z.string().trim().email().max(254);
+
+export function invalidRecipients(value: string): string[] {
+  return splitRecipients(value).filter(
+    (recipient) => !recipientSchema.safeParse(recipient).success
+  );
+}
+
+export function hasInvalidRecipients(...values: string[]): boolean {
+  return values.some((value) => invalidRecipients(value).length > 0);
+}
 
 export function replyRecipients(message: MessageDetail): string[] {
   if (message.direction === "inbound") return [message.fromAddress];
@@ -137,9 +151,11 @@ export function composeContextLabel(
 export function draftStatus(state: DraftSaveState): string {
   return state === "saving"
     ? "Saving draft…"
-    : state === "error"
-      ? "Draft not saved"
-      : "Draft saved";
+    : state === "local"
+      ? "Saved on this device"
+      : state === "error"
+        ? "Draft not saved"
+        : "Draft saved";
 }
 
 export function forwardedMessage(message: MessageDetail): { html: string; text: string } {

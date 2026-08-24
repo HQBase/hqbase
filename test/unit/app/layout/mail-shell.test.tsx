@@ -187,6 +187,24 @@ describe("mail shell", () => {
     expect(html).not.toContain(">HQ<");
   });
 
+  it("makes Contacts a primary destination with its own navigation", () => {
+    const html = renderToStaticMarkup(
+      <Sidebar
+        activeFolder="contacts"
+        mailboxId="all"
+        unread={unread}
+        user={user}
+        onFolderChange={() => undefined}
+        onSignedOut={() => undefined}
+      />
+    );
+
+    expect(html).toContain('aria-label="Contacts navigation"');
+    expect(html).toContain('href="/contacts"');
+    expect(html).toContain(">All contacts</span>");
+    expect(html).toContain('aria-label="Contacts"');
+  });
+
   it("uses the canonical logo on the signed-out surface", () => {
     const html = renderToStaticMarkup(<LoginPage onLogin={() => undefined} />);
 

@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useDraftAutosave } from "@/features/compose/use-draft-autosave";
 import type { Draft } from "@/features/drafts/types";
 import { flushHookEffects, renderHook } from "../render-hook";
@@ -57,6 +57,12 @@ function options(overrides: Partial<Parameters<typeof useDraftAutosave>[0]> = {}
 }
 
 describe("useDraftAutosave", () => {
+  beforeEach(() => {
+    mocks.toastError.mockReset();
+    mocks.updateDraft.mockReset();
+    localStorage.clear();
+  });
+
   it("persists recovery state and saves the latest initialized draft after the debounce", async () => {
     vi.useFakeTimers();
     const nextDraft = { ...draft, subject: "Changed", version: 2 };
@@ -87,6 +93,30 @@ describe("useDraftAutosave", () => {
     expect(changed.setDraft).toHaveBeenCalledWith(nextDraft);
     expect(changed.setSaveState).toHaveBeenLastCalledWith("saved");
     expect(localStorage.getItem(initial.recoveryKey)).toBeNull();
+
+    await hook.unmount();
+    vi.useRealTimers();
+  });
+
+  it("keeps an unfinished recipient local without dispatching repeated save errors", async () => {
+    vi.useFakeTimers();
+    const initial = options();
+    const hook = await renderHook(useDraftAutosave, initial);
+    hook.result.initializeAutosave(draft);
+    const changed = options({
+      open: true,
+      subject: "Changed",
+      to: "unfinished",
+      setDraft: initial.setDraft,
+      setSaveState: initial.setSaveState
+    });
+    await hook.rerender(changed);
+    await flushHookEffects(() => vi.advanceTimersByTime(2_000));
+
+    expect(localStorage.getItem(initial.recoveryKey)).toContain('"to":"unfinished"');
+    expect(changed.setSaveState).toHaveBeenLastCalledWith("local");
+    expect(mocks.updateDraft).not.toHaveBeenCalled();
+    expect(mocks.toastError).not.toHaveBeenCalled();
 
     await hook.unmount();
     vi.useRealTimers();

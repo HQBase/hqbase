@@ -1,4 +1,5 @@
 import {
+  PiAddressBook,
   PiArchive,
   PiArrowsClockwise,
   PiBell,
@@ -11,13 +12,15 @@ import {
   PiPaperPlaneTilt,
   PiPlug,
   PiRobot,
+  PiSignature,
   PiStar,
+  PiTag,
   PiTrash,
   PiTray,
   PiUsers,
   PiWarning
 } from "react-icons/pi";
-import type { mailFolders, SettingsTabId } from "@/lib/routes";
+import type { SettingsTabId } from "@/lib/routes";
 
 export const icons = {
   inbox: PiTray,
@@ -29,15 +32,13 @@ export const icons = {
   catchall: PiWarning
 } as const;
 
-export const quickAccess: Array<
-  | {
-      folder: (typeof mailFolders)[number]["id"];
-      icon: React.ComponentType<{ className?: string }>;
-      label: string;
-    }
-  | { folder: "settings"; icon: React.ComponentType<{ className?: string }>; label: string }
-> = [
-  { folder: "inbox", icon: PiTray, label: "Inbox" },
+export const quickAccess: Array<{
+  folder: "inbox" | "contacts" | "settings";
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+}> = [
+  { folder: "inbox", icon: PiTray, label: "Mail" },
+  { folder: "contacts", icon: PiAddressBook, label: "Contacts" },
   { folder: "settings", icon: PiGear, label: "Settings" }
 ];
 
@@ -51,6 +52,8 @@ export const settingsTabIcons: Record<
   domains: PiGlobe,
   notifications: PiBell,
   interface: PiPalette,
+  labels: PiTag,
+  signatures: PiSignature,
   mcp: PiPlug,
   updates: PiArrowsClockwise,
   debug: PiBug
@@ -63,9 +66,11 @@ export const settingsTabLabels: Record<SettingsTabId, string> = {
   domains: "Domains",
   notifications: "Notifications",
   interface: "Interface",
+  labels: "Labels",
+  signatures: "Signatures",
   mcp: "Connect AI agents",
   updates: "Updates",
   debug: "Debug"
 };
 
-export { PiNotePencil };
+export { PiAddressBook, PiNotePencil };

@@ -22,6 +22,7 @@ import {
   draftStatus,
   findDraftForComposer,
   forwardedMessage,
+  hasInvalidRecipients,
   normalizeDraftHtml,
   readDraftRecovery,
   replyRecipients,
@@ -35,6 +36,7 @@ import { useDraftAutosave } from "./use-draft-autosave";
 export function ComposeDialog({
   defaultFromMailboxId = null,
   draftId = null,
+  initialTo = "",
   mailboxes,
   message = null,
   mode = "new",
@@ -118,7 +120,12 @@ export function ComposeDialog({
             replyToMessageId,
             forwardOfMessageId,
             from: preferredIdentity?.address ?? "",
-            to: mode === "reply" && message ? replyRecipients(message) : [],
+            to:
+              mode === "reply" && message
+                ? replyRecipients(message)
+                : mode === "new" && initialTo
+                  ? [initialTo]
+                  : [],
             cc: [],
             bcc: [],
             subject:
@@ -156,6 +163,7 @@ export function ComposeDialog({
     identities,
     defaultIdentity,
     draftId,
+    initialTo,
     recoveryKey,
     replyToMessageId,
     forwardOfMessageId,
@@ -164,7 +172,7 @@ export function ComposeDialog({
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
-    if (!draft) return;
+    if (!draft || hasInvalidRecipients(to, cc, bcc)) return;
     setIsPending(true);
     try {
       const common = {
@@ -250,7 +258,8 @@ export function ComposeDialog({
     !draft ||
     identities.length === 0 ||
     !text.trim() ||
-    splitRecipients(to).length === 0;
+    splitRecipients(to).length === 0 ||
+    hasInvalidRecipients(to, cc, bcc);
   const content = (
     <ComposeForm
       attachments={attachments}

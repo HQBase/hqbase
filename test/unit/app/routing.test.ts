@@ -35,6 +35,13 @@ describe("application routing", () => {
     }
   });
 
+  it("round-trips the contacts page and an exact correspondent", () => {
+    expect(readAppRoute("/contacts")).toEqual({ kind: "contacts", contactId: null });
+    const route: AppRoute = { kind: "contacts", contactId: "friend@example.com" };
+    expect(appRoutePath(route)).toBe("/contacts/friend%40example.com");
+    expect(readAppRoute(appRoutePath(route))).toEqual(route);
+  });
+
   it("gives agent management its own settings route", () => {
     expect(readAppRoute("/settings/agents")).toEqual({ kind: "settings", tab: "agents" });
     expect(appRoutePath({ kind: "settings", tab: "agents" })).toBe("/settings/agents");

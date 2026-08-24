@@ -14,7 +14,7 @@ import { AccountMenu } from "./account-menu";
 import { quickAccess } from "./sidebar/constants";
 import { MailConnectionIndicator } from "./sidebar/mail-connection-indicator";
 import { isModifiedNavigation } from "./sidebar/sidebar-helpers";
-import { MailNav, SettingsNav } from "./sidebar/sidebar-nav";
+import { ContactsNav, MailNav, SettingsNav } from "./sidebar/sidebar-nav";
 
 type SidebarProps = {
   activeFolder: FolderId;
@@ -89,7 +89,9 @@ export function Sidebar({
             <div className="mt-5 flex flex-col gap-1">
               {quickAccess.map(({ folder, icon: Icon, label }) => {
                 const isActive =
-                  folder === "settings" ? activeFolder === "settings" : activeFolder !== "settings";
+                  folder === "inbox"
+                    ? activeFolder !== "settings" && activeFolder !== "contacts"
+                    : activeFolder === folder;
                 return (
                   <Button
                     asChild
@@ -109,7 +111,9 @@ export function Sidebar({
                       href={
                         folder === "settings"
                           ? appRoutePath({ kind: "settings", tab: "mailboxes" })
-                          : appRoutePath({ kind: "mail", folder, messageId: null })
+                          : folder === "contacts"
+                            ? appRoutePath({ kind: "contacts", contactId: null })
+                            : appRoutePath({ kind: "mail", folder, messageId: null })
                       }
                       onClick={(event) => {
                         if (isModifiedNavigation(event)) return;
@@ -139,7 +143,11 @@ export function Sidebar({
             <div className="flex min-w-0 items-center gap-3">
               {isDrawer ? <img alt="" className="h-7 w-auto shrink-0" src="/logo.svg" /> : null}
               <span className="truncate text-sm font-semibold leading-none tracking-tight">
-                Mail
+                {activeFolder === "settings"
+                  ? "Settings"
+                  : activeFolder === "contacts"
+                    ? "Contacts"
+                    : "Mail"}
               </span>
               <MailConnectionIndicator status={connectionStatus} />
             </div>
@@ -175,6 +183,14 @@ export function Sidebar({
               onCompose={onCompose}
               onFolderChange={onFolderChange}
               onSettingsTabChange={onSettingsTabChange}
+              onSignedOut={onSignedOut}
+            />
+          ) : activeFolder === "contacts" ? (
+            <ContactsNav
+              isDrawer={isDrawer}
+              user={user}
+              onCompose={onCompose}
+              onFolderChange={onFolderChange}
               onSignedOut={onSignedOut}
             />
           ) : (
