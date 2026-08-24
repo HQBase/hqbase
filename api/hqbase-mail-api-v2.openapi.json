@@ -30,6 +30,9 @@
       "name": "Conversations"
     },
     {
+      "name": "Labels"
+    },
+    {
       "name": "Drafts"
     },
     {
@@ -317,6 +320,61 @@
         "x-hqbase-agent-capabilities": ["mail:read"]
       }
     },
+    "/api/v2/labels": {
+      "get": {
+        "summary": "List labels",
+        "description": "Lists shared workspace labels. Labels organize mail but never grant mailbox access or change folders.",
+        "security": [
+          {
+            "oauth2": ["mail:read"]
+          },
+          {
+            "cookieSession": []
+          },
+          {
+            "agentBearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Workspace labels",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Label"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid authentication",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The mail:read permission is required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "tags": ["Labels"],
+        "operationId": "listLabels",
+        "x-hqbase-agent-capabilities": ["mail:read"]
+      }
+    },
     "/api/v2/messages": {
       "get": {
         "summary": "List or search messages",
@@ -427,6 +485,16 @@
               "maxLength": 100
             },
             "description": "Limit results to one accessible mailbox."
+          },
+          {
+            "in": "query",
+            "name": "labelId",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 100
+            },
+            "description": "Limit results to messages assigned this existing label."
           },
           {
             "in": "query",
@@ -1164,6 +1232,148 @@
         "x-hqbase-agent-capabilities": ["mail:write"]
       }
     },
+    "/api/v2/messages/{id}/labels/{labelId}": {
+      "put": {
+        "summary": "Add a label to a message",
+        "description": "Adds one existing label without changing mailbox access or the message folder.",
+        "security": [
+          {
+            "oauth2": ["mail:write"]
+          },
+          {
+            "cookieSession": []
+          },
+          {
+            "agentBearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Label assignment state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LabelAssignmentResult"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The caller cannot organize this message",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The message or label was not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "tags": ["Labels"],
+        "operationId": "addMessageLabel",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 100
+            }
+          },
+          {
+            "in": "path",
+            "name": "labelId",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 100
+            }
+          }
+        ],
+        "x-hqbase-agent-capabilities": ["mail:write"]
+      },
+      "delete": {
+        "summary": "Remove a label from a message",
+        "description": "Removes one label without changing mailbox access or the message folder.",
+        "security": [
+          {
+            "oauth2": ["mail:write"]
+          },
+          {
+            "cookieSession": []
+          },
+          {
+            "agentBearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Label assignment state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LabelAssignmentResult"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The caller cannot organize this message",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The message or label was not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "tags": ["Labels"],
+        "operationId": "removeMessageLabel",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 100
+            }
+          },
+          {
+            "in": "path",
+            "name": "labelId",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 100
+            }
+          }
+        ],
+        "x-hqbase-agent-capabilities": ["mail:write"]
+      }
+    },
     "/api/v2/conversations": {
       "get": {
         "summary": "List or search conversations",
@@ -1262,6 +1472,16 @@
               "maxLength": 100
             },
             "description": "Limit results to one accessible mailbox."
+          },
+          {
+            "in": "query",
+            "name": "labelId",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 100
+            },
+            "description": "Limit results to conversations where an accessible message has this existing label."
           },
           {
             "in": "query",
@@ -1410,6 +1630,150 @@
             }
           }
         },
+        "x-hqbase-agent-capabilities": ["mail:write"]
+      }
+    },
+    "/api/v2/conversations/{id}/labels/{labelId}": {
+      "put": {
+        "summary": "Add a label to a conversation",
+        "description": "Adds one existing label to every accessible message that the caller can organize. Inaccessible copies remain unchanged.",
+        "security": [
+          {
+            "oauth2": ["mail:write"]
+          },
+          {
+            "cookieSession": []
+          },
+          {
+            "agentBearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Label assignment state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LabelAssignmentResult"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The caller cannot organize this conversation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The conversation or label was not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "tags": ["Labels"],
+        "operationId": "addConversationLabel",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "description": "One accessible message ID representing the conversation.",
+            "schema": {
+              "type": "string",
+              "maxLength": 100
+            }
+          },
+          {
+            "in": "path",
+            "name": "labelId",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 100
+            }
+          }
+        ],
+        "x-hqbase-agent-capabilities": ["mail:write"]
+      },
+      "delete": {
+        "summary": "Remove a label from a conversation",
+        "description": "Removes one label from every accessible message that the caller can organize. Inaccessible copies remain unchanged.",
+        "security": [
+          {
+            "oauth2": ["mail:write"]
+          },
+          {
+            "cookieSession": []
+          },
+          {
+            "agentBearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Label assignment state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LabelAssignmentResult"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The caller cannot organize this conversation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The conversation or label was not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "tags": ["Labels"],
+        "operationId": "removeConversationLabel",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "description": "One accessible message ID representing the conversation.",
+            "schema": {
+              "type": "string",
+              "maxLength": 100
+            }
+          },
+          {
+            "in": "path",
+            "name": "labelId",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 100
+            }
+          }
+        ],
         "x-hqbase-agent-capabilities": ["mail:write"]
       }
     },
@@ -2685,6 +3049,71 @@
           }
         }
       },
+      "Label": {
+        "type": "object",
+        "required": ["id", "name", "color", "createdAt", "updatedAt"],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          },
+          "color": {
+            "type": "string",
+            "enum": [
+              "gray",
+              "red",
+              "orange",
+              "amber",
+              "green",
+              "teal",
+              "blue",
+              "indigo",
+              "purple",
+              "pink"
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "LabelAssignmentResult": {
+        "type": "object",
+        "required": ["affected", "assigned", "labelId", "labels"],
+        "properties": {
+          "affected": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "assigned": {
+            "type": "boolean"
+          },
+          "labelId": {
+            "type": "string"
+          },
+          "messageId": {
+            "type": "string"
+          },
+          "threadId": {
+            "type": "string"
+          },
+          "labels": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Label"
+            }
+          }
+        }
+      },
       "MessageSummary": {
         "type": "object",
         "required": [
@@ -2702,7 +3131,8 @@
           "readAt",
           "starredAt",
           "hasAttachments",
-          "createdAt"
+          "createdAt",
+          "labels"
         ],
         "properties": {
           "id": {
@@ -2796,6 +3226,13 @@
           "createdAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "labels": {
+            "type": "array",
+            "description": "Labels assigned to this message. Conversation summaries contain the union from accessible messages.",
+            "items": {
+              "$ref": "#/components/schemas/Label"
+            }
           }
         }
       },

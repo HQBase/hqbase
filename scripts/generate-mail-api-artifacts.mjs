@@ -54,7 +54,7 @@ function buildCollection(document, version) {
     // Postman v2.1 HTTP collections cannot contain a real WebSocket request.
     // Keep the socket in OpenAPI and provide manual connection details below.
     if (route === `${apiBasePath}/events`) continue;
-    for (const method of ["get", "post", "patch", "delete"]) {
+    for (const method of ["get", "post", "put", "patch", "delete"]) {
       const operation = pathItem[method];
       if (!operation) continue;
       const tag = operation.tags?.[0] ?? "Mail API";
@@ -87,6 +87,7 @@ function buildCollection(document, version) {
       { key: "id", value: "msg_example", type: "string" },
       { key: "attachmentId", value: "att_example", type: "string" },
       { key: "draftId", value: "drf_example", type: "string" },
+      { key: "labelId", value: "lbl_example", type: "string" },
       { key: "action", value: "read", type: "string" }
     ],
     item: [oauthSetupFolder(version), ...folders.values()]
@@ -106,7 +107,7 @@ function withAgentAuthentication(document) {
   };
 
   for (const [route, pathItem] of Object.entries(result.paths ?? {})) {
-    for (const method of ["get", "post", "patch", "delete"]) {
+    for (const method of ["get", "post", "put", "patch", "delete"]) {
       const operation = pathItem[method];
       if (!operation) continue;
       operation.security = (operation.security ?? []).filter(
@@ -135,6 +136,9 @@ function validateOpenApi(document, version) {
     `${apiBasePath}/changes`,
     `${apiBasePath}/events`,
     `${apiBasePath}/conversations`,
+    `${apiBasePath}/labels`,
+    `${apiBasePath}/messages/{id}/labels/{labelId}`,
+    `${apiBasePath}/conversations/{id}/labels/{labelId}`,
     `${apiBasePath}/drafts`,
     `${apiBasePath}/drafts/changes`,
     `${apiBasePath}/send`,

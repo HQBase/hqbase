@@ -57,6 +57,11 @@
       "type": "string"
     },
     {
+      "key": "labelId",
+      "value": "lbl_example",
+      "type": "string"
+    },
+    {
       "key": "action",
       "value": "read",
       "type": "string"
@@ -188,6 +193,112 @@
       ]
     },
     {
+      "name": "Labels",
+      "item": [
+        {
+          "name": "List labels",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/labels",
+              "variable": []
+            },
+            "description": "Lists shared workspace labels. Labels organize mail but never grant mailbox access or change folders."
+          },
+          "response": []
+        },
+        {
+          "name": "Add a label to a message",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/messages/:id/labels/:labelId",
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{id}}"
+                },
+                {
+                  "key": "labelId",
+                  "value": "{{labelId}}"
+                }
+              ]
+            },
+            "description": "Adds one existing label without changing mailbox access or the message folder."
+          },
+          "response": []
+        },
+        {
+          "name": "Remove a label from a message",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/messages/:id/labels/:labelId",
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{id}}"
+                },
+                {
+                  "key": "labelId",
+                  "value": "{{labelId}}"
+                }
+              ]
+            },
+            "description": "Removes one label without changing mailbox access or the message folder."
+          },
+          "response": []
+        },
+        {
+          "name": "Add a label to a conversation",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/conversations/:id/labels/:labelId",
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{id}}"
+                },
+                {
+                  "key": "labelId",
+                  "value": "{{labelId}}"
+                }
+              ]
+            },
+            "description": "Adds one existing label to every accessible message that the caller can organize. Inaccessible copies remain unchanged."
+          },
+          "response": []
+        },
+        {
+          "name": "Remove a label from a conversation",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/conversations/:id/labels/:labelId",
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{id}}"
+                },
+                {
+                  "key": "labelId",
+                  "value": "{{labelId}}"
+                }
+              ]
+            },
+            "description": "Removes one label from every accessible message that the caller can organize. Inaccessible copies remain unchanged."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
       "name": "Messages",
       "item": [
         {
@@ -210,6 +321,12 @@
                   "value": "",
                   "disabled": true,
                   "description": "Limit results to one accessible mailbox."
+                },
+                {
+                  "key": "labelId",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Limit results to messages assigned this existing label."
                 },
                 {
                   "key": "search",
@@ -402,6 +519,12 @@
                   "value": "",
                   "disabled": true,
                   "description": "Limit results to one accessible mailbox."
+                },
+                {
+                  "key": "labelId",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Limit results to conversations where an accessible message has this existing label."
                 },
                 {
                   "key": "search",
