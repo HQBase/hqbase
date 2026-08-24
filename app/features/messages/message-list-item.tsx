@@ -1,6 +1,7 @@
 import type * as React from "react";
 import { PiChats, PiPaperclip, PiStar } from "react-icons/pi";
 
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/cn";
 import { formatConversationTimestamp } from "@/lib/format";
@@ -27,11 +28,17 @@ export function MessageListItem({
 }: MessageListItemProps): React.ReactElement {
   const isUnread = conversation.unreadCount > 0;
   const timestamp = formatConversationTimestamp(conversationActivityTimestamp(conversation));
+  const correspondent = correspondentLabel(conversation);
+  const avatarInitial =
+    correspondent
+      .replace(/^To:\s*/u, "")
+      .charAt(0)
+      .toUpperCase() || "?";
 
   return (
     <a
       className={cn(
-        "group flex w-full items-center gap-4 rounded-xl px-3 py-2 text-left text-[13px] leading-5 transition-colors [@media(hover:hover)]:hover:bg-hover focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring",
+        "group grid w-full grid-cols-[2.5rem_minmax(0,1fr)_2.5rem] items-start gap-x-3 rounded-none py-3 text-left text-[14px] leading-5 transition-colors [@media(hover:hover)]:hover:bg-hover focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring sm:flex sm:items-center sm:gap-4 sm:rounded-xl sm:px-3 sm:py-2 sm:text-[13px]",
         isActive && "bg-selected"
       )}
       href={href}
@@ -49,11 +56,18 @@ export function MessageListItem({
         onSelect(conversation);
       }}
     >
+      <Avatar
+        aria-hidden="true"
+        className="row-span-2 size-10 sm:hidden"
+        data-message-avatar="mobile"
+      >
+        <AvatarFallback className="font-medium uppercase">{avatarInitial}</AvatarFallback>
+      </Avatar>
       <button
         aria-label={conversation.isStarred ? "Unstar conversation" : "Star conversation"}
         aria-pressed={conversation.isStarred}
         className={cn(
-          "flex size-10 min-h-10 min-w-10 shrink-0 items-center justify-center rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+          "col-start-3 row-start-2 flex size-10 min-h-10 min-w-10 shrink-0 self-end justify-self-end items-center justify-center rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:col-auto sm:row-auto sm:self-auto sm:justify-self-auto",
           conversation.isStarred
             ? "text-star"
             : "text-muted-foreground/45 [@media(hover:hover)]:hover:bg-accent [@media(hover:hover)]:hover:text-muted-foreground group-hover:text-muted-foreground"
@@ -71,7 +85,7 @@ export function MessageListItem({
           className={cn("pointer-events-none size-4", conversation.isStarred && "fill-star")}
         />
       </button>
-      <span className="flex w-[30%] min-w-0 max-w-[16rem] shrink-0 items-center gap-2">
+      <span className="col-start-2 row-start-1 flex min-w-0 items-center gap-2 sm:w-[30%] sm:max-w-[16rem] sm:shrink-0">
         <span
           className={cn(
             "min-w-0 truncate",
@@ -80,13 +94,14 @@ export function MessageListItem({
               : "font-normal text-foreground/85 dark:text-white/65"
           )}
         >
-          {correspondentLabel(conversation)}
+          {correspondent}
         </span>
       </span>
-      <span className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden">
-        <span className="min-w-0 flex-1 truncate">
+      <span className="col-start-2 row-start-2 flex min-w-0 items-end gap-2 overflow-hidden sm:flex-1 sm:items-center">
+        <span className="min-w-0 flex-1">
           <span
             className={cn(
+              "block truncate sm:inline",
               isUnread
                 ? "font-semibold text-foreground dark:text-white"
                 : "font-normal text-foreground/85 dark:text-white/65"
@@ -96,10 +111,11 @@ export function MessageListItem({
           </span>
           <span
             className={cn(
+              "block truncate sm:inline",
               isUnread ? "text-foreground/75 dark:text-white/75" : "text-muted-foreground"
             )}
           >
-            {" — "}
+            <span className="hidden sm:inline">{" — "}</span>
             {conversation.snippet || "No preview"}
           </span>
         </span>
@@ -125,7 +141,7 @@ export function MessageListItem({
       </span>
       <time
         className={cn(
-          "w-[5.75rem] shrink-0 text-right text-[12px] tabular-nums",
+          "col-start-3 row-start-1 shrink-0 text-right text-[11px] tabular-nums sm:w-[5.75rem] sm:text-[12px]",
           isUnread ? "font-medium text-foreground dark:text-white" : "text-muted-foreground"
         )}
       >

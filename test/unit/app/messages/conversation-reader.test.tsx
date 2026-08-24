@@ -227,6 +227,25 @@ describe("conversation reader", () => {
     expect(readHtml).toContain('aria-label="Star conversation"');
   });
 
+  it("uses a Gmail-style information stack only below the small breakpoint", () => {
+    const html = renderToStaticMarkup(
+      <MessageListItem
+        activeFolder="inbox"
+        conversation={{ ...conversation, fromAddress: "Support Team <support@example.com>" }}
+        href="/mail/inbox/msg_1"
+        isActive={false}
+        onSelect={() => undefined}
+        onToggleStar={() => undefined}
+      />
+    );
+
+    expect(html).toContain('data-message-avatar="mobile"');
+    expect(html).toContain("grid-cols-[2.5rem_minmax(0,1fr)_2.5rem]");
+    expect(html).toContain("sm:flex");
+    expect(html.indexOf("Support Team")).toBeLessThan(html.indexOf("Account access"));
+    expect(html.indexOf("Account access")).toBeLessThan(html.indexOf("We can help"));
+  });
+
   it("collapses messages between the first and final message behind a counted divider", () => {
     const messages = Array.from({ length: 6 }, (_, index) => ({
       ...firstMessage,
