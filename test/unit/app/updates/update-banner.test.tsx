@@ -15,7 +15,7 @@ describe("update banner", () => {
     );
     expect(html).toContain("Update available");
     expect(html).toContain("0.2.0");
-    expect(html).toContain("Review update");
+    expect(html).toContain("View changelog");
     expect(html).toContain("Add contact suggestions.");
     expect(html).toContain('role="status"');
     expect(html).toContain("bg-muted/45");

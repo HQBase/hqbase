@@ -3,6 +3,7 @@ import type { CurrentUser } from "@/features/auth/types";
 import type { MailConnectionStatus } from "@/features/events/types";
 import type { Mailbox } from "@/features/mailboxes/types";
 import type { UnreadCounts } from "@/features/notifications/types";
+import type { GlobalSearchResult } from "@/features/search/types";
 import type { UpdateStatus } from "@/features/updates/types";
 import { UpdateBanner } from "@/features/updates/update-banner";
 import { useDesktopShell } from "@/hooks/use-desktop-shell";
@@ -32,6 +33,8 @@ type AppShellProps = {
   onSettingsTabChange?: ((tab: import("@/lib/routes").SettingsTabId) => void) | undefined;
   onMailboxChange: (mailboxId: string) => void;
   onSearchChange: (search: string) => void;
+  onSearchSelect?: (result: GlobalSearchResult) => void;
+  onSearchSubmit?: (query: string) => void;
   onSignedOut: () => void;
   onOpenUpdates: () => void;
 };
@@ -140,6 +143,8 @@ function ShellContent({
   onMailboxChange,
   onOpenUpdates,
   onSearchChange,
+  onSearchSelect = () => undefined,
+  onSearchSubmit = () => undefined,
   onSettingsTabChange,
   onSignedOut,
   sidebarCollapsed,
@@ -167,6 +172,8 @@ function ShellContent({
         onFolderChange={onFolderChange}
         onMailboxChange={onMailboxChange}
         onSearchChange={onSearchChange}
+        onSearchSelect={onSearchSelect}
+        onSearchSubmit={onSearchSubmit}
         onSettingsTabChange={onSettingsTabChange}
         onSignedOut={onSignedOut}
         onToggleSidebar={onToggleSidebar}

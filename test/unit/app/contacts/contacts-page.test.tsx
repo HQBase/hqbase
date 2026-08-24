@@ -85,7 +85,9 @@ describe("contacts page", () => {
       button.textContent?.includes("Project timing")
     );
     await flushHookEffects(() => exchange?.click());
-    expect(onOpenConversation).toHaveBeenCalledWith("message-1");
+    expect(onOpenConversation).toHaveBeenCalledWith(
+      expect.objectContaining({ folder: "inbox", id: "message-1" })
+    );
     await view.unmount();
   });
 });

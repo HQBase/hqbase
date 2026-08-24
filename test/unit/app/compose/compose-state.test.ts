@@ -98,6 +98,7 @@ describe("composer state", () => {
       subject: id,
       text: "",
       html: "",
+      signature: { mode: "automatic", id: null, name: "", html: "", text: "" },
       version: 1,
       updatedAt: "2026-07-29T14:00:00.000Z",
       attachments: []

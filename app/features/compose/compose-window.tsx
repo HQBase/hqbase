@@ -53,7 +53,7 @@ export function ComposeWindow({
   }, [open]);
 
   React.useEffect(() => {
-    const query = window.matchMedia("(min-width: 768px)");
+    const query = window.matchMedia("(min-width: 1024px)");
     const update = () => {
       setDesktop(query.matches);
       if (!query.matches) {
@@ -111,10 +111,10 @@ export function ComposeWindow({
       aria-labelledby={titleId}
       aria-modal="false"
       className={cn(
-        "fixed inset-0 z-[60] flex h-[100dvh] w-full flex-col overflow-hidden bg-card pt-[env(safe-area-inset-top)] shadow-2xl outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring md:inset-auto md:bottom-0 md:right-4 md:z-[60] md:h-[min(42rem,calc(100vh-5rem))] md:max-h-[calc(100vh-1rem)] md:min-h-96 md:w-[min(42rem,calc(100vw-2rem))] md:max-w-[calc(100vw-2rem)] md:min-w-96 md:rounded-t-lg md:border md:pt-0",
-        !minimized && "md:resize",
+        "fixed inset-0 z-[60] flex h-[100dvh] w-full flex-col overflow-hidden bg-card pt-[env(safe-area-inset-top)] shadow-2xl outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring lg:inset-auto lg:bottom-0 lg:right-4 lg:z-[60] lg:h-[min(42rem,calc(100vh-5rem))] lg:max-h-[calc(100vh-1rem)] lg:min-h-96 lg:w-[min(42rem,calc(100vw-2rem))] lg:max-w-[calc(100vw-2rem)] lg:min-w-96 lg:rounded-t-lg lg:border lg:pt-0",
+        !minimized && "lg:resize",
         minimized &&
-          "md:h-auto md:min-h-0 md:w-80 md:min-w-0 md:resize-none md:translate-x-0 md:rounded-b-none md:rounded-t-lg"
+          "lg:h-auto lg:min-h-0 lg:w-80 lg:min-w-0 lg:resize-none lg:translate-x-0 lg:rounded-b-none lg:rounded-t-lg"
       )}
       ref={windowRef}
       role="dialog"
@@ -125,7 +125,7 @@ export function ComposeWindow({
       }}
     >
       <header
-        className="flex min-h-14 shrink-0 items-center gap-3 border-b bg-background/80 px-4 md:cursor-move md:select-none md:touch-none [&_button]:cursor-default"
+        className="flex min-h-14 shrink-0 items-center gap-3 border-b bg-background/80 px-4 lg:cursor-move lg:select-none lg:touch-none [&_button]:cursor-default"
         onLostPointerCapture={() => {
           dragRef.current = null;
         }}
@@ -183,7 +183,7 @@ export function ComposeWindow({
         <div className="flex items-center gap-1">
           <Button
             aria-label={minimized ? "Restore compose" : "Minimize compose"}
-            className="hidden size-10 min-h-10 min-w-10 md:inline-flex"
+            className="hidden size-10 min-h-10 min-w-10 lg:inline-flex"
             size="icon"
             type="button"
             variant="ghost"
@@ -207,7 +207,7 @@ export function ComposeWindow({
           </Button>
         </div>
       </header>
-      <div className={cn("min-h-0 flex-1 flex-col", minimized ? "flex md:hidden" : "flex")}>
+      <div className={cn("min-h-0 flex-1 flex-col", minimized ? "flex lg:hidden" : "flex")}>
         {children}
       </div>
     </section>

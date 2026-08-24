@@ -17,9 +17,12 @@ import { DraftsPage } from "@/features/drafts/drafts-page";
 import { useDrafts } from "@/features/drafts/use-drafts";
 import { useMailEvents } from "@/features/events/use-mail-events";
 import { InboxPage } from "@/features/inbox/inbox-page";
+import { listLabels } from "@/features/labels/api";
+import type { MailLabel } from "@/features/labels/types";
 import { listDeletedMailboxes, listMailboxes } from "@/features/mailboxes/api";
 import type { Mailbox } from "@/features/mailboxes/types";
 import { useMailSync } from "@/features/messages/use-mail-sync";
+import { type GlobalSearchResult, globalSearchResultPath } from "@/features/search/types";
 import { SettingsPage } from "@/features/settings/settings-page";
 import { getSetupStatus } from "@/features/setup/api";
 import { SetupPage } from "@/features/setup/setup-page";
@@ -31,6 +34,7 @@ import {
   type FolderId,
   isPublicAuthenticationPath,
   type MailFolderId,
+  readAppRoute,
   type SettingsTabId
 } from "@/lib/routes";
 import { useAppRoute } from "@/lib/use-app-route";
@@ -49,10 +53,13 @@ export function App(): React.ReactElement {
   const [setup, setSetup] = React.useState<SetupStatus | null>(null);
   const [user, setUser] = React.useState<CurrentUser | null | undefined>(undefined);
   const [mailboxes, setMailboxes] = React.useState<Mailbox[]>([]);
+  const [labels, setLabels] = React.useState<MailLabel[]>([]);
   const [deletedMailboxes, setDeletedMailboxes] = React.useState<Mailbox[]>([]);
   const [users, setUsers] = React.useState<WorkspaceUser[]>([]);
   const [mailboxId, setMailboxId] = React.useState("all");
+  const [labelId, setLabelId] = React.useState("all");
   const [search, setSearch] = React.useState("");
+  const [searchQuery, setSearchQuery] = React.useState("");
   const [composeOpen, setComposeOpen] = React.useState(false);
   const [composeTo, setComposeTo] = React.useState("");
   const [isLoading, setIsLoading] = React.useState(true);
@@ -87,15 +94,21 @@ export function App(): React.ReactElement {
   const updateMonitor = useUpdateMonitor(canManageUpdates);
   const mailSync = useMailSync({
     activeFolder,
+    labelId,
     mailboxId,
     search,
     userId: currentUserId
   });
 
   const loadWorkspace = React.useCallback(async (currentUser: CurrentUser) => {
-    const [nextSetup, nextMailboxes] = await Promise.all([getSetupStatus(), listMailboxes()]);
+    const [nextSetup, nextMailboxes, nextLabels] = await Promise.all([
+      getSetupStatus(),
+      listMailboxes(),
+      listLabels()
+    ]);
     setSetup(nextSetup);
     setMailboxes(nextMailboxes);
+    setLabels(nextLabels);
 
     if (currentUser.role === "owner" || currentUser.role === "admin") {
       const [nextUsers, nextDeletedMailboxes] = await Promise.all([
@@ -184,6 +197,30 @@ export function App(): React.ReactElement {
     }
   }, [contentMailboxes, mailboxId]);
 
+  React.useEffect(() => {
+    if (labelId !== "all" && !labels.some((label) => label.id === labelId)) setLabelId("all");
+  }, [labelId, labels]);
+
+  const refreshLabels = React.useCallback(async () => {
+    setLabels(await listLabels());
+  }, []);
+
+  const selectSearchResult = React.useCallback(
+    (result: GlobalSearchResult) => {
+      navigate(readAppRoute(globalSearchResultPath(result)));
+    },
+    [navigate]
+  );
+
+  const submitSearch = React.useCallback(
+    (query: string) => {
+      setSearch(query);
+      setSearchQuery(query);
+      navigate({ kind: "mail", folder: "inbox", messageId: null });
+    },
+    [navigate]
+  );
+
   if (publicAuthenticationPath) {
     const params = new URLSearchParams(window.location.search);
     const returnTo = safeAuthenticationReturnPath(params.get("returnTo"), window.location.origin);
@@ -253,7 +290,7 @@ export function App(): React.ReactElement {
         mailboxId={mailboxId}
         mailboxes={contentMailboxes}
         unread={mailSync.notifications.unread}
-        search={search}
+        search={searchQuery}
         user={user}
         updateInProgress={updateMonitor.progress !== null}
         updateReady={updateMonitor.ready}
@@ -278,7 +315,9 @@ export function App(): React.ReactElement {
         }}
         onSettingsTabChange={(tab) => navigate({ kind: "settings", tab })}
         onMailboxChange={setMailboxId}
-        onSearchChange={setSearch}
+        onSearchChange={setSearchQuery}
+        onSearchSelect={selectSearchResult}
+        onSearchSubmit={submitSearch}
         onSignedOut={() => {
           setUser(null);
         }}
@@ -293,8 +332,12 @@ export function App(): React.ReactElement {
                   setComposeTo(email);
                   setComposeOpen(true);
                 }}
-                onOpenConversation={(messageId) =>
-                  navigate({ kind: "mail", folder: "inbox", messageId })
+                onOpenConversation={(conversation) =>
+                  navigate({
+                    kind: "mail",
+                    folder: conversation.folder,
+                    messageId: conversation.id
+                  })
                 }
                 onSelect={(contactId) => navigate({ kind: "contacts", contactId })}
               />
@@ -305,6 +348,7 @@ export function App(): React.ReactElement {
                 currentUser={user}
                 defaultFromMailboxId={user.defaultFromMailboxId}
                 deletedMailboxes={deletedMailboxes}
+                labels={labels}
                 mailboxes={mailboxes}
                 notifications={mailSync.notifications}
                 setup={setup}
@@ -313,6 +357,7 @@ export function App(): React.ReactElement {
                   setUser((current) => (current ? { ...current, defaultFromMailboxId } : current));
                 }}
                 onRefresh={reload}
+                onLabelsChanged={refreshLabels}
                 onUpdateStarted={updateMonitor.start}
                 onUpdateStatusChange={updateMonitor.acceptStatus}
                 updateProgress={updateMonitor.progress}
@@ -353,12 +398,24 @@ export function App(): React.ReactElement {
                 defaultFromMailboxId={user.defaultFromMailboxId}
                 hasMore={mailSync.hasMore}
                 isLoadingMore={mailSync.isLoadingMore}
+                labelId={labelId}
+                labels={labels}
                 loadMoreError={mailSync.loadMoreError}
                 mailboxes={contentMailboxes}
                 selectedId={selectedId}
                 onDraftsChange={() => void draftState.refresh().catch(() => undefined)}
                 onConversationAction={mailSync.applyConversationAction}
+                onConversationLabelsChange={mailSync.applyConversationLabels}
                 onLoadMore={() => void mailSync.loadMore()}
+                onLabelChange={setLabelId}
+                canOrganizeConversation={(mailboxId) =>
+                  user.role === "owner" ||
+                  contentMailboxes.some(
+                    (mailbox) =>
+                      mailbox.id === mailboxId &&
+                      (mailbox.accessLevel === "agent" || mailbox.accessLevel === "manager")
+                  )
+                }
                 onRefresh={() => mailSync.refresh()}
                 onMessageRouteChange={(folder, messageId) =>
                   navigate({ kind: "mail", folder, messageId })

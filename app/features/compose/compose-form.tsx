@@ -4,6 +4,8 @@ import { PiPaperclip, PiPaperPlaneTilt, PiTrash } from "react-icons/pi";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import type { DraftAttachment } from "@/features/drafts/types";
+import { ComposeSignature } from "@/features/signatures/compose-signature";
+import type { SignatureSelection, SignatureSnapshot } from "@/features/signatures/types";
 import { cn } from "@/lib/cn";
 import { AttachmentList } from "./attachment-list";
 import { ComposeFields, type SendingIdentity } from "./compose-fields";
@@ -25,6 +27,7 @@ type ComposeFormProps = {
   presentation: "window" | "thread";
   ready: boolean;
   sendDisabled: boolean;
+  signature: SignatureSnapshot;
   subject: string;
   threadContext?: React.ReactNode;
   to: string;
@@ -32,6 +35,8 @@ type ComposeFormProps = {
   onEditorChange: (html: string, text: string) => void;
   onFiles: (files: File[]) => void;
   onRemoveAttachment: (attachment: DraftAttachment) => void;
+  onManageSignatures: () => void;
+  onSetSignature: (selection: SignatureSelection) => Promise<void> | void;
   onSetBcc: (value: string) => void;
   onSetCc: (value: string) => void;
   onSetFrom: (value: string) => void;
@@ -82,12 +87,19 @@ export function ComposeForm(props: ComposeFormProps): React.ReactElement {
             onFiles={props.onFiles}
             onChange={props.onEditorChange}
           />
+          <ComposeSignature
+            disabled={props.isPending}
+            from={props.from}
+            signature={props.signature}
+            onManage={props.onManageSignatures}
+            onSelectionChange={props.onSetSignature}
+          />
           <AttachmentList attachments={props.attachments} onRemove={props.onRemoveAttachment} />
           <footer
             className={cn(
               "flex items-center justify-between gap-2 border-t bg-background/50 px-5 py-3",
               props.presentation === "window" &&
-                "pb-[max(1rem,env(safe-area-inset-bottom))] md:pb-3"
+                "pb-[max(1rem,env(safe-area-inset-bottom))] lg:pb-3"
             )}
           >
             <div className="flex gap-2">

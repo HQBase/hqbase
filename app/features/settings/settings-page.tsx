@@ -2,6 +2,8 @@ import type * as React from "react";
 import { AgentSettings } from "@/features/agents/agent-settings";
 import type { CurrentUser } from "@/features/auth/types";
 import { DomainSettings } from "@/features/domains/domain-settings";
+import { LabelSettings } from "@/features/labels/label-settings";
+import type { MailLabel } from "@/features/labels/types";
 import { MailboxSettings } from "@/features/mailboxes/mailbox-settings";
 import type { Mailbox } from "@/features/mailboxes/types";
 import { McpSettings } from "@/features/mcp/mcp-settings";
@@ -11,6 +13,7 @@ import { DebugSettings } from "@/features/settings/debug-settings";
 import { InterfaceSettings } from "@/features/settings/interface-settings";
 import { SettingsSection } from "@/features/settings/settings-section";
 import type { SetupStatus } from "@/features/setup/types";
+import { SignatureSettings } from "@/features/signatures/signature-settings";
 import type { UpdateStatus } from "@/features/updates/types";
 import type { UpdateProgress } from "@/features/updates/update-progress";
 import { UpdateSettings } from "@/features/updates/update-settings";
@@ -25,11 +28,13 @@ type SettingsPageProps = {
   defaultFromMailboxId: string | null;
   deletedMailboxes: Mailbox[];
   mailboxes: Mailbox[];
+  labels?: MailLabel[];
   notifications: NotificationController;
   setup: SetupStatus;
   users: WorkspaceUser[];
   onDefaultFromMailboxChange: (mailboxId: string) => void;
   onRefresh: () => Promise<void>;
+  onLabelsChanged?: () => Promise<void>;
   onUpdateStarted: (buildId: string) => void;
   onUpdateStatusChange: (status: UpdateStatus) => void;
   updateProgress: UpdateProgress | null;
@@ -43,11 +48,13 @@ export function SettingsPage({
   defaultFromMailboxId,
   deletedMailboxes,
   mailboxes,
+  labels = [],
   notifications,
   setup,
   users,
   onDefaultFromMailboxChange,
   onRefresh,
+  onLabelsChanged = () => Promise.resolve(),
   onUpdateStarted,
   onUpdateStatusChange,
   updateProgress,
@@ -88,6 +95,12 @@ export function SettingsPage({
           <NotificationSettings notifications={notifications} />
         ) : null}
         {activeTab === "interface" ? <InterfaceSettings /> : null}
+        {activeTab === "labels" ? (
+          <LabelSettings canManage={canManage} labels={labels} onChanged={onLabelsChanged} />
+        ) : null}
+        {activeTab === "signatures" ? (
+          <SignatureSettings domains={setup.domains} mailboxes={mailboxes} user={currentUser} />
+        ) : null}
         {activeTab === "mcp" ? (
           <McpSettings
             canManage={canManage}

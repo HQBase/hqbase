@@ -2,6 +2,9 @@ import * as React from "react";
 import { PiArrowLeft } from "react-icons/pi";
 
 import { Button } from "@/components/ui/button";
+import { setConversationLabel } from "@/features/labels/api";
+import { LabelFilter } from "@/features/labels/label-controls";
+import type { MailLabel } from "@/features/labels/types";
 import type { Mailbox } from "@/features/mailboxes/types";
 import { getMessageThread, runConversationAction } from "@/features/messages/api";
 import { MessageDetail } from "@/features/messages/message-detail";
@@ -20,16 +23,21 @@ type InboxPageProps = {
   defaultFromMailboxId: string | null;
   hasMore: boolean;
   isLoadingMore: boolean;
+  labelId?: string;
+  labels?: MailLabel[];
   loadMoreError: string | null;
   mailboxes: Mailbox[];
   selectedId: string | null;
   onDraftsChange?: () => void;
   onConversationAction: (threadId: string, action: ConversationAction, affected: number) => void;
+  onConversationLabelsChange?: (threadId: string, labels: MailLabel[]) => void;
   onLoadMore: () => void;
+  onLabelChange?: (labelId: string) => void;
   onRefresh: () => Promise<void> | void;
   onMessageRouteChange: (folder: MailFolderId, messageId: string | null) => void;
   onSelect: (messageId: string) => void;
   totalCount: number | null;
+  canOrganizeConversation?: (mailboxId: string | null) => boolean;
 };
 
 export function InboxPage({
@@ -38,16 +46,21 @@ export function InboxPage({
   defaultFromMailboxId,
   hasMore,
   isLoadingMore,
+  labelId = "all",
+  labels = [],
   loadMoreError,
   mailboxes,
   selectedId,
   onDraftsChange,
   onConversationAction,
+  onConversationLabelsChange = () => undefined,
   onLoadMore,
+  onLabelChange = () => undefined,
   onRefresh,
   onMessageRouteChange,
   onSelect,
-  totalCount
+  totalCount,
+  canOrganizeConversation = () => false
 }: InboxPageProps): React.ReactElement {
   const activeLabel = mailFolders.find((folder) => folder.id === activeFolder)?.label ?? "Messages";
   const conversationCountLabel =
@@ -124,6 +137,7 @@ export function InboxPage({
     (conversation) => conversation.threadId === selectedThreadId
   );
   const readerSelectedId = selectedConversation?.id ?? selectedId;
+  const selectedMailboxId = selectedConversation?.mailboxId ?? thread.at(-1)?.mailboxId ?? null;
 
   React.useEffect(() => {
     if (
@@ -206,6 +220,8 @@ export function InboxPage({
             error={detailError}
             isLoading={detailLoading}
             key={selectedId}
+            canOrganizeLabels={canOrganizeConversation(selectedMailboxId)}
+            labels={labels}
             mailboxes={mailboxes}
             messages={thread}
             selectedId={readerSelectedId}
@@ -216,6 +232,16 @@ export function InboxPage({
             onRefresh={async () => {
               await onRefresh();
               if (selectedId) await loadThread(selectedId);
+            }}
+            onToggleLabel={async (label, assigned) => {
+              const result = await setConversationLabel(
+                readerSelectedId ?? selectedId,
+                label.id,
+                assigned
+              );
+              onConversationLabelsChange(result.threadId, result.labels);
+              await onRefresh();
+              await loadThread(selectedId);
             }}
             onSent={() => {
               void Promise.resolve(onRefresh()).catch(() => undefined);
@@ -232,9 +258,14 @@ export function InboxPage({
       <div className="flex h-11 shrink-0 items-center border-b border-divider bg-toolbar">
         <div className="mx-auto flex w-full max-w-[960px] items-center justify-between gap-3 px-4 sm:px-6 lg:px-8">
           <span className="text-sm font-medium text-foreground">{activeLabel}</span>
-          {conversationCountLabel ? (
-            <span className="text-[12px] tabular-nums text-tertiary">{conversationCountLabel}</span>
-          ) : null}
+          <div className="flex min-w-0 items-center gap-2">
+            <LabelFilter labels={labels} value={labelId} onChange={onLabelChange} />
+            {conversationCountLabel ? (
+              <span className="hidden text-[12px] tabular-nums text-tertiary sm:inline">
+                {conversationCountLabel}
+              </span>
+            ) : null}
+          </div>
         </div>
       </div>
       <div className="min-h-0 flex-1 overflow-hidden">
@@ -249,6 +280,13 @@ export function InboxPage({
           onRefresh={onRefresh}
           onSelect={(conversation) => onSelect(conversation.id)}
           onToggleStar={handleStarToggle}
+          onToggleLabel={async (conversation, label, assigned) => {
+            const result = await setConversationLabel(conversation.id, label.id, assigned);
+            onConversationLabelsChange(result.threadId, result.labels);
+            await onRefresh();
+          }}
+          canOrganizeConversation={canOrganizeConversation}
+          labels={labels}
         />
       </div>
     </div>

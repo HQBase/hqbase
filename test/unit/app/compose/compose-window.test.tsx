@@ -57,7 +57,7 @@ describe("compose window", () => {
     const header = dialog?.querySelector<HTMLElement>("header");
     expect(dialog?.style.left).toBe("500px");
     expect(dialog?.style.top).toBe("80px");
-    expect(dialog?.className).toContain("md:resize");
+    expect(dialog?.className).toContain("lg:resize");
     expect(document.body.textContent).not.toContain("Expand compose");
 
     Object.assign(header ?? {}, {

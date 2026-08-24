@@ -8,6 +8,29 @@ export const DropdownMenu = DropdownMenuPrimitive.Root;
 export const DropdownMenuTrigger = DropdownMenuPrimitive.Trigger;
 export const DropdownMenuRadioGroup = DropdownMenuPrimitive.RadioGroup;
 
+export const DropdownMenuCheckboxItem = React.forwardRef<
+  React.ElementRef<typeof DropdownMenuPrimitive.CheckboxItem>,
+  React.ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.CheckboxItem>
+>(({ children, checked, className, ...props }, ref) => (
+  <DropdownMenuPrimitive.CheckboxItem
+    checked={checked ?? false}
+    className={cn(
+      "relative flex cursor-default select-none items-center rounded-sm py-1.5 pl-7 pr-2 text-sm outline-none focus:bg-muted",
+      className
+    )}
+    ref={ref}
+    {...props}
+  >
+    <span className="absolute left-2 flex items-center justify-center">
+      <DropdownMenuPrimitive.ItemIndicator>
+        <PiCheck aria-hidden="true" />
+      </DropdownMenuPrimitive.ItemIndicator>
+    </span>
+    {children}
+  </DropdownMenuPrimitive.CheckboxItem>
+));
+DropdownMenuCheckboxItem.displayName = DropdownMenuPrimitive.CheckboxItem.displayName;
+
 export const DropdownMenuContent = React.forwardRef<
   React.ElementRef<typeof DropdownMenuPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.Content>

@@ -1,5 +1,7 @@
 type MessageFolder = "inbox" | "sent" | "archived" | "trash" | "catchall";
 
+import type { MailLabel } from "@/features/labels/types";
+
 export type MessageSummary = {
   id: string;
   threadId: string;
@@ -15,6 +17,7 @@ export type MessageSummary = {
   readAt: string | null;
   starredAt: string | null;
   hasAttachments: boolean;
+  labels?: MailLabel[];
   createdAt: string;
 };
 

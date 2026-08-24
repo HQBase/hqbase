@@ -1,6 +1,7 @@
 import * as React from "react";
 import { toast } from "sonner";
 
+import type { MailLabel } from "@/features/labels/types";
 import { useNotifications } from "@/features/notifications/use-notifications";
 import { playNotificationSound } from "@/lib/notification-sounds";
 import type { FolderId } from "@/lib/routes";
@@ -10,13 +11,21 @@ import type { ConversationAction, ConversationSummary } from "./types";
 
 type MailSyncOptions = {
   activeFolder: FolderId;
+  labelId?: string;
   mailboxId: string;
   search: string;
   userId: string | null;
 };
 
-export function useMailSync({ activeFolder, mailboxId, search, userId }: MailSyncOptions): {
+export function useMailSync({
+  activeFolder,
+  labelId = "all",
+  mailboxId,
+  search,
+  userId
+}: MailSyncOptions): {
   applyConversationAction: (threadId: string, action: ConversationAction, affected: number) => void;
+  applyConversationLabels: (threadId: string, labels: MailLabel[]) => void;
   conversations: ConversationSummary[];
   hasMore: boolean;
   isLoadingMore: boolean;
@@ -37,7 +46,7 @@ export function useMailSync({ activeFolder, mailboxId, search, userId }: MailSyn
   const latestInboundId = React.useRef<string | null>(null);
   const hasInboundSnapshot = React.useRef(false);
   const currentUserId = React.useRef(userId);
-  const syncKey = [userId, activeFolder, mailboxId, search].join("\u0000");
+  const syncKey = [userId, activeFolder, mailboxId, labelId, search].join("\u0000");
   const currentSyncKey = React.useRef(syncKey);
   const paginationSyncKey = React.useRef<string | null>(null);
   const inboundSnapshotUserId = React.useRef(userId);
@@ -83,6 +92,7 @@ export function useMailSync({ activeFolder, mailboxId, search, userId }: MailSyn
           ? Promise.resolve<null>(null)
           : listConversations({
               folder: activeFolder,
+              labelId: labelId === "all" ? undefined : labelId,
               mailboxId: mailboxId === "all" ? undefined : mailboxId,
               search: search || undefined
             })
@@ -133,7 +143,7 @@ export function useMailSync({ activeFolder, mailboxId, search, userId }: MailSyn
     };
     void promise.then(clearInFlight, clearInFlight);
     return promise;
-  }, [activeFolder, mailboxId, refreshNotifications, search, syncKey, userId]);
+  }, [activeFolder, labelId, mailboxId, refreshNotifications, search, syncKey, userId]);
 
   const hardRefresh = React.useCallback((): Promise<void> => {
     reset();
@@ -212,6 +222,7 @@ export function useMailSync({ activeFolder, mailboxId, search, userId }: MailSyn
         const page = await listConversations({
           cursor,
           folder: activeFolder,
+          labelId: labelId === "all" ? undefined : labelId,
           mailboxId: mailboxId === "all" ? undefined : mailboxId,
           search: search || undefined
         });
@@ -243,7 +254,7 @@ export function useMailSync({ activeFolder, mailboxId, search, userId }: MailSyn
     };
     void promise.then(clearInFlight, clearInFlight);
     return promise;
-  }, [activeFolder, mailboxId, nextCursor, search, syncKey, userId]);
+  }, [activeFolder, labelId, mailboxId, nextCursor, search, syncKey, userId]);
 
   const applyConversationAction = React.useCallback(
     (threadId: string, action: ConversationAction, affected: number): void => {
@@ -280,8 +291,26 @@ export function useMailSync({ activeFolder, mailboxId, search, userId }: MailSyn
     [activeFolder]
   );
 
+  const applyConversationLabels = React.useCallback(
+    (threadId: string, labels: MailLabel[]): void => {
+      const remainsInView =
+        labelId === "all" || Boolean(labels?.some((label) => label.id === labelId));
+      if (!remainsInView) {
+        setTotalCount((current) => (current === null ? null : Math.max(0, current - 1)));
+      }
+      setConversations((current) =>
+        current.flatMap((conversation) => {
+          if (conversation.threadId !== threadId) return [conversation];
+          return remainsInView ? [{ ...conversation, labels }] : [];
+        })
+      );
+    },
+    [labelId]
+  );
+
   return {
     applyConversationAction,
+    applyConversationLabels,
     conversations,
     hasMore: nextCursor !== null,
     isLoadingMore,

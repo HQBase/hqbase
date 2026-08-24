@@ -3,6 +3,8 @@ import { PiChats, PiPaperclip, PiStar } from "react-icons/pi";
 
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
+import { LabelBadges, LabelMenu } from "@/features/labels/label-controls";
+import type { MailLabel } from "@/features/labels/types";
 import { cn } from "@/lib/cn";
 import { formatConversationTimestamp } from "@/lib/format";
 import type { MailFolderId } from "@/lib/routes";
@@ -14,7 +16,10 @@ type MessageListItemProps = {
   conversation: ConversationSummary;
   href: string;
   isActive: boolean;
+  canOrganizeLabels?: boolean;
+  labels?: MailLabel[];
   onSelect: (conversation: ConversationSummary) => void;
+  onToggleLabel?: (label: MailLabel, assigned: boolean) => Promise<void> | void;
   onToggleStar: (conversation: ConversationSummary) => void;
 };
 
@@ -23,7 +28,10 @@ export function MessageListItem({
   conversation,
   href,
   isActive,
+  canOrganizeLabels = false,
+  labels = [],
   onSelect,
+  onToggleLabel,
   onToggleStar
 }: MessageListItemProps): React.ReactElement {
   const isUnread = conversation.unreadCount > 0;
@@ -38,7 +46,7 @@ export function MessageListItem({
   return (
     <a
       className={cn(
-        "group grid w-full grid-cols-[2.5rem_minmax(0,1fr)_2.5rem] items-start gap-x-3 rounded-none py-3 text-left text-[14px] leading-5 transition-colors [@media(hover:hover)]:hover:bg-hover focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring sm:flex sm:items-center sm:gap-4 sm:rounded-xl sm:px-3 sm:py-2 sm:text-[13px]",
+        "group grid w-full grid-cols-[2.5rem_minmax(0,1fr)_5rem] items-start gap-x-3 rounded-none py-3 text-left text-[14px] leading-5 transition-colors [@media(hover:hover)]:hover:bg-hover focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring sm:flex sm:items-center sm:gap-4 sm:rounded-xl sm:px-3 sm:py-2 sm:text-[13px]",
         isActive && "bg-selected"
       )}
       href={href}
@@ -63,28 +71,38 @@ export function MessageListItem({
       >
         <AvatarFallback className="font-medium uppercase">{avatarInitial}</AvatarFallback>
       </Avatar>
-      <button
-        aria-label={conversation.isStarred ? "Unstar conversation" : "Star conversation"}
-        aria-pressed={conversation.isStarred}
-        className={cn(
-          "col-start-3 row-start-2 flex size-10 min-h-10 min-w-10 shrink-0 self-end justify-self-end items-center justify-center rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:col-auto sm:row-auto sm:self-auto sm:justify-self-auto",
-          conversation.isStarred
-            ? "text-star"
-            : "text-muted-foreground/45 [@media(hover:hover)]:hover:bg-accent [@media(hover:hover)]:hover:text-muted-foreground group-hover:text-muted-foreground"
-        )}
-        onClick={(event) => {
-          event.preventDefault();
-          event.stopPropagation();
-          onToggleStar(conversation);
-        }}
-        title={conversation.isStarred ? "Starred" : "Not starred"}
-        type="button"
-      >
-        <PiStar
-          aria-hidden="true"
-          className={cn("pointer-events-none size-4", conversation.isStarred && "fill-star")}
-        />
-      </button>
+      <span className="col-start-3 row-start-2 flex shrink-0 self-end justify-self-end sm:col-auto sm:row-auto sm:self-auto sm:justify-self-auto">
+        {labels.length > 0 && onToggleLabel ? (
+          <LabelMenu
+            assigned={conversation.labels ?? []}
+            canOrganizeLabels={canOrganizeLabels}
+            labels={labels}
+            onToggle={onToggleLabel}
+          />
+        ) : null}
+        <button
+          aria-label={conversation.isStarred ? "Unstar conversation" : "Star conversation"}
+          aria-pressed={conversation.isStarred}
+          className={cn(
+            "flex size-10 min-h-10 min-w-10 shrink-0 items-center justify-center rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:size-8 sm:min-h-8 sm:min-w-8",
+            conversation.isStarred
+              ? "text-star"
+              : "text-muted-foreground/45 [@media(hover:hover)]:hover:bg-accent [@media(hover:hover)]:hover:text-muted-foreground group-hover:text-muted-foreground"
+          )}
+          onClick={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            onToggleStar(conversation);
+          }}
+          title={conversation.isStarred ? "Starred" : "Not starred"}
+          type="button"
+        >
+          <PiStar
+            aria-hidden="true"
+            className={cn("pointer-events-none size-4", conversation.isStarred && "fill-star")}
+          />
+        </button>
+      </span>
       <span className="col-start-2 row-start-1 flex min-w-0 items-center gap-2 sm:w-[30%] sm:max-w-[16rem] sm:shrink-0">
         <span
           className={cn(
@@ -119,6 +137,7 @@ export function MessageListItem({
             {conversation.snippet || "No preview"}
           </span>
         </span>
+        <LabelBadges labels={conversation.labels ?? []} />
         {conversation.messageCount > 1 ? (
           <span
             className="shrink-0 rounded-md bg-muted px-1.5 py-0.5 text-[11px] tabular-nums text-tertiary"

@@ -1,3 +1,5 @@
+import type { SignatureSelection, SignatureSnapshot } from "@/features/signatures/types";
+
 export type DraftAttachment = {
   id: string;
   filename: string;
@@ -17,12 +19,17 @@ export type Draft = {
   subject: string;
   text: string;
   html: string;
+  signature: SignatureSnapshot;
   version: number;
   updatedAt: string;
   attachments: DraftAttachment[];
 };
 
-export type DraftInput = Omit<Draft, "id" | "version" | "updatedAt" | "attachments"> & {
+export type DraftInput = Omit<
+  Draft,
+  "id" | "version" | "updatedAt" | "attachments" | "signature"
+> & {
   id?: string;
+  signature?: SignatureSelection;
   version?: number;
 };

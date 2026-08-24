@@ -5,6 +5,7 @@ import type { ConversationAction, ConversationPage, MessageDetail, MessageHtml }
 export type MessageListParams = {
   cursor?: string | undefined;
   folder?: string | undefined;
+  labelId?: string | undefined;
   mailboxId?: string | undefined;
   search?: string | undefined;
 };
@@ -15,6 +16,7 @@ export async function listConversations(
   const query = new URLSearchParams({ folder: params.folder });
   if (params.cursor) query.set("cursor", params.cursor);
   if (params.mailboxId) query.set("mailboxId", params.mailboxId);
+  if (params.labelId) query.set("labelId", params.labelId);
   if (params.search) query.set("search", params.search);
   return apiGet<ConversationPage>(`/api/v2/conversations?${query.toString()}`);
 }

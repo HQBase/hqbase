@@ -105,6 +105,7 @@ const draft: Draft = {
   subject: "Re: Account access",
   text: "Draft response",
   html: "<p>Draft response</p>",
+  signature: { mode: "automatic", id: null, name: "", html: "", text: "" },
   version: 2,
   updatedAt: "2026-08-18T14:03:00.000Z",
   attachments: []

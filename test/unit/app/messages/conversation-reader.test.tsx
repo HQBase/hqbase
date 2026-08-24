@@ -240,7 +240,7 @@ describe("conversation reader", () => {
     );
 
     expect(html).toContain('data-message-avatar="mobile"');
-    expect(html).toContain("grid-cols-[2.5rem_minmax(0,1fr)_2.5rem]");
+    expect(html).toContain("grid-cols-[2.5rem_minmax(0,1fr)_5rem]");
     expect(html).toContain("sm:flex");
     expect(html.indexOf("Support Team")).toBeLessThan(html.indexOf("Account access"));
     expect(html.indexOf("Account access")).toBeLessThan(html.indexOf("We can help"));

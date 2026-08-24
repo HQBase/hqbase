@@ -2,6 +2,7 @@ import * as React from "react";
 import { toast } from "sonner";
 import { updateDraft } from "@/features/drafts/api";
 import type { Draft } from "@/features/drafts/types";
+import type { SignatureSelection } from "@/features/signatures/types";
 import type { SendingIdentity } from "./compose-fields";
 import {
   type DraftSaveState,
@@ -72,6 +73,64 @@ export function useDraftAutosave(options: DraftAutosaveOptions) {
   const resetAutosave = React.useCallback(() => {
     draftRef.current = null;
   }, []);
+
+  const saveSignature = React.useCallback(
+    (selection: SignatureSelection): Promise<Draft> => {
+      const snapshot = serializeDraft(from, to, cc, bcc, subject, text, html);
+      latestSnapshot.current = snapshot;
+      setSaveState("saving");
+      return saveQueue.current.enqueue(async () => {
+        const current = draftRef.current;
+        if (!current || !initialized.current) throw new Error("Draft is not ready.");
+        const recipientsValid = !hasInvalidRecipients(to, cc, bcc);
+        try {
+          const next = await updateDraft(current.id, {
+            mailboxId: identities.find((identity) => identity.address === from)?.mailboxId ?? null,
+            replyToMessageId,
+            forwardOfMessageId,
+            from,
+            to: recipientsValid ? splitRecipients(to) : current.to,
+            cc: recipientsValid ? splitRecipients(cc) : current.cc,
+            bcc: recipientsValid ? splitRecipients(bcc) : current.bcc,
+            subject,
+            text,
+            html: normalizeDraftHtml(text, html),
+            signature: selection,
+            version: current.version
+          });
+          draftRef.current = next;
+          if (recipientsValid) {
+            lastSaved.current = snapshot;
+            localStorage.removeItem(recoveryKey);
+          }
+          setDraft(next);
+          setSaveState(
+            recipientsValid ? (latestSnapshot.current === snapshot ? "saved" : "saving") : "local"
+          );
+          return next;
+        } catch (error) {
+          setSaveState("error");
+          throw error;
+        }
+      });
+    },
+    [
+      initialized,
+      identities,
+      recoveryKey,
+      replyToMessageId,
+      forwardOfMessageId,
+      from,
+      to,
+      cc,
+      bcc,
+      subject,
+      text,
+      html,
+      setDraft,
+      setSaveState
+    ]
+  );
 
   React.useEffect(() => {
     if (!open || !initialized.current) return;
@@ -151,5 +210,5 @@ export function useDraftAutosave(options: DraftAutosaveOptions) {
     setSaveState
   ]);
 
-  return { initializeAutosave, resetAutosave };
+  return { initializeAutosave, resetAutosave, saveSignature };
 }

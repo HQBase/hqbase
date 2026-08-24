@@ -279,4 +279,41 @@ describe("useMailSync", () => {
     expect(hook.result.totalCount).toBe(4);
     await hook.unmount();
   });
+
+  it("removes a conversation immediately when its active label is removed", async () => {
+    const labeled = {
+      ...conversation("message-labeled", "2026-07-30T12:00:00.000Z"),
+      labels: [
+        {
+          color: "blue" as const,
+          createdAt: "2026-07-30T12:00:00.000Z",
+          id: "label-customer",
+          name: "Customer",
+          updatedAt: "2026-07-30T12:00:00.000Z"
+        }
+      ]
+    };
+    mocks.listConversations.mockResolvedValueOnce({
+      conversations: [labeled],
+      nextCursor: null,
+      totalCount: 1
+    });
+    mocks.refreshNotifications.mockResolvedValueOnce(status("message-labeled"));
+    const hook = await renderHook(useMailSync, {
+      activeFolder: "inbox",
+      labelId: "label-customer",
+      mailboxId: "all",
+      search: "",
+      userId: "user-1"
+    });
+    await flushHookEffects();
+
+    await flushHookEffects(() => {
+      hook.result.applyConversationLabels(labeled.threadId, []);
+    });
+
+    expect(hook.result.conversations).toEqual([]);
+    expect(hook.result.totalCount).toBe(0);
+    await hook.unmount();
+  });
 });

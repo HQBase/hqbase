@@ -33,7 +33,7 @@ type ContactsPageProps = {
   selectedId: string | null;
   onBack: () => void;
   onCompose: (email: string) => void;
-  onOpenConversation: (messageId: string) => void;
+  onOpenConversation: (conversation: ConversationSummary) => void;
   onSelect: (id: string) => void;
 };
 
@@ -201,7 +201,7 @@ function ContactDetailView({
   id: string;
   onBack: () => void;
   onCompose: (email: string) => void;
-  onOpenConversation: (messageId: string) => void;
+  onOpenConversation: (conversation: ConversationSummary) => void;
   onRemoved: () => void;
   onSaved: () => void;
 }): React.ReactElement {
@@ -386,14 +386,14 @@ function ExchangeRow({
   onOpen
 }: {
   conversation: ConversationSummary;
-  onOpen: (messageId: string) => void;
+  onOpen: (conversation: ConversationSummary) => void;
 }): React.ReactElement {
   const timestamp = conversation.receivedAt ?? conversation.sentAt ?? conversation.createdAt;
   return (
     <button
       className="grid min-h-16 w-full grid-cols-[minmax(0,1fr)_auto] gap-x-3 border-b px-4 py-3 text-left last:border-b-0 [@media(hover:hover)]:hover:bg-muted/55 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
       type="button"
-      onClick={() => onOpen(conversation.id)}
+      onClick={() => onOpen(conversation)}
     >
       <span className="truncate text-sm font-medium">{conversation.subject || "(no subject)"}</span>
       <span className="text-[11px] text-muted-foreground">

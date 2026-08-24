@@ -29,6 +29,7 @@ const draft: Draft = {
   subject: "Original",
   text: "Original body",
   html: "<p>Original body</p>",
+  signature: { mode: "automatic", id: null, name: "", html: "", text: "" },
   version: 1,
   updatedAt: "2026-07-29T00:00:00.000Z",
   attachments: []
@@ -120,5 +121,27 @@ describe("useDraftAutosave", () => {
 
     await hook.unmount();
     vi.useRealTimers();
+  });
+
+  it("saves a signature choice through the same revision queue", async () => {
+    const nextDraft = {
+      ...draft,
+      signature: { mode: "none" as const, id: null, name: "", html: "", text: "" },
+      version: 2
+    };
+    mocks.updateDraft.mockResolvedValue(nextDraft);
+    const initial = options();
+    const hook = await renderHook(useDraftAutosave, initial);
+    hook.result.initializeAutosave(draft);
+
+    await hook.result.saveSignature({ mode: "none" });
+
+    expect(mocks.updateDraft).toHaveBeenCalledWith(
+      draft.id,
+      expect.objectContaining({ signature: { mode: "none" }, version: 1 })
+    );
+    expect(initial.setDraft).toHaveBeenCalledWith(nextDraft);
+    expect(initial.setSaveState).toHaveBeenLastCalledWith("saved");
+    await hook.unmount();
   });
 });

@@ -9,6 +9,7 @@ import {
   uploadDraftAttachment
 } from "@/features/drafts/api";
 import type { Draft, DraftAttachment } from "@/features/drafts/types";
+import type { SignatureSnapshot } from "@/features/signatures/types";
 import { playNotificationSound } from "@/lib/notification-sounds";
 
 import { replyToMessage, sendMessage } from "./api";
@@ -32,6 +33,14 @@ import {
 } from "./compose-state";
 import { ComposeSurface } from "./compose-surface";
 import { useDraftAutosave } from "./use-draft-autosave";
+
+const emptyAutomaticSignature: SignatureSnapshot = {
+  mode: "automatic",
+  id: null,
+  name: "",
+  html: "",
+  text: ""
+};
 
 export function ComposeDialog({
   defaultFromMailboxId = null,
@@ -74,7 +83,7 @@ export function ComposeDialog({
   const forwardOfMessageId = mode === "forward" ? (message?.id ?? null) : null;
   const contextLabel = composeContextLabel(mode, message);
   const recoveryKey = `hqbase:compose:${mode}:${draftId ?? message?.id ?? "new"}`;
-  const { initializeAutosave, resetAutosave } = useDraftAutosave({
+  const { initializeAutosave, resetAutosave, saveSignature } = useDraftAutosave({
     open,
     initialized,
     draft,
@@ -135,7 +144,8 @@ export function ComposeDialog({
                   ? `Fwd: ${message.subject.replace(/^(fw|fwd):\s*/i, "")}`
                   : "",
             text: forwarded?.text ?? "",
-            html: forwarded?.html ?? "<p></p>"
+            html: forwarded?.html ?? "<p></p>",
+            signature: { mode: "automatic" }
           }));
         if (!existing) onDraftsChangeRef.current?.();
         const recovered = readDraftRecovery(recoveryKey, initial.updatedAt);
@@ -275,6 +285,7 @@ export function ComposeDialog({
       presentation={presentation}
       ready={Boolean(draft && initialized.current)}
       sendDisabled={sendDisabled}
+      signature={draft?.signature ?? emptyAutomaticSignature}
       subject={subject}
       threadContext={threadContext}
       to={to}
@@ -285,10 +296,14 @@ export function ComposeDialog({
       }}
       onFiles={(files) => void upload(files)}
       onRemoveAttachment={(item) => void removeAttachment(item)}
+      onManageSignatures={() => window.location.assign("/settings/signatures")}
       onSetBcc={setBcc}
       onSetCc={setCc}
       onSetFrom={setFrom}
       onSetSubject={setSubject}
+      onSetSignature={async (selection) => {
+        await saveSignature(selection);
+      }}
       onSetTo={setTo}
       onSubmit={(event) => void handleSubmit(event)}
     />

@@ -6,7 +6,7 @@ import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import type { CurrentUser } from "@/features/auth/types";
 import type { Mailbox } from "@/features/mailboxes/types";
 import type { UnreadCounts } from "@/features/notifications/types";
-import { inboxUnreadForMailbox, mailboxUnreadLabel } from "@/features/notifications/unread";
+import { inboxUnreadForMailbox } from "@/features/notifications/unread";
 import { cn } from "@/lib/cn";
 import type { FolderId, SettingsTabId } from "@/lib/routes";
 import { appRoutePath, draftFolder, mailFolders, settingsTabs } from "@/lib/routes";
@@ -170,11 +170,11 @@ export function MailNav({
               id="drawer-mailbox-filter"
               options={[
                 {
-                  label: mailboxUnreadLabel("All mailboxes", "all", unread),
+                  label: "All mailboxes",
                   value: "all"
                 },
                 ...mailboxFilter.mailboxes.map((mailbox) => ({
-                  label: mailboxUnreadLabel(mailbox.address, mailbox.id, unread),
+                  label: mailbox.address,
                   value: mailbox.id
                 }))
               ]}

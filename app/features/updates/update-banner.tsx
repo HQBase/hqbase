@@ -45,7 +45,7 @@ export function UpdateBanner({
         </div>
       </div>
       <Button className="h-7 px-3 text-xs" onClick={onOpen} type="button" variant="outline">
-        {inProgress ? "View progress" : "Review update"}
+        {inProgress ? "View progress" : "View changelog"}
       </Button>
     </div>
   );

@@ -12,6 +12,8 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { PullToRefresh } from "@/components/ui/pull-to-refresh";
 import type { ComposeMode } from "@/features/compose/compose-state";
+import { LabelBadges, LabelMenu } from "@/features/labels/label-controls";
+import type { MailLabel } from "@/features/labels/types";
 import type { Mailbox } from "@/features/mailboxes/types";
 import type { MailFolderId } from "@/lib/routes";
 import { ConversationMessages } from "./conversation-messages";
@@ -26,6 +28,8 @@ type MessageDetailProps = {
   defaultFromMailboxId: string | null;
   error?: string | null;
   isLoading?: boolean;
+  canOrganizeLabels?: boolean;
+  labels?: MailLabel[];
   mailboxes: Mailbox[];
   messages: MessageDetailType[];
   selectedId: string | null;
@@ -35,6 +39,7 @@ type MessageDetailProps = {
   onDraftsChange?: () => void;
   onRefresh: () => Promise<void> | void;
   onSent: () => void;
+  onToggleLabel?: (label: MailLabel, assigned: boolean) => Promise<void> | void;
 };
 
 type MessageAction =
@@ -59,6 +64,8 @@ export function MessageDetail({
   defaultFromMailboxId,
   error = null,
   isLoading = false,
+  canOrganizeLabels = false,
+  labels = [],
   mailboxes,
   messages,
   selectedId,
@@ -67,7 +74,8 @@ export function MessageDetail({
   onBack,
   onDraftsChange,
   onRefresh,
-  onSent
+  onSent,
+  onToggleLabel
 }: MessageDetailProps): React.ReactElement {
   const [composeState, setComposeState] = React.useState<ThreadComposeState | null>(null);
 
@@ -120,6 +128,14 @@ export function MessageDetail({
             {selected.subject}
           </h1>
           <div className="flex shrink-0 flex-wrap items-center gap-0.5">
+            {labels.length > 0 && onToggleLabel ? (
+              <LabelMenu
+                assigned={mergeMessageLabels(messages)}
+                canOrganizeLabels={canOrganizeLabels}
+                labels={labels}
+                onToggle={onToggleLabel}
+              />
+            ) : null}
             <IconButton
               label={isUnread ? "Mark conversation read" : "Mark conversation unread"}
               onClick={() => {
@@ -179,6 +195,11 @@ export function MessageDetail({
         </div>
       </div>
       <PullToRefresh className="min-h-0 flex-1" onRefresh={onRefresh}>
+        {mergeMessageLabels(messages).length > 0 ? (
+          <div className="px-4 pt-4 sm:px-6">
+            <LabelBadges labels={mergeMessageLabels(messages)} />
+          </div>
+        ) : null}
         <ConversationMessages
           messages={messages}
           onCompose={(message, mode) => setComposeState({ message, mode })}
@@ -213,6 +234,14 @@ export function MessageDetail({
       </PullToRefresh>
     </article>
   );
+}
+
+function mergeMessageLabels(messages: MessageDetailType[]): MailLabel[] {
+  const byId = new Map<string, MailLabel>();
+  for (const message of messages) {
+    for (const label of message.labels ?? []) byId.set(label.id, label);
+  }
+  return [...byId.values()].sort((left, right) => left.name.localeCompare(right.name));
 }
 
 function MessageReaderStatus({

@@ -9,7 +9,6 @@ import { DraftsPage } from "@/features/drafts/drafts-page";
 import { InboxPage } from "@/features/inbox/inbox-page";
 import type { Mailbox } from "@/features/mailboxes/types";
 import { McpConnectionDetails } from "@/features/mcp/connection-dialog";
-import { mailboxUnreadLabel } from "@/features/notifications/unread";
 
 const user = {
   defaultFromMailboxId: "mailbox-1",
@@ -59,10 +58,10 @@ describe("mail shell", () => {
 
     expect(html).toContain("h-12 w-full");
     expect(html).toContain("relative min-w-0 max-w-xl flex-1");
-    expect(html).toContain("Search mail");
+    expect(html).toContain("Search HQBase");
     expect(html).not.toContain("Connect MCP");
     expect(html).toContain("Open navigation");
-    expect(html.indexOf("Open navigation")).toBeLessThan(html.indexOf("Search mail"));
+    expect(html.indexOf("Open navigation")).toBeLessThan(html.indexOf("Search HQBase"));
   });
 
   it("keeps unread totals out of the header mailbox label", () => {
@@ -290,15 +289,7 @@ describe("mail shell", () => {
     expect(html).not.toContain("Your mail");
   });
 
-  it("shows per-mailbox unread labels and scopes the Inbox count to the selection", () => {
-    expect(mailboxUnreadLabel("All mailboxes", "all", unread)).toBe("All mailboxes (7)");
-    expect(mailboxUnreadLabel("support@example.com", "mailbox-1", unread)).toBe(
-      "support@example.com (4)"
-    );
-    expect(mailboxUnreadLabel("empty@example.com", "mailbox-empty", unread)).toBe(
-      "empty@example.com (0)"
-    );
-
+  it("scopes the Inbox count to the selected mailbox", () => {
     const html = renderToStaticMarkup(
       <Sidebar
         activeFolder="inbox"
@@ -372,6 +363,7 @@ describe("mail shell", () => {
             subject: "Quarterly follow-up",
             text: "Here is the requested summary.",
             html: "<p>Here is the requested summary.</p>",
+            signature: { mode: "automatic", id: null, name: "", html: "", text: "" },
             version: 2,
             updatedAt: "2026-07-29T14:00:00.000Z",
             attachments: [
@@ -463,8 +455,8 @@ describe("mail shell", () => {
     expect(html).toContain('role="dialog"');
     expect(html).toContain('aria-modal="false"');
     expect(html).toContain("fixed inset-0");
-    expect(html).toContain("md:bottom-0");
-    expect(html).toContain("md:resize");
+    expect(html).toContain("lg:bottom-0");
+    expect(html).toContain("lg:resize");
     expect(html).toContain('aria-label="Minimize compose"');
     expect(html).not.toContain('aria-label="Expand compose"');
     expect(html).toContain('aria-label="Close compose"');

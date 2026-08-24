@@ -1,0 +1,113 @@
+// @vitest-environment happy-dom
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { listUsableSignatures } from "@/features/signatures/api";
+import { ComposeSignature } from "@/features/signatures/compose-signature";
+import type { Signature, SignatureSnapshot } from "@/features/signatures/types";
+import { flushHookEffects, renderComponent } from "../render-hook";
+
+vi.mock("@/features/signatures/api", () => ({ listUsableSignatures: vi.fn() }));
+vi.mock("sonner", () => ({ toast: { error: vi.fn() } }));
+
+const candidate: Signature = {
+  id: "sig_support",
+  name: "Support",
+  html: "<p>HQBase Support</p>",
+  text: "HQBase Support",
+  scope: "mailbox",
+  scopeId: "mbx_support",
+  scopeLabel: "Support · support@example.com",
+  isDefault: true,
+  createdAt: "2026-08-24T12:00:00.000Z",
+  updatedAt: "2026-08-24T12:00:00.000Z"
+};
+const automatic: SignatureSnapshot = {
+  mode: "automatic",
+  id: candidate.id,
+  name: candidate.name,
+  html: candidate.html,
+  text: candidate.text
+};
+
+afterEach(() => {
+  document.body.replaceChildren();
+  vi.clearAllMocks();
+});
+
+describe("compose signature", () => {
+  it("renders the saved preview and offers exact-address choices", async () => {
+    vi.mocked(listUsableSignatures).mockResolvedValue({
+      automaticSignatureId: candidate.id,
+      signatures: [candidate]
+    });
+    const onManage = vi.fn();
+    const onSelectionChange = vi.fn().mockResolvedValue(undefined);
+    const view = await renderComponent(
+      <ComposeSignature
+        from="support@example.com"
+        signature={automatic}
+        onManage={onManage}
+        onSelectionChange={onSelectionChange}
+      />
+    );
+    document.body.appendChild(view.container);
+    await flushHookEffects();
+
+    expect(listUsableSignatures).toHaveBeenCalledWith("support@example.com");
+    const preview = view.container.querySelector<HTMLIFrameElement>(
+      'iframe[title="Signature preview"]'
+    );
+    expect(preview?.srcdoc).toContain("HQBase Support");
+
+    await openSignatureMenu(view.container);
+    const selected = Array.from(
+      document.body.querySelectorAll<HTMLElement>('[role="menuitemradio"]')
+    ).find((item) => item.textContent?.includes("Support · Support"));
+    await flushHookEffects(() => selected?.click());
+    expect(onSelectionChange).toHaveBeenCalledWith({
+      mode: "selected",
+      id: candidate.id
+    });
+
+    await openSignatureMenu(view.container);
+    const manage = Array.from(
+      document.body.querySelectorAll<HTMLElement>('[role="menuitemradio"]')
+    ).find((item) => item.textContent?.includes("Manage signatures"));
+    await flushHookEffects(() => manage?.click());
+    expect(onManage).toHaveBeenCalledOnce();
+    await view.unmount();
+  });
+
+  it("keeps a deleted source snapshot visible", async () => {
+    vi.mocked(listUsableSignatures).mockResolvedValue({
+      automaticSignatureId: null,
+      signatures: []
+    });
+    const view = await renderComponent(
+      <ComposeSignature
+        from="support@example.com"
+        signature={{ ...automatic, mode: "selected", id: null, name: "Old footer" }}
+        onManage={() => undefined}
+        onSelectionChange={() => undefined}
+      />
+    );
+    document.body.appendChild(view.container);
+    await flushHookEffects();
+    await openSignatureMenu(view.container);
+
+    expect(document.body.textContent).toContain("Old footer · Saved copy");
+    await view.unmount();
+  });
+});
+
+async function openSignatureMenu(container: HTMLElement): Promise<void> {
+  await flushHookEffects(() =>
+    container.querySelector<HTMLButtonElement>('[aria-label="Signature"]')?.dispatchEvent(
+      new PointerEvent("pointerdown", {
+        bubbles: true,
+        button: 0,
+        ctrlKey: false,
+        pointerType: "mouse"
+      })
+    )
+  );
+}

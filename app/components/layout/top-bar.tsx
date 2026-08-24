@@ -1,5 +1,5 @@
 import type * as React from "react";
-import { PiCaretDown, PiMagnifyingGlass, PiRobot, PiSidebarSimple } from "react-icons/pi";
+import { PiCaretDown, PiRobot, PiSidebarSimple } from "react-icons/pi";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -11,11 +11,12 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger
 } from "@/components/ui/dropdown-menu";
-import { Input } from "@/components/ui/input";
 import type { CurrentUser } from "@/features/auth/types";
 import type { MailConnectionStatus } from "@/features/events/types";
 import type { Mailbox } from "@/features/mailboxes/types";
 import type { UnreadCounts } from "@/features/notifications/types";
+import { GlobalSearch } from "@/features/search/global-search";
+import type { GlobalSearchResult } from "@/features/search/types";
 import type { FolderId, SettingsTabId } from "@/lib/routes";
 import { MobileNavigation } from "./mobile-navigation";
 
@@ -34,6 +35,8 @@ type TopBarProps = {
   onFolderChange: (folder: FolderId) => void;
   onMailboxChange: (mailboxId: string) => void;
   onSearchChange: (search: string) => void;
+  onSearchSelect?: (result: GlobalSearchResult) => void;
+  onSearchSubmit?: (query: string) => void;
   onSettingsTabChange?: ((tab: SettingsTabId) => void) | undefined;
   onSignedOut: () => void;
   sidebarCollapsed?: boolean;
@@ -55,6 +58,8 @@ export function TopBar({
   onFolderChange,
   onMailboxChange,
   onSearchChange,
+  onSearchSelect = () => undefined,
+  onSearchSubmit = () => undefined,
   onSettingsTabChange,
   onSignedOut,
   sidebarCollapsed,
@@ -96,19 +101,12 @@ export function TopBar({
         onSettingsTabChange={onSettingsTabChange}
         onSignedOut={onSignedOut}
       />
-      <div className="relative min-w-0 max-w-xl flex-1">
-        <PiMagnifyingGlass
-          aria-hidden="true"
-          className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground"
-        />
-        <Input
-          aria-label="Search mail"
-          className="h-8 border-transparent bg-muted/70 pl-8 text-xs shadow-none focus-visible:border-input focus-visible:ring-1"
-          placeholder="Search mail"
-          value={search}
-          onChange={(event) => onSearchChange(event.target.value)}
-        />
-      </div>
+      <GlobalSearch
+        query={search}
+        onQueryChange={onSearchChange}
+        onSelect={onSearchSelect}
+        onSubmit={onSearchSubmit}
+      />
       <div className="ml-auto flex shrink-0 items-center gap-2">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>

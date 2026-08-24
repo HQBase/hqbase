@@ -3,6 +3,7 @@ import { PiCircleNotch } from "react-icons/pi";
 
 import { Button } from "@/components/ui/button";
 import { PullToRefresh } from "@/components/ui/pull-to-refresh";
+import type { MailLabel } from "@/features/labels/types";
 import { appRoutePath, type MailFolderId } from "@/lib/routes";
 import { groupConversations } from "./conversation-display";
 import { EmptyMessageList, MessageListItem } from "./message-list-item";
@@ -19,6 +20,13 @@ type MessageListProps = {
   onRefresh: () => Promise<void> | void;
   onSelect: (conversation: ConversationSummary) => void;
   onToggleStar: (conversation: ConversationSummary) => void;
+  labels?: MailLabel[];
+  canOrganizeConversation?: (mailboxId: string | null) => boolean;
+  onToggleLabel?: (
+    conversation: ConversationSummary,
+    label: MailLabel,
+    assigned: boolean
+  ) => Promise<void> | void;
 };
 
 export function MessageList({
@@ -31,7 +39,10 @@ export function MessageList({
   onLoadMore,
   onRefresh,
   onSelect,
-  onToggleStar
+  onToggleStar,
+  labels = [],
+  canOrganizeConversation = () => false,
+  onToggleLabel = () => undefined
 }: MessageListProps): React.ReactElement {
   const scrollContainerRef = React.useRef<HTMLDivElement>(null);
   const pagingTriggerRef = React.useRef<HTMLDivElement>(null);
@@ -85,7 +96,12 @@ export function MessageList({
                     })}
                     isActive={conversation.threadId === selectedThreadId}
                     key={conversation.threadId}
+                    labels={labels}
+                    canOrganizeLabels={canOrganizeConversation(conversation.mailboxId)}
                     onSelect={onSelect}
+                    onToggleLabel={(label, assigned) =>
+                      onToggleLabel(conversation, label, assigned)
+                    }
                     onToggleStar={onToggleStar}
                   />
                 ))}
