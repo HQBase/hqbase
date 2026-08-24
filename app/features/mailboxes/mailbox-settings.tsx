@@ -12,16 +12,9 @@ import {
   DialogTitle,
   DialogTrigger
 } from "@/components/ui/dialog";
+import { DropdownSelect } from "@/components/ui/dropdown-select";
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectTrigger,
-  SelectValue
-} from "@/components/ui/select";
 import { BulkMailboxAccessDialog } from "@/features/mailbox-access/bulk-mailbox-access-dialog";
 import { useMailboxAccessPolicies } from "@/features/mailbox-access/mailbox-access-policies";
 import { MailboxAccessPolicyDialog } from "@/features/mailbox-access/mailbox-access-policy";
@@ -140,7 +133,7 @@ export function MailboxSettings({
         canManage ? (
           <Dialog open={createOpen} onOpenChange={setCreateOpen}>
             <DialogTrigger asChild>
-              <Button type="button">
+              <Button size="sm" type="button">
                 <PiPlus data-icon="inline-start" />
                 Add mailbox
               </Button>
@@ -200,27 +193,19 @@ export function MailboxSettings({
 
       {canManage && mailboxes.length > 0 && domains.length > 1 ? (
         <div>
-          <Select
+          <DropdownSelect
+            ariaLabel="Filter mailboxes by domain"
+            className="w-56 shadow-none"
+            options={[
+              { label: "All domains", value: "all" },
+              ...domains.map((domain) => ({ label: domain, value: domain }))
+            ]}
             value={activeDomain}
             onValueChange={(value) => {
               setDomainFilter(value);
               setSelectedMailboxIds([]);
             }}
-          >
-            <SelectTrigger aria-label="Filter mailboxes by domain" className="w-56 shadow-none">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectGroup>
-                <SelectItem value="all">All domains</SelectItem>
-                {domains.map((domain) => (
-                  <SelectItem key={domain} value={domain}>
-                    {domain}
-                  </SelectItem>
-                ))}
-              </SelectGroup>
-            </SelectContent>
-          </Select>
+          />
         </div>
       ) : null}
 
