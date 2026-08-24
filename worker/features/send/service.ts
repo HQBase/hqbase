@@ -19,36 +19,47 @@ import {
 } from "../messages/queries";
 import { createThread, touchThread } from "../messages/threading";
 import type { MessageSummary, StoredAttachment } from "../messages/types";
+import type { SignatureSnapshot } from "../signatures/types";
 
-import { buildReplyBody } from "./reply-body";
+import { assembleMessageBody, type MessageBodyPart } from "./body";
+import { buildReplyContext } from "./reply-body";
 import type { ReplyMessageInput, SendMessageInput } from "./validation";
 
 export async function sendNewMessage(
   env: WorkerEnv,
   input: SendMessageInput,
-  principalId?: string
+  principalId?: string,
+  signature?: SignatureSnapshot,
+  context?: MessageBodyPart
 ): Promise<MessageSummary> {
   const mailbox = await ensureActiveMailbox(env.DB, input.from);
 
   const timestamp = nowIso();
+  const body = assembleMessageBody({
+    authored: { text: input.text, html: input.html },
+    signature,
+    context
+  });
   const email = {
     from: input.from,
     to: input.to,
     subject: input.subject,
-    text: input.text
+    text: body.text
   };
   const attachments = await loadAttachments(env, input.attachmentIds, principalId);
   const sendResult = await env.MAIL_SENDER.send({
     ...email,
     ...(input.cc.length ? { cc: input.cc } : {}),
     ...(input.bcc.length ? { bcc: input.bcc } : {}),
-    ...(input.html ? { html: input.html } : {}),
+    ...(body.html ? { html: body.html } : {}),
     ...(attachments.length ? { attachments: attachments.map(asEmailAttachment) } : {})
   });
   const threadId = await createThread(env.DB, input.subject, timestamp);
 
   return storeSentMessage(env, {
     ...input,
+    text: body.text,
+    ...(body.html ? { html: body.html } : { html: undefined }),
     inReplyTo: null,
     messageId: sendResult.messageId,
     mailboxId: mailbox.id,
@@ -65,7 +76,8 @@ export async function sendNewMessage(
 export async function replyToMessage(
   env: WorkerEnv,
   input: ReplyMessageInput,
-  principalId?: string
+  principalId?: string,
+  signature?: SignatureSnapshot
 ): Promise<MessageSummary> {
   const mailbox = await ensureActiveMailbox(env.DB, input.from);
 
@@ -81,7 +93,7 @@ export async function replyToMessage(
   const to = input.to?.length ? input.to : [original.fromAddress];
   const attachments = await loadAttachments(env, input.attachmentIds, principalId);
   const quoted =
-    input.html && original.htmlAvailable
+    (input.html || signature?.html) && original.htmlAvailable
       ? await loadQuotedMessageHtml(
           env,
           original.id,
@@ -89,7 +101,17 @@ export async function replyToMessage(
           maxAttachmentBytes - totalAttachmentBytes(attachments)
         )
       : { html: undefined, inlineAttachments: [] };
-  const body = buildReplyBody(input, original, quoted.html);
+  const signatureTextLength = signature?.text.trim().length ?? 0;
+  const context = buildReplyContext(
+    original,
+    quoted.html,
+    100_000 - input.text.trim().length - signatureTextLength - 4
+  );
+  const body = assembleMessageBody({
+    authored: { text: input.text, html: input.html },
+    signature,
+    context: input.html || signature?.html ? context : { text: context.text }
+  });
   const outgoingAttachments = [...attachments, ...quoted.inlineAttachments];
   const sendResult = await env.MAIL_SENDER.send({
     from: input.from,

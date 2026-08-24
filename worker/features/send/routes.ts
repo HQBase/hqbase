@@ -7,14 +7,12 @@ import { readJson } from "../../lib/json";
 import { parseWith } from "../../lib/validation";
 import { enforceRateLimit } from "../../security/rate-limit";
 import { recordAudit } from "../audit/service";
-import {
-  getAccessibleDraft,
-  requireDraftAttachmentIdsAccess,
-  requireDraftIdAccess
-} from "../drafts/access";
+import { getAccessibleDraft, requireDraftAttachmentIdsAccess } from "../drafts/access";
 import { scheduleSentMailEvents } from "../events/service";
 import { findMailboxForSending } from "../mailboxes/queries";
 import { requireMessageAccess } from "../messages/access";
+import { emptySignatureSnapshot, resolveSignatureSelection } from "../signatures/service";
+import type { SignatureSnapshot } from "../signatures/types";
 
 import { forwardMessage, sendForwardDraft } from "./forward";
 import { replyToMessage, sendNewMessage } from "./service";
@@ -39,10 +37,18 @@ sendRoutes.post("/send", async (c) => {
   const draft = input.draftId
     ? await getAccessibleDraft(c.env, draftPrincipal, input.draftId)
     : null;
+  const signature = await signatureForSend(c.env.DB, principal, input, draft);
   await requireDraftAttachmentIdsAccess(c.env, draftPrincipal, input.attachmentIds);
   const sent = draft?.forwardOfMessageId
-    ? await sendForwardDraft(c.env, input, draft.id, draft.forwardOfMessageId, principal.id)
-    : await sendNewMessage(c.env, input, principal.id);
+    ? await sendForwardDraft(
+        c.env,
+        input,
+        draft.id,
+        draft.forwardOfMessageId,
+        principal.id,
+        signature
+      )
+    : await sendNewMessage(c.env, input, principal.id, signature);
   scheduleSentMailEvents(c.env, (promise) => c.executionCtx.waitUntil(promise), {
     draftId: input.draftId,
     mailboxId: mailbox.id,
@@ -75,9 +81,12 @@ sendRoutes.post("/reply", async (c) => {
   if (!mailbox) throw new AppError("MAILBOX_NOT_FOUND", "Sending mailbox not found.", 404);
   await requireMailboxAccess(c.env.DB, principal.id, principal.role, mailbox.id, "agent");
   const draftPrincipal = { id: principal.id, role: principal.role };
-  await requireDraftIdAccess(c.env, draftPrincipal, input.draftId);
+  const draft = input.draftId
+    ? await getAccessibleDraft(c.env, draftPrincipal, input.draftId)
+    : null;
+  const signature = await signatureForSend(c.env.DB, principal, input, draft);
   await requireDraftAttachmentIdsAccess(c.env, draftPrincipal, input.attachmentIds);
-  const sent = await replyToMessage(c.env, input, principal.id);
+  const sent = await replyToMessage(c.env, input, principal.id, signature);
   scheduleSentMailEvents(c.env, (promise) => c.executionCtx.waitUntil(promise), {
     draftId: input.draftId,
     mailboxId: mailbox.id,
@@ -111,7 +120,8 @@ sendRoutes.post("/forward", async (c) => {
   await requireMailboxAccess(c.env.DB, principal.id, principal.role, mailbox.id, "agent");
   const draftPrincipal = { id: principal.id, role: principal.role };
   await requireDraftAttachmentIdsAccess(c.env, draftPrincipal, input.attachmentIds);
-  const sent = await forwardMessage(c.env, input, principal.id);
+  const signature = await signatureForSend(c.env.DB, principal, input, null);
+  const sent = await forwardMessage(c.env, input, principal.id, signature);
   scheduleSentMailEvents(c.env, (promise) => c.executionCtx.waitUntil(promise), {
     mailboxId: mailbox.id,
     userId: principal.id
@@ -127,3 +137,24 @@ sendRoutes.post("/forward", async (c) => {
   });
   return c.json(sent, 201);
 });
+
+async function signatureForSend(
+  db: D1Database,
+  principal: Awaited<ReturnType<typeof requireMailApiPrincipal>>["principal"],
+  input: { from: string; signature?: Parameters<typeof resolveSignatureSelection>[3] | undefined },
+  draft: Awaited<ReturnType<typeof getAccessibleDraft>> | null
+): Promise<SignatureSnapshot> {
+  if (draft) {
+    if (draft.from.toLowerCase() !== input.from.toLowerCase()) {
+      throw new AppError(
+        "DRAFT_FROM_MISMATCH",
+        "The send request does not match the draft From address.",
+        400
+      );
+    }
+    return draft.signature;
+  }
+  return input.signature
+    ? resolveSignatureSelection(db, principal, input.from, input.signature)
+    : emptySignatureSnapshot("none");
+}

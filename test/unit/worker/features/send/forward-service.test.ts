@@ -122,10 +122,14 @@ describe("forward service", () => {
         attachmentIds: [],
         from: mailbox.address,
         subject: "Fwd: Original",
-        text: expect.stringContaining("---------- Forwarded message ---------"),
+        text: "Please review",
         to: ["recipient@example.com"]
       }),
-      "user-1"
+      "user-1",
+      undefined,
+      expect.objectContaining({
+        text: expect.stringContaining("---------- Forwarded message ---------")
+      })
     );
     expect(saveDraft).not.toHaveBeenCalled();
   });
@@ -199,6 +203,7 @@ describe("forward service", () => {
       subject: "Fwd: Original",
       text: "Forwarded",
       html: "<blockquote>Forwarded</blockquote>",
+      signature: { mode: "none", id: null, name: "", html: "", text: "" },
       version: 1,
       updatedAt: original.createdAt,
       attachments: []
@@ -242,7 +247,11 @@ describe("forward service", () => {
         attachmentIds: ["attachment-copy"],
         draftId: "draft-forward"
       }),
-      "user-1"
+      "user-1",
+      undefined,
+      expect.objectContaining({
+        text: expect.stringContaining("---------- Forwarded message ---------")
+      })
     );
     expect(deleteDraft).not.toHaveBeenCalled();
   });
@@ -285,7 +294,8 @@ describe("forward service", () => {
         cc: [],
         bcc: [],
         subject: "Fwd: Original",
-        text: "---------- Forwarded message ---------",
+        text: "Authored quote\n\n---------- Forwarded message ---------",
+        html: "<blockquote>Authored quote</blockquote><blockquote>Forwarded message</blockquote>",
         attachmentIds: ["attachment-added"],
         draftId: "draft-web"
       },
@@ -299,9 +309,14 @@ describe("forward service", () => {
       expect.objectContaining({
         attachmentIds: ["attachment-added", "attachment-copy"],
         draftId: "draft-web",
-        text: "---------- Forwarded message ---------"
+        text: "Authored quote",
+        html: "<blockquote>Authored quote</blockquote>"
       }),
-      "user-1"
+      "user-1",
+      undefined,
+      expect.objectContaining({
+        text: expect.stringContaining("---------- Forwarded message ---------")
+      })
     );
     expect(saveDraft).not.toHaveBeenCalled();
     expect(removeDraftAttachment).not.toHaveBeenCalled();

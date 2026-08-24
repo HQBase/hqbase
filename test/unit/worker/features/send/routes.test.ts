@@ -1,4 +1,5 @@
 import type { WorkerEnv } from "@worker/lib/env";
+import { errorBody, toAppError } from "@worker/lib/errors";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
@@ -55,6 +56,13 @@ vi.mock("@worker/features/send/forward", () => ({
 
 import { sendRoutes } from "@worker/features/send/routes";
 
+sendRoutes.onError((error) => {
+  const appError = toAppError(error);
+  return Response.json(errorBody(appError.code, appError.message), { status: appError.status });
+});
+
+const noSignature = { mode: "none", id: null, name: "", html: "", text: "" } as const;
+
 describe("send routes", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -70,7 +78,9 @@ describe("send routes", () => {
     mocks.findMailboxForSending.mockResolvedValue({ id: "mailbox-1" });
     mocks.getAccessibleDraft.mockResolvedValue({
       forwardOfMessageId: null,
-      id: "draft-forward"
+      from: "sender@example.com",
+      id: "draft-forward",
+      signature: noSignature
     });
     mocks.sendForwardDraft.mockResolvedValue({ id: "sent-message-1" });
     mocks.forwardMessage.mockResolvedValue({ id: "sent-message-1" });
@@ -122,7 +132,9 @@ describe("send routes", () => {
   it("includes original attachments when sending a web forward draft", async () => {
     mocks.getAccessibleDraft.mockResolvedValue({
       forwardOfMessageId: "message-original",
-      id: "draft-forward"
+      from: "sender@example.com",
+      id: "draft-forward",
+      signature: noSignature
     });
     const db = {} as D1Database;
     const response = await sendRoutes.request(
@@ -153,7 +165,8 @@ describe("send routes", () => {
       expect.objectContaining({ draftId: "draft-forward" }),
       "draft-forward",
       "message-original",
-      "user-1"
+      "user-1",
+      noSignature
     );
     expect(mocks.sendNewMessage).not.toHaveBeenCalled();
     expect(mocks.scheduleSentMailEvents).toHaveBeenCalledWith(
@@ -161,6 +174,28 @@ describe("send routes", () => {
       expect.any(Function),
       { draftId: "draft-forward", mailboxId: "mailbox-1", userId: "user-1" }
     );
+  });
+
+  it("rejects a send request whose From address differs from its draft", async () => {
+    mocks.getAccessibleDraft.mockResolvedValue({
+      forwardOfMessageId: null,
+      from: "saved@example.com",
+      id: "draft-forward",
+      signature: noSignature
+    });
+    const response = await request({} as D1Database, "/send", {
+      from: "request@example.com",
+      to: ["reader@example.com"],
+      subject: "Mismatch",
+      text: "Hello",
+      draftId: "draft-forward"
+    });
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toMatchObject({
+      error: { code: "DRAFT_FROM_MISMATCH" }
+    });
+    expect(mocks.sendNewMessage).not.toHaveBeenCalled();
   });
 
   it("sends as an agent with its exact mailbox grant and agent audit identity", async () => {
@@ -184,7 +219,8 @@ describe("send routes", () => {
     expect(mocks.sendNewMessage).toHaveBeenCalledWith(
       expect.objectContaining({ DB: db }),
       expect.objectContaining({ from: "agent@example.com" }),
-      "agent-1"
+      "agent-1",
+      noSignature
     );
     expect(mocks.recordAudit).toHaveBeenCalledWith(
       db,
@@ -219,7 +255,8 @@ describe("send routes", () => {
     expect(mocks.replyToMessage).toHaveBeenCalledWith(
       expect.objectContaining({ DB: db }),
       expect.objectContaining({ messageId: "message-1" }),
-      "agent-1"
+      "agent-1",
+      noSignature
     );
     expect(mocks.recordAudit).toHaveBeenCalledWith(
       db,
@@ -254,7 +291,8 @@ describe("send routes", () => {
     expect(mocks.forwardMessage).toHaveBeenCalledWith(
       expect.objectContaining({ DB: db }),
       expect.objectContaining({ messageId: "message-1" }),
-      "agent-1"
+      "agent-1",
+      noSignature
     );
     expect(mocks.recordAudit).toHaveBeenCalledWith(
       db,

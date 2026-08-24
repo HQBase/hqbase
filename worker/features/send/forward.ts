@@ -1,6 +1,5 @@
 import type { WorkerEnv } from "../../lib/env";
 import { AppError } from "../../lib/errors";
-import { parseWith } from "../../lib/validation";
 import {
   addDraftAttachment,
   deleteDraft,
@@ -10,16 +9,19 @@ import {
 import { findMailboxForSending } from "../mailboxes/queries";
 import { getMessageDetail } from "../messages/queries";
 import type { MessageDetail } from "../messages/types";
+import type { SignatureSnapshot } from "../signatures/types";
 
+import { assembleMessageBody } from "./body";
 import { sendNewMessage } from "./service";
-import { type ForwardMessageInput, type SendMessageInput, sendMessageSchema } from "./validation";
+import type { ForwardMessageInput, SendMessageInput } from "./validation";
 
 const maxForwardedAttachments = 20;
 
 export async function forwardMessage(
   env: WorkerEnv,
   input: ForwardMessageInput,
-  principalId: string
+  principalId: string,
+  signature?: SignatureSnapshot
 ) {
   const original = await getMessageDetail(env.DB, input.messageId);
   if (!original) throw new AppError("MESSAGE_NOT_FOUND", "Message not found.", 404);
@@ -30,20 +32,21 @@ export async function forwardMessage(
     throw new AppError("MAILBOX_DISABLED", "Disabled mailboxes cannot send email.", 400);
   }
 
-  const body = forwardedBody(original, input.text, input.html);
+  const context = forwardedContext(original);
   const subject = input.subject ?? forwardSubject(original.subject);
-  const outbound = parseWith(sendMessageSchema, {
+  const outbound: SendMessageInput = {
     from: input.from,
     to: input.to,
     cc: input.cc,
     bcc: input.bcc,
     subject,
-    text: body.text,
-    html: body.html,
-    attachmentIds: input.attachmentIds
-  });
+    text: input.text,
+    html: input.html,
+    attachmentIds: input.attachmentIds,
+    signature: input.signature
+  };
   if (!input.includeOriginalAttachments || original.attachments.length === 0) {
-    return sendNewMessage(env, outbound, principalId);
+    return sendNewMessage(env, outbound, principalId, signature, context);
   }
 
   requireForwardedAttachmentCount(original.attachments.length, input.attachmentIds.length);
@@ -57,8 +60,9 @@ export async function forwardMessage(
     cc: input.cc,
     bcc: input.bcc,
     subject,
-    text: body.text,
-    html: body.html,
+    text: input.text,
+    html: input.html ?? "",
+    signature,
     version: undefined
   });
 
@@ -77,12 +81,14 @@ export async function forwardMessage(
 
   return sendNewMessage(
     env,
-    parseWith(sendMessageSchema, {
+    {
       ...outbound,
       attachmentIds: [...input.attachmentIds, ...copiedAttachmentIds],
       draftId: draft.id
-    }),
-    principalId
+    },
+    principalId,
+    signature,
+    context
   );
 }
 
@@ -91,12 +97,15 @@ export async function sendForwardDraft(
   input: SendMessageInput,
   draftId: string,
   originalMessageId: string,
-  principalId: string
+  principalId: string,
+  signature?: SignatureSnapshot
 ) {
   const original = await getMessageDetail(env.DB, originalMessageId);
   if (!original) throw new AppError("MESSAGE_NOT_FOUND", "Message not found.", 404);
+  const authored = stripLegacyForwardContext(input);
+  const context = forwardedContext(original);
   if (original.attachments.length === 0) {
-    return sendNewMessage(env, { ...input, draftId }, principalId);
+    return sendNewMessage(env, { ...input, ...authored, draftId }, principalId, signature, context);
   }
 
   requireForwardedAttachmentCount(original.attachments.length, input.attachmentIds.length);
@@ -111,10 +120,13 @@ export async function sendForwardDraft(
       env,
       {
         ...input,
+        ...authored,
         attachmentIds: [...input.attachmentIds, ...copiedAttachmentIds],
         draftId
       },
-      principalId
+      principalId,
+      signature,
+      context
     );
   } catch (error) {
     await removeCopiedAttachments(env, principalId, draftId, copiedAttachmentIds);
@@ -181,6 +193,14 @@ export function forwardedBody(
   noteText = "",
   noteHtml?: string
 ): { text: string; html: string } {
+  const body = assembleMessageBody({
+    authored: { text: noteText, html: noteHtml },
+    context: forwardedContext(message)
+  });
+  return { text: body.text, html: body.html ?? "" };
+}
+
+export function forwardedContext(message: MessageDetail): { text: string; html: string } {
   const timestamp = message.receivedAt ?? message.sentAt ?? message.createdAt;
   const forwarded = [
     "---------- Forwarded message ---------",
@@ -192,16 +212,39 @@ export function forwardedBody(
     "",
     message.textBody || message.snippet
   ].join("\n");
-  const text = [noteText.trim(), forwarded].filter(Boolean).join("\n\n");
-  const authoredHtml = noteHtml?.trim()
-    ? noteHtml.trim()
-    : noteText.trim()
-      ? `<p>${escapeHtml(noteText.trim()).replaceAll("\n", "<br>")}</p>`
-      : "";
   return {
-    text,
-    html: `${authoredHtml}<blockquote>${escapeHtml(forwarded).replaceAll("\n", "<br>")}</blockquote>`
+    text: forwarded,
+    html: `<blockquote>${escapeHtml(forwarded).replaceAll("\n", "<br>")}</blockquote>`
   };
+}
+
+function stripLegacyForwardContext(input: Pick<SendMessageInput, "html" | "text">): {
+  html?: string | undefined;
+  text: string;
+} {
+  const marker = "---------- Forwarded message ---------";
+  const markerIndex = input.text.lastIndexOf(marker);
+  if (markerIndex < 0) return { text: input.text, html: input.html };
+  const text = input.text.slice(0, markerIndex).trim();
+  const html = stripFinalForwardBlockquote(input.html);
+  return { text, ...(html ? { html } : {}) };
+}
+
+function stripFinalForwardBlockquote(html: string | undefined): string | undefined {
+  if (!html) return undefined;
+  const markerIndex = html.lastIndexOf("Forwarded message");
+  const blockStart = html.lastIndexOf("<blockquote", markerIndex);
+  const closingTag = "</blockquote>";
+  const blockEnd = html.indexOf(closingTag, markerIndex);
+  if (
+    markerIndex < 0 ||
+    blockStart < 0 ||
+    blockEnd < 0 ||
+    html.slice(blockEnd + closingTag.length).trim()
+  ) {
+    return html;
+  }
+  return html.slice(0, blockStart).trim() || undefined;
 }
 
 function forwardSubject(subject: string): string {

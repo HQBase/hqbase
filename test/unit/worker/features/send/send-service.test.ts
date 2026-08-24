@@ -115,6 +115,42 @@ describe("send service", () => {
     expect(createThread).toHaveBeenCalledWith(env.DB, "Hello", "2026-07-10T00:00:00.000Z");
   });
 
+  it("sends and stores one resolved signature after the authored content", async () => {
+    send.mockResolvedValue({ messageId: "<cloudflare-signature@example.com>" });
+
+    await sendNewMessage(
+      env,
+      {
+        attachmentIds: [],
+        bcc: [],
+        cc: [],
+        from: mailbox.address,
+        subject: "Signed",
+        text: "Hello",
+        to: ["owner@example.com"]
+      },
+      "user-1",
+      {
+        mode: "selected",
+        id: "sig_support",
+        name: "Support",
+        text: "Jane\nSupport",
+        html: "<p>Jane<br>Support</p>"
+      }
+    );
+
+    expect(send).toHaveBeenCalledWith(
+      expect.objectContaining({
+        text: "Hello\n\nJane\nSupport",
+        html: "<p>Hello</p><br><br><p>Jane<br>Support</p>"
+      })
+    );
+    expect(insertMessage).toHaveBeenCalledWith(
+      env.DB,
+      expect.objectContaining({ textBody: "Hello\n\nJane\nSupport" })
+    );
+  });
+
   it("keeps only allowlisted threading headers on replies", async () => {
     vi.mocked(getMessageDetail).mockResolvedValue({
       ...sentSummary,
@@ -146,7 +182,7 @@ describe("send service", () => {
 
     const quotedText = "Reply\n\nOn 2026-07-10 at 00:00 UTC, owner@example.com wrote:\n> Original";
     const quotedHtml =
-      '<p>Reply</p><div class="gmail_quote gmail_quote_container"><div dir="ltr" class="gmail_attr"><br>On 2026-07-10 at 00:00 UTC, owner@example.com wrote:<br></div><blockquote class="gmail_quote" style="margin:0 0 0 .8ex;border-left:1px #ccc solid;padding-left:1ex">Original</blockquote></div>';
+      '<p>Reply</p><br><br><div class="gmail_quote gmail_quote_container"><div dir="ltr" class="gmail_attr"><br>On 2026-07-10 at 00:00 UTC, owner@example.com wrote:<br></div><blockquote class="gmail_quote" style="margin:0 0 0 .8ex;border-left:1px #ccc solid;padding-left:1ex">Original</blockquote></div>';
     expect(send).toHaveBeenCalledWith({
       from: mailbox.address,
       bcc: ["audit@example.com"],
