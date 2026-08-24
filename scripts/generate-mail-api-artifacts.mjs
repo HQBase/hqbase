@@ -1,12 +1,14 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 
+import { withSignatures } from "./mail-api-signatures.mjs";
+
 const outputDirectory = "api";
 const v1OpenApiLocation = path.join(outputDirectory, "hqbase-mail-api-v1.openapi.json");
 const v2OpenApiLocation = path.join(outputDirectory, "hqbase-mail-api-v2.openapi.json");
-const v1OpenApiDocument = JSON.parse(await readFile(v1OpenApiLocation, "utf8"));
+const v1OpenApiDocument = withSignatures(JSON.parse(await readFile(v1OpenApiLocation, "utf8")), 1);
 const v2OpenApiDocument = withAgentAuthentication(
-  JSON.parse(await readFile(v2OpenApiLocation, "utf8"))
+  withSignatures(JSON.parse(await readFile(v2OpenApiLocation, "utf8")), 2)
 );
 validateOpenApi(v1OpenApiDocument, 1);
 validateOpenApi(v2OpenApiDocument, 2);
@@ -88,6 +90,7 @@ function buildCollection(document, version) {
       { key: "attachmentId", value: "att_example", type: "string" },
       { key: "draftId", value: "drf_example", type: "string" },
       { key: "labelId", value: "lbl_example", type: "string" },
+      { key: "signatureId", value: "sig_example", type: "string" },
       { key: "action", value: "read", type: "string" }
     ],
     item: [oauthSetupFolder(version), ...folders.values()]
@@ -141,6 +144,7 @@ function validateOpenApi(document, version) {
     `${apiBasePath}/conversations/{id}/labels/{labelId}`,
     `${apiBasePath}/drafts`,
     `${apiBasePath}/drafts/changes`,
+    `${apiBasePath}/signatures`,
     `${apiBasePath}/send`,
     `${apiBasePath}/reply`,
     `${apiBasePath}/forward`
@@ -227,8 +231,13 @@ function postmanRequest(route, method, operation) {
     .filter((parameter) => parameter.in === "query")
     .map((parameter) => ({
       key: parameter.name,
-      value: parameter.name === "folder" ? "inbox" : "",
-      disabled: parameter.name !== "folder",
+      value:
+        parameter.name === "folder"
+          ? "inbox"
+          : parameter.name === "from"
+            ? "support@example.com"
+            : "",
+      disabled: parameter.required !== true && parameter.name !== "folder",
       description: parameter.description
     }));
   const headers = (operation.parameters ?? [])

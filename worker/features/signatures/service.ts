@@ -12,9 +12,13 @@ import type {
   SignatureSnapshot
 } from "./types";
 
+type SignaturePrincipal =
+  | RequestPrincipal
+  | { id: string; role: HumanPrincipal["role"]; type: "user" };
+
 export async function listUsableSignatures(
   db: D1Database,
-  principal: RequestPrincipal,
+  principal: SignaturePrincipal,
   from: string
 ): Promise<{ automaticSignatureId: string | null; signatures: Signature[] }> {
   const mailbox = await requireSendingMailbox(db, principal, from);
@@ -31,7 +35,7 @@ export async function listUsableSignatures(
 
 export async function resolveSignatureSelection(
   db: D1Database,
-  principal: RequestPrincipal,
+  principal: SignaturePrincipal,
   from: string,
   selection: SignatureSelection
 ): Promise<SignatureSnapshot> {
@@ -51,7 +55,7 @@ export async function resolveSignatureSelection(
 
 export async function resolveDraftSignature(
   db: D1Database,
-  principal: RequestPrincipal,
+  principal: SignaturePrincipal,
   input: {
     from: string;
     selection?: SignatureSelection | undefined;
@@ -75,6 +79,26 @@ export async function resolveDraftSignature(
   return candidates.signatures.some((item) => item.id === current.id)
     ? current
     : resolveSignatureSelection(db, principal, input.from, { mode: "automatic" });
+}
+
+export async function resolveSendSignature(
+  db: D1Database,
+  principal: SignaturePrincipal,
+  input: { from: string; selection?: SignatureSelection | undefined },
+  draft?: { from: string; signature: SignatureSnapshot } | null
+): Promise<SignatureSnapshot> {
+  if (draft && draft.from.toLowerCase() !== input.from.toLowerCase()) {
+    throw new AppError(
+      "DRAFT_FROM_MISMATCH",
+      "The send request does not match the draft From address.",
+      400
+    );
+  }
+  if (draft) return draft.signature;
+  if (input.selection) {
+    return resolveSignatureSelection(db, principal, input.from, input.selection);
+  }
+  return emptySignatureSnapshot("none");
 }
 
 export async function listManageableSignatures(
@@ -190,7 +214,7 @@ export function emptySignatureSnapshot(mode: SignatureSnapshot["mode"]): Signatu
   return { mode, id: null, name: "", html: "", text: "" };
 }
 
-async function requireSendingMailbox(db: D1Database, principal: RequestPrincipal, from: string) {
+async function requireSendingMailbox(db: D1Database, principal: SignaturePrincipal, from: string) {
   const mailbox = await findMailboxForSending(db, from);
   if (!mailbox) throw new AppError("MAILBOX_NOT_FOUND", "Sending mailbox not found.", 404);
   if (!mailbox.isActive) {

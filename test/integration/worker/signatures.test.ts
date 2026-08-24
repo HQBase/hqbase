@@ -9,6 +9,7 @@ import {
   listManageableSignatures,
   listUsableSignatures,
   resolveDraftSignature,
+  resolveSendSignature,
   resolveSignatureSelection,
   updateSignature
 } from "../../../worker/features/signatures/service";
@@ -180,6 +181,17 @@ describe("email signatures", () => {
       signature: automatic
     });
     expect(saved.signature).toMatchObject({ mode: "automatic", id: mailbox.id });
+    await expect(
+      resolveSendSignature(
+        env.DB,
+        member,
+        {
+          from: "one@signature-one.example",
+          selection: { mode: "none" }
+        },
+        saved
+      )
+    ).resolves.toEqual(saved.signature);
 
     const updated = await saveDraft(env.DB, member.id, {
       ...saved,
@@ -244,12 +256,13 @@ describe("email signatures", () => {
       }
     });
     expect(deletedSourceDraft).not.toBeNull();
+    if (!deletedSourceDraft) throw new Error("Deleted signature draft was not found.");
     await expect(
       resolveDraftSignature(env.DB, member, {
         from: "two@signature-two.example",
         current: {
           from: "one@signature-one.example",
-          signature: deletedSourceDraft!.signature
+          signature: deletedSourceDraft.signature
         }
       })
     ).resolves.toMatchObject({ mode: "automatic", id: secondMailbox.id });

@@ -78,6 +78,13 @@ describe("HQBase MCP server", () => {
          VALUES ('lbl_mcp_customer', 'Customer', 'blue', ?, ?, ?)`
       ).bind(userId, now.toISOString(), now.toISOString()),
       env.DB.prepare(
+        `INSERT INTO email_signatures
+         (id, name, html_body, text_body, user_id, is_default, created_by, updated_by,
+          created_at, updated_at)
+         VALUES ('sig_mcp_default', 'MCP default', '<p>MCP signature</p>', 'MCP signature', ?, 1,
+                 ?, ?, ?, ?)`
+      ).bind(userId, userId, userId, now.toISOString(), now.toISOString()),
+      env.DB.prepare(
         `INSERT INTO oauthClient
          (id, clientId, disabled, redirectUris, public, requirePKCE, createdAt, updatedAt)
          VALUES ('oc_mcp_hqbase', 'client_mcp_hqbase', 0, ?, 1, 1, ?, ?)`
@@ -160,8 +167,12 @@ describe("HQBase MCP server", () => {
         `INSERT INTO threads (id, subject_normalized, last_message_at, created_at, updated_at)
          VALUES
            ('thr_mcp_allowed', 'mcp allowed', ?, ?, ?),
-           ('thr_mcp_unassigned', 'mcp unassigned', ?, ?, ?)`
+           ('thr_mcp_unassigned', 'mcp unassigned', ?, ?, ?),
+           ('thr_mcp_signature', 'mcp signature source', ?, ?, ?)`
       ).bind(
+        now.toISOString(),
+        now.toISOString(),
+        now.toISOString(),
         now.toISOString(),
         now.toISOString(),
         now.toISOString(),
@@ -179,6 +190,23 @@ describe("HQBase MCP server", () => {
           'sender@example.com', ?, '[]', '[]', 'MCP allowed', 'Attachment body',
           'Attachment body', '<mcp-allowed@example.com>', 'mcp-allowed:allowed@example.com',
           NULL, '[]', ?, NULL, NULL, 1, ?, ?
+        )`
+      ).bind(
+        JSON.stringify(["allowed@example.com"]),
+        now.toISOString(),
+        now.toISOString(),
+        now.toISOString()
+      ),
+      env.DB.prepare(
+        `INSERT INTO messages (
+          id, thread_id, mailbox_id, direction, folder, from_address, to_json, cc_json, bcc_json,
+          subject, snippet, text_body, message_id, dedupe_key, in_reply_to, references_json,
+          received_at, sent_at, read_at, has_attachments, created_at, updated_at
+        ) VALUES (
+          'msg_mcp_signature', 'thr_mcp_signature', 'mbx_allowed', 'inbound', 'inbox',
+          'signature-sender@example.com', ?, '[]', '[]', 'MCP signature source', 'Earlier signature body',
+          'Earlier signature body', '<mcp-signature@example.com>', 'mcp-signature:allowed@example.com',
+          NULL, '[]', ?, NULL, NULL, 0, ?, ?
         )`
       ).bind(
         JSON.stringify(["allowed@example.com"]),
@@ -472,8 +500,11 @@ describe("HQBase MCP server", () => {
       },
       fullToken,
       "/mcp/full"
-    )) as { id: string; version: number };
-    expect(created).toMatchObject({ version: 1 });
+    )) as { id: string; signature: { id: string | null; mode: string }; version: number };
+    expect(created).toMatchObject({
+      signature: { id: "sig_mcp_default", mode: "automatic" },
+      version: 1
+    });
 
     const attachment = (await callTool(
       "add_draft_attachment",
@@ -497,19 +528,111 @@ describe("HQBase MCP server", () => {
       },
       fullToken,
       "/mcp/full"
-    )) as { attachments: Array<{ id: string }>; text: string; version: number };
-    expect(updated).toMatchObject({ text: "Updated review", version: 2 });
+    )) as {
+      attachments: Array<{ id: string }>;
+      signature: { id: string | null; mode: string };
+      text: string;
+      version: number;
+    };
+    expect(updated).toMatchObject({
+      signature: { id: "sig_mcp_default", mode: "automatic" },
+      text: "Updated review",
+      version: 2
+    });
     expect(updated.attachments.map((item) => item.id)).toEqual([attachment.id]);
+
+    const withoutSignature = (await callTool(
+      "update_draft",
+      {
+        draftId: created.id,
+        version: updated.version,
+        signature: { mode: "none" }
+      },
+      fullToken,
+      "/mcp/full"
+    )) as { signature: { id: string | null; mode: string }; version: number };
+    expect(withoutSignature).toMatchObject({
+      signature: { id: null, mode: "none" },
+      version: 3
+    });
 
     await env.DB.prepare(
       "UPDATE mail_domains SET sending_status = 'disabled' WHERE id = 'dom_example'"
     ).run();
     await expect(
       callTool("get_draft", { draftId: created.id }, fullToken, "/mcp/full")
-    ).resolves.toMatchObject({ id: created.id });
+    ).resolves.toMatchObject({
+      id: created.id,
+      signature: { id: null, mode: "none" }
+    });
     await env.DB.prepare(
       "UPDATE mail_domains SET sending_status = 'ready' WHERE id = 'dom_example'"
     ).run();
+  });
+
+  it("defaults MCP sends, replies, and forwards to the automatic signature", async () => {
+    const sent = (await callTool(
+      "send_email",
+      {
+        from: "allowed@example.com",
+        to: ["reader@example.net"],
+        subject: "MCP signature send",
+        text: "Send authored"
+      },
+      fullToken,
+      "/mcp/full"
+    )) as { id: string };
+    expect(await storedText(sent.id)).toBe("Send authored\n\nMCP signature");
+
+    const replied = (await callTool(
+      "reply_to_message",
+      {
+        from: "allowed@example.com",
+        messageId: "msg_mcp_signature",
+        text: "Reply authored"
+      },
+      fullToken,
+      "/mcp/full"
+    )) as { id: string };
+    const replyText = await storedText(replied.id);
+    expect(replyText.indexOf("Reply authored")).toBeLessThan(replyText.indexOf("MCP signature"));
+    expect(replyText.indexOf("MCP signature")).toBeLessThan(
+      replyText.indexOf("Earlier signature body")
+    );
+
+    const forwarded = (await callTool(
+      "forward_message",
+      {
+        from: "allowed@example.com",
+        includeOriginalAttachments: false,
+        messageId: "msg_mcp_signature",
+        text: "Forward authored",
+        to: ["reader@example.net"]
+      },
+      fullToken,
+      "/mcp/full"
+    )) as { id: string };
+    const forwardText = await storedText(forwarded.id);
+    expect(forwardText.indexOf("Forward authored")).toBeLessThan(
+      forwardText.indexOf("MCP signature")
+    );
+    expect(forwardText.indexOf("MCP signature")).toBeLessThan(
+      forwardText.indexOf("Forwarded message")
+    );
+
+    const unsigned = (await callTool(
+      "send_email",
+      {
+        from: "allowed@example.com",
+        signature: { mode: "none" },
+        subject: "MCP unsigned send",
+        text: "Unsigned body",
+        to: ["reader@example.net"]
+      },
+      fullToken,
+      "/mcp/full"
+    )) as { id: string };
+    expect(await storedText(unsigned.id)).toBe("Unsigned body");
   });
 
   it("applies conversation actions through agent access", async () => {
@@ -587,6 +710,14 @@ async function callTool(
     throw new Error(payload.result.content?.[0]?.text ?? `${name} failed without an error body.`);
   }
   return JSON.parse(payload.result?.content?.[0]?.text ?? "null") as unknown;
+}
+
+async function storedText(messageId: string): Promise<string> {
+  const row = await env.DB.prepare("SELECT text_body FROM messages WHERE id = ?")
+    .bind(messageId)
+    .first<{ text_body: string }>();
+  if (!row) throw new Error("MCP sent message was not stored.");
+  return row.text_body;
 }
 
 function mcpRequest(body: unknown, accessToken?: string, endpoint = "/mcp"): Promise<Response> {

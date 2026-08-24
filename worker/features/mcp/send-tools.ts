@@ -7,13 +7,15 @@ import { AppError } from "../../lib/errors";
 import { parseWith } from "../../lib/validation";
 import { enforceRateLimit } from "../../security/rate-limit";
 import { recordAudit } from "../audit/service";
-import { requireDraftAttachmentIdsAccess, requireDraftIdAccess } from "../drafts/access";
+import { getAccessibleDraft, requireDraftAttachmentIdsAccess } from "../drafts/access";
 import { type MailEventScheduler, scheduleSentMailEvents } from "../events/service";
 import { findMailboxForSending } from "../mailboxes/queries";
 import { requireMessageAccess } from "../messages/access";
 import { forwardMessage } from "../send/forward";
 import { replyToMessage, sendNewMessage } from "../send/service";
 import { forwardMessageSchema, replyMessageSchema, sendMessageSchema } from "../send/validation";
+import { resolveSendSignature } from "../signatures/service";
+import { signatureSelectionSchema } from "../signatures/validation";
 
 import type { McpPrincipal } from "./route";
 import { toolResult } from "./tool-result";
@@ -43,7 +45,8 @@ export function registerSendTools(
         text: z.string().trim().min(1).max(100_000),
         html: z.string().trim().max(200_000).optional(),
         attachmentIds,
-        draftId: z.string().min(1).max(100).optional()
+        draftId: z.string().min(1).max(100).optional(),
+        signature: signatureSelectionSchema.default({ mode: "automatic" })
       },
       annotations: { destructiveHint: false, idempotentHint: false, openWorldHint: true }
     },
@@ -52,9 +55,17 @@ export function registerSendTools(
         await enforceSendRateLimit(env, principal.userId);
         const parsed = parseWith(sendMessageSchema, input);
         const mailboxId = await requireSendingAccess(env, principal, parsed.from);
-        await requireDraftIdAccess(env, principal, parsed.draftId);
+        const draft = parsed.draftId
+          ? await getAccessibleDraft(env, principal, parsed.draftId)
+          : null;
+        const signature = await resolveSendSignature(
+          env.DB,
+          signaturePrincipal(principal),
+          { from: parsed.from, selection: parsed.signature },
+          draft
+        );
         await requireDraftAttachmentIdsAccess(env, principal, parsed.attachmentIds);
-        const message = await sendNewMessage(env, parsed, principal.userId);
+        const message = await sendNewMessage(env, parsed, principal.userId, signature);
         scheduleSentMailEvents(env, schedule, {
           draftId: parsed.draftId,
           mailboxId,
@@ -79,7 +90,8 @@ export function registerSendTools(
         text: z.string().trim().min(1).max(100_000),
         html: z.string().trim().max(200_000).optional(),
         attachmentIds,
-        draftId: z.string().min(1).max(100).optional()
+        draftId: z.string().min(1).max(100).optional(),
+        signature: signatureSelectionSchema.default({ mode: "automatic" })
       },
       annotations: { destructiveHint: false, idempotentHint: false, openWorldHint: true }
     },
@@ -89,9 +101,17 @@ export function registerSendTools(
         const parsed = parseWith(replyMessageSchema, input);
         await requireSourceAccess(env, principal, parsed.messageId);
         const mailboxId = await requireSendingAccess(env, principal, parsed.from);
-        await requireDraftIdAccess(env, principal, parsed.draftId);
+        const draft = parsed.draftId
+          ? await getAccessibleDraft(env, principal, parsed.draftId)
+          : null;
+        const signature = await resolveSendSignature(
+          env.DB,
+          signaturePrincipal(principal),
+          { from: parsed.from, selection: parsed.signature },
+          draft
+        );
         await requireDraftAttachmentIdsAccess(env, principal, parsed.attachmentIds);
-        const message = await replyToMessage(env, parsed, principal.userId);
+        const message = await replyToMessage(env, parsed, principal.userId, signature);
         scheduleSentMailEvents(env, schedule, {
           draftId: parsed.draftId,
           mailboxId,
@@ -117,7 +137,8 @@ export function registerSendTools(
         text: z.string().trim().max(100_000).default(""),
         html: z.string().trim().max(200_000).optional(),
         attachmentIds,
-        includeOriginalAttachments: z.boolean().default(true)
+        includeOriginalAttachments: z.boolean().default(true),
+        signature: signatureSelectionSchema.default({ mode: "automatic" })
       },
       annotations: { destructiveHint: false, idempotentHint: false, openWorldHint: true }
     },
@@ -128,7 +149,11 @@ export function registerSendTools(
         await requireSourceAccess(env, principal, parsed.messageId);
         const mailboxId = await requireSendingAccess(env, principal, parsed.from);
         await requireDraftAttachmentIdsAccess(env, principal, parsed.attachmentIds);
-        const message = await forwardMessage(env, parsed, principal.userId);
+        const signature = await resolveSendSignature(env.DB, signaturePrincipal(principal), {
+          from: parsed.from,
+          selection: parsed.signature
+        });
+        const message = await forwardMessage(env, parsed, principal.userId, signature);
         scheduleSentMailEvents(env, schedule, { mailboxId, userId: principal.userId });
         await recordSend(env, principal, "mcp.message.forward", mailboxId);
         return message;
@@ -174,4 +199,8 @@ function recordSend(env: WorkerEnv, principal: McpPrincipal, action: string, mai
     resourceId: mailboxId,
     outcome: "success"
   });
+}
+
+function signaturePrincipal(principal: McpPrincipal) {
+  return { id: principal.userId, role: principal.role, type: "user" as const };
 }

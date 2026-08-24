@@ -11,8 +11,7 @@ import { getAccessibleDraft, requireDraftAttachmentIdsAccess } from "../drafts/a
 import { scheduleSentMailEvents } from "../events/service";
 import { findMailboxForSending } from "../mailboxes/queries";
 import { requireMessageAccess } from "../messages/access";
-import { emptySignatureSnapshot, resolveSignatureSelection } from "../signatures/service";
-import type { SignatureSnapshot } from "../signatures/types";
+import { resolveSendSignature } from "../signatures/service";
 
 import { forwardMessage, sendForwardDraft } from "./forward";
 import { replyToMessage, sendNewMessage } from "./service";
@@ -37,7 +36,12 @@ sendRoutes.post("/send", async (c) => {
   const draft = input.draftId
     ? await getAccessibleDraft(c.env, draftPrincipal, input.draftId)
     : null;
-  const signature = await signatureForSend(c.env.DB, principal, input, draft);
+  const signature = await resolveSendSignature(
+    c.env.DB,
+    principal,
+    { from: input.from, selection: input.signature },
+    draft
+  );
   await requireDraftAttachmentIdsAccess(c.env, draftPrincipal, input.attachmentIds);
   const sent = draft?.forwardOfMessageId
     ? await sendForwardDraft(
@@ -84,7 +88,12 @@ sendRoutes.post("/reply", async (c) => {
   const draft = input.draftId
     ? await getAccessibleDraft(c.env, draftPrincipal, input.draftId)
     : null;
-  const signature = await signatureForSend(c.env.DB, principal, input, draft);
+  const signature = await resolveSendSignature(
+    c.env.DB,
+    principal,
+    { from: input.from, selection: input.signature },
+    draft
+  );
   await requireDraftAttachmentIdsAccess(c.env, draftPrincipal, input.attachmentIds);
   const sent = await replyToMessage(c.env, input, principal.id, signature);
   scheduleSentMailEvents(c.env, (promise) => c.executionCtx.waitUntil(promise), {
@@ -120,7 +129,10 @@ sendRoutes.post("/forward", async (c) => {
   await requireMailboxAccess(c.env.DB, principal.id, principal.role, mailbox.id, "agent");
   const draftPrincipal = { id: principal.id, role: principal.role };
   await requireDraftAttachmentIdsAccess(c.env, draftPrincipal, input.attachmentIds);
-  const signature = await signatureForSend(c.env.DB, principal, input, null);
+  const signature = await resolveSendSignature(c.env.DB, principal, {
+    from: input.from,
+    selection: input.signature
+  });
   const sent = await forwardMessage(c.env, input, principal.id, signature);
   scheduleSentMailEvents(c.env, (promise) => c.executionCtx.waitUntil(promise), {
     mailboxId: mailbox.id,
@@ -137,24 +149,3 @@ sendRoutes.post("/forward", async (c) => {
   });
   return c.json(sent, 201);
 });
-
-async function signatureForSend(
-  db: D1Database,
-  principal: Awaited<ReturnType<typeof requireMailApiPrincipal>>["principal"],
-  input: { from: string; signature?: Parameters<typeof resolveSignatureSelection>[3] | undefined },
-  draft: Awaited<ReturnType<typeof getAccessibleDraft>> | null
-): Promise<SignatureSnapshot> {
-  if (draft) {
-    if (draft.from.toLowerCase() !== input.from.toLowerCase()) {
-      throw new AppError(
-        "DRAFT_FROM_MISMATCH",
-        "The send request does not match the draft From address.",
-        400
-      );
-    }
-    return draft.signature;
-  }
-  return input.signature
-    ? resolveSignatureSelection(db, principal, input.from, input.signature)
-    : emptySignatureSnapshot("none");
-}

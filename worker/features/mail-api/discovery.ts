@@ -171,6 +171,7 @@ Fetch ${openApiUrl} for the available methods, parameters, payloads, action valu
 - Open \`${apiBase}/events\` as a WebSocket when low-latency updates are useful. Each frame only identifies a changed topic. After a frame or reconnect, use the REST resources and change journals to reconcile state. Reconnect with bounded exponential backoff. Keep periodic synchronization as a fallback.
 - List mailboxes before each change cycle. Remove cached mail for mailboxes that are no longer readable, and bootstrap each newly readable mailbox.
 - List labels before applying one. A label organizes mail only; it never grants mailbox access or changes a folder.
+- List signatures for the exact From address before selecting one. Omit the signature field when the supplied body must remain unchanged.
 - Repeat a full draft bootstrap when mailbox access changes so newly hidden or visible drafts are reconciled.
 - Ignore response fields you do not recognize.
 - Do not log credentials, access tokens, refresh tokens, message bodies, or attachments.
@@ -185,7 +186,7 @@ JSON errors contain a stable \`error.code\` and human-readable \`error.message\`
 
 ## API boundary and stability
 
-The Mail API covers mailboxes, messages, conversations, labels, attachments, drafts, sending, replying, and forwarding. It does not manage people, mailbox grants, label definitions, domains, setup, updates, audits, sessions, notifications, app secrets, or Cloudflare credentials.
+The Mail API covers mailboxes, messages, conversations, labels, signatures, attachments, drafts, sending, replying, and forwarding. It does not manage people, mailbox grants, label definitions, signature definitions, domains, setup, updates, audits, sessions, notifications, app secrets, or Cloudflare credentials.
 
 \`/api/v2\` is HQBase's stable public Mail API. Additive fields and endpoints may appear, so ignore unknown response fields. Breaking changes use a new versioned base path such as \`/api/v3\`.
 `;

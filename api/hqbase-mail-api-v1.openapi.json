@@ -40,6 +40,9 @@
     },
     {
       "name": "Events"
+    },
+    {
+      "name": "Signatures"
     }
   ],
   "paths": {
@@ -2815,6 +2818,87 @@
           }
         }
       }
+    },
+    "/api/v1/signatures": {
+      "get": {
+        "summary": "List signatures for a From address",
+        "security": [
+          {
+            "oauth2": ["mail:send"]
+          },
+          {
+            "cookieSession": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Applicable signatures and the automatic selection",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SignatureCandidates"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid From address",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid authentication",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient OAuth scope or mailbox access",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Sending mailbox not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "tags": ["Signatures"],
+        "operationId": "listSignatures",
+        "description": "Returns only personal, mailbox, and exact-domain signatures usable from the exact address.",
+        "parameters": [
+          {
+            "name": "from",
+            "in": "query",
+            "required": true,
+            "description": "Exact sending address.",
+            "schema": {
+              "type": "string",
+              "format": "email",
+              "maxLength": 254
+            }
+          }
+        ]
+      }
     }
   },
   "components": {
@@ -3554,6 +3638,9 @@
           "version": {
             "type": "integer",
             "minimum": 1
+          },
+          "signature": {
+            "$ref": "#/components/schemas/SignatureSelection"
           }
         }
       },
@@ -3564,7 +3651,7 @@
           },
           {
             "type": "object",
-            "required": ["id", "version", "updatedAt", "attachments"],
+            "required": ["id", "version", "updatedAt", "attachments", "signature"],
             "properties": {
               "id": {
                 "type": "string"
@@ -3581,6 +3668,9 @@
                 "items": {
                   "$ref": "#/components/schemas/DraftAttachment"
                 }
+              },
+              "signature": {
+                "$ref": "#/components/schemas/SignatureSnapshot"
               }
             }
           }
@@ -3693,6 +3783,9 @@
           },
           "draftId": {
             "type": "string"
+          },
+          "signature": {
+            "$ref": "#/components/schemas/SignatureSelection"
           }
         }
       },
@@ -3746,6 +3839,9 @@
           },
           "draftId": {
             "type": "string"
+          },
+          "signature": {
+            "$ref": "#/components/schemas/SignatureSelection"
           }
         }
       },
@@ -3816,6 +3912,135 @@
           "includeOriginalAttachments": {
             "type": "boolean",
             "default": true
+          },
+          "signature": {
+            "$ref": "#/components/schemas/SignatureSelection"
+          }
+        }
+      },
+      "SignatureSelection": {
+        "oneOf": [
+          {
+            "type": "object",
+            "required": ["mode"],
+            "properties": {
+              "mode": {
+                "type": "string",
+                "const": "automatic"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": ["mode", "id"],
+            "properties": {
+              "mode": {
+                "type": "string",
+                "const": "selected"
+              },
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 100
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": ["mode"],
+            "properties": {
+              "mode": {
+                "type": "string",
+                "const": "none"
+              }
+            }
+          }
+        ]
+      },
+      "SignatureSnapshot": {
+        "type": "object",
+        "required": ["mode", "id", "name", "html", "text"],
+        "properties": {
+          "mode": {
+            "type": "string",
+            "enum": ["automatic", "selected", "none"]
+          },
+          "id": {
+            "type": ["string", "null"]
+          },
+          "name": {
+            "type": "string"
+          },
+          "html": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          }
+        }
+      },
+      "Signature": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "html",
+          "text",
+          "scope",
+          "scopeId",
+          "scopeLabel",
+          "isDefault",
+          "createdAt",
+          "updatedAt"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "html": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          },
+          "scope": {
+            "type": "string",
+            "enum": ["user", "mailbox", "domain"]
+          },
+          "scopeId": {
+            "type": "string"
+          },
+          "scopeLabel": {
+            "type": "string"
+          },
+          "isDefault": {
+            "type": "boolean"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "SignatureCandidates": {
+        "type": "object",
+        "required": ["automaticSignatureId", "signatures"],
+        "properties": {
+          "automaticSignatureId": {
+            "type": ["string", "null"]
+          },
+          "signatures": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Signature"
+            }
           }
         }
       }
