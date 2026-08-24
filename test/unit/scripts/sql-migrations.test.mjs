@@ -31,7 +31,10 @@ const expectedMigrationNames = [
   "0015_draft_changes.sql",
   "0016_one_address_per_mailbox.sql",
   "0017_agent_principals.sql",
-  "0018_mailbox_lifecycle.sql"
+  "0018_mailbox_lifecycle.sql",
+  "0019_contacts.sql",
+  "0020_labels.sql",
+  "0021_email_signatures.sql"
 ];
 const expectedAfterDeployMigrationNames = [
   "0001_remove_mailbox_alias_storage.sql",
@@ -350,7 +353,7 @@ describe("SQL migration contract", () => {
     const tables = database
       .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'")
       .all();
-    expect(tables).toHaveLength(43);
+    expect(tables).toHaveLength(47);
     expect(tables.map((table) => table.name)).not.toContain("mailbox_addresses");
 
     const mailboxColumns = database.prepare("PRAGMA table_info(mailboxes)").all();
@@ -456,6 +459,31 @@ describe("SQL migration contract", () => {
     expect(applyMigration(database, migrationNamed(migrations, "0018_mailbox_lifecycle.sql"))).toBe(
       true
     );
+    expect(applyMigration(database, migrationNamed(migrations, "0019_contacts.sql"))).toBe(true);
+    expect(applyMigration(database, migrationNamed(migrations, "0020_labels.sql"))).toBe(true);
+    expect(applyMigration(database, migrationNamed(migrations, "0021_email_signatures.sql"))).toBe(
+      true
+    );
+
+    database.exec(`
+      INSERT INTO contacts (
+        user_id, email, name, notes, created_at, updated_at
+      ) VALUES (
+        'usr_upgrade', 'sender@example.com', 'Upgrade sender', 'Private upgrade note',
+        '2026-08-23T12:02:00.000Z', '2026-08-23T12:02:00.000Z'
+      );
+      INSERT INTO labels (
+        id, name, color, created_by_user_id, created_at, updated_at
+      ) VALUES (
+        'lbl_upgrade', 'Upgrade label', 'blue', 'usr_upgrade',
+        '2026-08-23T12:02:00.000Z', '2026-08-23T12:02:00.000Z'
+      );
+      INSERT INTO message_labels (
+        message_id, label_id, assigned_by_principal_id, created_at
+      ) VALUES (
+        'msg_upgrade', 'lbl_upgrade', 'usr_upgrade', '2026-08-23T12:02:00.000Z'
+      );
+    `);
 
     database.exec(`
       INSERT INTO principals (id, type, name, status, created_at, updated_at)
@@ -612,6 +640,25 @@ describe("SQL migration contract", () => {
         )
         .get()
     ).toEqual({ is_unassigned: 1 });
+    expect(
+      database
+        .prepare("SELECT email, name, notes FROM contacts WHERE user_id = 'usr_upgrade'")
+        .get()
+    ).toEqual({
+      email: "sender@example.com",
+      name: "Upgrade sender",
+      notes: "Private upgrade note"
+    });
+    expect(
+      database
+        .prepare(
+          `SELECT label.name, label.color
+           FROM message_labels assignment
+           JOIN labels label ON label.id = assignment.label_id
+           WHERE assignment.message_id = 'msg_upgrade'`
+        )
+        .get()
+    ).toEqual({ name: "Upgrade label", color: "blue" });
 
     expect(applyMigration(database, migrationNamed(migrations, "0018_mailbox_lifecycle.sql"))).toBe(
       false
@@ -624,7 +671,7 @@ describe("SQL migration contract", () => {
       )
     ).toBe(false);
     expect(database.prepare("SELECT count(*) AS count FROM d1_migrations").get()).toEqual({
-      count: 18
+      count: 21
     });
     expect(
       database.prepare("SELECT count(*) AS count FROM d1_migrations_after_deploy").get()
@@ -859,7 +906,7 @@ describe("SQL migration contract", () => {
   it("backfills only mailboxes created with their mailbox agent", async () => {
     const database = createDatabase();
     const migrations = await readD1Migrations(migrationsDirectory);
-    for (const migration of migrations.slice(0, -1)) applyMigration(database, migration);
+    applyBefore(database, migrations, "0018_mailbox_lifecycle.sql");
 
     const oldTimestamp = "2026-08-20T12:00:00.000Z";
     const agentTimestamp = "2026-08-23T12:00:00.000Z";
@@ -911,7 +958,9 @@ describe("SQL migration contract", () => {
          '${agentTimestamp}', '${agentTimestamp}');
     `);
 
-    expect(applyMigration(database, migrations.at(-1))).toBe(true);
+    expect(applyMigration(database, migrationNamed(migrations, "0018_mailbox_lifecycle.sql"))).toBe(
+      true
+    );
     expect(database.prepare("SELECT id, kind FROM mailboxes ORDER BY id").all()).toEqual([
       { id: "mbx_agent_kind", kind: "agent" },
       { id: "mbx_human_kind", kind: "human" }
