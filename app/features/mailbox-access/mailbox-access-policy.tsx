@@ -9,14 +9,7 @@ import {
   DialogHeader,
   DialogTitle
 } from "@/components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectTrigger,
-  SelectValue
-} from "@/components/ui/select";
+import { DropdownSelect } from "@/components/ui/dropdown-select";
 import {
   Table,
   TableBody,
@@ -109,30 +102,23 @@ export function MailboxAccessPolicyDialog({
                     <span className="block text-xs text-muted-foreground">{user.email}</span>
                   </TableCell>
                   <TableCell>
-                    <Select
+                    <DropdownSelect
+                      ariaLabel={`${user.name} access to ${mailbox?.address ?? "mailbox"}`}
+                      className="w-32 shadow-none"
                       disabled={policies.busy === key || !mailbox}
+                      options={[
+                        { label: "No access", value: "none" },
+                        { label: "Read", value: "read" },
+                        { label: "Handle mail", value: "agent" },
+                        { label: "Manager", value: "manager" }
+                      ]}
                       value={value}
                       onValueChange={(next) =>
                         mailbox
                           ? void policies.change(mailbox.id, user.id, next as AccessChoice)
                           : undefined
                       }
-                    >
-                      <SelectTrigger
-                        aria-label={`${user.name} access to ${mailbox?.address ?? "mailbox"}`}
-                        className="w-32 shadow-none"
-                      >
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectGroup>
-                          <SelectItem value="none">No access</SelectItem>
-                          <SelectItem value="read">Read</SelectItem>
-                          <SelectItem value="agent">Handle mail</SelectItem>
-                          <SelectItem value="manager">Manager</SelectItem>
-                        </SelectGroup>
-                      </SelectContent>
-                    </Select>
+                    />
                   </TableCell>
                 </TableRow>
               );

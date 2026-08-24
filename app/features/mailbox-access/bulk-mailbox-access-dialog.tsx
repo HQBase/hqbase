@@ -9,15 +9,8 @@ import {
   DialogHeader,
   DialogTitle
 } from "@/components/ui/dialog";
+import { DropdownSelect } from "@/components/ui/dropdown-select";
 import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field";
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectTrigger,
-  SelectValue
-} from "@/components/ui/select";
 import type { Mailbox } from "@/features/mailboxes/types";
 import type { WorkspaceUser } from "@/features/users/types";
 import type { AccessChoice, MailboxAccessPolicies } from "./mailbox-access-policies";
@@ -77,39 +70,27 @@ export function BulkMailboxAccessDialog({
           <FieldGroup>
             <Field>
               <FieldLabel>User</FieldLabel>
-              <Select value={userId} onValueChange={setUserId}>
-                <SelectTrigger aria-label="User">
-                  <SelectValue placeholder="Choose a user" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectGroup>
-                    {managedUsers.map((user) => (
-                      <SelectItem key={user.id} value={user.id}>
-                        {user.name}
-                      </SelectItem>
-                    ))}
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
+              <DropdownSelect
+                ariaLabel="User"
+                options={managedUsers.map((user) => ({ label: user.name, value: user.id }))}
+                placeholder="Choose a user"
+                value={userId}
+                onValueChange={setUserId}
+              />
             </Field>
             <Field>
               <FieldLabel>Access</FieldLabel>
-              <Select
+              <DropdownSelect
+                ariaLabel="Access"
+                options={[
+                  { label: "No access", value: "none" },
+                  { label: "Read", value: "read" },
+                  { label: "Handle mail", value: "agent" },
+                  { label: "Manager", value: "manager" }
+                ]}
                 value={accessLevel}
                 onValueChange={(value) => setAccessLevel(value as AccessChoice)}
-              >
-                <SelectTrigger aria-label="Access">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectGroup>
-                    <SelectItem value="none">No access</SelectItem>
-                    <SelectItem value="read">Read</SelectItem>
-                    <SelectItem value="agent">Handle mail</SelectItem>
-                    <SelectItem value="manager">Manager</SelectItem>
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
+              />
               <FieldDescription>
                 Selected: {mailboxes.map((mailbox) => mailbox.address).join(", ")}
               </FieldDescription>

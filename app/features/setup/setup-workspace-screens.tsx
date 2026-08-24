@@ -2,6 +2,7 @@ import * as React from "react";
 import { PiEye, PiEyeSlash, PiPlus, PiTrash, PiWarningCircle } from "react-icons/pi";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { DropdownSelect } from "@/components/ui/dropdown-select";
 import {
   Field,
   FieldDescription,
@@ -11,14 +12,6 @@ import {
   FieldLabelRow
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectTrigger,
-  SelectValue
-} from "@/components/ui/select";
 import {
   Table,
   TableBody,
@@ -250,22 +243,19 @@ export function MailboxStep({
 
       <Field className="max-w-md">
         <FieldLabel htmlFor="setup-default-from-mailbox">Default From mailbox</FieldLabel>
-        <Select value={defaultFromMailboxAddress} onValueChange={onSetDefaultFromMailboxAddress}>
-          <SelectTrigger id="setup-default-from-mailbox" className="w-full shadow-none">
-            <SelectValue placeholder="Choose a mailbox" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectGroup>
-              {mailboxes
-                .filter((mailbox) => mailbox.address)
-                .map((mailbox, index) => (
-                  <SelectItem key={`${index}:${mailbox.address}`} value={mailbox.address}>
-                    {mailbox.displayName || "Mailbox"} — {mailbox.address}
-                  </SelectItem>
-                ))}
-            </SelectGroup>
-          </SelectContent>
-        </Select>
+        <DropdownSelect
+          className="shadow-none"
+          id="setup-default-from-mailbox"
+          options={mailboxes
+            .filter((mailbox) => mailbox.address)
+            .map((mailbox) => ({
+              label: `${mailbox.displayName || "Mailbox"} — ${mailbox.address}`,
+              value: mailbox.address
+            }))}
+          placeholder="Choose a mailbox"
+          value={defaultFromMailboxAddress}
+          onValueChange={onSetDefaultFromMailboxAddress}
+        />
         <FieldDescription>
           New messages and forwards start from this mailbox. Replies use the mailbox that received
           the original message.

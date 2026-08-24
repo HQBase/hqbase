@@ -1,14 +1,7 @@
 import * as React from "react";
 import { toast } from "sonner";
+import { DropdownSelect } from "@/components/ui/dropdown-select";
 import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectTrigger,
-  SelectValue
-} from "@/components/ui/select";
 import { updateDefaultFromMailbox } from "@/features/auth/api";
 import type { Mailbox } from "./types";
 
@@ -48,24 +41,17 @@ export function DefaultFromMailboxControl({
   return (
     <Field className="max-w-md">
       <FieldLabel htmlFor="default-from-mailbox">Default From mailbox</FieldLabel>
-      <Select
+      <DropdownSelect
+        className="shadow-none"
         disabled={pendingMailboxId !== null}
+        id="default-from-mailbox"
+        options={options.map((mailbox) => ({
+          label: `${mailbox.displayName} — ${mailbox.address}`,
+          value: mailbox.id
+        }))}
         value={pendingMailboxId ?? selectedMailboxId}
         onValueChange={(mailboxId) => void changeDefault(mailboxId)}
-      >
-        <SelectTrigger id="default-from-mailbox" className="w-full shadow-none">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectGroup>
-            {options.map((mailbox) => (
-              <SelectItem key={mailbox.id} value={mailbox.id}>
-                {mailbox.displayName} — {mailbox.address}
-              </SelectItem>
-            ))}
-          </SelectGroup>
-        </SelectContent>
-      </Select>
+      />
       <FieldDescription>
         New messages and forwards use this mailbox. Replies use the mailbox that received the
         original message.

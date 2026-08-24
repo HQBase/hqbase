@@ -16,7 +16,6 @@ import type { CurrentUser } from "@/features/auth/types";
 import type { MailConnectionStatus } from "@/features/events/types";
 import type { Mailbox } from "@/features/mailboxes/types";
 import type { UnreadCounts } from "@/features/notifications/types";
-import { mailboxUnreadLabel } from "@/features/notifications/unread";
 import type { FolderId, SettingsTabId } from "@/lib/routes";
 import { MobileNavigation } from "./mobile-navigation";
 
@@ -64,11 +63,7 @@ export function TopBar({
   const humanMailboxes = mailboxes.filter((mailbox) => mailbox.kind === "human");
   const agentMailboxes = mailboxes.filter((mailbox) => mailbox.kind === "agent");
   const selectedMailbox = mailboxes.find((mailbox) => mailbox.id === mailboxId);
-  const selectedMailboxLabel = mailboxUnreadLabel(
-    selectedMailbox?.address ?? "All mailboxes",
-    selectedMailbox?.id ?? "all",
-    unread
-  );
+  const selectedMailboxLabel = selectedMailbox?.address ?? "All mailboxes";
 
   return (
     <header className="flex h-12 w-full shrink-0 touch-none items-center gap-2 border-b border-divider bg-toolbar px-3 lg:px-4">
@@ -131,13 +126,11 @@ export function TopBar({
           <DropdownMenuContent align="end" className="w-52" side="bottom">
             <DropdownMenuRadioGroup value={mailboxId} onValueChange={onMailboxChange}>
               <DropdownMenuRadioItem className="py-1 text-xs" value="all">
-                {mailboxUnreadLabel("All mailboxes", "all", unread)}
+                All mailboxes
               </DropdownMenuRadioItem>
               {humanMailboxes.map((mailbox) => (
                 <DropdownMenuRadioItem className="py-1 text-xs" key={mailbox.id} value={mailbox.id}>
-                  <span className="truncate">
-                    {mailboxUnreadLabel(mailbox.address, mailbox.id, unread)}
-                  </span>
+                  <span className="truncate">{mailbox.address}</span>
                 </DropdownMenuRadioItem>
               ))}
             </DropdownMenuRadioGroup>
@@ -155,9 +148,7 @@ export function TopBar({
                       key={mailbox.id}
                       value={mailbox.id}
                     >
-                      <span className="truncate">
-                        {mailboxUnreadLabel(mailbox.address, mailbox.id, unread)}
-                      </span>
+                      <span className="truncate">{mailbox.address}</span>
                     </DropdownMenuRadioItem>
                   ))}
                 </DropdownMenuRadioGroup>

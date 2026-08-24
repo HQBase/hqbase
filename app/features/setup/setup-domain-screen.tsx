@@ -2,6 +2,7 @@ import type * as React from "react";
 import { PiCheckCircle, PiCircle, PiWarningCircle } from "react-icons/pi";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Checkbox } from "@/components/ui/checkbox";
+import { DropdownSelect } from "@/components/ui/dropdown-select";
 import {
   Field,
   FieldDescription,
@@ -10,14 +11,6 @@ import {
   FieldLabelRow
 } from "@/components/ui/field";
 import { InputGroup, InputGroupInput } from "@/components/ui/input-group";
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectTrigger,
-  SelectValue
-} from "@/components/ui/select";
 import type { DomainErrors } from "./setup-validation";
 import { WizardActions, WizardPanel } from "./setup-wizard-parts";
 import type { CloudflareConfigureResult, CloudflareZone } from "./types";
@@ -150,23 +143,14 @@ function WorkspaceUrlField(props: {
           value={props.value}
           onChange={(event) => props.onChange(event.target.value)}
         />
-        <Select value={props.portalZoneId} onValueChange={props.onDomainChange}>
-          <SelectTrigger
-            aria-label="Workspace URL domain"
-            className="h-full w-auto max-w-[65%] shrink-0 rounded-l-none border-0 border-l bg-muted/45 shadow-none focus:ring-0"
-          >
-            <SelectValue placeholder="Choose domain" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectGroup>
-              {props.selectedZones.map((zone) => (
-                <SelectItem key={zone.id} value={zone.id}>
-                  {zone.name}
-                </SelectItem>
-              ))}
-            </SelectGroup>
-          </SelectContent>
-        </Select>
+        <DropdownSelect
+          ariaLabel="Workspace URL domain"
+          className="h-full min-h-0 w-auto max-w-[65%] shrink-0 rounded-l-none border-0 border-l bg-muted/45 shadow-none focus-visible:ring-0"
+          options={props.selectedZones.map((zone) => ({ label: zone.name, value: zone.id }))}
+          placeholder="Choose domain"
+          value={props.portalZoneId}
+          onValueChange={props.onDomainChange}
+        />
       </InputGroup>
       <FieldDescription>
         Your webmail UI will be available at {props.hostname || `${props.value}.yourdomain.com`}.

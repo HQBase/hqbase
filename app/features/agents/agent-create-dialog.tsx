@@ -13,16 +13,9 @@ import {
   DialogTitle,
   DialogTrigger
 } from "@/components/ui/dialog";
+import { DropdownSelect } from "@/components/ui/dropdown-select";
 import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectTrigger,
-  SelectValue
-} from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { Mailbox } from "@/features/mailboxes/types";
@@ -60,7 +53,7 @@ export function AgentCreateDialog({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button type="button">
+        <Button size="sm" type="button">
           <PiPlus data-icon="inline-start" />
           {createLabel}
         </Button>
@@ -193,21 +186,18 @@ export function AgentCreateForm({
             <FieldGroup>
               <Field>
                 <FieldLabel>Mailbox</FieldLabel>
-                <Select value={mailboxChoice} onValueChange={setMailboxChoice}>
-                  <SelectTrigger aria-label="Mailbox">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectGroup>
-                      <SelectItem value={newMailboxValue}>Create a new mailbox</SelectItem>
-                      {activeMailboxes.map((mailbox) => (
-                        <SelectItem key={mailbox.id} value={mailbox.id}>
-                          {mailbox.address}
-                        </SelectItem>
-                      ))}
-                    </SelectGroup>
-                  </SelectContent>
-                </Select>
+                <DropdownSelect
+                  ariaLabel="Mailbox"
+                  options={[
+                    { label: "Create a new mailbox", value: newMailboxValue },
+                    ...activeMailboxes.map((mailbox) => ({
+                      label: mailbox.address,
+                      value: mailbox.id
+                    }))
+                  ]}
+                  value={mailboxChoice}
+                  onValueChange={setMailboxChoice}
+                />
               </Field>
               {mailboxChoice === newMailboxValue ? (
                 <>
@@ -236,20 +226,15 @@ export function AgentCreateForm({
               ) : null}
               <Field>
                 <FieldLabel>Access</FieldLabel>
-                <Select
+                <DropdownSelect
+                  ariaLabel="Agent mailbox access"
+                  options={[
+                    { label: "Read only", value: "read" },
+                    { label: "Handle mail", value: "agent" }
+                  ]}
                   value={accessLevel}
                   onValueChange={(value) => setAccessLevel(value as AgentMailboxAccess)}
-                >
-                  <SelectTrigger aria-label="Agent mailbox access">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectGroup>
-                      <SelectItem value="read">Read only</SelectItem>
-                      <SelectItem value="agent">Handle mail</SelectItem>
-                    </SelectGroup>
-                  </SelectContent>
-                </Select>
+                />
                 <FieldDescription>
                   Handle mail also lets the agent organize, draft, and send from this mailbox.
                 </FieldDescription>
@@ -269,20 +254,16 @@ export function AgentCreateForm({
             <FieldGroup>
               <Field>
                 <FieldLabel>Allowed domain</FieldLabel>
-                <Select value={mailDomainId} onValueChange={setMailDomainId}>
-                  <SelectTrigger aria-label="Allowed domain">
-                    <SelectValue placeholder="Choose a domain" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectGroup>
-                      {enabledDomains.map((domain) => (
-                        <SelectItem key={domain.id} value={domain.id}>
-                          {domain.name}
-                        </SelectItem>
-                      ))}
-                    </SelectGroup>
-                  </SelectContent>
-                </Select>
+                <DropdownSelect
+                  ariaLabel="Allowed domain"
+                  options={enabledDomains.map((domain) => ({
+                    label: domain.name,
+                    value: domain.id
+                  }))}
+                  placeholder="Choose a domain"
+                  value={mailDomainId}
+                  onValueChange={setMailDomainId}
+                />
                 {enabledDomains.length === 0 ? (
                   <FieldDescription>
                     Enable an email domain before creating a provisioner.

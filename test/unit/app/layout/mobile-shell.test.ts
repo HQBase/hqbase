@@ -118,6 +118,8 @@ describe("mobile application shell", () => {
     expect(topBar).toContain("DropdownMenuTrigger");
     expect(topBar).toContain('side="bottom"');
     expect(topBar).not.toContain("SelectTrigger");
+    expect(topBar).not.toContain("mailboxUnreadLabel");
+    expect(topBar).toContain('className="hidden h-8 min-h-0');
     expect(topBar).toContain('mailbox.kind === "human"');
     expect(topBar).toContain('mailbox.kind === "agent"');
     expect(topBar.indexOf("humanMailboxes.map")).toBeLessThan(topBar.indexOf("Agent mailboxes"));

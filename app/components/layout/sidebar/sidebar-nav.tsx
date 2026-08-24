@@ -1,15 +1,8 @@
 import type * as React from "react";
 
 import { Button } from "@/components/ui/button";
+import { DropdownSelect } from "@/components/ui/dropdown-select";
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectTrigger,
-  SelectValue
-} from "@/components/ui/select";
 import type { CurrentUser } from "@/features/auth/types";
 import type { Mailbox } from "@/features/mailboxes/types";
 import type { UnreadCounts } from "@/features/notifications/types";
@@ -161,27 +154,24 @@ export function MailNav({
             >
               Mailbox
             </FieldLabel>
-            <Select value={mailboxFilter.value} onValueChange={mailboxFilter.onChange}>
-              <SelectTrigger
-                aria-label="Mailbox filter"
-                className="h-11 bg-muted/70 shadow-none [&>span]:truncate"
-                id="drawer-mailbox-filter"
-              >
-                <SelectValue placeholder="All mailboxes" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectGroup>
-                  <SelectItem value="all">
-                    {mailboxUnreadLabel("All mailboxes", "all", unread)}
-                  </SelectItem>
-                  {mailboxFilter.mailboxes.map((mailbox) => (
-                    <SelectItem key={mailbox.id} value={mailbox.id}>
-                      {mailboxUnreadLabel(mailbox.address, mailbox.id, unread)}
-                    </SelectItem>
-                  ))}
-                </SelectGroup>
-              </SelectContent>
-            </Select>
+            <DropdownSelect
+              ariaLabel="Mailbox filter"
+              className="h-11 min-h-11 bg-muted/70 shadow-none"
+              id="drawer-mailbox-filter"
+              options={[
+                {
+                  label: mailboxUnreadLabel("All mailboxes", "all", unread),
+                  value: "all"
+                },
+                ...mailboxFilter.mailboxes.map((mailbox) => ({
+                  label: mailboxUnreadLabel(mailbox.address, mailbox.id, unread),
+                  value: mailbox.id
+                }))
+              ]}
+              placeholder="All mailboxes"
+              value={mailboxFilter.value}
+              onValueChange={mailboxFilter.onChange}
+            />
           </Field>
         </FieldGroup>
       ) : null}

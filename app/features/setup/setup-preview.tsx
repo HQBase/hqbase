@@ -1,15 +1,8 @@
 import * as React from "react";
 
 import { Button } from "@/components/ui/button";
+import { DropdownSelect } from "@/components/ui/dropdown-select";
 import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectTrigger,
-  SelectValue
-} from "@/components/ui/select";
 
 import { SetupFrame } from "./setup-frame";
 import { defaultMailboxesForDomains } from "./setup-helpers";
@@ -60,20 +53,12 @@ export function SetupPreview(): React.ReactElement {
           <div className="mx-auto flex max-w-4xl flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <Field className="w-full sm:max-w-xs">
               <FieldLabel htmlFor="preview-state">Setup UI lab</FieldLabel>
-              <Select value={state} onValueChange={(value) => selectState(value as PreviewState)}>
-                <SelectTrigger id="preview-state">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectGroup>
-                    {previewStates.map(([value, label]) => (
-                      <SelectItem key={value} value={value}>
-                        {label}
-                      </SelectItem>
-                    ))}
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
+              <DropdownSelect
+                id="preview-state"
+                options={previewStates.map(([value, label]) => ({ label, value }))}
+                value={state}
+                onValueChange={(value) => selectState(value as PreviewState)}
+              />
               <FieldDescription>
                 Development fixtures only. No APIs or Cloudflare resources.
               </FieldDescription>

@@ -98,7 +98,7 @@ export function UserOnboardingDialog({
       }}
     >
       <DialogTrigger asChild>
-        <Button type="button">
+        <Button size="sm" type="button">
           <PiUserPlus data-icon="inline-start" />
           Add user
         </Button>

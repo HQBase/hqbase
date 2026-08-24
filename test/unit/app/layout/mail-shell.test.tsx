@@ -65,6 +65,28 @@ describe("mail shell", () => {
     expect(html.indexOf("Open navigation")).toBeLessThan(html.indexOf("Search mail"));
   });
 
+  it("keeps unread totals out of the header mailbox label", () => {
+    const html = renderToStaticMarkup(
+      <TopBar
+        activeFolder="inbox"
+        draftCount={0}
+        mailboxId={mailbox.id}
+        mailboxes={[mailbox]}
+        search=""
+        unread={unread}
+        user={user}
+        onCompose={() => undefined}
+        onFolderChange={() => undefined}
+        onMailboxChange={() => undefined}
+        onSearchChange={() => undefined}
+        onSignedOut={() => undefined}
+      />
+    );
+
+    expect(html).toContain(">support@example.com<");
+    expect(html).not.toContain("support@example.com (4)");
+  });
+
   it("exposes the desktop sidebar state from the sidebar header control", () => {
     const visibleHtml = renderToStaticMarkup(
       <Sidebar
@@ -216,6 +238,7 @@ describe("mail shell", () => {
     expect(html).toContain("flex h-full w-full");
     expect(html).toContain('aria-label="Mailbox filter"');
     expect(html).toContain('id="drawer-mailbox-filter"');
+    expect(html).toContain("h-11 min-h-11");
     expect(html).toContain('for="drawer-mailbox-filter">Mailbox</label>');
     expect(html.indexOf(">Mailbox</label>")).toBeLessThan(html.indexOf(">Inbox</span>"));
     expect(html).toContain('aria-current="page"');

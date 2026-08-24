@@ -1,13 +1,6 @@
 import type * as React from "react";
+import { DropdownSelect } from "@/components/ui/dropdown-select";
 import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectTrigger,
-  SelectValue
-} from "@/components/ui/select";
 import type { ComposeMode } from "./compose-state";
 
 export type SendingIdentity = { mailboxId: string; address: string };
@@ -28,23 +21,18 @@ export function ComposeFields(props: {
   return (
     <div className="flex flex-col px-5">
       <Row label="From">
-        <Select required value={props.from} onValueChange={props.setFrom}>
-          <SelectTrigger
-            aria-label="From"
-            className="h-10 rounded-none border-0 bg-transparent px-0 shadow-none focus:ring-0"
-          >
-            <SelectValue placeholder="Choose address" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectGroup>
-              {props.identities.map((identity) => (
-                <SelectItem key={identity.address} value={identity.address}>
-                  {identity.address}
-                </SelectItem>
-              ))}
-            </SelectGroup>
-          </SelectContent>
-        </Select>
+        <DropdownSelect
+          ariaLabel="From"
+          className="rounded-none border-0 bg-transparent px-0 shadow-none focus-visible:ring-0"
+          options={props.identities.map((identity) => ({
+            label: identity.address,
+            value: identity.address
+          }))}
+          placeholder="Choose address"
+          required
+          value={props.from}
+          onValueChange={props.setFrom}
+        />
       </Row>
       <Row label="To">
         <Input
