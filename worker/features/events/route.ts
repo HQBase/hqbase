@@ -6,14 +6,14 @@ import { jsonResponse } from "../../lib/json";
 import { mailEventInternalHeaders } from "./durable-object";
 import type { MailEventTopic } from "./types";
 
-const eventPath = "/api/v2/events";
+const eventPaths = new Set(["/api/v1/events", "/api/v2/events"]);
 const workspaceHubName = "workspace";
 
 export async function handleMailEventRoute(
   request: Request,
   env: WorkerEnv
 ): Promise<Response | null> {
-  if (new URL(request.url).pathname !== eventPath) return null;
+  if (!eventPaths.has(new URL(request.url).pathname)) return null;
 
   const requestId = requestIdFor(request);
   try {

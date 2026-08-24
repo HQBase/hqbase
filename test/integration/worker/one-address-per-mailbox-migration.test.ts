@@ -323,7 +323,7 @@ describe("one address per mailbox migration", () => {
     ]);
   });
 
-  it("removes the alias schema and leaves valid foreign keys", async () => {
+  it("removes the alias schema, preserves v1 OAuth data, and leaves valid foreign keys", async () => {
     const tables = await env.DB.prepare(
       `SELECT name FROM sqlite_master
        WHERE type = 'table' AND name IN ('mailbox_addresses', 'mailbox_address_migration')`
@@ -340,13 +340,13 @@ describe("one address per mailbox migration", () => {
         `SELECT COUNT(*) AS count FROM oauthResource
          WHERE identifier = 'https://hqbase.test/api/v1'`
       ).first()
-    ).resolves.toEqual({ count: 0 });
+    ).resolves.toEqual({ count: 1 });
     await expect(
       env.DB.prepare(
         `SELECT COUNT(*) AS count FROM oauthClientResource
          WHERE clientId = 'legacy_alias_migration'`
       ).first()
-    ).resolves.toEqual({ count: 0 });
+    ).resolves.toEqual({ count: 1 });
     await expect(
       env.DB.prepare(
         "SELECT installed_schema_version FROM release_state WHERE singleton = 1"

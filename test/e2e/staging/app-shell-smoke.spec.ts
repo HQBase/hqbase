@@ -49,6 +49,22 @@ test("deployed HQBase publishes the v2 Mail API OAuth resource", async ({ reques
     scopes_supported: ["mail:read", "mail:write", "mail:send"]
   });
 
+  const v1Metadata = await getSuccessfulResponseBody(
+    request,
+    "/.well-known/oauth-protected-resource/api/v1"
+  );
+  expect(JSON.parse(v1Metadata)).toMatchObject({
+    resource: `${origin}/api/v1`,
+    authorization_servers: [`${origin}/api/auth`],
+    scopes_supported: ["mail:read", "mail:write", "mail:send"]
+  });
+
+  const v1OpenApi = await getSuccessfulResponseBody(request, "/api/v1/openapi.json");
+  expect(JSON.parse(v1OpenApi)).toMatchObject({
+    info: { version: "1.0.0" },
+    paths: { "/api/v1/mailboxes": expect.any(Object) }
+  });
+
   const authorization = await getSuccessfulResponseBody(
     request,
     "/.well-known/oauth-authorization-server/api/auth"

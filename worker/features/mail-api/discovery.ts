@@ -1,3 +1,4 @@
+import mailApiV1DocumentSource from "../../../api/hqbase-mail-api-v1.openapi.json";
 import mailApiDocumentSource from "../../../api/hqbase-mail-api-v2.openapi.json";
 
 import { authOrigin } from "../../auth/auth";
@@ -7,6 +8,10 @@ const humanMailSkillPath = "/skills/hqbase-mail/SKILL.md";
 const mailboxAgentSkillPath = "/skills/hqbase-mailbox/SKILL.md";
 const provisionerSkillPath = "/skills/hqbase-provisioner/SKILL.md";
 const mailApiOpenApiPath = "/api/v2/openapi.json";
+const mailApiOpenApiDocuments: ReadonlyMap<string, object> = new Map<string, object>([
+  ["/api/v1/openapi.json", mailApiV1DocumentSource],
+  [mailApiOpenApiPath, mailApiDocumentSource]
+]);
 
 const retiredAgentInstructionPaths = new Set(["/AGENTS.md", "/agents.md"]);
 
@@ -15,20 +20,19 @@ const publicDiscoveryCacheControl = "public, max-age=300";
 export function handleMailApiDiscovery(request: Request, env: WorkerEnv): Response | null {
   const pathname = new URL(request.url).pathname;
   const isRetiredAgentInstructionPath = retiredAgentInstructionPaths.has(pathname);
+  const openApiDocument = mailApiOpenApiDocuments.get(pathname);
   if (
     pathname !== humanMailSkillPath &&
     pathname !== mailboxAgentSkillPath &&
     pathname !== provisionerSkillPath &&
-    pathname !== mailApiOpenApiPath &&
+    !openApiDocument &&
     !isRetiredAgentInstructionPath
   ) {
     return null;
   }
 
   const headers = publicDiscoveryHeaders(
-    pathname === mailApiOpenApiPath
-      ? "application/json; charset=utf-8"
-      : "text/markdown; charset=utf-8"
+    openApiDocument ? "application/json; charset=utf-8" : "text/markdown; charset=utf-8"
   );
   if (request.method !== "GET" && request.method !== "HEAD") {
     headers.set("allow", "GET, HEAD");
@@ -36,23 +40,22 @@ export function handleMailApiDiscovery(request: Request, env: WorkerEnv): Respon
   }
 
   const origin = authOrigin(env, request);
-  const responseBody =
-    pathname === mailApiOpenApiPath
-      ? buildInstanceOpenApi(origin)
-      : pathname === humanMailSkillPath
-        ? buildHumanMailSkill(origin)
-        : pathname === mailboxAgentSkillPath
-          ? buildMailboxAgentSkill(origin)
-          : pathname === provisionerSkillPath
-            ? buildProvisionerSkill(origin)
-            : buildRetirementNotice();
+  const responseBody = openApiDocument
+    ? buildInstanceOpenApi(openApiDocument, origin)
+    : pathname === humanMailSkillPath
+      ? buildHumanMailSkill(origin)
+      : pathname === mailboxAgentSkillPath
+        ? buildMailboxAgentSkill(origin)
+        : pathname === provisionerSkillPath
+          ? buildProvisionerSkill(origin)
+          : buildRetirementNotice();
   return new Response(request.method === "HEAD" ? null : responseBody, { headers });
 }
 
-function buildInstanceOpenApi(origin: string): string {
+function buildInstanceOpenApi(document: object, origin: string): string {
   return `${JSON.stringify(
     {
-      ...mailApiDocumentSource,
+      ...document,
       servers: [{ url: origin, description: "This HQBase installation" }],
       externalDocs: {
         description: "Connect through the HQBase Mail API with human approval",

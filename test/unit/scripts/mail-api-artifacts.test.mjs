@@ -5,6 +5,10 @@ const openApi = JSON.parse(await readFile("api/hqbase-mail-api-v2.openapi.json",
 const postman = JSON.parse(
   await readFile("api/hqbase-mail-api-v2.postman_collection.json", "utf8")
 );
+const v1OpenApi = JSON.parse(await readFile("api/hqbase-mail-api-v1.openapi.json", "utf8"));
+const v1Postman = JSON.parse(
+  await readFile("api/hqbase-mail-api-v1.postman_collection.json", "utf8")
+);
 
 describe("Mail API public artifacts", () => {
   it("publishes the versioned endpoint and scope matrix without internal storage keys", () => {
@@ -72,6 +76,34 @@ describe("Mail API public artifacts", () => {
     expect(JSON.stringify(openApi)).not.toContain("r2Key");
   });
 
+  it("publishes the v1 mailbox schema without reviving alias storage", () => {
+    expect(v1OpenApi.openapi).toBe("3.1.0");
+    expect(v1OpenApi.info.version).toBe("1.0.0");
+    expect(Object.keys(v1OpenApi.paths).every((path) => path.startsWith("/api/v1/"))).toBe(true);
+    expect(v1OpenApi.components.securitySchemes.agentBearer).toBeUndefined();
+    expect(v1OpenApi.components.schemas.Mailbox.required).toEqual([
+      "id",
+      "address",
+      "addresses",
+      "displayName",
+      "isActive",
+      "accessLevel",
+      "createdAt",
+      "updatedAt"
+    ]);
+    expect(v1OpenApi.components.schemas.Mailbox.properties.kind).toBeUndefined();
+    expect(v1OpenApi.components.schemas.Mailbox.properties.deletedAt).toBeUndefined();
+    expect(v1OpenApi.components.schemas.Mailbox.properties.addresses).toMatchObject({
+      minItems: 1,
+      maxItems: 1,
+      items: { $ref: "#/components/schemas/MailboxAddress" }
+    });
+    expect(v1OpenApi.components.schemas.MailboxAddress).toBeDefined();
+    expect(JSON.stringify(v1OpenApi)).not.toContain("agentBearer");
+    expect(JSON.stringify(v1OpenApi)).not.toContain("x-hqbase-agent-capabilities");
+    expect(JSON.stringify(v1OpenApi)).not.toContain("r2Key");
+  });
+
   it("generates human-testable OAuth setup and every OpenAPI operation", () => {
     const serialized = JSON.stringify(postman);
     expect(serialized).not.toContain("/api/v1");
@@ -98,6 +130,20 @@ describe("Mail API public artifacts", () => {
     ]);
     for (const [route, pathItem] of Object.entries(openApi.paths)) {
       if (route === "/api/v2/events") continue;
+      for (const operation of Object.values(pathItem)) {
+        expect(serialized).toContain(operation.summary);
+      }
+    }
+  });
+
+  it("generates v1 OAuth and event setup for existing clients", () => {
+    const serialized = JSON.stringify(v1Postman);
+    expect(serialized).not.toContain("/api/v2");
+    expect(serialized).toContain("/.well-known/oauth-protected-resource/api/v1");
+    expect(serialized).toContain("{{ws_base_url}}/api/v1/events");
+    expect(serialized).not.toContain("hqb_agent_ credential");
+    for (const [route, pathItem] of Object.entries(v1OpenApi.paths)) {
+      if (route === "/api/v1/events") continue;
       for (const operation of Object.values(pathItem)) {
         expect(serialized).toContain(operation.summary);
       }

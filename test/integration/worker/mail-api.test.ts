@@ -7,7 +7,9 @@ import { tokenRow } from "./mail-api-token-fixture";
 
 const origin = "https://hqbase.test";
 const apiResource = `${origin}/api/v2`;
+const v1ApiResource = `${origin}/api/v1`;
 const readToken = "hqb_access_mail-api-read-token";
+const v1ReadToken = "hqb_access_mail-api-v1-read-token";
 const writeToken = "hqb_access_mail-api-write-token";
 const fullToken = "hqb_access_mail-api-full-token";
 const wrongAudienceToken = "hqb_access_mail-api-wrong-audience-token";
@@ -16,7 +18,7 @@ const scopes = ["mail:read", "mail:write", "mail:send"];
 let cookie = "";
 let userId = "";
 
-describe("HQBase Mail API v2", () => {
+describe("HQBase Mail API", () => {
   beforeAll(async () => {
     await applyCurrentMigrations();
 
@@ -59,6 +61,17 @@ describe("HQBase Mail API v2", () => {
         future,
         ["mail:read"],
         apiResource
+      ),
+      tokenRow(
+        env.DB,
+        "tok_api_v1_read",
+        v1ReadToken,
+        "client_mail_api_v1",
+        user.sessionId,
+        userId,
+        future,
+        ["mail:read"],
+        v1ApiResource
       ),
       tokenRow(
         env.DB,
@@ -140,6 +153,26 @@ describe("HQBase Mail API v2", () => {
         userId,
         JSON.stringify(scopes),
         JSON.stringify([apiResource]),
+        now.toISOString(),
+        now.toISOString()
+      ),
+      env.DB.prepare(
+        `INSERT INTO oauthClient
+         (id, clientId, disabled, redirectUris, public, requirePKCE, createdAt, updatedAt)
+         VALUES ('client_row_api_v1', 'client_mail_api_v1', 0, ?, 1, 1, ?, ?)`
+      ).bind(
+        JSON.stringify(["https://client.example/v1/callback"]),
+        now.toISOString(),
+        now.toISOString()
+      ),
+      env.DB.prepare(
+        `INSERT INTO oauthConsent
+         (id, clientId, userId, scopes, resources, createdAt, updatedAt)
+         VALUES ('consent_api_v1', 'client_mail_api_v1', ?, ?, ?, ?, ?)`
+      ).bind(
+        userId,
+        JSON.stringify(["mail:read"]),
+        JSON.stringify([v1ApiResource]),
         now.toISOString(),
         now.toISOString()
       ),
@@ -237,12 +270,12 @@ describe("HQBase Mail API v2", () => {
       resource_documentation: `${origin}/skills/hqbase-mail/SKILL.md`
     });
 
-    const retiredMetadata = await SELF.fetch(
-      `${origin}/.well-known/oauth-protected-resource/api/v1`
-    );
-    expect(retiredMetadata.status).toBe(404);
-    await expect(retiredMetadata.json()).resolves.toEqual({
-      error: { code: "NOT_FOUND", message: "Mail API v1 is no longer available." }
+    const v1Metadata = await SELF.fetch(`${origin}/.well-known/oauth-protected-resource/api/v1`);
+    expect(v1Metadata.status).toBe(200);
+    await expect(v1Metadata.json()).resolves.toMatchObject({
+      resource: v1ApiResource,
+      authorization_servers: [`${origin}/api/auth`],
+      scopes_supported: scopes
     });
 
     const rejected = await SELF.fetch(`${origin}/api/v2/messages`);
@@ -252,9 +285,15 @@ describe("HQBase Mail API v2", () => {
     );
     expect(rejected.headers.get("www-authenticate")).toContain('scope="mail:read"');
     expect(rejected.headers.get("x-request-id")).toBeTruthy();
+
+    const rejectedV1 = await SELF.fetch(`${origin}/api/v1/messages`);
+    expect(rejectedV1.status).toBe(401);
+    expect(rejectedV1.headers.get("www-authenticate")).toContain(
+      `resource_metadata="${origin}/.well-known/oauth-protected-resource/api/v1"`
+    );
   });
 
-  it("publishes separate connection skills, OpenAPI, and retirement notices", async () => {
+  it("publishes separate connection skills and versioned OpenAPI documents", async () => {
     const humanSkill = await SELF.fetch(`${origin}/skills/hqbase-mail/SKILL.md`);
     expect(humanSkill.status).toBe(200);
     expect(humanSkill.headers.get("content-type")).toContain("text/markdown");
@@ -356,6 +395,20 @@ describe("HQBase Mail API v2", () => {
       document.paths["/api/v2/messages/{id}/remote-media/trust"]?.post?.security
     ).not.toContainEqual({ agentBearer: [] });
 
+    const v1OpenApi = await SELF.fetch(`${origin}/api/v1/openapi.json`);
+    expect(v1OpenApi.status).toBe(200);
+    const v1Document = (await v1OpenApi.json()) as {
+      components: { schemas: Record<string, unknown>; securitySchemes: Record<string, unknown> };
+      info: { version: string };
+      paths: Record<string, unknown>;
+      servers: Array<{ url: string }>;
+    };
+    expect(v1Document.info.version).toBe("1.0.0");
+    expect(v1Document.servers).toEqual([{ url: origin, description: "This HQBase installation" }]);
+    expect(v1Document.paths["/api/v1/mailboxes"]).toBeDefined();
+    expect(v1Document.components.schemas.MailboxAddress).toBeDefined();
+    expect(v1Document.components.securitySchemes.agentBearer).toBeUndefined();
+
     for (const skillPath of [
       "/skills/hqbase-mail/SKILL.md",
       "/skills/hqbase-mailbox/SKILL.md",
@@ -378,15 +431,46 @@ describe("HQBase Mail API v2", () => {
     }
   });
 
-  it("accepts the web session on v2 while v1 is absent and legacy routes remain cookie-only", async () => {
+  it("keeps v1 compatible while v2 uses direct mailboxes and legacy routes remain cookie-only", async () => {
     const versioned = await SELF.fetch(`${origin}/api/v2/mailboxes`, { headers: { cookie } });
     expect(versioned.status, await versioned.clone().text()).toBe(200);
-    await expect(versioned.json()).resolves.toMatchObject([
-      { id: "mbx_api", accessLevel: "agent" }
+    const v2Mailboxes = (await versioned.json()) as Array<Record<string, unknown>>;
+    expect(v2Mailboxes).toMatchObject([{ id: "mbx_api", accessLevel: "agent" }]);
+    expect(v2Mailboxes[0]).not.toHaveProperty("addresses");
+
+    const v1Session = await SELF.fetch(`${origin}/api/v1/mailboxes`, { headers: { cookie } });
+    expect(v1Session.status, await v1Session.clone().text()).toBe(200);
+    await expect(v1Session.json()).resolves.toEqual([
+      {
+        id: "mbx_api",
+        address: "support@example.com",
+        addresses: [
+          {
+            id: "mbx_api",
+            mailboxId: "mbx_api",
+            mailDomainId: "dom_api",
+            address: "support@example.com",
+            displayName: "Support",
+            receiveEnabled: true,
+            sendEnabled: true,
+            isPrimary: true
+          }
+        ],
+        displayName: "Support",
+        isActive: true,
+        accessLevel: "agent",
+        createdAt: expect.any(String),
+        updatedAt: expect.any(String)
+      }
     ]);
 
-    const retiredV1 = await SELF.fetch(`${origin}/api/v1/mailboxes`, { headers: { cookie } });
-    expect(retiredV1.status).toBe(404);
+    const v1Bearer = await apiFetch("/api/v1/mailboxes", v1ReadToken);
+    expect(v1Bearer.status, await v1Bearer.clone().text()).toBe(200);
+
+    const v1TokenOnV2 = await apiFetch("/api/v2/mailboxes", v1ReadToken);
+    expect(v1TokenOnV2.status).toBe(401);
+    const v2TokenOnV1 = await apiFetch("/api/v1/mailboxes", readToken);
+    expect(v2TokenOnV1.status).toBe(401);
 
     const legacyCookie = await SELF.fetch(`${origin}/api/messages`, { headers: { cookie } });
     expect(legacyCookie.status).toBe(200);
@@ -398,6 +482,16 @@ describe("HQBase Mail API v2", () => {
     const missingUpgrade = await apiFetch("/api/v2/events", readToken);
     expect(missingUpgrade.status).toBe(426);
     expect(missingUpgrade.headers.get("upgrade")).toBe("websocket");
+
+    const v1MissingUpgrade = await apiFetch("/api/v1/events", v1ReadToken);
+    expect(v1MissingUpgrade.status).toBe(426);
+    expect(v1MissingUpgrade.headers.get("upgrade")).toBe("websocket");
+
+    const v1Socket = await openEventSocket(
+      { authorization: `Bearer ${v1ReadToken}`, upgrade: "websocket" },
+      "/api/v1/events"
+    );
+    v1Socket.close(1000, "v1 compatibility verified");
 
     const insufficientScope = await apiFetch("/api/v2/events", writeToken, {
       headers: { upgrade: "websocket" }
@@ -1100,8 +1194,8 @@ function extractSessionCookie(response: Response): string {
   return match[1];
 }
 
-async function openEventSocket(headers: HeadersInit): Promise<WebSocket> {
-  const response = await SELF.fetch(`${origin}/api/v2/events`, { headers });
+async function openEventSocket(headers: HeadersInit, path = "/api/v2/events"): Promise<WebSocket> {
+  const response = await SELF.fetch(`${origin}${path}`, { headers });
   if (response.status !== 101) {
     throw new Error(`WebSocket upgrade failed (${response.status}): ${await response.text()}`);
   }

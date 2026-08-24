@@ -33,6 +33,7 @@ export function createAuth(
   backgroundTaskHandler?: BackgroundTaskHandler
 ) {
   const baseURL = authOrigin(env, request);
+  const mailApiResources = [mailApiResource(env, request), mailApiV1Resource(env, request)];
 
   return betterAuth({
     appName: "HQBase",
@@ -120,7 +121,7 @@ export function createAuth(
         clientRegistrationAllowedResources: [
           mcpResource(env, request),
           mcpFullResource(env, request),
-          mailApiResource(env, request)
+          ...mailApiResources
         ],
         clientRegistrationAllowedScopes: ["mail:write", "mail:send", "offline_access"],
         clientRegistrationDefaultScopes: ["mail:read"],
@@ -136,11 +137,7 @@ export function createAuth(
         },
         scopes: ["mail:read", "mail:write", "mail:send", "offline_access"],
         storeTokens: { hash: hashOAuthToken },
-        resources: [
-          mcpResource(env, request),
-          mcpFullResource(env, request),
-          mailApiResource(env, request)
-        ],
+        resources: [mcpResource(env, request), mcpFullResource(env, request), ...mailApiResources],
         enforcePerClientResources: false
       }),
       oauthDeviceAuthorization({
@@ -170,4 +167,8 @@ export function mcpFullResource(env: WorkerEnv, request: Request): string {
 
 export function mailApiResource(env: WorkerEnv, request: Request): string {
   return `${authOrigin(env, request)}/api/v2`;
+}
+
+export function mailApiV1Resource(env: WorkerEnv, request: Request): string {
+  return `${authOrigin(env, request)}/api/v1`;
 }
