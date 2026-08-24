@@ -5,3 +5,4 @@ export * from "./schema-contacts-labels";
 export * from "./schema-mail";
 export * from "./schema-messages";
 export * from "./schema-notifications";
+export * from "./schema-signatures";

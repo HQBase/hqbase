@@ -3,6 +3,7 @@ import { check, index, integer, sqliteTable, text } from "drizzle-orm/sqlite-cor
 
 import { principals } from "./schema-core";
 import { mailboxes } from "./schema-mail";
+import { emailSignatures } from "./schema-signatures";
 
 export const threads = sqliteTable(
   "threads",
@@ -122,6 +123,15 @@ export const drafts = sqliteTable(
     subject: text("subject").default("").notNull(),
     textBody: text("text_body").default("").notNull(),
     htmlBody: text("html_body").default("").notNull(),
+    signatureMode: text("signature_mode", { enum: ["automatic", "selected", "none"] })
+      .default("none")
+      .notNull(),
+    signatureId: text("signature_id").references(() => emailSignatures.id, {
+      onDelete: "set null"
+    }),
+    signatureNameSnapshot: text("signature_name_snapshot").default("").notNull(),
+    signatureHtmlSnapshot: text("signature_html_snapshot").default("").notNull(),
+    signatureTextSnapshot: text("signature_text_snapshot").default("").notNull(),
     version: integer("version").default(1).notNull(),
     createdAt: text("created_at").notNull(),
     updatedAt: text("updated_at").notNull(),
@@ -130,6 +140,10 @@ export const drafts = sqliteTable(
     })
   },
   (table) => [
+    check(
+      "drafts_signature_mode_check",
+      sql`${table.signatureMode} IN ('automatic', 'selected', 'none')`
+    ),
     index("drafts_principal_updated_id_idx").on(
       table.principalId,
       sql`${table.updatedAt} DESC`,
