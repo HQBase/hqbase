@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { emailAddressSchema } from "../../lib/validation";
+import { signatureSelectionSchema } from "../signatures/validation";
 
 const recipients = z.array(emailAddressSchema).max(50).default([]);
 export const draftSchema = z.object({
@@ -14,5 +15,6 @@ export const draftSchema = z.object({
   subject: z.string().max(200).default(""),
   text: z.string().max(100_000).default(""),
   html: z.string().max(200_000).default(""),
+  signature: signatureSelectionSchema.optional(),
   version: z.number().int().positive().optional()
 });

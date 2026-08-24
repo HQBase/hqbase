@@ -4,6 +4,8 @@ import { newId, nowIso } from "../../db/client";
 import { createDatabase, getRow, getRows } from "../../db/drizzle";
 import { draftAttachments, drafts } from "../../db/schema";
 import { AppError } from "../../lib/errors";
+import { emptySignatureSnapshot } from "../signatures/service";
+import type { SignatureSelection, SignatureSnapshot } from "../signatures/types";
 import type { Draft, DraftAttachment } from "./types";
 
 export type DraftRow = {
@@ -18,6 +20,11 @@ export type DraftRow = {
   subject: string;
   text_body: string;
   html_body: string;
+  signature_mode: SignatureSnapshot["mode"];
+  signature_id: string | null;
+  signature_name_snapshot: string;
+  signature_html_snapshot: string;
+  signature_text_snapshot: string;
   version: number;
   updated_at: string;
 };
@@ -71,6 +78,13 @@ export function mapDraftRow(row: DraftRow, draftAttachments: DraftAttachment[]):
     subject: row.subject,
     text: row.text_body,
     html: row.html_body,
+    signature: {
+      mode: row.signature_mode,
+      id: row.signature_id,
+      name: row.signature_name_snapshot,
+      html: row.signature_html_snapshot,
+      text: row.signature_text_snapshot
+    },
     version: row.version,
     updatedAt: row.updated_at,
     attachments: draftAttachments
@@ -119,6 +133,7 @@ export async function saveDraft(
     subject: string;
     text: string;
     html: string;
+    signature?: SignatureSelection | SignatureSnapshot | undefined;
     version?: number | undefined;
   }
 ): Promise<Draft> {
@@ -129,6 +144,10 @@ export async function saveDraft(
     throw new AppError("DRAFT_CONFLICT", "This draft changed in another session.", 409);
   const now = nowIso();
   const nextVersion = current ? current.version + 1 : 1;
+  const signature =
+    input.signature && "name" in input.signature
+      ? input.signature
+      : (current?.signature ?? emptySignatureSnapshot("none"));
   await createDatabase(db)
     .insert(drafts)
     .values({
@@ -144,6 +163,11 @@ export async function saveDraft(
       subject: input.subject,
       textBody: input.text,
       htmlBody: input.html,
+      signatureMode: signature.mode,
+      signatureId: signature.id,
+      signatureNameSnapshot: signature.name,
+      signatureHtmlSnapshot: signature.html,
+      signatureTextSnapshot: signature.text,
       version: nextVersion,
       createdAt: current?.updatedAt ?? now,
       updatedAt: now
@@ -161,6 +185,11 @@ export async function saveDraft(
         subject: input.subject,
         textBody: input.text,
         htmlBody: input.html,
+        signatureMode: signature.mode,
+        signatureId: signature.id,
+        signatureNameSnapshot: signature.name,
+        signatureHtmlSnapshot: signature.html,
+        signatureTextSnapshot: signature.text,
         version: nextVersion,
         updatedAt: now
       }

@@ -5,6 +5,7 @@ import { AppError } from "../../lib/errors";
 import { readJson } from "../../lib/json";
 import { parseWith } from "../../lib/validation";
 import { ignoreMailEventFailure, publishUserMailEvent } from "../events/service";
+import { resolveDraftSignature } from "../signatures/service";
 import { getAccessibleDraft, listAccessibleDraftPage, requireDraftAccess } from "./access";
 import { defaultDraftChangeLimit, listDraftChanges, maxDraftChangeLimit } from "./change-queries";
 import { defaultDraftLimit, maxDraftLimit } from "./list-queries";
@@ -50,16 +51,29 @@ draftRoutes.post("/", async (c) => {
   const auth = await requireMailApiPrincipal(c.env, c.req.raw, "mail:send");
   const input = parseWith(draftSchema, await readJson(c.req.raw));
   await requireDraftAccess(c.env, draftPrincipal(auth), input);
-  const draft = await saveDraft(c.env.DB, auth.principal.id, input);
+  const signature = await resolveDraftSignature(c.env.DB, auth.principal, {
+    from: input.from,
+    selection: input.signature
+  });
+  const draft = await saveDraft(c.env.DB, auth.principal.id, { ...input, signature });
   scheduleDraftEvent(c, auth.principal.id);
   return c.json(draft, 201);
 });
 draftRoutes.patch("/:id", async (c) => {
   const auth = await requireMailApiPrincipal(c.env, c.req.raw, "mail:send");
-  await getAccessibleDraft(c.env, draftPrincipal(auth), c.req.param("id"));
+  const current = await getAccessibleDraft(c.env, draftPrincipal(auth), c.req.param("id"));
   const input = parseWith(draftSchema, await readJson(c.req.raw));
   await requireDraftAccess(c.env, draftPrincipal(auth), input);
-  const draft = await saveDraft(c.env.DB, auth.principal.id, { ...input, id: c.req.param("id") });
+  const signature = await resolveDraftSignature(c.env.DB, auth.principal, {
+    from: input.from,
+    selection: input.signature,
+    current: { from: current.from, signature: current.signature }
+  });
+  const draft = await saveDraft(c.env.DB, auth.principal.id, {
+    ...input,
+    id: c.req.param("id"),
+    signature
+  });
   scheduleDraftEvent(c, auth.principal.id);
   return c.json(draft);
 });

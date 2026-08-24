@@ -3,6 +3,7 @@ import { type SQL, sql } from "drizzle-orm";
 import { getRows } from "../../db/drizzle";
 import { AppError } from "../../lib/errors";
 import { decodeKeysetCursor, encodeKeysetCursor } from "../messages/keyset-cursor";
+import { literalSearchPattern } from "../messages/search";
 import { attachmentsForDrafts, type DraftRow, mapAttachment, mapDraftRow } from "./queries";
 import type { Draft, DraftAttachment } from "./types";
 
@@ -24,9 +25,24 @@ function decodeDraftCursor(value: string) {
 export async function listDraftPage(
   db: D1Database,
   principalId: string,
-  input: { cursor?: string | undefined; limit?: number | undefined } = {}
+  input: {
+    cursor?: string | undefined;
+    limit?: number | undefined;
+    search?: string | undefined;
+  } = {}
 ): Promise<DraftPage> {
   const where: SQL[] = [sql`principal_id = ${principalId}`];
+  if (input.search) {
+    const like = literalSearchPattern(input.search);
+    where.push(sql`(
+      subject LIKE ${like} ESCAPE '\\'
+      OR from_address LIKE ${like} ESCAPE '\\'
+      OR to_json LIKE ${like} ESCAPE '\\'
+      OR cc_json LIKE ${like} ESCAPE '\\'
+      OR bcc_json LIKE ${like} ESCAPE '\\'
+      OR text_body LIKE ${like} ESCAPE '\\'
+    )`);
+  }
   const cursor = input.cursor ? decodeDraftCursor(input.cursor) : null;
   if (cursor) {
     where.push(
