@@ -12,18 +12,14 @@ import {
   TemporaryPasswordSetupPage
 } from "@/features/auth/password-setup-page";
 import type { CurrentUser } from "@/features/auth/types";
-import { ContactsPage } from "@/features/contacts/contacts-page";
-import { DraftsPage } from "@/features/drafts/drafts-page";
 import { useDrafts } from "@/features/drafts/use-drafts";
 import { useMailEvents } from "@/features/events/use-mail-events";
-import { InboxPage } from "@/features/inbox/inbox-page";
 import { listLabels } from "@/features/labels/api";
 import type { MailLabel } from "@/features/labels/types";
 import { listDeletedMailboxes, listMailboxes } from "@/features/mailboxes/api";
 import type { Mailbox } from "@/features/mailboxes/types";
 import { useMailSync } from "@/features/messages/use-mail-sync";
 import { type GlobalSearchResult, globalSearchResultPath } from "@/features/search/types";
-import { SettingsPage } from "@/features/settings/settings-page";
 import { getSetupStatus } from "@/features/setup/api";
 import { SetupPage } from "@/features/setup/setup-page";
 import type { SetupStatus } from "@/features/setup/types";
@@ -33,21 +29,15 @@ import type { WorkspaceUser } from "@/features/users/types";
 import {
   type FolderId,
   isPublicAuthenticationPath,
-  type MailFolderId,
   readAppRoute,
   type SettingsTabId
 } from "@/lib/routes";
 import { useAppRoute } from "@/lib/use-app-route";
+import { WorkspacePages } from "@/workspace-pages";
 
 const ComposeDialog = React.lazy(() =>
   import("@/features/compose/compose-dialog").then((module) => ({ default: module.ComposeDialog }))
 );
-const DraftComposeDialog = React.lazy(() =>
-  import("@/features/drafts/draft-compose-dialog").then((module) => ({
-    default: module.DraftComposeDialog
-  }))
-);
-
 export function App(): React.ReactElement {
   const publicAuthenticationPath = isPublicAuthenticationPath(window.location.pathname);
   const [setup, setSetup] = React.useState<SetupStatus | null>(null);
@@ -72,19 +62,9 @@ export function App(): React.ReactElement {
         : route.kind === "drafts"
           ? "drafts"
           : route.folder;
-  const selectedId = route.kind === "mail" ? route.messageId : null;
-  const selectedDraftId = route.kind === "drafts" ? route.draftId : null;
-  const selectedContactId = route.kind === "contacts" ? route.contactId : null;
   const settingsTab: SettingsTabId = route.kind === "settings" ? route.tab : "mailboxes";
   const currentUserId = user?.passwordSetupRequired ? null : (user?.id ?? null);
   const draftState = useDrafts(currentUserId);
-  const selectedDraft =
-    selectedDraftId === null
-      ? null
-      : (draftState.drafts.find((draft) => draft.id === selectedDraftId) ?? null);
-  const selectedDraftHasContext = Boolean(
-    selectedDraft?.replyToMessageId ?? selectedDraft?.forwardOfMessageId
-  );
   const contentMailboxes = React.useMemo(
     () => mailboxes.filter((mailbox) => mailbox.accessLevel !== null),
     [mailboxes]
@@ -324,108 +304,35 @@ export function App(): React.ReactElement {
       >
         <div className="flex h-full flex-col">
           <div className="min-h-0 flex-1">
-            {activeFolder === "contacts" ? (
-              <ContactsPage
-                selectedId={selectedContactId}
-                onBack={() => navigate({ kind: "contacts", contactId: null })}
-                onCompose={(email) => {
-                  setComposeTo(email);
-                  setComposeOpen(true);
-                }}
-                onOpenConversation={(conversation) =>
-                  navigate({
-                    kind: "mail",
-                    folder: conversation.folder,
-                    messageId: conversation.id
-                  })
-                }
-                onSelect={(contactId) => navigate({ kind: "contacts", contactId })}
-              />
-            ) : activeFolder === "settings" ? (
-              <SettingsPage
-                activeTab={settingsTab}
-                canManage={user.role === "owner" || user.role === "admin"}
-                currentUser={user}
-                defaultFromMailboxId={user.defaultFromMailboxId}
-                deletedMailboxes={deletedMailboxes}
-                labels={labels}
-                mailboxes={mailboxes}
-                notifications={mailSync.notifications}
-                setup={setup}
-                users={users}
-                onDefaultFromMailboxChange={(defaultFromMailboxId) => {
-                  setUser((current) => (current ? { ...current, defaultFromMailboxId } : current));
-                }}
-                onRefresh={reload}
-                onLabelsChanged={refreshLabels}
-                onUpdateStarted={updateMonitor.start}
-                onUpdateStatusChange={updateMonitor.acceptStatus}
-                updateProgress={updateMonitor.progress}
-                updateStatus={updateMonitor.status}
-              />
-            ) : activeFolder === "drafts" && selectedDraft && selectedDraftHasContext ? (
-              <React.Suspense
-                fallback={
-                  <div className="grid h-full place-items-center text-sm text-muted-foreground">
-                    Opening draft…
-                  </div>
-                }
-              >
-                <DraftComposeDialog
-                  draft={selectedDraft}
-                  mailboxes={contentMailboxes}
-                  onDraftsChange={() => void draftState.refresh().catch(() => undefined)}
-                  onOpenChange={(open) => {
-                    if (!open) navigate({ kind: "drafts", draftId: null });
-                  }}
-                  onSent={() => void mailSync.refresh().catch(() => undefined)}
-                />
-              </React.Suspense>
-            ) : activeFolder === "drafts" ? (
-              <DraftsPage
-                drafts={draftState.drafts}
-                isLoading={draftState.isLoading}
-                mailboxId={mailboxId}
-                search={search}
-                selectedId={selectedDraftId}
-                onBack={() => navigate({ kind: "drafts", draftId: null })}
-                onSelect={(draftId) => navigate({ kind: "drafts", draftId })}
-              />
-            ) : (
-              <InboxPage
-                activeFolder={activeFolder as MailFolderId}
-                conversations={mailSync.conversations}
-                defaultFromMailboxId={user.defaultFromMailboxId}
-                hasMore={mailSync.hasMore}
-                isLoadingMore={mailSync.isLoadingMore}
-                labelId={labelId}
-                labels={labels}
-                loadMoreError={mailSync.loadMoreError}
-                mailboxes={contentMailboxes}
-                selectedId={selectedId}
-                onDraftsChange={() => void draftState.refresh().catch(() => undefined)}
-                onConversationAction={mailSync.applyConversationAction}
-                onConversationLabelsChange={mailSync.applyConversationLabels}
-                onLoadMore={() => void mailSync.loadMore()}
-                onLabelChange={setLabelId}
-                canOrganizeConversation={(mailboxId) =>
-                  user.role === "owner" ||
-                  contentMailboxes.some(
-                    (mailbox) =>
-                      mailbox.id === mailboxId &&
-                      (mailbox.accessLevel === "agent" || mailbox.accessLevel === "manager")
-                  )
-                }
-                onRefresh={() => mailSync.refresh()}
-                onMessageRouteChange={(folder, messageId) =>
-                  navigate({ kind: "mail", folder, messageId })
-                }
-                onSelect={(messageId) =>
-                  navigate({ kind: "mail", folder: activeFolder as MailFolderId, messageId })
-                }
-                totalCount={mailSync.totalCount}
-              />
-            )}
+            <WorkspacePages
+              activeFolder={activeFolder}
+              contentMailboxes={contentMailboxes}
+              deletedMailboxes={deletedMailboxes}
+              draftState={draftState}
+              labelId={labelId}
+              labels={labels}
+              mailboxId={mailboxId}
+              mailboxes={mailboxes}
+              mailSync={mailSync}
+              navigate={navigate}
+              route={route}
+              search={search}
+              settingsTab={settingsTab}
+              setup={setup}
+              updateMonitor={updateMonitor}
+              user={user}
+              users={users}
+              onCompose={(email) => {
+                setComposeTo(email);
+                setComposeOpen(true);
+              }}
+              onDefaultFromMailboxChange={(defaultFromMailboxId) => {
+                setUser((current) => (current ? { ...current, defaultFromMailboxId } : current));
+              }}
+              onLabelChange={setLabelId}
+              onLabelsChanged={refreshLabels}
+              onReload={reload}
+            />
           </div>
         </div>
       </AppShell>
@@ -442,19 +349,6 @@ export function App(): React.ReactElement {
               if (!open) setComposeTo("");
             }}
             onDraftsChange={() => void draftState.refresh().catch(() => undefined)}
-            onSent={() => void mailSync.refresh().catch(() => undefined)}
-          />
-        </React.Suspense>
-      ) : null}
-      {selectedDraft && !selectedDraftHasContext ? (
-        <React.Suspense fallback={null}>
-          <DraftComposeDialog
-            draft={selectedDraft}
-            mailboxes={contentMailboxes}
-            onDraftsChange={() => void draftState.refresh().catch(() => undefined)}
-            onOpenChange={(open) => {
-              if (!open) navigate({ kind: "drafts", draftId: null });
-            }}
             onSent={() => void mailSync.refresh().catch(() => undefined)}
           />
         </React.Suspense>

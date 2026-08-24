@@ -11,16 +11,7 @@ import {
   publishMessageMailEvent,
   scheduleMailEvent
 } from "../events/service";
-import {
-  labelsForMessageIds,
-  labelsForThreadIds,
-  listLabels,
-  requireLabel,
-  setConversationLabel,
-  setMessageLabel,
-  withConversationLabels,
-  withMessageLabels
-} from "../labels/queries";
+import { requireLabel, withConversationLabels, withMessageLabels } from "../labels/queries";
 import { listMailboxesForUser } from "../mailboxes/queries";
 import { requireAttachmentAccess, requireMessageAccess } from "../messages/access";
 import { listConversations, updateConversationAction } from "../messages/conversation-queries";
@@ -33,7 +24,7 @@ import {
   updateMessageAction
 } from "../messages/queries";
 import { conversationFolders } from "../messages/types";
-
+import { registerLabelReadTool, registerLabelWriteTools } from "./mail-label-tools";
 import type { McpPrincipal } from "./route";
 import { attachmentResult, toolResult } from "./tool-result";
 
@@ -73,15 +64,7 @@ function registerReadTools(server: McpServer, env: WorkerEnv, principal: McpPrin
       })
   );
 
-  server.registerTool(
-    "list_labels",
-    {
-      description:
-        "List shared labels. Labels organize mail but never change mailbox access or folders.",
-      annotations: { readOnlyHint: true, openWorldHint: false }
-    },
-    () => toolResult(() => listLabels(env.DB))
-  );
+  registerLabelReadTool(server, env);
 
   server.registerTool(
     "search_messages",
@@ -219,8 +202,7 @@ function registerWriteTools(
   principal: McpPrincipal,
   schedule: MailEventScheduler
 ): void {
-  registerLabelMutationTool(server, env, principal, schedule, "add_label", true);
-  registerLabelMutationTool(server, env, principal, schedule, "remove_label", false);
+  registerLabelWriteTools(server, env, principal, schedule);
 
   server.registerTool(
     "update_message",
@@ -286,106 +268,6 @@ function registerWriteTools(
         return result;
       })
   );
-}
-
-function registerLabelMutationTool(
-  server: McpServer,
-  env: WorkerEnv,
-  principal: McpPrincipal,
-  schedule: MailEventScheduler,
-  name: "add_label" | "remove_label",
-  assigned: boolean
-): void {
-  server.registerTool(
-    name,
-    {
-      description: `${assigned ? "Add" : "Remove"} one shared label on a message or accessible conversation. Labels organize mail but never change mailbox access or folders.`,
-      inputSchema: {
-        labelId: z.string().min(1).max(100),
-        messageId: z.string().min(1).max(100),
-        target: z.enum(["message", "conversation"]).default("message")
-      },
-      annotations: { destructiveHint: true, idempotentHint: true, openWorldHint: false }
-    },
-    ({ labelId, messageId, target }) =>
-      toolResult(async () => {
-        const label = await requireLabel(env.DB, labelId);
-        await requireLabelAccess(env, principal, messageId);
-        if (target === "message") {
-          const result = await setMessageLabel(env.DB, {
-            assigned,
-            labelId: label.id,
-            messageId,
-            principalId: principal.userId
-          });
-          if (result.eventTargets.length > 0) {
-            scheduleMailEvent(schedule, publishMessageMailEvent(env, result.eventTargets));
-          }
-          const current = await labelsForMessageIds(env.DB, [messageId]);
-          await recordMutation(
-            env,
-            principal,
-            `mcp.label.${assigned ? "add" : "remove"}`,
-            "message",
-            messageId
-          );
-          return {
-            affected: result.affected,
-            assigned,
-            labelId: label.id,
-            labels: current.get(messageId) ?? [],
-            messageId
-          };
-        }
-
-        const scope = await accessibleMessageScope(
-          env.DB,
-          principal.userId,
-          principal.role,
-          "agent"
-        );
-        const result = await setConversationLabel(env.DB, {
-          assigned,
-          labelId: label.id,
-          messageId,
-          principalId: principal.userId,
-          scope
-        });
-        if (result.eventTargets.length > 0) {
-          scheduleMailEvent(schedule, publishMessageMailEvent(env, result.eventTargets));
-        }
-        const current = await labelsForThreadIds(env.DB, [result.threadId], scope);
-        await recordMutation(
-          env,
-          principal,
-          `mcp.label.${assigned ? "add" : "remove"}`,
-          "conversation",
-          result.threadId
-        );
-        return {
-          affected: result.affected,
-          assigned,
-          labelId: label.id,
-          labels: current.get(result.threadId) ?? [],
-          threadId: result.threadId
-        };
-      })
-  );
-}
-
-async function requireLabelAccess(
-  env: WorkerEnv,
-  principal: McpPrincipal,
-  messageId: string
-): Promise<void> {
-  try {
-    await requireMessageAccess(env.DB, principal.userId, principal.role, messageId, "agent");
-  } catch (error) {
-    if (error instanceof AppError && error.code === "MAILBOX_FORBIDDEN") {
-      throw new AppError("LABEL_FORBIDDEN", "You cannot label this mail.", 403);
-    }
-    throw error;
-  }
 }
 
 async function readMessage(env: WorkerEnv, principal: McpPrincipal, messageId: string) {
