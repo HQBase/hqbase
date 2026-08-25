@@ -776,8 +776,15 @@ async function storedMessageBodies(
   const detail = (await detailResponse.json()) as { textBody: string };
   const htmlResponse = await request.get(`/api/v2/messages/${messageId}/html`);
   expect(htmlResponse.ok(), await htmlResponse.text()).toBeTruthy();
-  const rendered = (await htmlResponse.json()) as { html: string };
-  return { html: rendered.html, text: detail.textBody };
+  const rendered = (await htmlResponse.json()) as {
+    afterQuotedHtml: string | null;
+    html: string;
+    quotedHtml: string | null;
+  };
+  const html = [rendered.html, rendered.quotedHtml, rendered.afterQuotedHtml]
+    .filter((part): part is string => Boolean(part))
+    .join("");
+  return { html, text: detail.textBody };
 }
 
 function expectTextOrder(value: string, parts: string[]): void {
