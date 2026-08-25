@@ -60,11 +60,14 @@ export function ContactDetailView({
   const [error, setError] = React.useState<string | null>(null);
   const [loadingMore, setLoadingMore] = React.useState(false);
   const [pending, setPending] = React.useState<"save" | "remove" | null>(null);
+  const loadMoreRequest = React.useRef(0);
 
   React.useEffect(() => {
     let cancelled = false;
+    loadMoreRequest.current += 1;
     setDetail(null);
     setError(null);
+    setLoadingMore(false);
     void getContact(id)
       .then((next) => {
         if (cancelled) return;
@@ -118,11 +121,15 @@ export function ContactDetailView({
 
   async function loadMore(): Promise<void> {
     if (!detail?.nextCursor || loadingMore) return;
+    const contactId = detail.contact.id;
+    const cursor = detail.nextCursor;
+    const request = ++loadMoreRequest.current;
     setLoadingMore(true);
     try {
-      const next = await getContact(id, detail.nextCursor);
+      const next = await getContact(contactId, cursor);
+      if (request !== loadMoreRequest.current) return;
       setDetail((current) =>
-        current
+        current?.contact.id === contactId
           ? {
               ...current,
               conversations: [...current.conversations, ...next.conversations],
@@ -131,11 +138,13 @@ export function ContactDetailView({
           : current
       );
     } catch (nextError) {
-      toast.error(
-        nextError instanceof Error ? nextError.message : "Exchanges could not be loaded."
-      );
+      if (request === loadMoreRequest.current) {
+        toast.error(
+          nextError instanceof Error ? nextError.message : "Exchanges could not be loaded."
+        );
+      }
     } finally {
-      setLoadingMore(false);
+      if (request === loadMoreRequest.current) setLoadingMore(false);
     }
   }
 

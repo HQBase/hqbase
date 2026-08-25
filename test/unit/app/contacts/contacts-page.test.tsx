@@ -123,4 +123,67 @@ describe("contacts page", () => {
     expect(view.container.textContent).toContain("Earlier project note");
     await view.unmount();
   });
+
+  it("does not append an older page after another contact opens", async () => {
+    const baseConversation = detail.conversations.at(0);
+    if (!baseConversation) throw new Error("Expected the contact fixture to include an exchange.");
+    const older = {
+      ...baseConversation,
+      id: "message-older",
+      threadId: "thread-older",
+      subject: "Alice-only older exchange"
+    };
+    const bobDetail = {
+      ...detail,
+      contact: {
+        ...detail.contact,
+        email: "bob@example.com",
+        id: "bob@example.com",
+        name: "Bob"
+      },
+      conversations: [
+        {
+          ...baseConversation,
+          fromAddress: "bob@example.com",
+          id: "message-bob",
+          subject: "Bob exchange",
+          threadId: "thread-bob"
+        }
+      ]
+    };
+    let resolveOlder: (value: typeof detail) => void = () => undefined;
+    const olderRequest = new Promise<typeof detail>((resolve) => {
+      resolveOlder = resolve;
+    });
+    mocks.getContact.mockReset().mockImplementation((contactId: string, cursor?: string) => {
+      if (contactId === "alice@example.com" && cursor === "contact-cursor") {
+        return olderRequest;
+      }
+      if (contactId === "bob@example.com") return Promise.resolve(bobDetail);
+      return Promise.resolve({ ...detail, nextCursor: "contact-cursor" });
+    });
+    const props = {
+      onBack: () => undefined,
+      onCompose: () => undefined,
+      onOpenConversation: () => undefined,
+      onSelect: () => undefined
+    };
+    const view = await renderComponent(<ContactsPage {...props} selectedId="alice@example.com" />);
+    await flushHookEffects();
+
+    const loadMore = Array.from(view.container.querySelectorAll("button")).find((button) =>
+      button.textContent?.includes("Load more exchanges")
+    );
+    await flushHookEffects(() => loadMore?.click());
+    await view.rerender(<ContactsPage {...props} selectedId="bob@example.com" />);
+    await flushHookEffects();
+    expect(view.container.textContent).toContain("Bob exchange");
+
+    await flushHookEffects(() =>
+      resolveOlder({ ...detail, conversations: [older], nextCursor: null })
+    );
+    expect(view.container.textContent).toContain("Bob exchange");
+    expect(view.container.textContent).not.toContain("Alice-only older exchange");
+    await view.unmount();
+  });
 });
