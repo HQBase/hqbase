@@ -144,4 +144,68 @@ describe("useDraftAutosave", () => {
     expect(initial.setSaveState).toHaveBeenLastCalledWith("saved");
     await hook.unmount();
   });
+
+  it("saves a From change immediately with its matching mailbox", async () => {
+    const nextDraft = {
+      ...draft,
+      from: "other@example.com",
+      mailboxId: "mailbox-2",
+      version: 2
+    };
+    mocks.updateDraft.mockResolvedValue(nextDraft);
+    const initial = options({
+      identities: [
+        { mailboxId: "mailbox-1", address: "sender@example.com" },
+        { mailboxId: "mailbox-2", address: "other@example.com" }
+      ]
+    });
+    localStorage.setItem(initial.recoveryKey, "pending recovery");
+    const hook = await renderHook(useDraftAutosave, initial);
+    hook.result.initializeAutosave(draft);
+
+    await hook.result.saveFrom("other@example.com");
+
+    expect(mocks.updateDraft).toHaveBeenCalledWith(
+      draft.id,
+      expect.objectContaining({
+        from: "other@example.com",
+        mailboxId: "mailbox-2",
+        version: 1
+      })
+    );
+    expect(initial.setDraft).toHaveBeenCalledWith(nextDraft);
+    expect(initial.setSaveState).toHaveBeenLastCalledWith("saved");
+    expect(localStorage.getItem(initial.recoveryKey)).toBeNull();
+    await hook.unmount();
+  });
+
+  it("keeps invalid recipients local while saving a signature snapshot", async () => {
+    const nextDraft = {
+      ...draft,
+      signature: { mode: "none" as const, id: null, name: "", html: "", text: "" },
+      version: 2
+    };
+    mocks.updateDraft.mockResolvedValue(nextDraft);
+    const initial = options({ identities: [], to: "unfinished" });
+    localStorage.setItem(initial.recoveryKey, "pending recovery");
+    const hook = await renderHook(useDraftAutosave, initial);
+    hook.result.initializeAutosave(draft);
+
+    await hook.result.saveSignature({ mode: "none" });
+
+    expect(mocks.updateDraft).toHaveBeenCalledWith(
+      draft.id,
+      expect.objectContaining({
+        bcc: draft.bcc,
+        cc: draft.cc,
+        mailboxId: null,
+        signature: { mode: "none" },
+        to: draft.to
+      })
+    );
+    expect(initial.setDraft).toHaveBeenCalledWith(nextDraft);
+    expect(initial.setSaveState).toHaveBeenLastCalledWith("local");
+    expect(localStorage.getItem(initial.recoveryKey)).toBe("pending recovery");
+    await hook.unmount();
+  });
 });
