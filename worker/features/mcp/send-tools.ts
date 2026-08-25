@@ -11,7 +11,7 @@ import { getAccessibleDraft, requireDraftAttachmentIdsAccess } from "../drafts/a
 import { type MailEventScheduler, scheduleSentMailEvents } from "../events/service";
 import { findMailboxForSending } from "../mailboxes/queries";
 import { requireMessageAccess } from "../messages/access";
-import { forwardMessage } from "../send/forward";
+import { forwardMessage, sendForwardDraft } from "../send/forward";
 import { replyToMessage, sendNewMessage } from "../send/service";
 import { forwardMessageSchema, replyMessageSchema, sendMessageSchema } from "../send/validation";
 import { resolveSendSignature } from "../signatures/service";
@@ -65,7 +65,16 @@ export function registerSendTools(
           draft
         );
         await requireDraftAttachmentIdsAccess(env, principal, parsed.attachmentIds);
-        const message = await sendNewMessage(env, parsed, principal.userId, signature);
+        const message = draft?.forwardOfMessageId
+          ? await sendForwardDraft(
+              env,
+              parsed,
+              draft.id,
+              draft.forwardOfMessageId,
+              principal.userId,
+              signature
+            )
+          : await sendNewMessage(env, parsed, principal.userId, signature);
         scheduleSentMailEvents(env, schedule, {
           draftId: parsed.draftId,
           mailboxId,

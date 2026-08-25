@@ -620,6 +620,49 @@ describe("HQBase MCP server", () => {
       forwardText.indexOf("Forwarded message")
     );
 
+    const savedForwardDraft = (await callTool(
+      "create_draft",
+      {
+        mailboxId: "mbx_allowed",
+        forwardOfMessageId: "msg_mcp_allowed",
+        from: "allowed@example.com",
+        subject: "Fwd: MCP allowed",
+        text: "Saved forward authored",
+        to: ["reader@example.net"]
+      },
+      fullToken,
+      "/mcp/full"
+    )) as { id: string };
+    const savedForward = (await callTool(
+      "send_email",
+      {
+        attachmentIds: [],
+        draftId: savedForwardDraft.id,
+        from: "allowed@example.com",
+        subject: "Fwd: MCP allowed",
+        text: "Saved forward authored",
+        to: ["reader@example.net"]
+      },
+      fullToken,
+      "/mcp/full"
+    )) as { id: string };
+    const savedForwardText = await storedText(savedForward.id);
+    expect(savedForwardText.indexOf("Saved forward authored")).toBeLessThan(
+      savedForwardText.indexOf("MCP signature")
+    );
+    expect(savedForwardText.indexOf("MCP signature")).toBeLessThan(
+      savedForwardText.indexOf("Forwarded message")
+    );
+    const savedForwardAttachments = await env.DB.prepare(
+      "SELECT filename FROM message_attachments WHERE message_id = ? ORDER BY filename"
+    )
+      .bind(savedForward.id)
+      .all<{ filename: string }>();
+    expect(savedForwardAttachments.results).toEqual([{ filename: "hello.txt" }]);
+    expect(
+      await env.DB.prepare("SELECT id FROM drafts WHERE id = ?").bind(savedForwardDraft.id).first()
+    ).toBeNull();
+
     const unsigned = (await callTool(
       "send_email",
       {
