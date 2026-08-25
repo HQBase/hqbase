@@ -12,6 +12,7 @@ const desktopQuery = {
 };
 
 beforeEach(() => {
+  desktopQuery.matches = true;
   vi.stubGlobal(
     "matchMedia",
     vi.fn(() => desktopQuery)
@@ -97,6 +98,56 @@ describe("compose surface", () => {
     );
     expect(document.body.querySelector("[data-pending-image-editor] output")?.textContent).toBe(
       "1 images"
+    );
+
+    await view.unmount();
+  });
+
+  it("parks a compact inline composer instead of showing it on another route", async () => {
+    desktopQuery.matches = false;
+    let mounts = 0;
+
+    function Editor(): React.ReactElement {
+      React.useEffect(() => {
+        mounts += 1;
+      }, []);
+      return <input aria-label="Draft body" defaultValue="Unsaved body" />;
+    }
+
+    const inlineTarget = document.createElement("div");
+    const parkingTarget = document.createElement("div");
+    parkingTarget.dataset.composerParking = "";
+    parkingTarget.hidden = true;
+    document.body.appendChild(inlineTarget);
+    document.body.appendChild(parkingTarget);
+    const surface = (target: HTMLElement) => (
+      <ComposeSurface
+        dockIndex={0}
+        dockTarget={null}
+        formId="compose-form"
+        inlineTarget={target}
+        open
+        presentation="thread"
+        sendDisabled={false}
+        status="Draft saved"
+        title="Reply"
+        windowSlot={0}
+        onOpenChange={() => undefined}
+      >
+        <Editor />
+      </ComposeSurface>
+    );
+
+    const view = await renderComponent(surface(inlineTarget));
+    const input = document.body.querySelector<HTMLInputElement>('[aria-label="Draft body"]');
+    if (input) input.value = "Keep this reply";
+    await view.rerender(surface(parkingTarget));
+    await flushHookEffects();
+
+    expect(mounts).toBe(1);
+    expect(parkingTarget.querySelector('[aria-label="Draft body"]')).not.toBeNull();
+    expect(parkingTarget.querySelector<HTMLInputElement>('[aria-label="Draft body"]')?.value).toBe(
+      "Keep this reply"
     );
 
     await view.unmount();

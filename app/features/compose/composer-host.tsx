@@ -58,6 +58,7 @@ export function ComposerHost({
   const [sessions, setSessions] = React.useState<ComposerSession[]>([]);
   const [inlineTargets, setInlineTargets] = React.useState<Record<string, HTMLElement>>({});
   const [dockTarget, setDockTarget] = React.useState<HTMLElement | null>(null);
+  const [parkingTarget, setParkingTarget] = React.useState<HTMLElement | null>(null);
   const sessionsRef = React.useRef(sessions);
   const routeRef = React.useRef(route);
   const navigateRef = React.useRef(navigate);
@@ -254,13 +255,12 @@ export function ComposerHost({
   );
 
   const minimizedSessions = sessions.filter((session) => session.minimized);
-  const windowSessions = sessions.filter(
-    (session) => session.detached || !inlineTargets[session.id]
-  );
+  const windowSessions = sessions.filter((session) => session.detached);
 
   return (
     <ComposerContext.Provider value={controls}>
       {children(controls)}
+      <section aria-hidden className="hidden" data-composer-parking ref={setParkingTarget} />
       <section
         aria-label="Minimized composers"
         className="fixed bottom-0 right-4 z-[100] hidden w-fit max-w-[calc(100vw-2rem)] flex-row-reverse items-end gap-2 overflow-x-auto overscroll-x-contain lg:flex"
@@ -269,8 +269,8 @@ export function ComposerHost({
       />
       {sessions.map((session) => {
         const origin = session.origin;
-        const inlineTarget = session.detached ? null : (inlineTargets[session.id] ?? null);
-        const presentation = inlineTarget ? "thread" : "window";
+        const inlineTarget = session.detached ? null : (inlineTargets[session.id] ?? parkingTarget);
+        const presentation = session.detached ? "window" : "thread";
         return (
           <React.Suspense fallback={null} key={session.id}>
             <ComposeDialog

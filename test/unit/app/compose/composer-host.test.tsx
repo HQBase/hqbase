@@ -221,7 +221,7 @@ describe("composer host", () => {
     await view.unmount();
   });
 
-  it("deduplicates a contextual reply and never unmounts it while its target appears", async () => {
+  it("deduplicates and parks an inline reply without detaching it on navigation", async () => {
     const navigate = vi.fn();
     const view = await renderComponent(host(originRoute, navigate));
     const reply = view.container.querySelectorAll("button")[2] ?? null;
@@ -251,7 +251,13 @@ describe("composer host", () => {
       view.container
         .querySelector("[data-compose-mode='reply']")
         ?.getAttribute("data-compose-presentation")
-    ).toBe("window");
+    ).toBe("thread");
+    expect(
+      view.container
+        .querySelector("[data-compose-mode='reply']")
+        ?.getAttribute("data-compose-inline")
+    ).toBe("true");
+    expect(view.container.querySelector("[data-composer-parking]")?.className).toContain("hidden");
     expect(
       view.container.querySelector<HTMLInputElement>("[aria-label='Composer reply']")?.value
     ).toBe("unsaved editor state");

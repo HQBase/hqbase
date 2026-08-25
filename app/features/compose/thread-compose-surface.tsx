@@ -166,5 +166,8 @@ export function ThreadComposeSurface({
   );
 
   if (typeof document === "undefined") return overlay;
-  return createPortal(overlay, document.body);
+  return createPortal(
+    overlay,
+    inlineTarget?.hasAttribute("data-composer-parking") ? inlineTarget : document.body
+  );
 }
