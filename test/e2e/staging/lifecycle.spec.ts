@@ -320,7 +320,7 @@ test("candidate mail experience contracts work together", async ({ request }) =>
   });
   expect(login.ok(), await login.text()).toBeTruthy();
 
-  const mailboxesResponse = await request.get("/api/v2/mailboxes");
+  const mailboxesResponse = await request.get(stagingMailApiPath("/mailboxes"));
   expect(mailboxesResponse.ok(), await mailboxesResponse.text()).toBeTruthy();
   const mailboxes = (await mailboxesResponse.json()) as Array<{
     address: string;
