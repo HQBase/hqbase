@@ -9,7 +9,13 @@ import { readJson } from "../../lib/json";
 import { emailAddressSchema } from "../../lib/validation";
 import { withConversationLabels } from "../labels/queries";
 
-import { deleteSavedContact, getContactDetail, listContacts, saveContact } from "./queries";
+import {
+  deleteSavedContact,
+  getContactDetail,
+  listContacts,
+  listRecipientSuggestions,
+  saveContact
+} from "./queries";
 
 export const contactRoutes = new Hono<HonoApp>();
 
@@ -35,6 +41,23 @@ contactRoutes.get("/", async (c) => {
     await listContacts(c.env.DB, {
       limit: contactLimit(c.req.query("limit")),
       offset: contactOffset(c.req.query("offset")),
+      scope,
+      search,
+      userId: auth.user.id
+    })
+  );
+});
+
+contactRoutes.get("/suggestions", async (c) => {
+  const auth = await requireAuthContext(c.env, c.req.raw);
+  const search = c.req.query("search")?.trim();
+  if (search && search.length > 200) {
+    throw new AppError("CONTACT_INVALID", "Contact search is too long.", 400);
+  }
+  const scope = await accessibleMessageScope(c.env.DB, auth.user.id, auth.user.role, "read");
+  return c.json(
+    await listRecipientSuggestions(c.env.DB, {
+      limit: contactLimit(c.req.query("limit")),
       scope,
       search,
       userId: auth.user.id

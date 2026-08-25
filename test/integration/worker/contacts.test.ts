@@ -59,8 +59,19 @@ describe("contacts", () => {
         threadId: "thr_contacts_inbound",
         to: ["support@contacts.example"]
       }),
+      thread("thr_contacts_inbound_only", "Inbound only", "2026-08-24T12:01:30.000Z"),
+      message({
+        from: "inbound-only@example.net",
+        id: "msg_contacts_inbound_only",
+        mailboxId: "mbx_contacts_one",
+        receivedAt: "2026-08-24T12:01:30.000Z",
+        subject: "Inbound only",
+        threadId: "thr_contacts_inbound_only",
+        to: ["support@contacts.example"]
+      }),
       thread("thr_contacts_outbound", "Outbound", "2026-08-24T12:02:00.000Z"),
       message({
+        bcc: ["quiet@example.net"],
         cc: ["team@example.net"],
         direction: "outbound",
         from: "support@contacts.example",
@@ -80,11 +91,22 @@ describe("contacts", () => {
         subject: "Private",
         threadId: "thr_contacts_private",
         to: ["private@contacts.example"]
+      }),
+      thread("thr_contacts_self_send", "Workspace recipient", "2026-08-24T12:04:00.000Z"),
+      message({
+        direction: "outbound",
+        from: "support@contacts.example",
+        id: "msg_contacts_self_send",
+        mailboxId: "mbx_contacts_one",
+        receivedAt: "2026-08-24T12:04:00.000Z",
+        subject: "Workspace recipient",
+        threadId: "thr_contacts_self_send",
+        to: ["support@contacts.example", "private@contacts.example"]
       })
     ]);
   });
 
-  it("merges saved contacts, accessible correspondents, and available mailboxes", async () => {
+  it("lists outbound external recipients and keeps mailbox suggestions separate", async () => {
     const response = await sessionFetch("/api/contacts?search=pat&limit=5", firstCookie);
     expect(response.status, await response.clone().text()).toBe(200);
     expect(await response.json()).toEqual([
@@ -98,12 +120,34 @@ describe("contacts", () => {
       }
     ]);
 
-    const mailboxes = (await (
+    for (const recipient of ["team@example.net", "quiet@example.net"]) {
+      const recent = (await (
+        await sessionFetch(`/api/contacts?search=${encodeURIComponent(recipient)}`, firstCookie)
+      ).json()) as Array<{ email: string; source: string }>;
+      expect(recent).toEqual([expect.objectContaining({ email: recipient, source: "recent" })]);
+    }
+
+    const inboundOnly = (await (
+      await sessionFetch("/api/contacts?search=inbound-only", firstCookie)
+    ).json()) as unknown[];
+    expect(inboundOnly).toEqual([]);
+
+    const directoryMailboxes = (await (
       await sessionFetch("/api/contacts?search=support", firstCookie)
     ).json()) as Array<{ email: string; source: string }>;
-    expect(mailboxes).toEqual([
+    expect(directoryMailboxes).toEqual([]);
+
+    const mailboxSuggestions = (await (
+      await sessionFetch("/api/contacts/suggestions?search=support", firstCookie)
+    ).json()) as Array<{ email: string; source: string }>;
+    expect(mailboxSuggestions).toEqual([
       expect.objectContaining({ email: "support@contacts.example", source: "mailbox" })
     ]);
+
+    const inaccessibleMailbox = (await (
+      await sessionFetch("/api/contacts/suggestions?search=private", firstCookie)
+    ).json()) as unknown[];
+    expect(inaccessibleMailbox).toEqual([]);
 
     const hidden = (await (
       await sessionFetch("/api/contacts?search=hidden", firstCookie)
@@ -191,6 +235,18 @@ describe("contacts", () => {
     expect(mismatched.status).toBe(400);
     expect(await mismatched.json()).toMatchObject({ error: { code: "CONTACT_INVALID" } });
 
+    const mailbox = await sessionFetch("/api/contacts/support%40contacts.example", firstCookie, {
+      body: JSON.stringify({
+        email: "support@contacts.example",
+        name: "Support",
+        notes: "Do not save"
+      }),
+      headers: { "content-type": "application/json" },
+      method: "PUT"
+    });
+    expect(mailbox.status).toBe(400);
+    expect(await mailbox.json()).toMatchObject({ error: { code: "CONTACT_INVALID" } });
+
     const missing = await sessionFetch("/api/contacts/missing%40example.net", firstCookie);
     expect(missing.status).toBe(404);
     expect(await missing.json()).toMatchObject({ error: { code: "CONTACT_NOT_FOUND" } });
@@ -238,6 +294,7 @@ function thread(id: string, subject: string, timestamp: string): D1PreparedState
 }
 
 function message(input: {
+  bcc?: string[];
   cc?: string[];
   direction?: "inbound" | "outbound";
   from: string;
@@ -254,7 +311,7 @@ function message(input: {
      (id, thread_id, mailbox_id, direction, folder, from_address, to_json, cc_json, bcc_json,
       subject, snippet, text_body, references_json, received_at, sent_at, has_attachments,
       created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, '[]', ?, ?, '', '[]', ?, ?, 0, ?, ?)`
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '', '[]', ?, ?, 0, ?, ?)`
   ).bind(
     input.id,
     input.threadId,
@@ -264,6 +321,7 @@ function message(input: {
     input.from,
     JSON.stringify(input.to),
     JSON.stringify(input.cc ?? []),
+    JSON.stringify(input.bcc ?? []),
     input.subject,
     input.subject,
     direction === "inbound" ? input.receivedAt : null,

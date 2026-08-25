@@ -96,6 +96,16 @@ describe("global search", () => {
       destinations: [{ id: "labels", path: "/settings/labels" }]
     });
   });
+
+  it("does not return workspace mailboxes as contacts", async () => {
+    const response = await searchRoutes.request(
+      `${origin}/?q=team&limit=5`,
+      { headers: { cookie } },
+      env
+    );
+    expect(response.status, await response.clone().text()).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({ contacts: [] });
+  });
 });
 
 async function createUser(): Promise<{ cookie: string; userId: string }> {

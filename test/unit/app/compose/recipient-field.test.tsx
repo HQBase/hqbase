@@ -7,13 +7,15 @@ import {
 } from "@/features/compose/recipient-field";
 import { flushHookEffects, renderComponent } from "../render-hook";
 
-const mocks = vi.hoisted(() => ({ listContacts: vi.fn() }));
+const mocks = vi.hoisted(() => ({ listRecipientSuggestions: vi.fn() }));
 
-vi.mock("@/features/contacts/api", () => ({ listContacts: mocks.listContacts }));
+vi.mock("@/features/contacts/api", () => ({
+  listRecipientSuggestions: mocks.listRecipientSuggestions
+}));
 
 describe("recipient field", () => {
   beforeEach(() => {
-    mocks.listContacts.mockReset().mockResolvedValue([]);
+    mocks.listRecipientSuggestions.mockReset().mockResolvedValue([]);
   });
 
   it("reads the active recipient and inserts a unique suggestion", () => {
@@ -47,19 +49,19 @@ describe("recipient field", () => {
 
   it("loads and selects a keyboard suggestion", async () => {
     vi.useFakeTimers();
-    mocks.listContacts.mockResolvedValue([
+    mocks.listRecipientSuggestions.mockResolvedValue([
       {
-        email: "alice@example.com",
-        id: "alice@example.com",
+        email: "support@example.com",
+        id: "support@example.com",
         lastContactAt: null,
-        name: "Alice",
-        saved: true,
-        source: "saved"
+        name: "Support",
+        saved: false,
+        source: "mailbox"
       }
     ]);
     const onChange = vi.fn();
     const view = await renderComponent(
-      <RecipientField autoFocus label="To" value="ali" onChange={onChange} />
+      <RecipientField autoFocus label="To" value="sup" onChange={onChange} />
     );
     const input = view.container.querySelector<HTMLInputElement>('[aria-label="To"]');
     await flushHookEffects(() =>
@@ -67,12 +69,14 @@ describe("recipient field", () => {
     );
     await flushHookEffects(() => vi.advanceTimersByTime(150));
 
-    expect(mocks.listContacts).toHaveBeenCalledWith("ali", 5);
-    expect(view.container.querySelector('[role="option"]')?.textContent).toContain("Alice");
+    expect(mocks.listRecipientSuggestions).toHaveBeenCalledWith("sup", 5);
+    expect(view.container.querySelector('[role="option"]')?.textContent).toContain(
+      "Supportsupport@example.comMailbox"
+    );
     await flushHookEffects(() =>
       input?.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, key: "Enter" }))
     );
-    expect(onChange).toHaveBeenCalledWith("alice@example.com, ");
+    expect(onChange).toHaveBeenCalledWith("support@example.com, ");
 
     await view.unmount();
     vi.useRealTimers();

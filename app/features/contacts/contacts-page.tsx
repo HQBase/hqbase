@@ -151,7 +151,7 @@ export function ContactsPage({
                   {search ? "No contacts match this search" : "No contacts yet"}
                 </p>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  Correspondents appear here after an email exchange.
+                  Contacts appear here after you send an email or save a contact.
                 </p>
               </div>
             </div>

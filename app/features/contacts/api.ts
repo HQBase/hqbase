@@ -14,6 +14,14 @@ export function listContacts(
   return apiGet<ContactSummary[]>(`/api/contacts${suffix}`);
 }
 
+export function listRecipientSuggestions(search = "", limit?: number): Promise<ContactSummary[]> {
+  const query = new URLSearchParams();
+  if (search.trim()) query.set("search", search.trim());
+  if (limit !== undefined) query.set("limit", String(limit));
+  const suffix = query.size > 0 ? `?${query.toString()}` : "";
+  return apiGet<ContactSummary[]>(`/api/contacts/suggestions${suffix}`);
+}
+
 export function getContact(id: string, cursor?: string): Promise<ContactDetailResponse> {
   const query = new URLSearchParams();
   if (cursor) query.set("cursor", cursor);

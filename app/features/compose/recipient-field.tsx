@@ -1,6 +1,6 @@
 import * as React from "react";
 import { PiAddressBook, PiClock, PiEnvelopeSimple } from "react-icons/pi";
-import { listContacts } from "@/features/contacts/api";
+import { listRecipientSuggestions } from "@/features/contacts/api";
 import type { ContactSource, ContactSummary } from "@/features/contacts/types";
 import { cn } from "@/lib/cn";
 import { invalidRecipients, splitRecipients } from "./compose-state";
@@ -39,7 +39,7 @@ export function RecipientField({
     }
     const currentRequest = ++requestId.current;
     const timer = window.setTimeout(() => {
-      void listContacts(query, 5)
+      void listRecipientSuggestions(query, 5)
         .then((contacts) => {
           if (currentRequest !== requestId.current) return;
           setSuggestions(contacts);

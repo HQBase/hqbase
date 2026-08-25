@@ -3,7 +3,7 @@ import { sql } from "drizzle-orm";
 import type { MessageScope } from "../../auth/mailbox-access";
 import { messageScopeCondition } from "../../auth/mailbox-access";
 import { nowIso } from "../../db/client";
-import { createDatabase, getRows } from "../../db/drizzle";
+import { createDatabase, getRow, getRows } from "../../db/drizzle";
 import { contacts } from "../../db/schema";
 import { AppError } from "../../lib/errors";
 import { listConversationPage } from "../messages/conversation-queries";
@@ -43,7 +43,20 @@ export async function listContacts(
     userId: string;
   }
 ): Promise<ContactSummary[]> {
-  const rows = await contactRows(db, input);
+  const rows = await contactRows(db, { ...input, includeMailboxSuggestions: false });
+  return rows.map(contactSummary);
+}
+
+export async function listRecipientSuggestions(
+  db: D1Database,
+  input: {
+    limit: number;
+    scope: MessageScope;
+    search?: string | undefined;
+    userId: string;
+  }
+): Promise<ContactSummary[]> {
+  const rows = await contactRows(db, { ...input, includeMailboxSuggestions: true });
   return rows.map(contactSummary);
 }
 
@@ -63,6 +76,7 @@ export async function getContactDetail(
 }> {
   const rows = await contactRows(db, {
     exactEmail: input.email,
+    includeMailboxSuggestions: false,
     limit: 1,
     scope: input.scope,
     userId: input.userId
@@ -92,6 +106,9 @@ export async function saveContact(
     userId: string;
   }
 ): Promise<void> {
+  if (await isWorkspaceMailboxAddress(db, input.email)) {
+    throw new AppError("CONTACT_INVALID", "A workspace mailbox cannot be saved as a contact.", 400);
+  }
   const timestamp = nowIso();
   const database = createDatabase(db);
   await database
@@ -129,6 +146,7 @@ async function contactRows(
   db: D1Database,
   input: {
     exactEmail?: string | undefined;
+    includeMailboxSuggestions: boolean;
     limit: number;
     offset?: number | undefined;
     scope: MessageScope;
@@ -172,14 +190,12 @@ async function contactRows(
   return getRows<ContactRow>(
     db,
     sql`WITH accessible_messages AS (
-          SELECT message.from_address, message.to_json, message.cc_json, message.bcc_json,
+          SELECT message.to_json, message.cc_json, message.bcc_json,
             COALESCE(message.received_at, message.sent_at, message.created_at) AS activity_at
           FROM messages message
-          WHERE ${scope}
+          WHERE ${scope} AND message.direction = 'outbound'
         ),
         correspondent_events(email, activity_at) AS (
-          SELECT lower(trim(from_address)), activity_at FROM accessible_messages
-          UNION ALL
           SELECT lower(trim(CAST(recipient.value AS TEXT))), message.activity_at
           FROM accessible_messages message, json_each(message.to_json) recipient
           UNION ALL
@@ -189,10 +205,19 @@ async function contactRows(
           SELECT lower(trim(CAST(recipient.value AS TEXT))), message.activity_at
           FROM accessible_messages message, json_each(message.bcc_json) recipient
         ),
+        workspace_mailboxes AS (
+          SELECT lower(mailbox.address) AS email
+          FROM mailboxes mailbox
+          WHERE mailbox.deleted_at IS NULL
+        ),
         recent AS (
           SELECT email, MAX(activity_at) AS last_contact_at
           FROM correspondent_events
           WHERE length(email) BETWEEN 3 AND 254 AND instr(email, '@') > 1
+            AND NOT EXISTS (
+              SELECT 1 FROM workspace_mailboxes mailbox
+              WHERE mailbox.email = correspondent_events.email
+            )
           GROUP BY email
         ),
         available_mailboxes AS (
@@ -202,17 +227,17 @@ async function contactRows(
         ),
         known_addresses AS (
           SELECT lower(saved.email) AS email, 1 AS saved, 'saved' AS source,
-            recent.last_contact_at, mailbox.mailbox_name
+            recent.last_contact_at, NULL AS mailbox_name
           FROM contacts saved
           LEFT JOIN recent ON recent.email = saved.email
-          LEFT JOIN available_mailboxes mailbox ON mailbox.email = saved.email
           WHERE saved.user_id = ${input.userId}
+            AND NOT EXISTS (
+              SELECT 1 FROM workspace_mailboxes mailbox
+              WHERE mailbox.email = lower(saved.email)
+            )
           UNION ALL
-          SELECT recent.email, 0,
-            CASE WHEN mailbox.email IS NOT NULL THEN 'mailbox' ELSE 'recent' END,
-            recent.last_contact_at, mailbox.mailbox_name
+          SELECT recent.email, 0, 'recent', recent.last_contact_at, NULL
           FROM recent
-          LEFT JOIN available_mailboxes mailbox ON mailbox.email = recent.email
           WHERE NOT EXISTS (
             SELECT 1 FROM contacts saved
             WHERE saved.user_id = ${input.userId} AND saved.email = recent.email
@@ -220,11 +245,7 @@ async function contactRows(
           UNION ALL
           SELECT mailbox.email, 0, 'mailbox', NULL, mailbox.mailbox_name
           FROM available_mailboxes mailbox
-          WHERE NOT EXISTS (SELECT 1 FROM recent WHERE recent.email = mailbox.email)
-            AND NOT EXISTS (
-              SELECT 1 FROM contacts saved
-              WHERE saved.user_id = ${input.userId} AND saved.email = mailbox.email
-            )
+          WHERE ${input.includeMailboxSuggestions ? 1 : 0} = 1
         ),
         known AS (
           SELECT email, MAX(saved) AS saved,
@@ -245,6 +266,16 @@ async function contactRows(
         ORDER BY ${rank}, known.last_contact_at DESC, known.email ASC
         LIMIT ${input.limit} OFFSET ${input.offset ?? 0}`
   );
+}
+
+async function isWorkspaceMailboxAddress(db: D1Database, email: string): Promise<boolean> {
+  const row = await getRow<{ found: number }>(
+    db,
+    sql`SELECT 1 AS found FROM mailboxes
+        WHERE lower(address) = ${email} AND deleted_at IS NULL
+        LIMIT 1`
+  );
+  return row !== null;
 }
 
 function contactSummary(row: ContactRow): ContactSummary {
