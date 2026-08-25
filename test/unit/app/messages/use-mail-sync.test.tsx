@@ -130,6 +130,20 @@ describe("useMailSync", () => {
     const second = conversation("message-2", "2026-07-30T11:00:00.000Z");
     const newest = conversation("message-0", "2026-07-30T13:00:00.000Z");
     const replacement = conversation("message-new", "2026-07-30T14:00:00.000Z");
+    let resolveReplacement:
+      | ((page: {
+          conversations: ConversationSummary[];
+          nextCursor: string | null;
+          totalCount: number | null;
+        }) => void)
+      | null = null;
+    const replacementRequest = new Promise<{
+      conversations: ConversationSummary[];
+      nextCursor: string | null;
+      totalCount: number | null;
+    }>((resolve) => {
+      resolveReplacement = resolve;
+    });
     mocks.listConversations
       .mockResolvedValueOnce({
         conversations: [first],
@@ -146,11 +160,7 @@ describe("useMailSync", () => {
         nextCursor: "cursor-2",
         totalCount: 3
       })
-      .mockResolvedValueOnce({
-        conversations: [replacement],
-        nextCursor: null,
-        totalCount: 1
-      });
+      .mockReturnValueOnce(replacementRequest);
     mocks.refreshNotifications
       .mockResolvedValueOnce(status("message-1"))
       .mockResolvedValueOnce(status("message-1"))
@@ -184,11 +194,23 @@ describe("useMailSync", () => {
     expect(hook.result.hasMore).toBe(false);
     expect(hook.result.totalCount).toBe(3);
 
-    await flushHookEffects(() => hook.result.hardRefresh());
+    let hardRefresh: Promise<void> | null = null;
+    await flushHookEffects(() => {
+      hardRefresh = hook.result.hardRefresh();
+    });
     expect(mocks.listConversations).toHaveBeenNthCalledWith(
       4,
       expect.not.objectContaining({ cursor: expect.anything() })
     );
+    expect(hook.result.conversations.map((item) => item.id)).toEqual([
+      "message-0",
+      "message-1",
+      "message-2"
+    ]);
+    expect(hook.result.totalCount).toBe(3);
+
+    resolveReplacement?.({ conversations: [replacement], nextCursor: null, totalCount: 1 });
+    await flushHookEffects(() => hardRefresh);
     expect(hook.result.conversations.map((item) => item.id)).toEqual(["message-new"]);
     expect(hook.result.hasMore).toBe(false);
     expect(hook.result.totalCount).toBe(1);

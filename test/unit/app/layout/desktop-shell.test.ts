@@ -13,10 +13,6 @@ const desktopLayout = readFileSync(
   new URL("../../../../app/components/layout/desktop-layout.ts", import.meta.url),
   "utf8"
 );
-const desktopShellHook = readFileSync(
-  new URL("../../../../app/hooks/use-desktop-shell.ts", import.meta.url),
-  "utf8"
-);
 const inboxPage = readFileSync(
   new URL("../../../../app/features/inbox/inbox-page.tsx", import.meta.url),
   "utf8"
@@ -47,7 +43,7 @@ describe("desktop application shell", () => {
   });
 
   it("opens a conversation in the full mail content area", () => {
-    expect(appShell).toContain("desktopShell");
+    expect(appShell.match(/<ShellContent/gu)).toHaveLength(1);
     expect(appShell).toContain("desktop-sidebar");
     expect(appShell).toContain("desktop-content");
     expect(inboxPage).toContain("if (selectedId)");
@@ -59,7 +55,9 @@ describe("desktop application shell", () => {
   it("switches to the compact shell below 1024 pixels without a blocking guard", () => {
     expect(desktopLayout).not.toContain("desktopMinimumWidth");
     expect(desktopLayout).not.toContain("desktopMinimumHeight");
-    expect(desktopShellHook).toContain("(min-width: 1024px)");
+    expect(appShell).not.toContain("useDesktopShell");
+    expect(appShell.match(/<ShellContent/gu)).toHaveLength(1);
+    expect(appShell).toContain('"hidden w-[20rem] shrink-0 lg:block"');
     expect(appShell).not.toContain("Make the HQBase window a little larger");
     expect(styles).not.toContain("desktop-window-guard");
   });

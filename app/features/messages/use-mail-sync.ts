@@ -63,16 +63,17 @@ export function useMailSync({
   currentUserId.current = userId;
   currentSyncKey.current = syncKey;
 
-  const reset = React.useCallback((): void => {
+  const reset = React.useCallback((preserveVisible = false): void => {
     refreshGeneration.current += 1;
     inFlight.current = null;
     loadMoreInFlight.current = null;
     loadedAdditionalPages.current = false;
+    setIsLoadingMore(false);
+    setLoadMoreError(null);
+    if (preserveVisible) return;
     setConversations([]);
     setNextCursor(null);
     setTotalCount(null);
-    setIsLoadingMore(false);
-    setLoadMoreError(null);
   }, []);
 
   const refresh = React.useCallback((): Promise<void> => {
@@ -148,7 +149,7 @@ export function useMailSync({
   }, [activeFolder, labelIds, mailboxId, refreshNotifications, search, syncKey, userId]);
 
   const hardRefresh = React.useCallback((): Promise<void> => {
-    reset();
+    reset(true);
     return refresh();
   }, [refresh, reset]);
 

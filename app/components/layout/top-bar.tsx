@@ -75,7 +75,7 @@ export function TopBar({
       {sidebarCollapsed && onToggleSidebar ? (
         <Button
           aria-label="Show sidebar"
-          className="size-9 shrink-0 text-muted-foreground"
+          className="hidden size-9 shrink-0 text-muted-foreground lg:inline-flex"
           onClick={onToggleSidebar}
           size="icon"
           title="Show sidebar"
