@@ -1,5 +1,5 @@
 import * as React from "react";
-import { PiTag } from "react-icons/pi";
+import { PiDotsThree, PiFunnelSimple } from "react-icons/pi";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -42,12 +42,12 @@ export function LabelFilter({
               ? "Filter by labels"
               : `Filter by labels: ${selectedLabels.map((label) => label.name).join(", ")}`
           }
-          className="h-7 min-h-7 max-w-[min(16rem,50vw)] gap-1 rounded-full bg-muted/70 px-2 text-[11px] shadow-none"
+          className="h-7 min-h-7 max-w-[min(14rem,50vw)] gap-1 rounded-full bg-muted/50 px-2 text-[11px] font-normal text-muted-foreground shadow-none"
           size="sm"
           type="button"
           variant="ghost"
         >
-          <PiTag aria-hidden="true" className="size-3.5 shrink-0" />
+          <PiFunnelSimple aria-hidden="true" className="size-3 shrink-0" />
           {selectedLabels.length > 0 ? (
             <LabelStack compact labels={selectedLabels} />
           ) : (
@@ -55,7 +55,7 @@ export function LabelFilter({
           )}
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-52 p-1 text-xs">
+      <DropdownMenuContent align="start" className="w-52 p-1 text-xs">
         <DropdownMenuLabel className="px-2 py-1 text-[10px] text-muted-foreground">
           Filter by every selected label
         </DropdownMenuLabel>
@@ -126,7 +126,7 @@ export function LabelMenu({
         <Button
           aria-label="Labels"
           className={cn(
-            "relative size-10 min-h-10 min-w-10 text-muted-foreground sm:size-8 sm:min-h-8 sm:min-w-8",
+            "relative size-10 min-h-10 min-w-10 text-muted-foreground sm:size-8 sm:min-h-8 sm:min-w-8 [&_svg]:size-3.5",
             className
           )}
           disabled={disabled || !canOrganizeLabels || labels.length === 0 || pendingId !== null}
@@ -145,7 +145,7 @@ export function LabelMenu({
             event.stopPropagation();
           }}
         >
-          <PiTag aria-hidden="true" className="pointer-events-none" />
+          <PiDotsThree aria-hidden="true" className="pointer-events-none" />
           {assigned.length > 0 ? (
             <span
               aria-hidden="true"
@@ -163,15 +163,18 @@ export function LabelMenu({
       </DropdownMenuTrigger>
       <DropdownMenuContent
         align="end"
-        className="w-56"
+        className="w-52 p-1 text-xs"
         onClick={(event) => event.stopPropagation()}
       >
-        <DropdownMenuLabel className="text-xs text-muted-foreground">Labels</DropdownMenuLabel>
+        <DropdownMenuLabel className="px-2 py-1 text-[10px] text-muted-foreground">
+          Labels
+        </DropdownMenuLabel>
         {labels.map((label) => {
           const checked = assignedIds.has(label.id);
           return (
             <DropdownMenuCheckboxItem
               checked={checked}
+              className="min-h-7 py-1 text-xs"
               disabled={pendingId !== null}
               key={label.id}
               onCheckedChange={(next) => void toggle(label, next === true)}

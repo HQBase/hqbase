@@ -46,7 +46,7 @@ export function MessageListItem({
   return (
     <a
       className={cn(
-        "group grid w-full grid-cols-[2.5rem_minmax(0,1fr)_5rem] items-start gap-x-3 rounded-xl px-3 py-3 text-left text-[14px] leading-5 transition-colors focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring sm:grid-cols-[2rem_minmax(8rem,20%)_minmax(0,1fr)_3.25rem_minmax(8rem,14rem)_5rem] sm:gap-x-2 sm:py-2 sm:text-[13px]",
+        "group grid w-full grid-cols-[2.5rem_minmax(0,1fr)_5rem] items-start gap-x-3 rounded-xl px-3 py-3 text-left text-[14px] leading-5 transition-colors focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring sm:grid-cols-[2rem_minmax(7rem,18%)_minmax(0,1fr)_3rem_minmax(6rem,10rem)_5rem] sm:items-center sm:gap-x-2 sm:py-2 sm:text-[13px]",
         isActive
           ? "bg-selected [@media(hover:hover)]:hover:bg-selected"
           : "[@media(hover:hover)]:hover:bg-hover"
@@ -73,7 +73,7 @@ export function MessageListItem({
       >
         <AvatarFallback className="font-medium uppercase">{avatarInitial}</AvatarFallback>
       </Avatar>
-      <span className="col-start-3 row-start-2 flex shrink-0 self-end justify-self-end sm:col-start-1 sm:row-start-1 sm:self-start sm:justify-self-auto">
+      <span className="col-start-3 row-start-2 flex shrink-0 self-end justify-self-end sm:col-start-1 sm:row-start-1 sm:self-center sm:justify-self-auto">
         <button
           aria-label={conversation.isStarred ? "Unstar conversation" : "Star conversation"}
           aria-pressed={conversation.isStarred}
@@ -177,7 +177,7 @@ export function MessageListItem({
               namedLimit={0}
             />
           ) : null}
-          <LabelStack className="hidden sm:flex" labels={conversation.labels ?? []} />
+          <LabelStack className="hidden sm:flex" compact labels={conversation.labels ?? []} />
           {labels.length > 0 && onToggleLabel ? (
             <LabelMenu
               assigned={conversation.labels ?? []}

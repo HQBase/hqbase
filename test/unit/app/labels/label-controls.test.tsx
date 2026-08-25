@@ -46,6 +46,7 @@ describe("label controls", () => {
     expect(selectedFilter).toContain("Priority");
     expect(selectedFilter).toContain("h-7");
     expect(selectedFilter).toContain("text-[11px]");
+    expect(selectedFilter).toContain("text-muted-foreground");
     expect(badges).toContain("Customer");
     expect(badges).toContain("bg-blue-500/15");
   });
