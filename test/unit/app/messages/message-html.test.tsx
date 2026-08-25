@@ -101,6 +101,10 @@ describe("message HTML view", () => {
     expect(html).toContain('aria-expanded="false"');
     expect(html.match(/data-quoted-content-dot/g)).toHaveLength(3);
     expect(html).toContain("print:hidden");
+    expect(html).toContain("justify-start");
+    expect(html).toContain("h-5 w-8");
+    expect(html).toContain("bg-muted");
+    expect(html).not.toContain("data-orientation");
   });
 
   it("keeps content after a collapsed quote in order and includes the quote when printing", () => {

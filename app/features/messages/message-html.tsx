@@ -3,7 +3,6 @@ import { PiImageBroken } from "react-icons/pi";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
 import { useTheme } from "@/features/theme/theme-provider";
 
 import { getMessageHtml, trustRemoteMediaSender } from "./api";
@@ -264,24 +263,20 @@ export function QuotedContentDivider({
   onToggle: () => void;
 }): React.ReactElement {
   return (
-    <div className="flex items-center gap-2 print:hidden" data-quoted-content-control>
-      <Separator className="flex-1" />
-      <Button
+    <div className="flex justify-start print:hidden" data-quoted-content-control>
+      <button
         aria-expanded={expanded}
         aria-label={expanded ? "Hide quoted message history" : "Show quoted message history"}
-        className="rounded-full"
+        className="inline-flex h-5 w-8 items-center justify-center rounded bg-muted text-muted-foreground transition-colors [@media(hover:hover)]:hover:bg-muted/80 [@media(hover:hover)]:hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         onClick={onToggle}
-        size="icon"
         type="button"
-        variant="outline"
       >
-        <span aria-hidden="true" className="inline-flex items-center gap-1">
+        <span aria-hidden="true" className="inline-flex items-center gap-0.5">
           <span className="size-[3px] rounded-full bg-current" data-quoted-content-dot />
           <span className="size-[3px] rounded-full bg-current" data-quoted-content-dot />
           <span className="size-[3px] rounded-full bg-current" data-quoted-content-dot />
         </span>
-      </Button>
-      <Separator className="flex-1" />
+      </button>
     </div>
   );
 }
