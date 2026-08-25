@@ -334,6 +334,12 @@
                   "description": "Limit results to messages assigned this existing label."
                 },
                 {
+                  "key": "labelIds",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Repeat this parameter to require every listed label on each returned message."
+                },
+                {
                   "key": "search",
                   "value": "",
                   "disabled": true,
@@ -530,6 +536,12 @@
                   "value": "",
                   "disabled": true,
                   "description": "Limit results to conversations where an accessible message has this existing label."
+                },
+                {
+                  "key": "labelIds",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Repeat this parameter to require every listed label on accessible messages in each returned conversation."
                 },
                 {
                   "key": "search",

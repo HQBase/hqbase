@@ -299,11 +299,16 @@ describe("HQBase Mail API message changes", () => {
       await expect(response.json()).resolves.toMatchObject({ error: { code: "INVALID_LIMIT" } });
     }
 
-    const filtered = await apiFetch("/api/v2/changes?folder=inbox", readToken);
-    expect(filtered.status).toBe(400);
-    await expect(filtered.json()).resolves.toMatchObject({
-      error: { code: "INVALID_CHANGE_FILTER" }
-    });
+    for (const path of [
+      "/api/v2/changes?folder=inbox",
+      "/api/v2/changes?labelIds=lbl_one&labelIds=lbl_two"
+    ]) {
+      const filtered = await apiFetch(path, readToken);
+      expect(filtered.status, path).toBe(400);
+      await expect(filtered.json()).resolves.toMatchObject({
+        error: { code: "INVALID_CHANGE_FILTER" }
+      });
+    }
 
     const future = encodeChangeCursor({ after: "9223372036854775807", highWater: null });
     for (const value of ["not-a-cursor", future]) {

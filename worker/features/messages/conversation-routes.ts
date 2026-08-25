@@ -36,7 +36,10 @@ const actionBodySchema = z.object({ folder: folderSchema });
 conversationRoutes.get("/", async (c) => {
   const auth = await requireMailApiPrincipal(c.env, c.req.raw, "mail:read");
   const labelId = c.req.query("labelId");
-  if (labelId) await requireLabel(c.env.DB, labelId);
+  const labelIds = [
+    ...new Set([...(labelId === undefined ? [] : [labelId]), ...(c.req.queries("labelIds") ?? [])])
+  ];
+  await Promise.all(labelIds.map((id) => requireLabel(c.env.DB, id)));
   const scope = await accessibleMessageScope(
     c.env.DB,
     auth.principal.id,
@@ -47,7 +50,7 @@ conversationRoutes.get("/", async (c) => {
   const page = await listConversationPage(c.env.DB, {
     cursor: parseWith(cursorSchema, c.req.query("cursor")),
     folder,
-    labelId,
+    labelIds,
     mailboxId: c.req.query("mailboxId"),
     search: c.req.query("search"),
     scope

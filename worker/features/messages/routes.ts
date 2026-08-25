@@ -49,7 +49,10 @@ const actions: readonly MessageAction[] = [
 messageRoutes.get("/", async (c) => {
   const auth = await requireMailApiPrincipal(c.env, c.req.raw, "mail:read");
   const labelId = c.req.query("labelId");
-  if (labelId) await requireLabel(c.env.DB, labelId);
+  const labelIds = [
+    ...new Set([...(labelId === undefined ? [] : [labelId]), ...(c.req.queries("labelIds") ?? [])])
+  ];
+  await Promise.all(labelIds.map((id) => requireLabel(c.env.DB, id)));
   const scope = await accessibleMessageScope(
     c.env.DB,
     auth.principal.id,
@@ -60,7 +63,7 @@ messageRoutes.get("/", async (c) => {
   const page = await listMessagePage(c.env.DB, {
     cursor: c.req.query("cursor"),
     folder: c.req.query("folder"),
-    labelId,
+    labelIds,
     limit,
     mailboxId: c.req.query("mailboxId"),
     search: c.req.query("search"),
@@ -311,6 +314,9 @@ function nextMessagePageUrl(requestUrl: string, cursor: string): string {
   for (const name of ["mailboxId", "folder", "labelId", "search", "limit"]) {
     const value = url.searchParams.get(name);
     if (value !== null) preserved.set(name, value);
+  }
+  for (const labelId of url.searchParams.getAll("labelIds")) {
+    preserved.append("labelIds", labelId);
   }
   preserved.set("cursor", cursor);
   url.search = preserved.toString();

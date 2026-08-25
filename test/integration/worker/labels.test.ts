@@ -10,6 +10,7 @@ let memberCookie = "";
 let ownerId = "";
 let memberId = "";
 let labelId = "";
+let priorityLabelId = "";
 
 describe("labels", () => {
   beforeAll(async () => {
@@ -89,6 +90,14 @@ describe("labels", () => {
     });
     expect(invalid.status).toBe(400);
     expect(await invalid.json()).toMatchObject({ error: { code: "LABEL_INVALID" } });
+
+    const priority = await sessionFetch("/api/labels", ownerCookie, {
+      body: JSON.stringify({ color: "red", name: "Priority" }),
+      headers: { "content-type": "application/json" },
+      method: "POST"
+    });
+    expect(priority.status, await priority.clone().text()).toBe(201);
+    priorityLabelId = ((await priority.json()) as { id: string }).id;
   });
 
   it("lists labels through both stable Mail API versions", async () => {
@@ -96,7 +105,8 @@ describe("labels", () => {
       const response = await sessionFetch(`/api/${version}/labels`, memberCookie);
       expect(response.status, await response.clone().text()).toBe(200);
       expect(await response.json()).toEqual([
-        expect.objectContaining({ color: "blue", id: labelId, name: "Customer" })
+        expect.objectContaining({ color: "blue", id: labelId, name: "Customer" }),
+        expect.objectContaining({ color: "red", id: priorityLabelId, name: "Priority" })
       ]);
     }
   });
@@ -153,6 +163,83 @@ describe("labels", () => {
     const missing = await sessionFetch("/api/v2/messages?labelId=lbl_missing", memberCookie);
     expect(missing.status).toBe(404);
     expect(await missing.json()).toMatchObject({ error: { code: "LABEL_NOT_FOUND" } });
+
+    const empty = await sessionFetch("/api/v2/messages?labelIds=", memberCookie);
+    expect(empty.status).toBe(404);
+    expect(await empty.json()).toMatchObject({ error: { code: "LABEL_NOT_FOUND" } });
+  });
+
+  it("requires every repeated label and keeps them in message pagination links", async () => {
+    const timestamp = "2026-08-24T14:00:00.000Z";
+    await env.DB.batch([
+      env.DB.prepare(
+        `INSERT INTO threads (id, subject_normalized, last_message_at, created_at, updated_at)
+         VALUES
+          ('thr_labels_split', 'split labels', ?, ?, ?),
+          ('thr_labels_both', 'both labels', ?, ?, ?)`
+      ).bind(timestamp, timestamp, timestamp, timestamp, timestamp, timestamp),
+      labelMessage(
+        "msg_labels_split_customer",
+        "mbx_labels_allowed",
+        "2026-08-24T14:01:00.000Z",
+        "thr_labels_split"
+      ),
+      labelMessage(
+        "msg_labels_split_priority",
+        "mbx_labels_allowed",
+        "2026-08-24T14:02:00.000Z",
+        "thr_labels_split"
+      ),
+      labelMessage(
+        "msg_labels_both_1",
+        "mbx_labels_allowed",
+        "2026-08-24T14:03:00.000Z",
+        "thr_labels_both"
+      ),
+      labelMessage(
+        "msg_labels_both_2",
+        "mbx_labels_allowed",
+        "2026-08-24T14:04:00.000Z",
+        "thr_labels_both"
+      )
+    ]);
+    await env.DB.batch([
+      labelAssignment("msg_labels_split_customer", labelId, timestamp),
+      labelAssignment("msg_labels_split_priority", priorityLabelId, timestamp),
+      labelAssignment("msg_labels_both_1", labelId, timestamp),
+      labelAssignment("msg_labels_both_1", priorityLabelId, timestamp),
+      labelAssignment("msg_labels_both_2", labelId, timestamp),
+      labelAssignment("msg_labels_both_2", priorityLabelId, timestamp)
+    ]);
+
+    const query = `labelIds=${labelId}&labelIds=${priorityLabelId}&labelIds=${labelId}`;
+    const conversations = await sessionFetch(`/api/v2/conversations?${query}`, memberCookie);
+    expect(conversations.status, await conversations.clone().text()).toBe(200);
+    expect(
+      ((await conversations.json()) as { conversations: Array<{ threadId: string }> }).conversations
+        .map((conversation) => conversation.threadId)
+        .sort()
+    ).toEqual(["thr_labels_both", "thr_labels_split"]);
+
+    const messages = await sessionFetch(`/api/v2/messages?${query}&limit=1`, memberCookie);
+    expect(messages.status, await messages.clone().text()).toBe(200);
+    const nextLink = messages.headers.get("link");
+    if (!nextLink) throw new Error("Expected a next page link for repeated label filters.");
+    const nextUrl = new URL(nextLink.match(/^<([^>]+)>/u)?.[1] ?? "");
+    expect(nextUrl.searchParams.getAll("labelIds")).toEqual([labelId, priorityLabelId, labelId]);
+
+    const secondPage = await sessionFetch(`${nextUrl.pathname}${nextUrl.search}`, memberCookie);
+    expect(secondPage.status, await secondPage.clone().text()).toBe(200);
+    await expect(secondPage.json()).resolves.toEqual([
+      expect.objectContaining({ id: "msg_labels_both_1" })
+    ]);
+
+    const missing = await sessionFetch(
+      `/api/v2/conversations?labelIds=${labelId}&labelIds=lbl_missing`,
+      memberCookie
+    );
+    expect(missing.status).toBe(404);
+    expect(await missing.json()).toMatchObject({ error: { code: "LABEL_NOT_FOUND" } });
   });
 
   it("requires Handle mail access for assignment and supports idempotent removal", async () => {
@@ -184,8 +271,10 @@ describe("labels", () => {
     expect(removed.status, await removed.clone().text()).toBe(200);
     expect(await removed.json()).toMatchObject({ affected: 1, assigned: false, labelId });
     expect(
-      await env.DB.prepare("SELECT COUNT(*) AS count FROM message_labels WHERE label_id = ?")
-        .bind(labelId)
+      await env.DB.prepare(
+        "SELECT COUNT(*) AS count FROM message_labels WHERE label_id = ? AND message_id = ?"
+      )
+        .bind(labelId, "msg_labels_allowed")
         .first()
     ).toEqual({ count: 0 });
   });
@@ -272,12 +361,28 @@ function sessionCookie(response: Response): string {
   return match[1];
 }
 
-function labelMessage(id: string, mailboxId: string, timestamp: string): D1PreparedStatement {
+function labelMessage(
+  id: string,
+  mailboxId: string,
+  timestamp: string,
+  threadId = "thr_labels_shared"
+): D1PreparedStatement {
   return env.DB.prepare(
     `INSERT INTO messages
      (id, thread_id, mailbox_id, direction, folder, from_address, to_json, cc_json, bcc_json,
       subject, snippet, text_body, references_json, received_at, has_attachments, created_at, updated_at)
-     VALUES (?, 'thr_labels_shared', ?, 'inbound', 'inbox', 'sender@example.net', '[]', '[]', '[]',
+     VALUES (?, ?, ?, 'inbound', 'inbox', 'sender@example.net', '[]', '[]', '[]',
        'Shared', 'Shared', 'Shared', '[]', ?, 0, ?, ?)`
-  ).bind(id, mailboxId, timestamp, timestamp, timestamp);
+  ).bind(id, threadId, mailboxId, timestamp, timestamp, timestamp);
+}
+
+function labelAssignment(
+  messageId: string,
+  assignedLabelId: string,
+  timestamp: string
+): D1PreparedStatement {
+  return env.DB.prepare(
+    `INSERT INTO message_labels (message_id, label_id, assigned_by_principal_id, created_at)
+     VALUES (?, ?, ?, ?)`
+  ).bind(messageId, assignedLabelId, memberId, timestamp);
 }

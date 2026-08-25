@@ -12,7 +12,7 @@ export const changeRoutes = new Hono<HonoApp>();
 
 changeRoutes.get("/", async (c) => {
   const auth = await requireMailApiPrincipal(c.env, c.req.raw, "mail:read");
-  for (const name of ["mailboxId", "folder", "labelId", "search"]) {
+  for (const name of ["mailboxId", "folder", "labelId", "labelIds", "search"]) {
     if (c.req.query(name) !== undefined) {
       throw new AppError(
         "INVALID_CHANGE_FILTER",

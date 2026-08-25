@@ -501,6 +501,22 @@
           },
           {
             "in": "query",
+            "name": "labelIds",
+            "required": false,
+            "style": "form",
+            "explode": true,
+            "schema": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "maxLength": 100
+              }
+            },
+            "description": "Repeat this parameter to require every listed label on each returned message."
+          },
+          {
+            "in": "query",
             "name": "search",
             "required": false,
             "schema": {
@@ -1485,6 +1501,22 @@
               "maxLength": 100
             },
             "description": "Limit results to conversations where an accessible message has this existing label."
+          },
+          {
+            "in": "query",
+            "name": "labelIds",
+            "required": false,
+            "style": "form",
+            "explode": true,
+            "schema": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "maxLength": 100
+              }
+            },
+            "description": "Repeat this parameter to require every listed label on accessible messages in each returned conversation."
           },
           {
             "in": "query",

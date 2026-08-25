@@ -27,6 +27,15 @@ describe("Mail API public artifacts", () => {
     expect(openApi.paths["/api/v2/messages"].get["x-hqbase-agent-capabilities"]).toEqual([
       "mail:read"
     ]);
+    expect(
+      openApi.paths["/api/v2/conversations"].get.parameters.find(
+        (parameter) => parameter.name === "labelIds"
+      )
+    ).toMatchObject({
+      explode: true,
+      schema: { type: "array", uniqueItems: true },
+      style: "form"
+    });
     expect(openApi.components.securitySchemes.agentBearer).toMatchObject({
       type: "http",
       scheme: "bearer",
@@ -136,6 +145,16 @@ describe("Mail API public artifacts", () => {
     ).toBe(
       "Message folder to list. The `drafts` value remains for v1 compatibility, but current write paths do not store drafts as message rows. Use `/api/v1/drafts` for drafts."
     );
+    expect(
+      v1OpenApi.paths["/api/v1/messages"].get.parameters.find(
+        (parameter) => parameter.name === "labelIds"
+      )?.schema.type
+    ).toBe("array");
+    expect(
+      v1OpenApi.paths["/api/v1/messages"].get.parameters.find(
+        (parameter) => parameter.name === "labelId"
+      )?.schema.type
+    ).toBe("string");
     expect(JSON.stringify(v1OpenApi)).not.toContain("agentBearer");
     expect(JSON.stringify(v1OpenApi)).not.toContain("x-hqbase-agent-capabilities");
     expect(JSON.stringify(v1OpenApi)).not.toContain("r2Key");

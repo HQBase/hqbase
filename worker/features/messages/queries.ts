@@ -31,6 +31,7 @@ export type ListMessageFilters = {
   cursor?: string | undefined;
   folder?: string | undefined;
   labelId?: string | undefined;
+  labelIds?: readonly string[] | undefined;
   limit?: number | undefined;
   mailboxId?: string | undefined;
   search?: string | undefined;
@@ -163,10 +164,11 @@ export async function listMessagePage(
            OR ${literalContains(sql`text_body`, filters.search)})`
     );
   }
-  if (filters.labelId) {
+  const labelIds = filters.labelIds ?? (filters.labelId ? [filters.labelId] : []);
+  for (const labelId of labelIds) {
     where.push(sql`EXISTS (
       SELECT 1 FROM message_labels assignment
-      WHERE assignment.message_id = messages.id AND assignment.label_id = ${filters.labelId}
+      WHERE assignment.message_id = messages.id AND assignment.label_id = ${labelId}
     )`);
   }
 

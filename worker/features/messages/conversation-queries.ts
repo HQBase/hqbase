@@ -28,6 +28,7 @@ export type ListConversationFilters = {
   folder?: ConversationFolder | undefined;
   limit?: number | undefined;
   labelId?: string | undefined;
+  labelIds?: readonly string[] | undefined;
   mailboxId?: string | undefined;
   scope: MessageScope;
   search?: string | undefined;
@@ -97,10 +98,13 @@ export async function listConversationPage(
       )
     )`);
   }
-  if (filters.labelId) {
+  const labelIds = filters.labelIds ?? (filters.labelId ? [filters.labelId] : []);
+  for (const labelId of labelIds) {
     eligibilityWhere.push(sql`EXISTS (
-      SELECT 1 FROM message_labels assignment
-      WHERE assignment.message_id = accessible.id AND assignment.label_id = ${filters.labelId}
+      SELECT 1
+      FROM accessible labeled
+      JOIN message_labels assignment ON assignment.message_id = labeled.id
+      WHERE labeled.thread_id = accessible.thread_id AND assignment.label_id = ${labelId}
     )`);
   }
 
