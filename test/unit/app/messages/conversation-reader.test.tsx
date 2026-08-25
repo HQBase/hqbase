@@ -274,23 +274,24 @@ describe("conversation reader", () => {
     expect(html).toContain("text-[9px]");
     expect(html).toContain('aria-label="Labels"');
     expect(html).toContain("min-h-10");
-    expect(html).toContain("size-7 min-h-7 min-w-7");
+    expect(html).toContain("size-6 min-h-6 min-w-6");
     expect(html).toContain("sm:min-h-5");
-    expect(html).toContain("group/label-pill col-start-3 row-start-2");
-    expect(html).toContain("w-10 min-w-0 max-w-10");
-    expect(html).toContain("self-center justify-self-start rounded-full bg-transparent p-0.5");
-    expect(html).toContain("sm:row-start-1 sm:w-fit sm:max-w-[75%]");
-    expect(html).toContain("sm:justify-self-end");
+    expect(html).toContain("group/label-pill col-start-2 row-start-2");
+    expect(html).toContain("w-fit min-w-0 max-w-[75%]");
+    expect(html).toContain("self-center justify-self-end rounded-full bg-transparent p-0.5");
+    expect(html).toContain("sm:col-start-3 sm:row-start-1");
     expect(html).toContain("sm:w-12 sm:min-w-12");
-    expect(html).toContain("max-w-1 overflow-hidden sm:hidden");
-    expect(html).toContain("shadow-[0_0_10px_4px_hsl(var(--background)/0.55)]");
-    expect(html).toContain("backdrop-blur-md");
+    expect(html).toContain("overflow-hidden sm:hidden");
+    expect(html).toContain("shadow-[0_0_6px_1px_hsl(var(--background)/0.14)]");
+    expect(html).toContain("backdrop-blur-[2px]");
     expect(html).toContain("hover:bg-transparent");
     expect(html).not.toContain("bg-background/60");
     expect(html).not.toContain("group/label-pill absolute");
+    expect(html.match(/>Customer<\/span>/gu)).toHaveLength(2);
     expect(html).toContain('data-label-menu-icon="tag"');
     expect(html.indexOf("Support Team")).toBeLessThan(html.indexOf("Account access"));
     expect(html.indexOf("Account access")).toBeLessThan(html.indexOf("We can help"));
+    expect(html.indexOf("We can help")).toBeLessThan(html.indexOf("Customer"));
   });
 
   it("collapses messages between the first and final message behind a counted divider", () => {
