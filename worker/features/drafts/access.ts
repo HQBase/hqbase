@@ -12,8 +12,9 @@ import type { WorkspaceRole } from "../../lib/validation";
 import { listMailboxesForUser } from "../mailboxes/queries";
 import type { Mailbox } from "../mailboxes/types";
 
+import { draftIdsForAttachmentIds } from "./attachment-lookups";
 import { defaultDraftLimit, listDraftPage } from "./list-queries";
-import { draftIdsForAttachmentIds, getDraft } from "./queries";
+import { getDraft } from "./queries";
 import type { Draft } from "./types";
 
 export type DraftPrincipal =

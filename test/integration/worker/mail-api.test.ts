@@ -1,7 +1,7 @@
 import { env, runDurableObjectAlarm, runInDurableObject, SELF } from "cloudflare:test";
 import { beforeAll, describe, expect, it, vi } from "vitest";
 import { createAuth } from "../../../worker/auth/auth";
-import { draftAttachmentObjects } from "../../../worker/features/drafts/queries";
+import { draftAttachmentObjects } from "../../../worker/features/drafts/attachment-lookups";
 import { mailEventInternalHeaders } from "../../../worker/features/events/durable-object";
 import { applyCurrentMigrations } from "./current-migrations";
 import { tokenRow } from "./mail-api-token-fixture";
