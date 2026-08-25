@@ -274,9 +274,11 @@ describe("conversation reader", () => {
     expect(html).toContain("text-[9px]");
     expect(html).toContain('aria-label="Labels"');
     expect(html).toContain("min-h-10");
-    expect(html).toContain("sm:min-h-7");
-    expect(html).toContain("absolute inset-y-0 right-0");
+    expect(html).toContain("sm:min-h-5");
+    expect(html).toContain("group/label-pill absolute right-0 top-1/2");
+    expect(html).toContain("rounded-full bg-background/60 p-0.5 shadow-sm");
     expect(html).toContain("backdrop-blur-md");
+    expect(html).toContain("hover:bg-transparent");
     expect(html).toContain('data-label-menu-icon="tag"');
     expect(html.indexOf("Support Team")).toBeLessThan(html.indexOf("Account access"));
     expect(html.indexOf("Account access")).toBeLessThan(html.indexOf("We can help"));

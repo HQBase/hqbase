@@ -151,7 +151,7 @@ export function MessageListItem({
           </Badge>
         ) : null}
         {(conversation.labels?.length ?? 0) > 0 || (labels.length > 0 && onToggleLabel) ? (
-          <span className="absolute inset-y-0 right-0 z-10 flex min-w-0 max-w-[75%] items-center justify-end gap-0.5 rounded-md bg-background/60 pl-2 pr-0.5 backdrop-blur-md">
+          <span className="group/label-pill absolute right-0 top-1/2 z-10 flex w-fit min-w-0 max-w-[75%] -translate-y-1/2 items-center justify-end gap-0.5 rounded-full bg-background/60 p-0.5 shadow-sm backdrop-blur-md">
             <LabelStack
               className="sm:hidden"
               compact
@@ -163,7 +163,7 @@ export function MessageListItem({
               <LabelMenu
                 assigned={conversation.labels ?? []}
                 canOrganizeLabels={canOrganizeLabels}
-                className="sm:size-7 sm:min-h-7 sm:min-w-7"
+                className="bg-transparent shadow-none group-hover/label-pill:text-foreground/80 [@media(hover:hover)]:hover:bg-transparent [@media(hover:hover)]:hover:text-foreground/80 sm:size-5 sm:min-h-5 sm:min-w-5"
                 labels={labels}
                 onToggle={onToggleLabel}
                 showTagIcon

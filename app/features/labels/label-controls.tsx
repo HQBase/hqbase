@@ -156,7 +156,7 @@ export function LabelMenu({
               data-label-menu-icon="more"
             />
           )}
-          {assigned.length > 0 ? (
+          {assigned.length > 0 && !showTagIcon ? (
             <span
               aria-hidden="true"
               className="pointer-events-none absolute bottom-1 flex -space-x-0.5"

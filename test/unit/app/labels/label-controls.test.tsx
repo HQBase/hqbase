@@ -79,8 +79,10 @@ describe("label controls", () => {
 
     expect(rowMenu).toContain('data-label-menu-icon="tag"');
     expect(rowMenu).not.toContain('data-label-menu-icon="more"');
+    expect(rowMenu).not.toContain("bottom-1");
     expect(generalMenu).toContain('data-label-menu-icon="more"');
     expect(generalMenu).not.toContain('data-label-menu-icon="tag"');
+    expect(generalMenu).toContain("bottom-1");
   });
 
   it("keeps the compact filter open while selecting every required label", async () => {
