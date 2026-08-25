@@ -9,7 +9,7 @@ vi.mock("@worker/db/drizzle", () => ({
   getRows: vi.fn()
 }));
 
-vi.mock("@worker/features/drafts/queries", () => ({
+vi.mock("@worker/features/drafts/attachment-lookups", () => ({
   draftAttachmentObjects: vi.fn()
 }));
 vi.mock("@worker/features/mailboxes/queries", () => ({
@@ -27,7 +27,7 @@ vi.mock("@worker/features/messages/threading", () => ({
 }));
 
 import { createDatabase, getRows } from "@worker/db/drizzle";
-import { draftAttachmentObjects } from "@worker/features/drafts/queries";
+import { draftAttachmentObjects } from "@worker/features/drafts/attachment-lookups";
 import { findMailboxForSending } from "@worker/features/mailboxes/queries";
 import {
   getMessageDetail,
@@ -494,6 +494,29 @@ describe("send service", () => {
     expect(deleteObject).toHaveBeenCalledWith(["sent/2026-07-10/html-1-1.png"]);
   });
 
+  it("removes an unrecorded HTML body when persistence fails after upload", async () => {
+    send.mockResolvedValue({ messageId: "<cloudflare-html@example.com>" });
+    vi.mocked(touchThread).mockRejectedValue(new Error("D1 unavailable"));
+
+    await expect(
+      sendNewMessage(env, {
+        attachmentIds: [],
+        bcc: [],
+        cc: [],
+        from: mailbox.address,
+        html: "<p>Hello</p>",
+        subject: "HTML cleanup",
+        text: "Hello",
+        to: ["owner@example.com"]
+      })
+    ).rejects.toThrow("D1 unavailable");
+
+    expect(put).toHaveBeenCalledWith("sent/2026-07-10/html-1.html", "<p>Hello</p>", {
+      httpMetadata: { contentType: "text/html; charset=utf-8" }
+    });
+    expect(deleteObject).toHaveBeenCalledWith(["sent/2026-07-10/html-1.html"]);
+  });
+
   it("keeps only allowlisted threading headers on replies", async () => {
     vi.mocked(getMessageDetail).mockResolvedValue({
       ...sentSummary,
@@ -630,8 +653,11 @@ describe("send service", () => {
       expect.objectContaining({
         contentId: "logo@example.com",
         messageId: "message-1",
-        r2Key: "mail/logo.png"
+        r2Key: "sent/2026-07-10/html-1-1"
       })
     );
+    expect(put).toHaveBeenCalledWith("sent/2026-07-10/html-1-1", expect.any(ArrayBuffer), {
+      httpMetadata: { contentType: "image/png" }
+    });
   });
 });
