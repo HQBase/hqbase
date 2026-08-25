@@ -267,16 +267,21 @@ describe("conversation reader", () => {
     );
 
     expect(html).toContain('data-message-avatar="mobile"');
-    expect(html).toContain("grid-cols-[2.5rem_minmax(0,1fr)_5rem]");
+    expect(html).toContain("grid-cols-[2.5rem_minmax(0,1fr)_4rem]");
+    expect(html).not.toContain("grid-cols-[2.5rem_minmax(0,1fr)_5rem]");
     expect(html).toContain("rounded-xl px-3");
-    expect(html).toContain("sm:grid-cols-[2rem_minmax(7rem,18%)_minmax(0,1fr)_auto_4.5rem]");
+    expect(html).toContain("sm:grid-cols-[2rem_minmax(7rem,18%)_minmax(0,1fr)_auto_4rem]");
+    expect(html).not.toContain("sm:grid-cols-[2rem_minmax(7rem,18%)_minmax(0,1fr)_auto_4.5rem]");
     expect(html).toContain("sm:items-center");
     expect(html).not.toContain("row-start-3");
     expect(html).toContain("sm:col-start-4");
     expect(html).toContain("sm:col-start-5");
     expect(html).not.toContain("sm:col-start-6");
     expect(html).not.toContain("sm:row-start-2 sm:mt-1");
-    expect(html).toContain("bg-blue-500/15");
+    const time = html.match(/<time[^>]*>/u)?.[0];
+    expect(time).toContain("whitespace-nowrap");
+    expect(html).toContain("bg-blue-500");
+    expect(html).not.toContain("bg-blue-500/15");
     expect(html).toContain("text-[9px]");
     expect(html).toContain('aria-label="Labels"');
     expect(html).toContain("min-h-10");

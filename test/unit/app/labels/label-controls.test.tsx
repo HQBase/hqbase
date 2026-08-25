@@ -54,7 +54,9 @@ describe("label controls", () => {
     expect(selectedFilter).toContain("text-[11px]");
     expect(selectedFilter).toContain("text-muted-foreground");
     expect(badges).toContain("Customer");
-    expect(badges).toContain("bg-blue-500/15");
+    expect(badges).toContain("bg-blue-500");
+    expect(badges).toContain("text-foreground");
+    expect(badges).not.toContain("bg-blue-500/15");
     expect(compact).toContain(">HR</span>");
     expect(compact).toContain(">Important</span>");
     expect(compact).toContain("min-w-10");
