@@ -9,7 +9,7 @@ import { AppError } from "../../lib/errors";
 import type { MessageAction } from "./actions";
 import { buildMessageActionPatch } from "./actions";
 import { decodeKeysetCursor, encodeKeysetCursor, type KeysetCursor } from "./keyset-cursor";
-import { literalSearchPattern } from "./search";
+import { literalContains } from "./search";
 import type {
   AttachmentRow,
   InsertAttachmentInput,
@@ -154,12 +154,13 @@ export async function listMessagePage(
     where.push(sql`mailbox_id = ${filters.mailboxId}`);
   }
   if (filters.search) {
-    const like = literalSearchPattern(filters.search);
     where.push(
-      sql`(subject LIKE ${like} ESCAPE '\\' OR from_address LIKE ${like} ESCAPE '\\'
-           OR from_name LIKE ${like} ESCAPE '\\'
-           OR to_json LIKE ${like} ESCAPE '\\' OR snippet LIKE ${like} ESCAPE '\\'
-           OR text_body LIKE ${like} ESCAPE '\\')`
+      sql`(${literalContains(sql`subject`, filters.search)}
+           OR ${literalContains(sql`from_address`, filters.search)}
+           OR ${literalContains(sql`from_name`, filters.search)}
+           OR ${literalContains(sql`to_json`, filters.search)}
+           OR ${literalContains(sql`snippet`, filters.search)}
+           OR ${literalContains(sql`text_body`, filters.search)})`
     );
   }
   if (filters.labelId) {

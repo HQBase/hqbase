@@ -10,7 +10,7 @@ import type { MessageEventTarget } from "../events/service";
 
 import type { MessageAction } from "./actions";
 import { decodeKeysetCursor, encodeKeysetCursor, type KeysetCursor } from "./keyset-cursor";
-import { literalSearchPattern } from "./search";
+import { literalContains } from "./search";
 import type {
   ConversationFolder,
   ConversationPage,
@@ -71,14 +71,13 @@ export async function listConversationPage(
     eligibilityWhere.push(sql`accessible.folder = ${filters.folder}`);
   }
   if (filters.search) {
-    const like = literalSearchPattern(filters.search);
     eligibilityWhere.push(
-      sql`(accessible.subject LIKE ${like} ESCAPE '\\'
-           OR accessible.from_address LIKE ${like} ESCAPE '\\'
-           OR accessible.from_name LIKE ${like} ESCAPE '\\'
-           OR accessible.to_json LIKE ${like} ESCAPE '\\'
-           OR accessible.snippet LIKE ${like} ESCAPE '\\'
-           OR accessible.text_body LIKE ${like} ESCAPE '\\')`
+      sql`(${literalContains(sql`accessible.subject`, filters.search)}
+           OR ${literalContains(sql`accessible.from_address`, filters.search)}
+           OR ${literalContains(sql`accessible.from_name`, filters.search)}
+           OR ${literalContains(sql`accessible.to_json`, filters.search)}
+           OR ${literalContains(sql`accessible.snippet`, filters.search)}
+           OR ${literalContains(sql`accessible.text_body`, filters.search)})`
     );
   }
   if (filters.correspondentEmail) {

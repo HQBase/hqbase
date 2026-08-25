@@ -7,6 +7,7 @@ import { applyCurrentMigrations } from "./current-migrations";
 
 const mailboxId = "mbx_search";
 const scope = { includeUnassigned: false, mailboxIds: [mailboxId] };
+const longSearch = "This search phrase stays exact after fifty bytes in remote D1";
 
 describe("message search", () => {
   beforeAll(async () => {
@@ -28,7 +29,9 @@ describe("message search", () => {
       ...searchMessageRows("underscore", "Project a_b", stamp),
       ...searchMessageRows("underscore_noise", "Project axb", stamp),
       ...searchMessageRows("backslash", String.raw`Path C:\mail`, stamp),
-      ...searchMessageRows("backslash_noise", "Path C:/mail", stamp)
+      ...searchMessageRows("backslash_noise", "Path C:/mail", stamp),
+      ...searchMessageRows("long", longSearch, stamp),
+      ...searchMessageRows("long_noise", `${longSearch.slice(0, -2)}xx`, stamp)
     ]);
   });
 
@@ -43,6 +46,17 @@ describe("message search", () => {
     expect(messagePage.messages.map((message) => message.id)).toEqual([expectedId]);
     expect(conversationPage.conversations.map((conversation) => conversation.id)).toEqual([
       expectedId
+    ]);
+  });
+
+  it("keeps searches longer than D1's LIKE pattern limit exact", async () => {
+    expect(new TextEncoder().encode(longSearch).byteLength).toBeGreaterThan(50);
+    const messagePage = await listMessagePage(env.DB, { scope, search: longSearch });
+    const conversationPage = await listConversationPage(env.DB, { scope, search: longSearch });
+
+    expect(messagePage.messages.map((message) => message.id)).toEqual(["msg_search_long"]);
+    expect(conversationPage.conversations.map((conversation) => conversation.id)).toEqual([
+      "msg_search_long"
     ]);
   });
 });

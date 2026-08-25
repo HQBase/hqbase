@@ -7,7 +7,7 @@ import { createDatabase, getRow, getRows } from "../../db/drizzle";
 import { contacts } from "../../db/schema";
 import { AppError } from "../../lib/errors";
 import { listConversationPage } from "../messages/conversation-queries";
-import { literalSearchPattern } from "../messages/search";
+import { literalContains, literalStartsWith } from "../messages/search";
 import type { ConversationSummary } from "../messages/types";
 
 export type ContactSource = "mailbox" | "recent" | "saved";
@@ -169,23 +169,22 @@ async function contactRows(
         )})`
       : sql`0`;
   const search = input.search?.trim();
-  const contains = search ? literalSearchPattern(search) : null;
-  const prefix = search ? literalSearchPattern(search).slice(1) : null;
   const effectiveName = sql`CASE WHEN known.source = 'mailbox' THEN known.mailbox_name
     ELSE COALESCE(contact.name, observed.observed_name) END`;
   const filter = input.exactEmail
     ? sql`WHERE known.email = ${input.exactEmail}`
     : search
-      ? sql`WHERE known.email LIKE ${contains} ESCAPE '\\'
-            OR ${effectiveName} LIKE ${contains} ESCAPE '\\'`
+      ? sql`WHERE ${literalContains(sql`known.email`, search)}
+            OR ${literalContains(effectiveName, search)}`
       : sql``;
   const rank = search
     ? sql`CASE
         WHEN known.saved = 1 AND (
-          known.email LIKE ${prefix} ESCAPE '\\' OR ${effectiveName} LIKE ${prefix} ESCAPE '\\'
+          ${literalStartsWith(sql`known.email`, search)}
+          OR ${literalStartsWith(effectiveName, search)}
         ) THEN 0
-        WHEN known.email LIKE ${prefix} ESCAPE '\\'
-          OR ${effectiveName} LIKE ${prefix} ESCAPE '\\' THEN 1
+        WHEN ${literalStartsWith(sql`known.email`, search)}
+          OR ${literalStartsWith(effectiveName, search)} THEN 1
         WHEN known.saved = 1 THEN 2
         WHEN known.source = 'mailbox' THEN 3
         ELSE 4
