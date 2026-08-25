@@ -5,6 +5,7 @@ export type DraftAttachment = {
   filename: string;
   contentType: string;
   sizeBytes: number;
+  inline: boolean;
 };
 
 export type Draft = {

@@ -206,6 +206,7 @@ DROP INDEX IF EXISTS drafts_user_updated_id_idx;
 DROP INDEX IF EXISTS drafts_principal_updated_id_idx;
 DROP INDEX IF EXISTS drafts_forward_message_idx;
 DROP INDEX IF EXISTS draft_attachments_draft_idx;
+DROP INDEX IF EXISTS draft_attachments_content_id_uidx;
 DROP INDEX IF EXISTS draft_changes_user_sequence_idx;
 DROP INDEX IF EXISTS draft_changes_principal_sequence_idx;
 
@@ -249,12 +250,17 @@ CREATE TABLE draft_attachments (
   filename TEXT NOT NULL,
   content_type TEXT NOT NULL,
   size_bytes INTEGER NOT NULL,
+  content_id TEXT,
   r2_key TEXT NOT NULL UNIQUE,
   created_at TEXT NOT NULL
 );
 
 CREATE INDEX draft_attachments_draft_idx
 ON draft_attachments(draft_id, created_at);
+
+CREATE UNIQUE INDEX draft_attachments_content_id_uidx
+ON draft_attachments(content_id)
+WHERE content_id IS NOT NULL;
 
 CREATE TABLE draft_changes (
   sequence INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -313,9 +319,9 @@ SELECT
 FROM drafts_principal_transition;
 
 INSERT INTO draft_attachments (
-  id, draft_id, filename, content_type, size_bytes, r2_key, created_at
+  id, draft_id, filename, content_type, size_bytes, content_id, r2_key, created_at
 )
-SELECT id, draft_id, filename, content_type, size_bytes, r2_key, created_at
+SELECT id, draft_id, filename, content_type, size_bytes, content_id, r2_key, created_at
 FROM draft_attachments_principal_transition;
 
 INSERT INTO draft_changes (sequence, draft_id, principal_id, kind, changed_at)

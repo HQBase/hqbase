@@ -5,11 +5,18 @@ import { AppError } from "../../lib/errors";
 import { readJson } from "../../lib/json";
 import { parseWith } from "../../lib/validation";
 import { ignoreMailEventFailure, publishUserMailEvent } from "../events/service";
+import { isSafeInlineImage, normalizedContentType } from "../messages/inline-media";
 import { resolveDraftSignature } from "../signatures/service";
 import { getAccessibleDraft, listAccessibleDraftPage, requireDraftAccess } from "./access";
+import { storeDraftAttachment } from "./attachments";
 import { defaultDraftChangeLimit, listDraftChanges, maxDraftChangeLimit } from "./change-queries";
 import { defaultDraftLimit, maxDraftLimit } from "./list-queries";
-import { addDraftAttachment, deleteDraft, removeDraftAttachment, saveDraft } from "./queries";
+import {
+  deleteDraft,
+  findInlineDraftAttachment,
+  removeDraftAttachment,
+  saveDraft
+} from "./queries";
 import { draftSchema } from "./validation";
 
 export const draftRoutes = new Hono<HonoApp>();
@@ -91,12 +98,42 @@ draftRoutes.post("/:id/attachments", async (c) => {
   const body = await c.req.raw.formData();
   const file = body.get("file");
   if (!(file instanceof File)) throw new AppError("FILE_REQUIRED", "Choose a file.", 400);
-  const added = await addDraftAttachment(c.env.DB, auth.principal.id, c.req.param("id"), file);
-  await c.env.MAIL_OBJECTS.put(added.r2Key, file.stream(), {
-    httpMetadata: { contentType: added.attachment.contentType }
-  });
+  const attachment = await storeDraftAttachment(
+    c.env,
+    auth.principal.id,
+    c.req.param("id"),
+    file,
+    body.get("inline") === "true"
+  );
   scheduleDraftEvent(c, auth.principal.id);
-  return c.json(added.attachment, 201);
+  return c.json(attachment, 201);
+});
+draftRoutes.get("/:draftId/attachments/:id/inline", async (c) => {
+  const auth = await requireMailApiPrincipal(c.env, c.req.raw, "mail:send");
+  await getAccessibleDraft(c.env, draftPrincipal(auth), c.req.param("draftId"));
+  const attachment = await findInlineDraftAttachment(
+    c.env.DB,
+    auth.principal.id,
+    c.req.param("draftId"),
+    c.req.param("id")
+  );
+  if (!attachment) throw new AppError("ATTACHMENT_NOT_FOUND", "Attachment not found.", 404);
+  if (!isSafeInlineImage(attachment.content_type)) {
+    throw new AppError("INLINE_MEDIA_UNSUPPORTED", "Attachment cannot be displayed inline.", 415);
+  }
+  const object = await c.env.MAIL_OBJECTS.get(attachment.r2_key);
+  if (!object) {
+    throw new AppError("ATTACHMENT_OBJECT_NOT_FOUND", "Attachment object not found.", 404);
+  }
+  return new Response(object.body, {
+    headers: {
+      "cache-control": "private, no-store",
+      "content-disposition": "inline",
+      "content-security-policy": "sandbox; default-src 'none'",
+      "content-type": normalizedContentType(attachment.content_type),
+      "x-content-type-options": "nosniff"
+    }
+  });
 });
 draftRoutes.delete("/:draftId/attachments/:id", async (c) => {
   const auth = await requireMailApiPrincipal(c.env, c.req.raw, "mail:send");

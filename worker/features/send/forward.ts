@@ -80,17 +80,24 @@ export async function forwardMessage(
     throw error;
   }
 
-  return sendNewMessage(
-    env,
-    {
-      ...outbound,
-      attachmentIds: [...input.attachmentIds, ...copiedAttachmentIds],
-      draftId: draft.id
-    },
-    principalId,
-    signature,
-    context
-  );
+  try {
+    return await sendNewMessage(
+      env,
+      {
+        ...outbound,
+        attachmentIds: [...input.attachmentIds, ...copiedAttachmentIds]
+      },
+      principalId,
+      signature,
+      context
+    );
+  } finally {
+    try {
+      await deleteDraft(env.DB, env.MAIL_OBJECTS, principalId, draft.id);
+    } catch {
+      // The temporary draft must not change a completed delivery result.
+    }
+  }
 }
 
 export async function sendForwardDraft(

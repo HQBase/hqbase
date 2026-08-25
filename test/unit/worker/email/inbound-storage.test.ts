@@ -54,12 +54,8 @@ describe("planInboundStorage", () => {
       content: new Uint8Array([1, 2, 3]).buffer
     };
 
-    expect(
-      hasDownloadableAttachments([{ ...attachment, disposition: "inline" }])
-    ).toBe(false);
-    expect(
-      hasDownloadableAttachments([{ ...attachment, disposition: "attachment" }])
-    ).toBe(true);
+    expect(hasDownloadableAttachments([{ ...attachment, disposition: "inline" }])).toBe(false);
+    expect(hasDownloadableAttachments([{ ...attachment, disposition: "attachment" }])).toBe(true);
     expect(
       hasDownloadableAttachments([{ ...attachment, contentId: null, disposition: null }])
     ).toBe(true);

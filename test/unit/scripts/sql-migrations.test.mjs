@@ -36,7 +36,8 @@ const expectedMigrationNames = [
   "0020_labels.sql",
   "0021_email_signatures.sql",
   "0022_login_email_domain_exact_match.sql",
-  "0023_message_sender_names.sql"
+  "0023_message_sender_names.sql",
+  "0024_draft_inline_images.sql"
 ];
 const expectedAfterDeployMigrationNames = [
   "0001_remove_mailbox_alias_storage.sql",
@@ -370,6 +371,8 @@ describe("SQL migration contract", () => {
     const draftColumns = database.prepare("PRAGMA table_info(drafts)").all();
     expect(draftColumns.map((column) => column.name)).toContain("principal_id");
     expect(draftColumns.map((column) => column.name)).not.toContain("user_id");
+    const draftAttachmentColumns = database.prepare("PRAGMA table_info(draft_attachments)").all();
+    expect(draftAttachmentColumns.map((column) => column.name)).toContain("content_id");
     const messageColumns = database.prepare("PRAGMA table_info(messages)").all();
     expect(messageColumns.map((column) => column.name)).toContain("delivered_to_address");
     expect(messageColumns.map((column) => column.name)).toContain("from_name");
@@ -476,6 +479,12 @@ describe("SQL migration contract", () => {
     expect(
       applyMigration(database, migrationNamed(migrations, "0023_message_sender_names.sql"))
     ).toBe(true);
+    expect(
+      applyMigration(database, migrationNamed(migrations, "0024_draft_inline_images.sql"))
+    ).toBe(true);
+    database
+      .prepare("UPDATE draft_attachments SET content_id = ? WHERE id = 'att_upgrade'")
+      .run("att_upgrade@hqbase.invalid");
     expect(
       database.prepare("SELECT from_name FROM messages WHERE id = 'msg_upgrade'").get()
     ).toEqual({ from_name: null });
@@ -590,13 +599,33 @@ describe("SQL migration contract", () => {
     });
     expect(
       database
-        .prepare("SELECT id, draft_id, r2_key FROM draft_attachments WHERE id = 'att_upgrade'")
+        .prepare(
+          "SELECT id, draft_id, content_id, r2_key FROM draft_attachments WHERE id = 'att_upgrade'"
+        )
         .get()
     ).toEqual({
       id: "att_upgrade",
       draft_id: "drf_upgrade",
+      content_id: "att_upgrade@hqbase.invalid",
       r2_key: "drafts/usr_upgrade/drf_upgrade/att_upgrade"
     });
+    expect(
+      database
+        .prepare("PRAGMA index_list('draft_attachments')")
+        .all()
+        .find((index) => index.name === "draft_attachments_content_id_uidx")
+    ).toMatchObject({ partial: 1, unique: 1 });
+    expect(() =>
+      database
+        .prepare(
+          `INSERT INTO draft_attachments
+           (id, draft_id, filename, content_type, size_bytes, content_id, r2_key, created_at)
+           VALUES ('att_duplicate', 'drf_upgrade', 'duplicate.png', 'image/png', 1, ?,
+                   'drafts/usr_upgrade/drf_upgrade/att_duplicate',
+                   '2026-08-23T12:03:00.000Z')`
+        )
+        .run("att_upgrade@hqbase.invalid")
+    ).toThrow(/UNIQUE constraint failed/);
     expect(
       database
         .prepare(
@@ -686,7 +715,7 @@ describe("SQL migration contract", () => {
       )
     ).toBe(false);
     expect(database.prepare("SELECT count(*) AS count FROM d1_migrations").get()).toEqual({
-      count: 23
+      count: 24
     });
     expect(
       database.prepare("SELECT count(*) AS count FROM d1_migrations_after_deploy").get()

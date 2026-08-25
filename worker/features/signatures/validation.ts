@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+export const MAX_SIGNATURE_HTML_INPUT_LENGTH = 400_000;
+
 export const signatureSelectionSchema = z.discriminatedUnion("mode", [
   z.object({ mode: z.literal("automatic") }),
   z.object({ mode: z.literal("selected"), id: z.string().min(1).max(100) }),
@@ -14,7 +16,7 @@ export const signatureScopeTargetSchema = z.discriminatedUnion("type", [
 
 export const createSignatureSchema = z.object({
   name: z.string().min(1).max(200),
-  html: z.string().max(100_000),
+  html: z.string().max(MAX_SIGNATURE_HTML_INPUT_LENGTH),
   scope: signatureScopeTargetSchema,
   isDefault: z.boolean().default(false)
 });
@@ -22,7 +24,7 @@ export const createSignatureSchema = z.object({
 export const updateSignatureSchema = z
   .object({
     name: z.string().min(1).max(200).optional(),
-    html: z.string().max(100_000).optional(),
+    html: z.string().max(MAX_SIGNATURE_HTML_INPUT_LENGTH).optional(),
     isDefault: z.boolean().optional()
   })
   .refine((input) => Object.keys(input).length > 0, "Provide a signature change.");

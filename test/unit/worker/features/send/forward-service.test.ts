@@ -261,7 +261,8 @@ describe("forward service", () => {
         id: "attachment-copy",
         filename: "original.txt",
         contentType: "text/plain",
-        sizeBytes: 8
+        sizeBytes: 8,
+        inline: false
       },
       r2Key: "drafts/user-1/draft-forward/attachment-copy"
     });
@@ -289,8 +290,7 @@ describe("forward service", () => {
     expect(sendNewMessage).toHaveBeenCalledWith(
       env,
       expect.objectContaining({
-        attachmentIds: ["attachment-copy"],
-        draftId: "draft-forward"
+        attachmentIds: ["attachment-copy"]
       }),
       "user-1",
       undefined,
@@ -298,7 +298,8 @@ describe("forward service", () => {
         text: expect.stringContaining("---------- Forwarded message ---------")
       })
     );
-    expect(deleteDraft).not.toHaveBeenCalled();
+    expect(vi.mocked(sendNewMessage).mock.calls[0]?.[1]).not.toHaveProperty("draftId");
+    expect(deleteDraft).toHaveBeenCalledWith(env.DB, env.MAIL_OBJECTS, "user-1", "draft-forward");
   });
 
   it("adds original attachments when the web UI sends a forward draft", async () => {
@@ -326,7 +327,8 @@ describe("forward service", () => {
         id: "attachment-copy",
         filename: "original.txt",
         contentType: "text/plain",
-        sizeBytes: 8
+        sizeBytes: 8,
+        inline: false
       },
       r2Key: "drafts/user-1/draft-web/attachment-copy"
     });
@@ -392,7 +394,8 @@ describe("forward service", () => {
         id: "attachment-copy",
         filename: "original.txt",
         contentType: "text/plain",
-        sizeBytes: 8
+        sizeBytes: 8,
+        inline: false
       },
       r2Key: "drafts/user-1/draft-web/attachment-copy"
     });

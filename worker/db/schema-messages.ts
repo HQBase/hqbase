@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { check, index, integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import { check, index, integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 
 import { principals } from "./schema-core";
 import { mailboxes } from "./schema-mail";
@@ -164,10 +164,16 @@ export const draftAttachments = sqliteTable(
     filename: text("filename").notNull(),
     contentType: text("content_type").notNull(),
     sizeBytes: integer("size_bytes").notNull(),
+    contentId: text("content_id"),
     r2Key: text("r2_key").notNull().unique(),
     createdAt: text("created_at").notNull()
   },
-  (table) => [index("draft_attachments_draft_idx").on(table.draftId, table.createdAt)]
+  (table) => [
+    index("draft_attachments_draft_idx").on(table.draftId, table.createdAt),
+    uniqueIndex("draft_attachments_content_id_uidx")
+      .on(table.contentId)
+      .where(sql`${table.contentId} IS NOT NULL`)
+  ]
 );
 
 export const draftChanges = sqliteTable(

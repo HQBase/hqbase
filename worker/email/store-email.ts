@@ -114,9 +114,7 @@ export async function storeInboundEmail(
   };
 }
 
-export function hasDownloadableAttachments(
-  attachments: ParsedEmail["attachments"]
-): boolean {
+export function hasDownloadableAttachments(attachments: ParsedEmail["attachments"]): boolean {
   return attachments.some(
     (attachment) =>
       attachment.disposition === "attachment" ||

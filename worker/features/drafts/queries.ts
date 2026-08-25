@@ -33,6 +33,7 @@ export type AttachmentRow = {
   filename: string;
   content_type: string;
   size_bytes: number;
+  content_id: string | null;
   r2_key: string;
 };
 export type PageAttachmentRow = AttachmentRow & { draft_id: string };
@@ -50,13 +51,14 @@ export const mapAttachment = (row: AttachmentRow): DraftAttachment => ({
   id: row.id,
   filename: row.filename,
   contentType: row.content_type,
-  sizeBytes: row.size_bytes
+  sizeBytes: row.size_bytes,
+  inline: row.content_id !== null
 });
 
 async function attachments(db: D1Database, draftId: string) {
   return getRows<AttachmentRow>(
     db,
-    sql`SELECT id, filename, content_type, size_bytes, r2_key
+    sql`SELECT id, filename, content_type, size_bytes, content_id, r2_key
         FROM draft_attachments
         WHERE draft_id = ${draftId}
         ORDER BY created_at`
@@ -109,7 +111,7 @@ export async function attachmentsForDrafts(
   if (draftIds.length === 0) return [];
   return getRows<PageAttachmentRow>(
     db,
-    sql`SELECT draft_id, id, filename, content_type, size_bytes, r2_key
+    sql`SELECT draft_id, id, filename, content_type, size_bytes, content_id, r2_key
         FROM draft_attachments
         WHERE draft_id IN (${sql.join(
           draftIds.map((id) => sql`${id}`),
@@ -216,49 +218,99 @@ export async function deleteDraft(
     .delete(drafts)
     .where(and(eq(drafts.id, id), eq(drafts.principalId, principalId)))
     .run();
-  await Promise.all(rows.map((row) => bucket.delete(row.r2_key)));
+  for (let start = 0; start < rows.length; start += 1_000) {
+    await bucket.delete(rows.slice(start, start + 1_000).map((row) => row.r2_key));
+  }
   return (result.meta.changes ?? 0) > 0;
 }
 export async function addDraftAttachment(
   db: D1Database,
   principalId: string,
   draftId: string,
-  file: File
+  file: File,
+  inline = false
 ): Promise<{ attachment: DraftAttachment; r2Key: string }> {
   if (!(await getDraft(db, principalId, draftId)))
     throw new AppError("DRAFT_NOT_FOUND", "Draft not found.", 404);
-  const total = await getRow<{ size: number }>(
-    db,
-    sql`SELECT COALESCE(SUM(size_bytes), 0) AS size
-        FROM draft_attachments
-        WHERE draft_id = ${draftId}`
-  );
-  if (file.size > 25 * 1024 * 1024 || (total?.size ?? 0) + file.size > 25 * 1024 * 1024)
-    throw new AppError("ATTACHMENTS_TOO_LARGE", "Attachments may total at most 25 MiB.", 413);
   const id = newId("att");
   const r2Key = `drafts/${principalId}/${draftId}/${id}`;
   const now = nowIso();
-  await createDatabase(db)
-    .insert(draftAttachments)
-    .values({
+  const filename = file.name.slice(0, 255);
+  const contentType = file.type || "application/octet-stream";
+  const maxBytes = 25 * 1024 * 1024;
+  const result = await db
+    .prepare(
+      `INSERT INTO draft_attachments
+       (id, draft_id, filename, content_type, size_bytes, content_id, r2_key, created_at)
+       SELECT ?, d.id, ?, ?, ?, ?, ?, ?
+       FROM drafts d
+       WHERE d.id = ?
+         AND d.principal_id = ?
+         AND ? <= ?
+         AND COALESCE(
+           (SELECT SUM(a.size_bytes) FROM draft_attachments a WHERE a.draft_id = d.id),
+           0
+         ) + ? <= ?`
+    )
+    .bind(
       id,
-      draftId,
-      filename: file.name.slice(0, 255),
-      contentType: file.type || "application/octet-stream",
-      sizeBytes: file.size,
+      filename,
+      contentType,
+      file.size,
+      inline ? `${id}@hqbase.invalid` : null,
       r2Key,
-      createdAt: now
-    })
+      now,
+      draftId,
+      principalId,
+      file.size,
+      maxBytes,
+      file.size,
+      maxBytes
+    )
     .run();
+  if ((result.meta.changes ?? 0) === 0) {
+    if (!(await getDraft(db, principalId, draftId))) {
+      throw new AppError("DRAFT_NOT_FOUND", "Draft not found.", 404);
+    }
+    throw new AppError("ATTACHMENTS_TOO_LARGE", "Attachments may total at most 25 MiB.", 413);
+  }
   return {
     attachment: {
       id,
-      filename: file.name.slice(0, 255),
-      contentType: file.type || "application/octet-stream",
-      sizeBytes: file.size
+      filename,
+      contentType,
+      sizeBytes: file.size,
+      inline
     },
     r2Key
   };
+}
+export async function deleteDraftAttachmentRecord(
+  db: D1Database,
+  draftId: string,
+  id: string
+): Promise<void> {
+  await createDatabase(db)
+    .delete(draftAttachments)
+    .where(and(eq(draftAttachments.id, id), eq(draftAttachments.draftId, draftId)))
+    .run();
+}
+export async function findInlineDraftAttachment(
+  db: D1Database,
+  principalId: string,
+  draftId: string,
+  id: string
+): Promise<AttachmentRow | null> {
+  return getRow<AttachmentRow>(
+    db,
+    sql`SELECT a.id, a.filename, a.content_type, a.size_bytes, a.content_id, a.r2_key
+        FROM draft_attachments a
+        JOIN drafts d ON d.id = a.draft_id
+        WHERE a.id = ${id}
+          AND a.draft_id = ${draftId}
+          AND d.principal_id = ${principalId}
+          AND a.content_id IS NOT NULL`
+  );
 }
 export async function removeDraftAttachment(
   db: D1Database,
@@ -287,17 +339,19 @@ export async function draftAttachmentObjects(
 ): Promise<
   Array<{
     id: string;
+    draftId: string;
     filename: string;
     contentType: string;
     sizeBytes: number;
+    contentId: string | null;
     r2Key: string;
     content: ArrayBuffer;
   }>
 > {
   if (ids.length === 0) return [];
-  const rows = await getRows<AttachmentRow>(
+  const rows = await getRows<AttachmentRow & { draft_id: string }>(
     db,
-    sql`SELECT a.id, a.filename, a.content_type, a.size_bytes, a.r2_key
+    sql`SELECT a.id, a.draft_id, a.filename, a.content_type, a.size_bytes, a.content_id, a.r2_key
         FROM draft_attachments a
         JOIN drafts d ON d.id = a.draft_id
         WHERE d.principal_id = ${principalId} AND a.id IN (${sql.join(
@@ -307,6 +361,16 @@ export async function draftAttachmentObjects(
   );
   if (rows.length !== new Set(ids).size)
     throw new AppError("ATTACHMENT_NOT_FOUND", "One or more attachments are unavailable.", 404);
+  if (rows.length > 20) {
+    throw new AppError(
+      "ATTACHMENTS_TOO_MANY",
+      "A message may contain at most 20 attachments and inline images.",
+      400
+    );
+  }
+  if (rows.reduce((total, row) => total + row.size_bytes, 0) > 25 * 1024 * 1024) {
+    throw new AppError("ATTACHMENTS_TOO_LARGE", "Attachments may total at most 25 MiB.", 413);
+  }
   return Promise.all(
     rows.map(async (row) => {
       const object = await bucket.get(row.r2_key);
@@ -314,9 +378,11 @@ export async function draftAttachmentObjects(
         throw new AppError("ATTACHMENT_NOT_FOUND", "An attachment object is unavailable.", 404);
       return {
         id: row.id,
+        draftId: row.draft_id,
         filename: row.filename,
         contentType: row.content_type,
         sizeBytes: row.size_bytes,
+        contentId: row.content_id,
         r2Key: row.r2_key,
         content: await object.arrayBuffer()
       };

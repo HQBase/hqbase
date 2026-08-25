@@ -5,6 +5,7 @@ import { createAuth } from "../../../worker/auth/auth";
 import { applyCurrentMigrations } from "./current-migrations";
 
 const origin = "https://hqbase.test";
+const pngDataUrl = "data:image/png;base64,iVBORw0KGgo=";
 let ownerCookie = "";
 let memberCookie = "";
 let ownerId = "";
@@ -68,7 +69,7 @@ describe("signature routes", () => {
   it("enforces management access and audits outcomes without signature content", async () => {
     const personal = await create(memberCookie, {
       name: "Personal route",
-      html: "<p>Personal route content</p>",
+      html: `<p>Personal route content</p><img src="${pngDataUrl}" alt="Personal route logo" width="64" height="64">`,
       scope: { type: "user", id: memberId },
       isDefault: true
     });
@@ -214,6 +215,25 @@ describe("signature routes", () => {
       before: "Authored",
       includes: "Personal route content"
     });
+    const selectedRow = await env.DB.prepare(
+      "SELECT has_attachments, html_r2_key FROM messages WHERE id = ?"
+    )
+      .bind(selected.id)
+      .first<{ has_attachments: number; html_r2_key: string }>();
+    expect(selectedRow?.has_attachments).toBe(0);
+    const selectedHtml = selectedRow?.html_r2_key
+      ? await env.MAIL_OBJECTS.get(selectedRow.html_r2_key)
+      : null;
+    const selectedHtmlText = await selectedHtml?.text();
+    expect(selectedHtmlText).toContain('src="cid:');
+    expect(selectedHtmlText).not.toContain("data:image");
+    const selectedInline = await env.DB.prepare(
+      "SELECT content_id, r2_key FROM message_attachments WHERE message_id = ?"
+    )
+      .bind(selected.id)
+      .first<{ content_id: string; r2_key: string }>();
+    expect(selectedInline?.content_id).toMatch(/@hqbase\.invalid$/u);
+    expect(await env.MAIL_OBJECTS.get(selectedInline?.r2_key ?? "missing")).not.toBeNull();
 
     const reply = await send("/api/v2/reply", {
       messageId: "msg_signature_routes",

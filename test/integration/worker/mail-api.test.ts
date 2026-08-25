@@ -1,6 +1,7 @@
 import { env, runDurableObjectAlarm, runInDurableObject, SELF } from "cloudflare:test";
 import { beforeAll, describe, expect, it, vi } from "vitest";
 import { createAuth } from "../../../worker/auth/auth";
+import { draftAttachmentObjects } from "../../../worker/features/drafts/queries";
 import { mailEventInternalHeaders } from "../../../worker/features/events/durable-object";
 import { applyCurrentMigrations } from "./current-migrations";
 import { tokenRow } from "./mail-api-token-fixture";
@@ -738,13 +739,206 @@ describe("HQBase Mail API", () => {
     await expect(uploaded.json()).resolves.toMatchObject({
       contentType: "image/png",
       filename: "pixel.png",
-      sizeBytes: 4
+      sizeBytes: 4,
+      inline: false
     });
 
     const stored = await apiFetch(`/api/v2/drafts/${draft.id}`, fullToken);
     await expect(stored.json()).resolves.toMatchObject({
-      attachments: [{ contentType: "image/png", filename: "pixel.png", sizeBytes: 4 }]
+      attachments: [
+        { contentType: "image/png", filename: "pixel.png", inline: false, sizeBytes: 4 }
+      ]
     });
+  });
+
+  it("enforces the draft byte limit across concurrent uploads", async () => {
+    const created = await apiFetch("/api/v2/drafts", fullToken, {
+      body: JSON.stringify({ mailboxId: "mbx_api", from: "support@example.com" }),
+      headers: { "content-type": "application/json" },
+      method: "POST"
+    });
+    expect(created.status, await created.clone().text()).toBe(201);
+    const draft = (await created.json()) as { id: string };
+    const maxBytes = 25 * 1024 * 1024;
+    await env.DB.prepare(
+      `INSERT INTO draft_attachments
+       (id, draft_id, filename, content_type, size_bytes, content_id, r2_key, created_at)
+       VALUES (?, ?, ?, ?, ?, NULL, ?, ?)`
+    )
+      .bind(
+        `seed-${draft.id}`,
+        draft.id,
+        "seed.bin",
+        "application/octet-stream",
+        maxBytes - 1,
+        `drafts/${userId}/${draft.id}/seed`,
+        "2026-08-25T00:00:00.000Z"
+      )
+      .run();
+    const upload = (filename: string) => {
+      const form = new FormData();
+      form.set("file", new File([new Uint8Array([1])], filename));
+      return apiFetch(`/api/v2/drafts/${draft.id}/attachments`, fullToken, {
+        body: form,
+        method: "POST"
+      });
+    };
+
+    const responses = await Promise.all([upload("first.bin"), upload("second.bin")]);
+
+    expect(responses.map((response) => response.status).sort()).toEqual([201, 413]);
+    const totals = await env.DB.prepare(
+      "SELECT COUNT(*) AS count, SUM(size_bytes) AS size FROM draft_attachments WHERE draft_id = ?"
+    )
+      .bind(draft.id)
+      .first<{ count: number; size: number }>();
+    expect(totals).toEqual({ count: 2, size: maxBytes });
+    const removed = await apiFetch(`/api/v2/drafts/${draft.id}`, fullToken, { method: "DELETE" });
+    expect(removed.status).toBe(204);
+  });
+
+  it("uploads, privately streams, and sends safe inline draft images", async () => {
+    const created = await apiFetch("/api/v2/drafts", fullToken, {
+      body: JSON.stringify({ mailboxId: "mbx_api", from: "support@example.com" }),
+      headers: { "content-type": "application/json" },
+      method: "POST"
+    });
+    expect(created.status, await created.clone().text()).toBe(201);
+    const draft = (await created.json()) as { id: string };
+    const bytes = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+    const form = new FormData();
+    form.set("file", new File([bytes], "inline.png", { type: "image/png" }));
+    form.set("inline", "true");
+
+    const uploaded = await apiFetch(`/api/v2/drafts/${draft.id}/attachments`, fullToken, {
+      body: form,
+      method: "POST"
+    });
+    expect(uploaded.status, await uploaded.clone().text()).toBe(201);
+    const attachment = (await uploaded.json()) as {
+      id: string;
+      inline: boolean;
+      contentId?: string;
+    };
+    expect(attachment.inline).toBe(true);
+    expect(attachment).not.toHaveProperty("contentId");
+    const reopened = await apiFetch(`/api/v2/drafts/${draft.id}`, fullToken);
+    await expect(reopened.json()).resolves.toMatchObject({
+      attachments: [{ id: attachment.id, inline: true }]
+    });
+
+    const stored = await env.DB.prepare("SELECT content_id FROM draft_attachments WHERE id = ?")
+      .bind(attachment.id)
+      .first<{ content_id: string }>();
+    expect(stored?.content_id).toBe(`${attachment.id}@hqbase.invalid`);
+    await expect(
+      draftAttachmentObjects(env.DB, env.MAIL_OBJECTS, userId, [attachment.id])
+    ).resolves.toEqual([
+      expect.objectContaining({
+        contentId: `${attachment.id}@hqbase.invalid`,
+        draftId: draft.id,
+        id: attachment.id
+      })
+    ]);
+
+    const inline = await apiFetch(
+      `/api/v2/drafts/${draft.id}/attachments/${attachment.id}/inline`,
+      fullToken
+    );
+    expect(inline.status).toBe(200);
+    expect(inline.headers.get("cache-control")).toBe("no-store");
+    expect(inline.headers.get("content-disposition")).toBe("inline");
+    expect(inline.headers.get("content-security-policy")).toBe("sandbox; default-src 'none'");
+    expect(inline.headers.get("content-type")).toBe("image/png");
+    expect(inline.headers.get("x-content-type-options")).toBe("nosniff");
+    expect(new Uint8Array(await inline.arrayBuffer())).toEqual(bytes);
+
+    const withoutSendAccess = await apiFetch(
+      `/api/v2/drafts/${draft.id}/attachments/${attachment.id}/inline`,
+      readToken
+    );
+    expect(withoutSendAccess.status).toBe(403);
+
+    const unusedForm = new FormData();
+    unusedForm.set("file", new File([bytes], "unused.png", { type: "image/png" }));
+    unusedForm.set("inline", "true");
+    const unusedUpload = await apiFetch(`/api/v2/drafts/${draft.id}/attachments`, fullToken, {
+      body: unusedForm,
+      method: "POST"
+    });
+    expect(unusedUpload.status, await unusedUpload.clone().text()).toBe(201);
+    const unusedAttachment = (await unusedUpload.json()) as { id: string };
+    const objectRows = await env.DB.prepare(
+      "SELECT id, r2_key FROM draft_attachments WHERE id IN (?, ?) ORDER BY id"
+    )
+      .bind(attachment.id, unusedAttachment.id)
+      .all<{ id: string; r2_key: string }>();
+    const objectKeys = new Map(objectRows.results.map((row) => [row.id, row.r2_key]));
+
+    const sentResponse = await apiFetch("/api/v2/send", fullToken, {
+      body: JSON.stringify({
+        attachmentIds: [attachment.id],
+        draftId: draft.id,
+        from: "support@example.com",
+        html: `<p>Hello<img src="/api/v2/drafts/${draft.id}/attachments/${attachment.id}/inline" width="32" height="32"></p>`,
+        subject: "Inline image",
+        text: "Hello",
+        to: ["person@example.net"]
+      }),
+      headers: { "content-type": "application/json" },
+      method: "POST"
+    });
+    expect(sentResponse.status, await sentResponse.clone().text()).toBe(201);
+    const sent = (await sentResponse.json()) as { hasAttachments: boolean; id: string };
+    expect(sent.hasAttachments).toBe(false);
+    const sentRow = await env.DB.prepare(
+      "SELECT has_attachments, html_r2_key FROM messages WHERE id = ?"
+    )
+      .bind(sent.id)
+      .first<{ has_attachments: number; html_r2_key: string }>();
+    expect(sentRow?.has_attachments).toBe(0);
+    const sentHtml = sentRow?.html_r2_key ? await env.MAIL_OBJECTS.get(sentRow.html_r2_key) : null;
+    expect(await sentHtml?.text()).toContain(`src="cid:${attachment.id}@hqbase.invalid"`);
+    const sentInline = await env.DB.prepare(
+      "SELECT content_id, r2_key FROM message_attachments WHERE message_id = ?"
+    )
+      .bind(sent.id)
+      .first<{ content_id: string; r2_key: string }>();
+    expect(sentInline).toMatchObject({
+      content_id: `${attachment.id}@hqbase.invalid`,
+      r2_key: expect.stringMatching(/^sent\//u)
+    });
+    expect(await env.MAIL_OBJECTS.get(sentInline?.r2_key ?? "missing")).not.toBeNull();
+    expect(await env.MAIL_OBJECTS.get(objectKeys.get(attachment.id) ?? "missing")).toBeNull();
+    expect(await env.MAIL_OBJECTS.get(objectKeys.get(unusedAttachment.id) ?? "missing")).toBeNull();
+    expect(await apiFetch(`/api/v2/drafts/${draft.id}`, fullToken)).toMatchObject({ status: 404 });
+  });
+
+  it("rejects spoofed inline images before storing metadata", async () => {
+    const created = await apiFetch("/api/v2/drafts", fullToken, {
+      body: JSON.stringify({ mailboxId: "mbx_api", from: "support@example.com" }),
+      headers: { "content-type": "application/json" },
+      method: "POST"
+    });
+    const draft = (await created.json()) as { id: string };
+    const form = new FormData();
+    form.set("file", new File(["not an image"], "spoofed.png", { type: "image/png" }));
+    form.set("inline", "true");
+
+    const rejected = await apiFetch(`/api/v2/drafts/${draft.id}/attachments`, fullToken, {
+      body: form,
+      method: "POST"
+    });
+    expect(rejected.status, await rejected.clone().text()).toBe(415);
+    await expect(rejected.json()).resolves.toMatchObject({
+      error: { code: "INLINE_MEDIA_UNSUPPORTED" }
+    });
+    const count = await env.DB.prepare(
+      "SELECT COUNT(*) AS count FROM draft_attachments WHERE draft_id = ?"
+    )
+      .bind(draft.id)
+      .first<{ count: number }>();
+    expect(count?.count).toBe(0);
   });
 
   it("forwards an accessible message with its original attachments", async () => {
