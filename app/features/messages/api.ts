@@ -6,6 +6,7 @@ export type MessageListParams = {
   cursor?: string | undefined;
   folder?: string | undefined;
   labelId?: string | undefined;
+  labelIds?: readonly string[] | undefined;
   mailboxId?: string | undefined;
   search?: string | undefined;
 };
@@ -17,6 +18,7 @@ export async function listConversations(
   if (params.cursor) query.set("cursor", params.cursor);
   if (params.mailboxId) query.set("mailboxId", params.mailboxId);
   if (params.labelId) query.set("labelId", params.labelId);
+  for (const labelId of params.labelIds ?? []) query.append("labelIds", labelId);
   if (params.search) query.set("search", params.search);
   return apiGet<ConversationPage>(`/api/v2/conversations?${query.toString()}`);
 }

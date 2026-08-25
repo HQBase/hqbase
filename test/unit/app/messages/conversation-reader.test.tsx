@@ -232,6 +232,13 @@ describe("conversation reader", () => {
   });
 
   it("uses a Gmail-style information stack only below the small breakpoint", () => {
+    const customerLabel = {
+      color: "blue" as const,
+      createdAt: "2026-07-27T14:00:00.000Z",
+      id: "label-customer",
+      name: "Customer",
+      updatedAt: "2026-07-27T14:00:00.000Z"
+    };
     const html = renderToStaticMarkup(
       <MessageListItem
         activeFolder="inbox"
@@ -239,18 +246,27 @@ describe("conversation reader", () => {
           ...conversation,
           direction: "inbound",
           fromAddress: "support@example.com",
-          fromName: "Support Team"
+          fromName: "Support Team",
+          labels: [customerLabel]
         }}
         href="/mail/inbox/msg_1"
         isActive={false}
+        labels={[customerLabel]}
         onSelect={() => undefined}
+        onToggleLabel={() => undefined}
         onToggleStar={() => undefined}
       />
     );
 
     expect(html).toContain('data-message-avatar="mobile"');
     expect(html).toContain("grid-cols-[2.5rem_minmax(0,1fr)_5rem]");
-    expect(html).toContain("sm:flex");
+    expect(html).toContain("rounded-xl px-3");
+    expect(html).toContain("sm:grid-cols-[2rem_minmax(8rem,22%)_minmax(0,1fr)_5rem]");
+    expect(html).toContain("row-start-3");
+    expect(html).toContain("bg-blue-500/15");
+    expect(html).toContain('aria-label="Labels"');
+    expect(html).toContain("min-h-10");
+    expect(html).toContain("sm:min-h-7");
     expect(html.indexOf("Support Team")).toBeLessThan(html.indexOf("Account access"));
     expect(html.indexOf("Account access")).toBeLessThan(html.indexOf("We can help"));
   });

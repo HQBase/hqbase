@@ -10,4 +10,11 @@ describe("button", () => {
     expect(html).toContain("h-9 min-h-9");
     expect(html).not.toContain("h-10 min-h-10");
   });
+
+  it("does not move when it is pressed", () => {
+    const html = renderToStaticMarkup(<Button>Action</Button>);
+
+    expect(html).not.toContain("active:scale");
+    expect(html).not.toContain("will-change-transform");
+  });
 });

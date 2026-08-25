@@ -9,9 +9,11 @@ import type { FolderId } from "@/lib/routes";
 import { listConversations } from "./api";
 import type { ConversationAction, ConversationSummary } from "./types";
 
+const noLabelIds: readonly string[] = [];
+
 type MailSyncOptions = {
   activeFolder: FolderId;
-  labelId?: string;
+  labelIds?: readonly string[];
   mailboxId: string;
   search: string;
   userId: string | null;
@@ -19,7 +21,7 @@ type MailSyncOptions = {
 
 export function useMailSync({
   activeFolder,
-  labelId = "all",
+  labelIds = noLabelIds,
   mailboxId,
   search,
   userId
@@ -46,7 +48,7 @@ export function useMailSync({
   const latestInboundId = React.useRef<string | null>(null);
   const hasInboundSnapshot = React.useRef(false);
   const currentUserId = React.useRef(userId);
-  const syncKey = [userId, activeFolder, mailboxId, labelId, search].join("\u0000");
+  const syncKey = [userId, activeFolder, mailboxId, labelIds.join(","), search].join("\u0000");
   const currentSyncKey = React.useRef(syncKey);
   const paginationSyncKey = React.useRef<string | null>(null);
   const inboundSnapshotUserId = React.useRef(userId);
@@ -92,7 +94,7 @@ export function useMailSync({
           ? Promise.resolve<null>(null)
           : listConversations({
               folder: activeFolder,
-              labelId: labelId === "all" ? undefined : labelId,
+              labelIds: labelIds.length === 0 ? undefined : labelIds,
               mailboxId: mailboxId === "all" ? undefined : mailboxId,
               search: search || undefined
             })
@@ -143,7 +145,7 @@ export function useMailSync({
     };
     void promise.then(clearInFlight, clearInFlight);
     return promise;
-  }, [activeFolder, labelId, mailboxId, refreshNotifications, search, syncKey, userId]);
+  }, [activeFolder, labelIds, mailboxId, refreshNotifications, search, syncKey, userId]);
 
   const hardRefresh = React.useCallback((): Promise<void> => {
     reset();
@@ -222,7 +224,7 @@ export function useMailSync({
         const page = await listConversations({
           cursor,
           folder: activeFolder,
-          labelId: labelId === "all" ? undefined : labelId,
+          labelIds: labelIds.length === 0 ? undefined : labelIds,
           mailboxId: mailboxId === "all" ? undefined : mailboxId,
           search: search || undefined
         });
@@ -254,7 +256,7 @@ export function useMailSync({
     };
     void promise.then(clearInFlight, clearInFlight);
     return promise;
-  }, [activeFolder, labelId, mailboxId, nextCursor, search, syncKey, userId]);
+  }, [activeFolder, labelIds, mailboxId, nextCursor, search, syncKey, userId]);
 
   const applyConversationAction = React.useCallback(
     (threadId: string, action: ConversationAction, affected: number): void => {
@@ -293,8 +295,7 @@ export function useMailSync({
 
   const applyConversationLabels = React.useCallback(
     (threadId: string, labels: MailLabel[]): void => {
-      const remainsInView =
-        labelId === "all" || Boolean(labels?.some((label) => label.id === labelId));
+      const remainsInView = labelIds.every((id) => labels.some((label) => label.id === id));
       if (!remainsInView) {
         setTotalCount((current) => (current === null ? null : Math.max(0, current - 1)));
       }
@@ -305,7 +306,7 @@ export function useMailSync({
         })
       );
     },
-    [labelId]
+    [labelIds]
   );
 
   return {

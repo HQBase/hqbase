@@ -23,7 +23,7 @@ type InboxPageProps = {
   defaultFromMailboxId: string | null;
   hasMore: boolean;
   isLoadingMore: boolean;
-  labelId?: string;
+  labelIds?: readonly string[];
   labels?: MailLabel[];
   loadMoreError: string | null;
   mailboxes: Mailbox[];
@@ -32,7 +32,7 @@ type InboxPageProps = {
   onConversationAction: (threadId: string, action: ConversationAction, affected: number) => void;
   onConversationLabelsChange?: (threadId: string, labels: MailLabel[]) => void;
   onLoadMore: () => void;
-  onLabelChange?: (labelId: string) => void;
+  onLabelChange?: (labelIds: string[]) => void;
   onRefresh: () => Promise<void> | void;
   onMessageRouteChange: (folder: MailFolderId, messageId: string | null) => void;
   onSelect: (messageId: string) => void;
@@ -46,7 +46,7 @@ export function InboxPage({
   defaultFromMailboxId,
   hasMore,
   isLoadingMore,
-  labelId = "all",
+  labelIds = [],
   labels = [],
   loadMoreError,
   mailboxes,
@@ -224,6 +224,7 @@ export function InboxPage({
             labels={labels}
             mailboxes={mailboxes}
             messages={thread}
+            routeMessageId={selectedId}
             selectedId={readerSelectedId}
             showBack
             onAction={handleAction}
@@ -256,12 +257,12 @@ export function InboxPage({
   return (
     <div className="flex h-full flex-col bg-list" data-mobile-view="message-list">
       <div className="flex h-11 shrink-0 items-center border-b border-divider bg-toolbar">
-        <div className="mx-auto flex w-full max-w-[960px] items-center justify-between gap-3 px-4 sm:px-6 lg:px-8">
+        <div className="mx-auto flex w-full max-w-[1200px] items-center justify-between gap-3 px-4 sm:px-6 lg:px-8">
           <span className="text-sm font-medium text-foreground">{activeLabel}</span>
           <div className="flex min-w-0 items-center gap-2">
-            <LabelFilter labels={labels} value={labelId} onChange={onLabelChange} />
+            <LabelFilter labels={labels} values={labelIds} onChange={onLabelChange} />
             {conversationCountLabel ? (
-              <span className="hidden text-[12px] tabular-nums text-tertiary sm:inline">
+              <span className="hidden px-2 text-[12px] tabular-nums text-tertiary sm:inline">
                 {conversationCountLabel}
               </span>
             ) : null}

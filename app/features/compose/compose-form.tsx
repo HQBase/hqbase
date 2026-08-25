@@ -4,6 +4,7 @@ import { PiPaperclip, PiPaperPlaneTilt, PiTrash } from "react-icons/pi";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import type { DraftAttachment } from "@/features/drafts/types";
+import type { MessageDetail } from "@/features/messages/types";
 import { ComposeSignature } from "@/features/signatures/compose-signature";
 import type { SignatureSelection, SignatureSnapshot } from "@/features/signatures/types";
 import { cn } from "@/lib/cn";
@@ -12,6 +13,7 @@ import { ComposeFields, type SendingIdentity } from "./compose-fields";
 import { submitComposeOnShortcut } from "./compose-shortcuts";
 import type { ComposeMode } from "./compose-state";
 import type { RichEmailImage } from "./email-images";
+import { ReplyQuotePreview } from "./reply-quote-preview";
 import { RichEmailEditor } from "./rich-email-editor";
 
 type ComposeFormProps = {
@@ -28,6 +30,7 @@ type ComposeFormProps = {
   mode: ComposeMode;
   presentation: "window" | "thread";
   ready: boolean;
+  replyMessage: MessageDetail | null;
   sendDisabled: boolean;
   signatureDisabled: boolean;
   signature: SignatureSnapshot;
@@ -100,6 +103,7 @@ export function ComposeForm(props: ComposeFormProps): React.ReactElement {
             onManage={props.onManageSignatures}
             onSelectionChange={props.onSetSignature}
           />
+          {props.replyMessage ? <ReplyQuotePreview message={props.replyMessage} /> : null}
           <AttachmentList attachments={props.attachments} onRemove={props.onRemoveAttachment} />
           <footer
             className={cn(

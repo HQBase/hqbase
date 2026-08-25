@@ -21,7 +21,7 @@ export function ContactRow({
 }): React.ReactElement {
   return (
     <button
-      className="flex min-h-16 w-full items-center gap-3 border-b px-4 py-2.5 text-left last:border-b-0 [@media(hover:hover)]:hover:bg-muted/55 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+      className="flex min-h-16 w-full items-center gap-3 rounded-xl px-3 py-3 text-left transition-colors [@media(hover:hover)]:hover:bg-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring sm:py-2"
       type="button"
       onClick={() => onSelect(contact.id)}
     >
@@ -149,7 +149,7 @@ export function ContactDetailView({
   }
 
   return (
-    <div className="flex h-full flex-col bg-reader">
+    <div className="flex h-full flex-col bg-list">
       <header className="flex h-12 shrink-0 items-center gap-2 border-b border-divider bg-toolbar px-3">
         <Button
           aria-label="Back to contacts"
@@ -245,7 +245,7 @@ export function ContactDetailView({
                   No accessible email exchanges with this address.
                 </p>
               ) : (
-                <div className="mt-3 overflow-hidden rounded-xl border bg-background">
+                <div className="mt-3 flex flex-col gap-0.5">
                   {detail.conversations.map((conversation) => (
                     <ExchangeRow
                       conversation={conversation}
@@ -287,7 +287,7 @@ function ExchangeRow({
   const timestamp = conversation.receivedAt ?? conversation.sentAt ?? conversation.createdAt;
   return (
     <button
-      className="grid min-h-16 w-full grid-cols-[minmax(0,1fr)_auto] gap-x-3 border-b px-4 py-3 text-left last:border-b-0 [@media(hover:hover)]:hover:bg-muted/55 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+      className="grid min-h-16 w-full grid-cols-[minmax(0,1fr)_auto] gap-x-3 rounded-xl px-3 py-3 text-left transition-colors [@media(hover:hover)]:hover:bg-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring sm:py-2"
       type="button"
       onClick={() => onOpen(conversation)}
     >

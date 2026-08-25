@@ -97,7 +97,8 @@ export function Sidebar({
                     asChild
                     className={cn(
                       "size-9 text-tertiary [@media(hover:hover)]:hover:bg-muted/70 [@media(hover:hover)]:hover:text-foreground",
-                      isActive && "bg-selected text-foreground"
+                      isActive &&
+                        "bg-selected text-foreground [@media(hover:hover)]:hover:bg-selected"
                     )}
                     key={folder}
                     size="icon"

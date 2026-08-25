@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   composeContextLabel,
   defaultSendingIdentity,
+  draftRecoveryKey,
   findDraftForComposer,
   forwardedMessage,
   hasInvalidRecipients,
@@ -107,6 +108,8 @@ describe("composer state", () => {
 
     expect(findDraftForComposer(drafts, "draft-two", null, null)?.id).toBe("draft-two");
     expect(findDraftForComposer(drafts, "missing", null, null)).toBeNull();
+    expect(findDraftForComposer(drafts, null, null, null)).toBeNull();
+    expect(draftRecoveryKey(drafts[0]?.id ?? "")).not.toBe(draftRecoveryKey(drafts[1]?.id ?? ""));
   });
 
   it("uses the mailbox that received the message as the reply identity", () => {

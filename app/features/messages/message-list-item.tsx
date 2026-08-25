@@ -46,8 +46,10 @@ export function MessageListItem({
   return (
     <a
       className={cn(
-        "group grid w-full grid-cols-[2.5rem_minmax(0,1fr)_5rem] items-start gap-x-3 rounded-none py-3 text-left text-[14px] leading-5 transition-colors [@media(hover:hover)]:hover:bg-hover focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring sm:flex sm:items-center sm:gap-4 sm:rounded-xl sm:px-3 sm:py-2 sm:text-[13px]",
-        isActive && "bg-selected"
+        "group grid w-full grid-cols-[2.5rem_minmax(0,1fr)_5rem] items-start gap-x-3 rounded-xl px-3 py-3 text-left text-[14px] leading-5 transition-colors focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring sm:grid-cols-[2rem_minmax(8rem,22%)_minmax(0,1fr)_5rem] sm:gap-x-3 sm:py-2 sm:text-[13px]",
+        isActive
+          ? "bg-selected [@media(hover:hover)]:hover:bg-selected"
+          : "[@media(hover:hover)]:hover:bg-hover"
       )}
       href={href}
       onClick={(event) => {
@@ -66,20 +68,12 @@ export function MessageListItem({
     >
       <Avatar
         aria-hidden="true"
-        className="row-span-2 size-10 sm:hidden"
+        className="row-span-3 size-10 sm:hidden"
         data-message-avatar="mobile"
       >
         <AvatarFallback className="font-medium uppercase">{avatarInitial}</AvatarFallback>
       </Avatar>
-      <span className="col-start-3 row-start-2 flex shrink-0 self-end justify-self-end sm:col-auto sm:row-auto sm:self-auto sm:justify-self-auto">
-        {labels.length > 0 && onToggleLabel ? (
-          <LabelMenu
-            assigned={conversation.labels ?? []}
-            canOrganizeLabels={canOrganizeLabels}
-            labels={labels}
-            onToggle={onToggleLabel}
-          />
-        ) : null}
+      <span className="col-start-3 row-start-2 flex shrink-0 self-end justify-self-end sm:col-start-1 sm:row-start-1 sm:self-start sm:justify-self-auto">
         <button
           aria-label={conversation.isStarred ? "Unstar conversation" : "Star conversation"}
           aria-pressed={conversation.isStarred}
@@ -103,7 +97,7 @@ export function MessageListItem({
           />
         </button>
       </span>
-      <span className="col-start-2 row-start-1 flex min-w-0 items-center gap-2 sm:w-[30%] sm:max-w-[16rem] sm:shrink-0">
+      <span className="col-start-2 row-start-1 flex min-w-0 items-center gap-2 sm:col-start-2 sm:row-start-1">
         <span
           className={cn(
             "min-w-0 truncate",
@@ -115,7 +109,7 @@ export function MessageListItem({
           {correspondent}
         </span>
       </span>
-      <span className="col-start-2 row-start-2 flex min-w-0 items-end gap-2 overflow-hidden sm:flex-1 sm:items-center">
+      <span className="col-start-2 row-start-2 flex min-w-0 items-end gap-2 overflow-hidden sm:col-start-3 sm:row-start-1 sm:items-center">
         <span className="min-w-0 flex-1">
           <span
             className={cn(
@@ -137,10 +131,9 @@ export function MessageListItem({
             {conversation.snippet || "No preview"}
           </span>
         </span>
-        <LabelBadges labels={conversation.labels ?? []} />
         {conversation.messageCount > 1 ? (
           <span
-            className="shrink-0 rounded-md bg-muted px-1.5 py-0.5 text-[11px] tabular-nums text-tertiary"
+            className="mx-1 shrink-0 rounded-md bg-muted px-1.5 py-0.5 text-[11px] tabular-nums text-tertiary"
             title={`${conversation.messageCount} messages`}
           >
             {conversation.messageCount}
@@ -158,9 +151,23 @@ export function MessageListItem({
           </Badge>
         ) : null}
       </span>
+      {(conversation.labels?.length ?? 0) > 0 || (labels.length > 0 && onToggleLabel) ? (
+        <span className="col-span-2 col-start-2 row-start-3 mt-1 flex min-w-0 items-center gap-1 sm:col-span-2 sm:col-start-3 sm:row-start-2 sm:mt-1">
+          <LabelBadges labels={conversation.labels ?? []} />
+          {labels.length > 0 && onToggleLabel ? (
+            <LabelMenu
+              assigned={conversation.labels ?? []}
+              canOrganizeLabels={canOrganizeLabels}
+              className="sm:size-7 sm:min-h-7 sm:min-w-7"
+              labels={labels}
+              onToggle={onToggleLabel}
+            />
+          ) : null}
+        </span>
+      ) : null}
       <time
         className={cn(
-          "col-start-3 row-start-1 shrink-0 text-right text-[11px] tabular-nums sm:w-[5.75rem] sm:text-[12px]",
+          "col-start-3 row-start-1 shrink-0 text-right text-[11px] tabular-nums sm:col-start-4 sm:row-start-1 sm:w-20 sm:text-[12px]",
           isUnread ? "font-medium text-foreground dark:text-white" : "text-muted-foreground"
         )}
       >

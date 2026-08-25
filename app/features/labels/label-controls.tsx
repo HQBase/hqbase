@@ -9,40 +9,78 @@ import {
   DropdownMenuLabel,
   DropdownMenuTrigger
 } from "@/components/ui/dropdown-menu";
-import { DropdownSelect } from "@/components/ui/dropdown-select";
 import { cn } from "@/lib/cn";
-import { LabelColorDot } from "./label-colors";
+import { LabelColorDot, labelPillColorClass } from "./label-colors";
 import type { MailLabel } from "./types";
 
 export function LabelFilter({
   labels,
-  value,
+  values,
   onChange
 }: {
   labels: MailLabel[];
-  value: string;
-  onChange: (labelId: string) => void;
+  values: readonly string[];
+  onChange: (labelIds: string[]) => void;
 }): React.ReactElement | null {
   if (labels.length === 0) return null;
+  const selectedIds = new Set(values);
+
+  function toggle(labelId: string, selected: boolean): void {
+    const next = new Set(values);
+    if (selected) next.add(labelId);
+    else next.delete(labelId);
+    onChange(labels.filter((label) => next.has(label.id)).map((label) => label.id));
+  }
+
   return (
-    <DropdownSelect
-      ariaLabel="Filter by label"
-      className="w-44 bg-muted/60 px-2.5 text-xs shadow-none"
-      options={[
-        { label: "All labels", value: "all" },
-        ...labels.map((label) => ({
-          label: (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          aria-label={
+            values.length === 0 ? "Filter by labels" : `Filter by labels, ${values.length} selected`
+          }
+          className="h-8 min-h-8 rounded-full bg-muted/70 px-2.5 text-xs shadow-none"
+          size="sm"
+          type="button"
+          variant="ghost"
+        >
+          <PiTag aria-hidden="true" />
+          <span>Labels</span>
+          {values.length > 0 ? (
+            <span className="rounded-full bg-background/80 px-1.5 text-[10px] tabular-nums">
+              {values.length}
+            </span>
+          ) : null}
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-56">
+        <DropdownMenuLabel className="text-xs text-muted-foreground">
+          Filter by every selected label
+        </DropdownMenuLabel>
+        <DropdownMenuCheckboxItem
+          checked={values.length === 0}
+          onCheckedChange={(checked) => {
+            if (checked) onChange([]);
+          }}
+          onSelect={(event) => event.preventDefault()}
+        >
+          All labels
+        </DropdownMenuCheckboxItem>
+        {labels.map((label) => (
+          <DropdownMenuCheckboxItem
+            checked={selectedIds.has(label.id)}
+            key={label.id}
+            onCheckedChange={(checked) => toggle(label.id, checked === true)}
+            onSelect={(event) => event.preventDefault()}
+          >
             <span className="flex min-w-0 items-center gap-2">
               <LabelColorDot color={label.color} />
               <span className="truncate">{label.name}</span>
             </span>
-          ),
-          value: label.id
-        }))
-      ]}
-      value={value}
-      onValueChange={onChange}
-    />
+          </DropdownMenuCheckboxItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 
@@ -135,22 +173,20 @@ export function LabelMenu({
 
 export function LabelBadges({ labels }: { labels: MailLabel[] }): React.ReactElement | null {
   if (labels.length === 0) return null;
-  const visible = labels.slice(0, 2);
   return (
-    <span className="inline-flex min-w-0 shrink items-center gap-1">
-      {visible.map((label) => (
+    <span className="flex min-w-0 flex-wrap items-center gap-1">
+      {labels.map((label) => (
         <span
-          className="inline-flex max-w-24 items-center gap-1 rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground"
+          className={cn(
+            "inline-flex max-w-28 items-center rounded-full px-2 py-0.5 text-[10px] font-medium",
+            labelPillColorClass(label.color)
+          )}
           key={label.id}
           title={label.name}
         >
-          <LabelColorDot className="size-1.5" color={label.color} />
           <span className="truncate">{label.name}</span>
         </span>
       ))}
-      {labels.length > visible.length ? (
-        <span className="text-[10px] text-muted-foreground">+{labels.length - visible.length}</span>
-      ) : null}
     </span>
   );
 }

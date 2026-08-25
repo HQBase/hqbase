@@ -202,6 +202,7 @@ describe("mail shell", () => {
     expect(html).toContain('href="/contacts"');
     expect(html).toContain(">All contacts</span>");
     expect(html).toContain('aria-label="Contacts"');
+    expect(html).toContain("hover:bg-selected");
   });
 
   it("uses the canonical logo on the signed-out surface", () => {

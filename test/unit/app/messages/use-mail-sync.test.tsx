@@ -290,6 +290,13 @@ describe("useMailSync", () => {
           id: "label-customer",
           name: "Customer",
           updatedAt: "2026-07-30T12:00:00.000Z"
+        },
+        {
+          color: "red" as const,
+          createdAt: "2026-07-30T12:00:00.000Z",
+          id: "label-priority",
+          name: "Priority",
+          updatedAt: "2026-07-30T12:00:00.000Z"
         }
       ]
     };
@@ -301,7 +308,7 @@ describe("useMailSync", () => {
     mocks.refreshNotifications.mockResolvedValueOnce(status("message-labeled"));
     const hook = await renderHook(useMailSync, {
       activeFolder: "inbox",
-      labelId: "label-customer",
+      labelIds: ["label-customer", "label-priority"],
       mailboxId: "all",
       search: "",
       userId: "user-1"
@@ -309,11 +316,14 @@ describe("useMailSync", () => {
     await flushHookEffects();
 
     await flushHookEffects(() => {
-      hook.result.applyConversationLabels(labeled.threadId, []);
+      hook.result.applyConversationLabels(labeled.threadId, labeled.labels?.slice(0, 1) ?? []);
     });
 
     expect(hook.result.conversations).toEqual([]);
     expect(hook.result.totalCount).toBe(0);
+    expect(mocks.listConversations).toHaveBeenCalledWith(
+      expect.objectContaining({ labelIds: ["label-customer", "label-priority"] })
+    );
     await hook.unmount();
   });
 });

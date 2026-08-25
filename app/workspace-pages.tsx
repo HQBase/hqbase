@@ -26,7 +26,7 @@ type WorkspacePagesProps = {
   contentMailboxes: Mailbox[];
   deletedMailboxes: Mailbox[];
   draftState: ReturnType<typeof useDrafts>;
-  labelId: string;
+  labelIds: readonly string[];
   labels: MailLabel[];
   mailboxId: string;
   mailboxes: Mailbox[];
@@ -43,7 +43,7 @@ type WorkspacePagesProps = {
   onDefaultFromMailboxChange: (mailboxId: string | null) => void;
   onLabelsChanged: () => Promise<void>;
   onReload: () => Promise<void>;
-  onLabelChange: (labelId: string) => void;
+  onLabelChange: (labelIds: string[]) => void;
 };
 
 export function WorkspacePages({
@@ -51,7 +51,7 @@ export function WorkspacePages({
   contentMailboxes,
   deletedMailboxes,
   draftState,
-  labelId,
+  labelIds,
   labels,
   mailboxId,
   mailboxes,
@@ -154,7 +154,7 @@ export function WorkspacePages({
           defaultFromMailboxId={user.defaultFromMailboxId}
           hasMore={mailSync.hasMore}
           isLoadingMore={mailSync.isLoadingMore}
-          labelId={labelId}
+          labelIds={labelIds}
           labels={labels}
           loadMoreError={mailSync.loadMoreError}
           mailboxes={contentMailboxes}

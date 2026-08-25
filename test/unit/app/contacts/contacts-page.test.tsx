@@ -1,5 +1,8 @@
 // @vitest-environment happy-dom
+
+import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { ContactRow } from "@/features/contacts/contact-views";
 import { ContactsPage } from "@/features/contacts/contacts-page";
 import { flushHookEffects, renderComponent } from "../render-hook";
 
@@ -56,6 +59,18 @@ describe("contacts page", () => {
     mocks.saveContact.mockReset().mockResolvedValue(detail);
   });
 
+  it("uses the inbox row surface and hover tokens", () => {
+    const html = renderToStaticMarkup(
+      <ContactRow contact={detail.contact} onSelect={() => undefined} />
+    );
+
+    expect(html).toContain("rounded-xl");
+    expect(html).toContain("hover:bg-hover");
+    expect(html).toContain("py-3");
+    expect(html).toContain("sm:py-2");
+    expect(html).not.toContain("border-b");
+  });
+
   it("shows private notes, exact exchanges, and the normal compose action", async () => {
     const onCompose = vi.fn();
     const onOpenConversation = vi.fn();
@@ -86,6 +101,9 @@ describe("contacts page", () => {
     const exchange = Array.from(view.container.querySelectorAll("button")).find((button) =>
       button.textContent?.includes("Project timing")
     );
+    expect(exchange?.className).toContain("hover:bg-hover");
+    expect(exchange?.className).toContain("sm:py-2");
+    expect(view.container.firstElementChild?.className).toContain("bg-list");
     await flushHookEffects(() => exchange?.click());
     expect(onOpenConversation).toHaveBeenCalledWith(
       expect.objectContaining({ folder: "inbox", id: "message-1" })

@@ -18,6 +18,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
 import { EMAIL_IMAGE_ACCEPT, isSafeRasterImage, type RichEmailImage } from "./email-images";
+import { Tool } from "./rich-email-editor-tool";
 
 export function RichEmailEditor({
   allowDataImages = false,
@@ -390,33 +391,4 @@ function resizeSelectedImage(editor: Editor, scale: number): void {
 function positiveNumber(value: unknown): number | null {
   const number = Number(value);
   return Number.isFinite(number) && number > 0 ? number : null;
-}
-
-function Tool({
-  active = false,
-  children,
-  disabled = false,
-  label,
-  onClick
-}: {
-  active?: boolean;
-  children: React.ReactNode;
-  disabled?: boolean;
-  label: string;
-  onClick: () => void;
-}) {
-  return (
-    <Button
-      aria-label={label}
-      aria-pressed={active}
-      className="size-10 min-h-10 min-w-10"
-      disabled={disabled}
-      size="icon"
-      type="button"
-      variant={active ? "secondary" : "ghost"}
-      onClick={onClick}
-    >
-      {children}
-    </Button>
-  );
 }

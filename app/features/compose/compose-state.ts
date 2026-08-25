@@ -11,16 +11,26 @@ export type DraftSaveState = "saved" | "saving" | "local" | "error";
 
 export type ComposeDialogProps = {
   defaultFromMailboxId?: string | null;
+  dockIndex?: number;
+  dockTarget?: HTMLElement | null;
   draftId?: Draft["id"] | null;
   initialTo?: string;
+  inlineTarget?: HTMLElement | null;
   mailboxes: Mailbox[];
   message?: MessageDetail | null;
+  minimized?: boolean;
   mode?: ComposeMode;
   open: boolean;
   presentation?: "window" | "thread";
   threadContext?: React.ReactNode;
+  windowSlot?: number;
+  onDetach?: (() => void) | undefined;
+  onDraftReady?: ((draftId: string) => void) | undefined;
   onDraftsChange?: () => void;
+  onManageSignatures?: (() => void) | undefined;
+  onMinimizedChange?: ((minimized: boolean) => void) | undefined;
   onOpenChange: (open: boolean) => void;
+  onReturnToThread?: (() => void) | undefined;
   onSent: () => void;
 };
 
@@ -30,15 +40,27 @@ export function findDraftForComposer(
   replyToMessageId: string | null,
   forwardOfMessageId: string | null
 ): Draft | null {
+  if (draftId) return drafts.find((draft) => draft.id === draftId) ?? null;
+  if (!replyToMessageId && !forwardOfMessageId) return null;
   return (
-    (draftId
-      ? drafts.find((draft) => draft.id === draftId)
-      : drafts.find(
-          (draft) =>
-            draft.replyToMessageId === replyToMessageId &&
-            draft.forwardOfMessageId === forwardOfMessageId
-        )) ?? null
+    drafts.find(
+      (draft) =>
+        draft.replyToMessageId === replyToMessageId &&
+        draft.forwardOfMessageId === forwardOfMessageId
+    ) ?? null
   );
+}
+
+export function draftRecoveryKey(draftId: string): string {
+  return `hqbase:compose:draft:${draftId}`;
+}
+
+export function legacyDraftRecoveryKey(
+  mode: ComposeMode,
+  draftId: string | null,
+  messageId: string | null
+): string {
+  return `hqbase:compose:${mode}:${draftId ?? messageId ?? "new"}`;
 }
 
 export const splitRecipients = (value: string) =>
@@ -117,7 +139,7 @@ export function normalizeDraftHtml(text: string, html: string): string {
   return text.trim() ? html : "";
 }
 
-type Recovery = {
+export type DraftRecovery = {
   from: string;
   to: string;
   cc: string;
@@ -127,14 +149,53 @@ type Recovery = {
   html: string;
   savedAt: number;
 };
-export function readDraftRecovery(key: string, serverUpdatedAt: string): Recovery | null {
+
+export function readStoredDraftRecovery(key: string): DraftRecovery | null {
   try {
-    const value = JSON.parse(localStorage.getItem(key) ?? "null") as Partial<Recovery> | null;
-    return value && typeof value.savedAt === "number" && value.savedAt > Date.parse(serverUpdatedAt)
-      ? (value as Recovery)
-      : null;
+    const value = JSON.parse(localStorage.getItem(key) ?? "null") as Partial<DraftRecovery> | null;
+    if (!value || typeof value.savedAt !== "number") return null;
+    const fields = [
+      value.from,
+      value.to,
+      value.cc,
+      value.bcc,
+      value.subject,
+      value.text,
+      value.html
+    ];
+    return fields.every((field) => typeof field === "string") ? (value as DraftRecovery) : null;
   } catch {
     return null;
+  }
+}
+
+export function readDraftRecovery(key: string, serverUpdatedAt: string): DraftRecovery | null {
+  const recovery = readStoredDraftRecovery(key);
+  return recovery && recovery.savedAt > Date.parse(serverUpdatedAt) ? recovery : null;
+}
+
+export function readNewestDraftRecovery(
+  keys: readonly string[],
+  serverUpdatedAt: string
+): DraftRecovery | null {
+  return keys.reduce<DraftRecovery | null>((newest, key) => {
+    const recovery = readDraftRecovery(key, serverUpdatedAt);
+    return recovery && (!newest || recovery.savedAt > newest.savedAt) ? recovery : newest;
+  }, null);
+}
+
+export function migrateDraftRecovery(
+  exactKey: string,
+  legacyKey: string,
+  recovery: DraftRecovery | null
+): void {
+  if (!recovery || exactKey === legacyKey) return;
+  try {
+    localStorage.setItem(exactKey, JSON.stringify(recovery));
+    const migrated = readStoredDraftRecovery(exactKey);
+    if (migrated?.savedAt === recovery.savedAt) localStorage.removeItem(legacyKey);
+  } catch {
+    // Keep the legacy payload when exact-key persistence is unavailable.
   }
 }
 

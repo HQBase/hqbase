@@ -12,6 +12,7 @@ import {
   TemporaryPasswordSetupPage
 } from "@/features/auth/password-setup-page";
 import type { CurrentUser } from "@/features/auth/types";
+import { ComposerHost } from "@/features/compose/composer-host";
 import { useDrafts } from "@/features/drafts/use-drafts";
 import { useMailEvents } from "@/features/events/use-mail-events";
 import { listLabels } from "@/features/labels/api";
@@ -35,9 +36,6 @@ import {
 import { useAppRoute } from "@/lib/use-app-route";
 import { WorkspacePages } from "@/workspace-pages";
 
-const ComposeDialog = React.lazy(() =>
-  import("@/features/compose/compose-dialog").then((module) => ({ default: module.ComposeDialog }))
-);
 export function App(): React.ReactElement {
   const publicAuthenticationPath = isPublicAuthenticationPath(window.location.pathname);
   const [setup, setSetup] = React.useState<SetupStatus | null>(null);
@@ -47,11 +45,9 @@ export function App(): React.ReactElement {
   const [deletedMailboxes, setDeletedMailboxes] = React.useState<Mailbox[]>([]);
   const [users, setUsers] = React.useState<WorkspaceUser[]>([]);
   const [mailboxId, setMailboxId] = React.useState("all");
-  const [labelId, setLabelId] = React.useState("all");
+  const [labelIds, setLabelIds] = React.useState<string[]>([]);
   const [search, setSearch] = React.useState("");
   const [searchQuery, setSearchQuery] = React.useState("");
-  const [composeOpen, setComposeOpen] = React.useState(false);
-  const [composeTo, setComposeTo] = React.useState("");
   const [isLoading, setIsLoading] = React.useState(true);
   const { navigate, route } = useAppRoute(setup?.isComplete);
   const activeFolder: FolderId =
@@ -74,7 +70,7 @@ export function App(): React.ReactElement {
   const updateMonitor = useUpdateMonitor(canManageUpdates);
   const mailSync = useMailSync({
     activeFolder,
-    labelId,
+    labelIds,
     mailboxId,
     search,
     userId: currentUserId
@@ -179,8 +175,11 @@ export function App(): React.ReactElement {
   }, [contentMailboxes, mailboxId]);
 
   React.useEffect(() => {
-    if (labelId !== "all" && !labels.some((label) => label.id === labelId)) setLabelId("all");
-  }, [labelId, labels]);
+    setLabelIds((current) => {
+      const next = current.filter((id) => labels.some((label) => label.id === id));
+      return next.length === current.length ? current : next;
+    });
+  }, [labels]);
 
   const refreshLabels = React.useCallback(async () => {
     setLabels(await listLabels());
@@ -262,98 +261,89 @@ export function App(): React.ReactElement {
 
   return (
     <>
-      <AppShell
-        activeFolder={activeFolder}
-        activeSettingsTab={settingsTab}
-        canManage={user.role === "owner" || user.role === "admin"}
-        connectionStatus={connectionStatus}
-        draftCount={draftState.drafts.length}
-        mailboxId={mailboxId}
+      <ComposerHost
+        defaultFromMailboxId={user.defaultFromMailboxId}
         mailboxes={contentMailboxes}
-        unread={mailSync.notifications.unread}
-        search={searchQuery}
-        user={user}
-        updateInProgress={updateMonitor.progress !== null}
-        updateReady={updateMonitor.ready}
-        updateStatus={updateMonitor.status}
-        onOpenUpdates={() => {
-          navigate({ kind: "settings", tab: "updates" });
-        }}
-        onCompose={() => {
-          setComposeTo("");
-          setComposeOpen(true);
-        }}
-        onFolderChange={(folder) => {
-          navigate(
-            folder === "settings"
-              ? { kind: "settings", tab: "mailboxes" }
-              : folder === "contacts"
-                ? { kind: "contacts", contactId: null }
-                : folder === "drafts"
-                  ? { kind: "drafts", draftId: null }
-                  : { kind: "mail", folder, messageId: null }
-          );
-        }}
-        onSettingsTabChange={(tab) => navigate({ kind: "settings", tab })}
-        onMailboxChange={setMailboxId}
-        onSearchChange={setSearchQuery}
-        onSearchSelect={selectSearchResult}
-        onSearchSubmit={submitSearch}
-        onSignedOut={() => {
-          setUser(null);
-        }}
+        navigate={navigate}
+        route={route}
+        onDraftsChange={() => void draftState.refresh().catch(() => undefined)}
+        onManageSignatures={() => navigate({ kind: "settings", tab: "signatures" })}
+        onSent={() => void mailSync.refresh().catch(() => undefined)}
       >
-        <div className="flex h-full flex-col">
-          <div className="min-h-0 flex-1">
-            <WorkspacePages
-              activeFolder={activeFolder}
-              contentMailboxes={contentMailboxes}
-              deletedMailboxes={deletedMailboxes}
-              draftState={draftState}
-              labelId={labelId}
-              labels={labels}
-              mailboxId={mailboxId}
-              mailboxes={mailboxes}
-              mailSync={mailSync}
-              navigate={navigate}
-              route={route}
-              search={search}
-              settingsTab={settingsTab}
-              setup={setup}
-              updateMonitor={updateMonitor}
-              user={user}
-              users={users}
-              onCompose={(email) => {
-                setComposeTo(email);
-                setComposeOpen(true);
-              }}
-              onDefaultFromMailboxChange={(defaultFromMailboxId) => {
-                setUser((current) => (current ? { ...current, defaultFromMailboxId } : current));
-              }}
-              onLabelChange={setLabelId}
-              onLabelsChanged={refreshLabels}
-              onReload={reload}
-            />
-          </div>
-        </div>
-      </AppShell>
-      {composeOpen ? (
-        <React.Suspense fallback={null}>
-          <ComposeDialog
-            defaultFromMailboxId={user.defaultFromMailboxId}
-            initialTo={composeTo}
+        {({ openNew }) => (
+          <AppShell
+            activeFolder={activeFolder}
+            activeSettingsTab={settingsTab}
+            canManage={user.role === "owner" || user.role === "admin"}
+            connectionStatus={connectionStatus}
+            draftCount={draftState.drafts.length}
+            mailboxId={mailboxId}
             mailboxes={contentMailboxes}
-            mode="new"
-            open={composeOpen}
-            onOpenChange={(open) => {
-              setComposeOpen(open);
-              if (!open) setComposeTo("");
+            unread={mailSync.notifications.unread}
+            search={searchQuery}
+            user={user}
+            updateInProgress={updateMonitor.progress !== null}
+            updateReady={updateMonitor.ready}
+            updateStatus={updateMonitor.status}
+            onOpenUpdates={() => {
+              navigate({ kind: "settings", tab: "updates" });
             }}
-            onDraftsChange={() => void draftState.refresh().catch(() => undefined)}
-            onSent={() => void mailSync.refresh().catch(() => undefined)}
-          />
-        </React.Suspense>
-      ) : null}
+            onCompose={() => openNew()}
+            onFolderChange={(folder) => {
+              navigate(
+                folder === "settings"
+                  ? { kind: "settings", tab: "mailboxes" }
+                  : folder === "contacts"
+                    ? { kind: "contacts", contactId: null }
+                    : folder === "drafts"
+                      ? { kind: "drafts", draftId: null }
+                      : { kind: "mail", folder, messageId: null }
+              );
+            }}
+            onSettingsTabChange={(tab) => navigate({ kind: "settings", tab })}
+            onMailboxChange={setMailboxId}
+            onSearchChange={setSearchQuery}
+            onSearchSelect={selectSearchResult}
+            onSearchSubmit={submitSearch}
+            onSignedOut={() => {
+              setUser(null);
+            }}
+          >
+            <div className="flex h-full flex-col">
+              <div className="min-h-0 flex-1">
+                <WorkspacePages
+                  activeFolder={activeFolder}
+                  contentMailboxes={contentMailboxes}
+                  deletedMailboxes={deletedMailboxes}
+                  draftState={draftState}
+                  labelIds={labelIds}
+                  labels={labels}
+                  mailboxId={mailboxId}
+                  mailboxes={mailboxes}
+                  mailSync={mailSync}
+                  navigate={navigate}
+                  route={route}
+                  search={search}
+                  settingsTab={settingsTab}
+                  setup={setup}
+                  updateMonitor={updateMonitor}
+                  user={user}
+                  users={users}
+                  onCompose={(email) => openNew(email)}
+                  onDefaultFromMailboxChange={(defaultFromMailboxId) => {
+                    setUser((current) =>
+                      current ? { ...current, defaultFromMailboxId } : current
+                    );
+                  }}
+                  onLabelChange={setLabelIds}
+                  onLabelsChanged={refreshLabels}
+                  onReload={reload}
+                />
+              </div>
+            </div>
+          </AppShell>
+        )}
+      </ComposerHost>
       <Toaster />
     </>
   );

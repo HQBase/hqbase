@@ -1,4 +1,4 @@
-import * as React from "react";
+import type * as React from "react";
 import {
   PiArchive,
   PiArrowCounterClockwise,
@@ -11,17 +11,13 @@ import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { PullToRefresh } from "@/components/ui/pull-to-refresh";
-import type { ComposeMode } from "@/features/compose/compose-state";
+import { ComposerInlineTarget, useComposer } from "@/features/compose/composer-host";
 import { LabelBadges, LabelMenu } from "@/features/labels/label-controls";
 import type { MailLabel } from "@/features/labels/types";
 import type { Mailbox } from "@/features/mailboxes/types";
 import type { MailFolderId } from "@/lib/routes";
 import { ConversationMessages } from "./conversation-messages";
 import type { MessageDetail as MessageDetailType } from "./types";
-
-const ComposeDialog = React.lazy(() =>
-  import("@/features/compose/compose-dialog").then((module) => ({ default: module.ComposeDialog }))
-);
 
 type MessageDetailProps = {
   activeFolder?: MailFolderId;
@@ -32,6 +28,7 @@ type MessageDetailProps = {
   labels?: MailLabel[];
   mailboxes: Mailbox[];
   messages: MessageDetailType[];
+  routeMessageId?: string | null;
   selectedId: string | null;
   showBack?: boolean;
   onAction: (action: MessageAction) => Promise<void> | void;
@@ -52,32 +49,23 @@ type MessageAction =
   | "trash"
   | "restore";
 
-type ThreadComposeMode = Extract<ComposeMode, "reply" | "forward">;
-
-type ThreadComposeState = {
-  message: MessageDetailType;
-  mode: ThreadComposeMode;
-};
-
 export function MessageDetail({
   activeFolder,
-  defaultFromMailboxId,
   error = null,
   isLoading = false,
   canOrganizeLabels = false,
   labels = [],
-  mailboxes,
   messages,
+  routeMessageId = null,
   selectedId,
   showBack = true,
   onAction,
   onBack,
-  onDraftsChange,
   onRefresh,
   onSent,
   onToggleLabel
 }: MessageDetailProps): React.ReactElement {
-  const [composeState, setComposeState] = React.useState<ThreadComposeState | null>(null);
+  const composer = useComposer();
 
   if (isLoading) {
     return <MessageReaderStatus label="Loading conversation" />;
@@ -98,6 +86,9 @@ export function MessageDetail({
   const isStarred = messages.some((message) => message.starredAt !== null);
   const isArchived = activeFolder === "archived";
   const isTrash = activeFolder === "trash";
+  const inlineSessions = composer.sessions.filter(
+    (session) => !session.detached && session.origin?.threadId === selected.threadId
+  );
 
   async function applyAction(action: MessageAction, successMessage?: string): Promise<void> {
     try {
@@ -202,35 +193,24 @@ export function MessageDetail({
         ) : null}
         <ConversationMessages
           messages={messages}
-          onCompose={(message, mode) => setComposeState({ message, mode })}
+          onCompose={(message, mode) => {
+            const folder = activeFolder ?? message.folder;
+            const messageId = routeMessageId ?? selectedId ?? message.id;
+            composer.openContext({
+              message,
+              messages,
+              mode,
+              onSent,
+              origin: { folder, messageId, threadId: message.threadId },
+              route: { kind: "mail", folder, messageId }
+            });
+          }}
         />
-        {composeState ? (
-          <div className="px-4 pb-8 pt-2 sm:px-6">
-            <React.Suspense
-              fallback={
-                <div className="grid min-h-60 place-items-center text-sm text-muted-foreground">
-                  Opening editor…
-                </div>
-              }
-            >
-              <ComposeDialog
-                defaultFromMailboxId={defaultFromMailboxId}
-                key={`${composeState.mode}:${composeState.message.id}`}
-                mailboxes={mailboxes}
-                message={composeState.message}
-                mode={composeState.mode}
-                open
-                presentation="thread"
-                threadContext={<ConversationMessages compact messages={messages} />}
-                {...(onDraftsChange ? { onDraftsChange } : {})}
-                onOpenChange={(nextOpen) => {
-                  if (!nextOpen) setComposeState(null);
-                }}
-                onSent={onSent}
-              />
-            </React.Suspense>
+        {inlineSessions.map((session) => (
+          <div className="px-4 pb-8 pt-2 sm:px-6" key={session.id}>
+            <ComposerInlineTarget sessionId={session.id} />
           </div>
-        ) : null}
+        ))}
       </PullToRefresh>
     </article>
   );

@@ -57,6 +57,20 @@ function options(overrides: Partial<Parameters<typeof useDraftAutosave>[0]> = {}
   };
 }
 
+function recovery(overrides: Record<string, unknown> = {}): string {
+  return JSON.stringify({
+    from: draft.from,
+    to: draft.to.join(", "),
+    cc: "",
+    bcc: "",
+    subject: draft.subject,
+    text: draft.text,
+    html: draft.html,
+    savedAt: Date.now(),
+    ...overrides
+  });
+}
+
 describe("useDraftAutosave", () => {
   beforeEach(() => {
     mocks.toastError.mockReset();
@@ -159,7 +173,7 @@ describe("useDraftAutosave", () => {
         { mailboxId: "mailbox-2", address: "other@example.com", displayName: "Other" }
       ]
     });
-    localStorage.setItem(initial.recoveryKey, "pending recovery");
+    localStorage.setItem(initial.recoveryKey, recovery({ from: "other@example.com" }));
     const hook = await renderHook(useDraftAutosave, initial);
     hook.result.initializeAutosave(draft);
 
@@ -207,5 +221,37 @@ describe("useDraftAutosave", () => {
     expect(initial.setSaveState).toHaveBeenLastCalledWith("local");
     expect(localStorage.getItem(initial.recoveryKey)).toBe("pending recovery");
     await hook.unmount();
+  });
+
+  it("does not let an older queued save delete newer reopened recovery", async () => {
+    vi.useFakeTimers();
+    let finishSave: ((value: Draft) => void) | undefined;
+    mocks.updateDraft.mockReturnValue(
+      new Promise<Draft>((resolve) => {
+        finishSave = resolve;
+      })
+    );
+    const initial = options();
+    const hook = await renderHook(useDraftAutosave, initial);
+    hook.result.initializeAutosave(draft);
+    const changed = options({
+      open: true,
+      subject: "Older queued edit",
+      setDraft: initial.setDraft,
+      setSaveState: initial.setSaveState
+    });
+    await hook.rerender(changed);
+    await flushHookEffects(() => vi.advanceTimersByTime(800));
+
+    const newerRecovery = recovery({ subject: "Newer reopened edit", savedAt: Date.now() + 1 });
+    localStorage.setItem(initial.recoveryKey, newerRecovery);
+    await flushHookEffects(() =>
+      finishSave?.({ ...draft, subject: "Older queued edit", version: 2 })
+    );
+
+    expect(localStorage.getItem(initial.recoveryKey)).toBe(newerRecovery);
+
+    await hook.unmount();
+    vi.useRealTimers();
   });
 });

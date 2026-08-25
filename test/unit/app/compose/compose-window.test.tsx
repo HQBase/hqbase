@@ -55,8 +55,8 @@ describe("compose window", () => {
 
     const dialog = document.body.querySelector<HTMLElement>('[role="dialog"]');
     const header = dialog?.querySelector<HTMLElement>("header");
-    expect(dialog?.style.left).toBe("500px");
-    expect(dialog?.style.top).toBe("80px");
+    expect(dialog?.style.bottom).toBe("0px");
+    expect(dialog?.style.right).toBe("16px");
     expect(dialog?.className).toContain("lg:resize");
     expect(document.body.textContent).not.toContain("Expand compose");
 
@@ -89,6 +89,103 @@ describe("compose window", () => {
 
     expect(dialog?.style.left).toBe("450px");
     expect(dialog?.style.top).toBe("120px");
+    await view.unmount();
+  });
+
+  it("docks minimized composers side by side and does not drag them", async () => {
+    const dock = document.createElement("div");
+    dock.style.maxWidth = "320px";
+    dock.style.overflowX = "auto";
+    document.body.insertAdjacentElement("beforeend", dock);
+    const view = await renderComponent(
+      ["First", "Second", "Third", "Fourth"].map((title, index) => (
+        <ComposeWindow
+          dockIndex={index}
+          dockTarget={dock}
+          key={title}
+          minimized
+          open
+          status="Draft saved"
+          title={`${title} message`}
+          onOpenChange={() => undefined}
+        >
+          <div>{title} draft</div>
+        </ComposeWindow>
+      ))
+    );
+    await flushHookEffects();
+
+    const dialogs = dock.querySelectorAll<HTMLElement>('[role="dialog"]');
+    expect(dialogs).toHaveLength(4);
+    expect(dialogs[0]?.parentElement).toBe(dock);
+    expect(dialogs[3]?.parentElement).toBe(dock);
+    expect(dialogs[0]?.style.order).toBe("0");
+    expect(dialogs[3]?.style.order).toBe("3");
+    expect(dialogs[0]?.className).toContain("lg:resize-none");
+    expect(dialogs[0]?.className).toContain("lg:relative");
+
+    const header = dialogs[0]?.querySelector<HTMLElement>("header");
+    await flushHookEffects(() => {
+      header?.dispatchEvent(
+        new PointerEvent("pointerdown", {
+          bubbles: true,
+          button: 0,
+          clientX: 600,
+          clientY: 100,
+          pointerId: 1
+        })
+      );
+      header?.dispatchEvent(
+        new PointerEvent("pointermove", {
+          bubbles: true,
+          clientX: 200,
+          clientY: 200,
+          pointerId: 1
+        })
+      );
+    });
+
+    expect(dialogs[0]?.style.order).toBe("0");
+    expect(dialogs[0]?.style.left).toBe("");
+    await view.unmount();
+  });
+
+  it("gives expanded composers distinct reachable title-bar slots", async () => {
+    const view = await renderComponent(
+      <>
+        <ComposeWindow
+          open
+          status="Draft saved"
+          title="Earlier message"
+          windowSlot={1}
+          onOpenChange={() => undefined}
+        >
+          <div>Earlier draft</div>
+        </ComposeWindow>
+        <ComposeWindow
+          open
+          status="Draft saved"
+          title="Latest message"
+          windowSlot={0}
+          onOpenChange={() => undefined}
+        >
+          <div>Latest draft</div>
+        </ComposeWindow>
+      </>
+    );
+    await flushHookEffects();
+
+    const dialogs = document.body.querySelectorAll<HTMLElement>('[role="dialog"]');
+    expect(dialogs).toHaveLength(2);
+    expect(dialogs[0]?.style.bottom).toBe("56px");
+    expect(dialogs[1]?.style.bottom).toBe("0px");
+    expect(dialogs[0]?.style.right).toBe("16px");
+    expect(dialogs[1]?.style.right).toBe("16px");
+
+    const latestLayer = Number(dialogs[1]?.style.zIndex);
+    dialogs[0]?.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, pointerId: 9 }));
+    await flushHookEffects();
+    expect(Number(dialogs[0]?.style.zIndex)).toBeGreaterThan(latestLayer);
     await view.unmount();
   });
 });

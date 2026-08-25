@@ -115,7 +115,7 @@ export function ContactsPage({
         </Button>
       </header>
       <div className="min-h-0 flex-1 overflow-auto">
-        <div className="mx-auto w-full max-w-[960px] px-4 py-5 sm:px-6 lg:px-8">
+        <div className="mx-auto w-full max-w-[1200px] px-4 py-5 sm:px-6 lg:px-8">
           <div className="relative mb-4">
             <PiMagnifyingGlass
               aria-hidden="true"
@@ -156,7 +156,7 @@ export function ContactsPage({
               </div>
             </div>
           ) : (
-            <div className="overflow-hidden rounded-xl border bg-background">
+            <div className="flex flex-col gap-0.5">
               {contacts.map((contact) => (
                 <ContactRow contact={contact} key={contact.id} onSelect={onSelect} />
               ))}

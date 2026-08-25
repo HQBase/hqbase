@@ -124,6 +124,7 @@ describe("compose signature send ordering", () => {
     );
     const view = await renderComponent(
       <ComposeDialog
+        draftId={draft.id}
         mailboxes={[
           {
             id: "mailbox-1",
@@ -175,6 +176,7 @@ describe("compose signature send ordering", () => {
     );
     const view = await renderComponent(
       <ComposeDialog
+        draftId={draft.id}
         mailboxes={[
           {
             id: "mailbox-1",
@@ -225,6 +227,7 @@ describe("compose signature send ordering", () => {
   it("uploads editor images as private inline draft attachments", async () => {
     const view = await renderComponent(
       <ComposeDialog
+        draftId={draft.id}
         mailboxes={[
           {
             id: "mailbox-1",
@@ -270,6 +273,7 @@ describe("compose signature send ordering", () => {
     );
     const view = await renderComponent(
       <ComposeDialog
+        draftId={draft.id}
         mailboxes={[mailbox]}
         open
         onOpenChange={() => undefined}
@@ -323,6 +327,7 @@ describe("compose signature send ordering", () => {
       })
     );
     const props = {
+      draftId: draft.id,
       mailboxes: [mailbox],
       onOpenChange: () => undefined,
       onSent: () => undefined
@@ -369,6 +374,7 @@ describe("compose signature send ordering", () => {
     ]);
     const view = await renderComponent(
       <ComposeDialog
+        draftId={draft.id}
         mailboxes={[mailbox]}
         open
         onOpenChange={() => undefined}
@@ -423,6 +429,7 @@ describe("compose signature send ordering", () => {
     ]);
     const view = await renderComponent(
       <ComposeDialog
+        draftId={draft.id}
         mailboxes={[mailbox]}
         open
         onOpenChange={() => undefined}

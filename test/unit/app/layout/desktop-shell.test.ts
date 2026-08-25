@@ -64,15 +64,16 @@ describe("desktop application shell", () => {
     expect(styles).not.toContain("desktop-window-guard");
   });
 
-  it("keeps desktop Reply and Forward inside the app shell", () => {
-    expect(threadComposeSurface).not.toContain("createPortal(desktop");
+  it("keeps inline Reply and Forward at the registered conversation target", () => {
+    expect(threadComposeSurface).toContain("createPortal(desktop, inlineTarget)");
+    expect(threadComposeSurface).toContain('aria-label="Detach composer"');
   });
 
   it("reopens Reply and Forward drafts with their conversation", () => {
     expect(workspacePages).toContain("selectedDraftHasContext");
     expect(draftComposeDialog).toContain("getMessageThread(contextMessageId)");
-    expect(draftComposeDialog).toContain('presentation="thread"');
-    expect(draftComposeDialog).toContain("threadContext=");
-    expect(draftComposeDialog).toContain("draftId={draft.id}");
+    expect(draftComposeDialog).toContain("openDraft({");
+    expect(draftComposeDialog).toContain("ComposerInlineTarget sessionId={sessionId}");
+    expect(draftComposeDialog).toContain("draftId: draft.id");
   });
 });

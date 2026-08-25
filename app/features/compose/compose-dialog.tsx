@@ -14,12 +14,15 @@ import {
   composeTitle,
   type DraftSaveState,
   defaultSendingIdentity,
+  draftRecoveryKey,
   draftStatus,
   findDraftForComposer,
   forwardedMessage,
   hasInvalidRecipients,
+  legacyDraftRecoveryKey,
+  migrateDraftRecovery,
   normalizeDraftHtml,
-  readDraftRecovery,
+  readNewestDraftRecovery,
   replyRecipients,
   replySendingIdentity,
   sendingIdentities,
@@ -39,16 +42,26 @@ const emptyAutomaticSignature: SignatureSnapshot = {
 };
 export function ComposeDialog({
   defaultFromMailboxId = null,
+  dockIndex = 0,
+  dockTarget = null,
   draftId = null,
   initialTo = "",
+  inlineTarget = null,
   mailboxes,
   message = null,
+  minimized,
   mode = "new",
   open,
   presentation = "window",
   threadContext,
+  windowSlot = 0,
+  onDetach,
+  onDraftReady,
   onDraftsChange,
+  onManageSignatures,
+  onMinimizedChange,
   onOpenChange,
+  onReturnToThread,
   onSent
 }: ComposeDialogProps): React.ReactElement | null {
   const identities = React.useMemo(() => sendingIdentities(mailboxes), [mailboxes]);
@@ -71,15 +84,17 @@ export function ComposeDialog({
   const generationRef = React.useRef(0);
   const draftRef = React.useRef<Draft | null>(null);
   const htmlRef = React.useRef(html);
+  const onDraftReadyRef = React.useRef(onDraftReady);
   const onDraftsChangeRef = React.useRef(onDraftsChange);
   const onOpenChangeRef = React.useRef(onOpenChange);
+  onDraftReadyRef.current = onDraftReady;
   onDraftsChangeRef.current = onDraftsChange;
   onOpenChangeRef.current = onOpenChange;
   const formId = React.useId();
   const replyToMessageId = mode === "reply" ? (message?.id ?? null) : null;
   const forwardOfMessageId = mode === "forward" ? (message?.id ?? null) : null;
   const contextLabel = composeContextLabel(mode, message);
-  const recoveryKey = `hqbase:compose:${mode}:${draftId ?? message?.id ?? "new"}`;
+  const recoveryKey = draft ? draftRecoveryKey(draft.id) : "";
   const { initializeAutosave, resetAutosave, saveFrom, saveSignature } = useDraftAutosave({
     open,
     initialized,
@@ -161,9 +176,16 @@ export function ComposeDialog({
           }));
         if (generation !== generationRef.current) return;
         if (!existing) onDraftsChangeRef.current?.();
-        const recovered = readDraftRecovery(recoveryKey, initial.updatedAt);
+        const exactRecoveryKey = draftRecoveryKey(initial.id);
+        const legacyRecoveryKey = legacyDraftRecoveryKey(mode, draftId, message?.id ?? null);
+        const recovered = readNewestDraftRecovery(
+          [exactRecoveryKey, legacyRecoveryKey],
+          initial.updatedAt
+        );
+        migrateDraftRecovery(exactRecoveryKey, legacyRecoveryKey, recovered);
         draftRef.current = initial;
         setDraft(initial);
+        onDraftReadyRef.current?.(initial.id);
         initializeAutosave(initial);
         setFrom(recovered?.from ?? initial.from);
         setTo(recovered?.to ?? initial.to.join(", "));
@@ -191,7 +213,6 @@ export function ComposeDialog({
     defaultIdentity,
     draftId,
     initialTo,
-    recoveryKey,
     replyToMessageId,
     forwardOfMessageId,
     initializeAutosave,
@@ -310,6 +331,7 @@ export function ComposeDialog({
       subject={subject}
       threadContext={threadContext}
       to={to}
+      replyMessage={mode === "reply" ? message : null}
       onDiscard={() => void discard()}
       onEditorChange={(nextHtml, nextText) => {
         removeUnreferencedInlineAttachments(nextHtml);
@@ -320,7 +342,9 @@ export function ComposeDialog({
       onFiles={upload}
       onImages={uploadImages}
       onRemoveAttachment={(item) => void removeAttachment(item)}
-      onManageSignatures={() => window.location.assign("/settings/signatures")}
+      onManageSignatures={
+        onManageSignatures ?? (() => window.location.assign("/settings/signatures"))
+      }
       onSetBcc={setBcc}
       onSetCc={setCc}
       onSetFrom={(nextFrom) => void changeFrom(nextFrom)}
@@ -340,16 +364,24 @@ export function ComposeDialog({
 
   return (
     <ComposeSurface
+      dockIndex={dockIndex}
+      dockTarget={dockTarget}
       formId={formId}
+      inlineTarget={inlineTarget}
+      minimized={minimized}
       open={open}
       presentation={presentation}
       sendDisabled={sendDisabled}
       status={draftStatus(saveState)}
       title={composeTitle(mode)}
+      windowSlot={windowSlot}
+      onDetach={onDetach}
+      onMinimizedChange={onMinimizedChange}
       onOpenChange={(nextOpen) => {
         if (!nextOpen) invalidateComposer();
         onOpenChangeRef.current(nextOpen);
       }}
+      onReturnToThread={onReturnToThread}
     >
       {content}
     </ComposeSurface>

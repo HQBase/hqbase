@@ -1,25 +1,29 @@
 import * as React from "react";
 import { createPortal } from "react-dom";
-import { PiArrowLeft, PiPaperPlaneTilt, PiX } from "react-icons/pi";
+import { PiArrowLeft, PiArrowSquareOut, PiPaperPlaneTilt, PiX } from "react-icons/pi";
 
 import { Button } from "@/components/ui/button";
 
 type ThreadComposeSurfaceProps = {
   children: React.ReactNode;
   formId: string;
+  inlineTarget: HTMLElement | null;
   sendDisabled: boolean;
   status: string;
   title: string;
   onClose: () => void;
+  onDetach?: (() => void) | undefined;
 };
 
 export function ThreadComposeSurface({
   children,
   formId,
+  inlineTarget,
   sendDisabled,
   status,
   title,
-  onClose
+  onClose,
+  onDetach
 }: ThreadComposeSurfaceProps): React.ReactElement {
   const surfaceRef = React.useRef<HTMLElement>(null);
   const previousFocusRef = React.useRef<HTMLElement | null>(null);
@@ -62,6 +66,18 @@ export function ThreadComposeSurface({
             {status}
           </p>
         </div>
+        {onDetach ? (
+          <Button
+            aria-label="Detach composer"
+            className="size-10 min-h-10 min-w-10"
+            size="icon"
+            type="button"
+            variant="ghost"
+            onClick={onDetach}
+          >
+            <PiArrowSquareOut aria-hidden="true" className="pointer-events-none" />
+          </Button>
+        ) : null}
         <Button
           aria-label={`Close ${title.toLowerCase()}`}
           className="size-10 min-h-10 min-w-10"
@@ -78,7 +94,7 @@ export function ThreadComposeSurface({
   );
 
   if (isDesktop) {
-    return desktop;
+    return inlineTarget ? createPortal(desktop, inlineTarget) : desktop;
   }
 
   const overlay = (
@@ -111,6 +127,18 @@ export function ThreadComposeSurface({
             {status}
           </p>
         </div>
+        {onDetach ? (
+          <Button
+            aria-label="Detach composer"
+            className="size-10 min-h-10 min-w-10"
+            size="icon"
+            type="button"
+            variant="ghost"
+            onClick={onDetach}
+          >
+            <PiArrowSquareOut aria-hidden="true" className="pointer-events-none" />
+          </Button>
+        ) : null}
         <Button
           aria-label="Send message"
           className="size-10 min-h-10 min-w-10 lg:hidden"

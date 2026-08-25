@@ -8,6 +8,7 @@ import {
   type DraftSaveState,
   hasInvalidRecipients,
   normalizeDraftHtml,
+  readStoredDraftRecovery,
   serializeDraft,
   splitRecipients
 } from "./compose-state";
@@ -101,7 +102,7 @@ export function useDraftAutosave(options: DraftAutosaveOptions) {
           draftRef.current = next;
           if (recipientsValid) {
             lastSaved.current = snapshot;
-            localStorage.removeItem(recoveryKey);
+            clearMatchingRecovery(recoveryKey, snapshot);
           }
           setDraft(next);
           setSaveState(
@@ -159,7 +160,7 @@ export function useDraftAutosave(options: DraftAutosaveOptions) {
           draftRef.current = next;
           if (recipientsValid) {
             lastSaved.current = snapshot;
-            localStorage.removeItem(recoveryKey);
+            clearMatchingRecovery(recoveryKey, snapshot);
           }
           setDraft(next);
           setSaveState(
@@ -238,7 +239,7 @@ export function useDraftAutosave(options: DraftAutosaveOptions) {
           });
           draftRef.current = next;
           lastSaved.current = snapshot;
-          localStorage.removeItem(recoveryKey);
+          clearMatchingRecovery(recoveryKey, snapshot);
           setDraft(next);
           setSaveState(latestSnapshot.current === snapshot ? "saved" : "saving");
         } catch (error) {
@@ -268,4 +269,19 @@ export function useDraftAutosave(options: DraftAutosaveOptions) {
   ]);
 
   return { initializeAutosave, resetAutosave, saveFrom, saveSignature };
+}
+
+function clearMatchingRecovery(recoveryKey: string, savedSnapshot: string): void {
+  const recovery = readStoredDraftRecovery(recoveryKey);
+  if (!recovery) return;
+  const recoverySnapshot = serializeDraft(
+    recovery.from,
+    recovery.to,
+    recovery.cc,
+    recovery.bcc,
+    recovery.subject,
+    recovery.text,
+    recovery.html
+  );
+  if (recoverySnapshot === savedSnapshot) localStorage.removeItem(recoveryKey);
 }
