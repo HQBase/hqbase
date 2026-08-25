@@ -132,7 +132,7 @@ describe("settings presentation", () => {
     expect(html).not.toContain("support@example.com");
   });
 
-  it("offers restore for deleted mailboxes while their mail is kept", () => {
+  it("offers restore for deleted mailboxes while retention rules still apply", () => {
     const html = renderToStaticMarkup(
       <MailboxSettings
         canManage
@@ -146,7 +146,9 @@ describe("settings presentation", () => {
     );
 
     expect(html).toContain("Deleted mailboxes");
-    expect(html).toContain("Mail is kept until you restore the mailbox.");
+    expect(html).toContain(
+      "Restore a mailbox to make its stored mail available again. Retention rules still apply."
+    );
     expect(html).toContain("support@example.com");
     expect(html).toContain("Restore");
   });

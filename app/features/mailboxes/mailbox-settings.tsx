@@ -233,7 +233,8 @@ export function MailboxSettings({
               Deleted mailboxes
             </h3>
             <p className="mt-1 text-sm text-muted-foreground">
-              Mail is kept until you restore the mailbox.
+              Restore a mailbox to make its stored mail available again. Retention rules still
+              apply.
             </p>
           </div>
           <div className="divide-y rounded-lg border">
