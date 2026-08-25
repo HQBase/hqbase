@@ -67,6 +67,9 @@ export function ConversationMessages({
 
   function renderMessage(message: MessageDetail, isLast: boolean): React.ReactElement {
     const timestamp = message.receivedAt ?? message.sentAt ?? message.createdAt;
+    const downloadableAttachments = message.attachments.filter(
+      (attachment) => !attachment.contentId
+    );
     return (
       <article
         className={cn("px-4 py-5 sm:px-6 sm:py-6", compact && "px-4 py-4 sm:px-4 sm:py-4")}
@@ -101,12 +104,12 @@ export function ConversationMessages({
           ) : (
             <PlainTextMessage message={message} />
           )}
-          {message.attachments.length > 0 ? (
+          {downloadableAttachments.length > 0 ? (
             <>
               <Separator className="my-6" />
               <div className="flex flex-col gap-2">
                 <div className="text-xs font-medium text-muted-foreground">Attachments</div>
-                {message.attachments.map((attachment) => (
+                {downloadableAttachments.map((attachment) => (
                   <a
                     className="flex w-fit max-w-full items-center gap-2 rounded-md border bg-card px-3 py-2 text-xs [@media(hover:hover)]:hover:bg-muted"
                     href={`/api/v2/attachments/${attachment.id}`}

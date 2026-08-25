@@ -276,4 +276,35 @@ describe("conversation reader", () => {
     expect(html).toContain('data-thread-arrow="top-outward"');
     expect(html).toContain('data-thread-arrow="bottom-outward"');
   });
+
+  it("keeps inline images out of the downloadable attachment list", () => {
+    const html = renderToStaticMarkup(
+      <ConversationMessages
+        messages={[
+          {
+            ...firstMessage,
+            attachments: [
+              {
+                id: "inline-logo",
+                filename: "logo.png",
+                contentType: "image/png",
+                sizeBytes: 4,
+                contentId: "logo@example.com"
+              },
+              {
+                id: "report",
+                filename: "report.pdf",
+                contentType: "application/pdf",
+                sizeBytes: 8,
+                contentId: null
+              }
+            ]
+          }
+        ]}
+      />
+    );
+
+    expect(html).not.toContain("logo.png");
+    expect(html).toContain("report.pdf");
+  });
 });
