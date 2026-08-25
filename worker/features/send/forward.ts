@@ -34,6 +34,7 @@ export async function forwardMessage(
 
   const context = forwardedContext(original);
   const subject = input.subject ?? forwardSubject(original.subject);
+  const originalAttachments = forwardableAttachments(original.attachments);
   const outbound: SendMessageInput = {
     from: input.from,
     to: input.to,
@@ -45,11 +46,11 @@ export async function forwardMessage(
     attachmentIds: input.attachmentIds,
     signature: input.signature
   };
-  if (!input.includeOriginalAttachments || original.attachments.length === 0) {
+  if (!input.includeOriginalAttachments || originalAttachments.length === 0) {
     return sendNewMessage(env, outbound, principalId, signature, context);
   }
 
-  requireForwardedAttachmentCount(original.attachments.length, input.attachmentIds.length);
+  requireForwardedAttachmentCount(originalAttachments.length, input.attachmentIds.length);
 
   const draft = await saveDraft(env.DB, principalId, {
     mailboxId: mailbox.id,
@@ -72,7 +73,7 @@ export async function forwardMessage(
       env,
       principalId,
       draft.id,
-      original.attachments
+      originalAttachments
     );
   } catch (error) {
     await deleteDraft(env.DB, env.MAIL_OBJECTS, principalId, draft.id);
@@ -104,16 +105,17 @@ export async function sendForwardDraft(
   if (!original) throw new AppError("MESSAGE_NOT_FOUND", "Message not found.", 404);
   const authored = stripLegacyForwardContext(input);
   const context = forwardedContext(original);
-  if (original.attachments.length === 0) {
+  const originalAttachments = forwardableAttachments(original.attachments);
+  if (originalAttachments.length === 0) {
     return sendNewMessage(env, { ...input, ...authored, draftId }, principalId, signature, context);
   }
 
-  requireForwardedAttachmentCount(original.attachments.length, input.attachmentIds.length);
+  requireForwardedAttachmentCount(originalAttachments.length, input.attachmentIds.length);
   const copiedAttachmentIds = await copyOriginalAttachments(
     env,
     principalId,
     draftId,
-    original.attachments
+    originalAttachments
   );
   try {
     return await sendNewMessage(
@@ -165,6 +167,12 @@ async function copyOriginalAttachments(
     await removeCopiedAttachments(env, principalId, draftId, copiedAttachmentIds);
     throw error;
   }
+}
+
+function forwardableAttachments(
+  attachments: MessageDetail["attachments"]
+): MessageDetail["attachments"] {
+  return attachments.filter((attachment) => !attachment.contentId);
 }
 
 async function removeCopiedAttachments(

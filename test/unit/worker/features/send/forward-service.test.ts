@@ -136,6 +136,49 @@ describe("forward service", () => {
     expect(saveDraft).not.toHaveBeenCalled();
   });
 
+  it("does not copy inline message images as forwarded attachments", async () => {
+    vi.mocked(getMessageDetail).mockResolvedValue({
+      ...original,
+      attachments: [
+        {
+          id: "inline-logo",
+          messageId: original.id,
+          filename: "logo.png",
+          contentType: "image/png",
+          sizeBytes: 4,
+          contentId: "logo@example.com",
+          r2Key: "mail/logo.png",
+          createdAt: original.createdAt
+        }
+      ]
+    });
+
+    await forwardMessage(
+      env,
+      {
+        messageId: original.id,
+        from: mailbox.address,
+        to: ["recipient@example.com"],
+        cc: [],
+        bcc: [],
+        text: "Please review",
+        attachmentIds: [],
+        includeOriginalAttachments: true
+      },
+      "user-1"
+    );
+
+    expect(saveDraft).not.toHaveBeenCalled();
+    expect(get).not.toHaveBeenCalled();
+    expect(sendNewMessage).toHaveBeenCalledWith(
+      env,
+      expect.objectContaining({ attachmentIds: [] }),
+      "user-1",
+      undefined,
+      expect.any(Object)
+    );
+  });
+
   it("rejects a disabled mailbox before creating an attachment draft", async () => {
     vi.mocked(findMailboxForSending).mockResolvedValue({ ...mailbox, isActive: false });
     vi.mocked(getMessageDetail).mockResolvedValue({
