@@ -152,7 +152,13 @@ export function MessageListItem({
         ) : null}
       </span>
       {(conversation.labels?.length ?? 0) > 0 || (labels.length > 0 && onToggleLabel) ? (
-        <span className="group/label-pill col-start-2 row-start-2 z-10 flex w-fit min-w-0 max-w-[75%] items-center justify-end gap-0.5 self-center justify-self-end rounded-full bg-transparent p-0.5 shadow-[0_0_6px_1px_hsl(var(--background)/0.14)] backdrop-blur-[2px] sm:col-start-3 sm:row-start-1">
+        <span
+          className={cn(
+            "group/label-pill col-start-2 row-start-2 z-10 flex w-fit min-w-0 max-w-[75%] items-center justify-end gap-0.5 self-end justify-self-end sm:col-start-3 sm:row-start-1 sm:self-center",
+            (conversation.labels?.length ?? 0) === 0 && "hidden sm:flex"
+          )}
+          data-message-labels
+        >
           <LabelStack
             className="overflow-hidden sm:hidden"
             compact
@@ -164,7 +170,7 @@ export function MessageListItem({
             <LabelMenu
               assigned={conversation.labels ?? []}
               canOrganizeLabels={canOrganizeLabels}
-              className="size-6 min-h-6 min-w-6 rounded-full bg-transparent shadow-none group-hover/label-pill:text-foreground/80 [@media(hover:hover)]:hover:bg-transparent [@media(hover:hover)]:hover:text-foreground/80 sm:size-5 sm:min-h-5 sm:min-w-5"
+              className="hidden size-6 min-h-6 min-w-6 rounded-full group-hover/label-pill:text-foreground/80 [@media(hover:hover)]:hover:bg-transparent [@media(hover:hover)]:hover:text-foreground/80 sm:inline-flex sm:size-5 sm:min-h-5 sm:min-w-5"
               labels={labels}
               onToggle={onToggleLabel}
               showTagIcon

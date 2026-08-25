@@ -21,6 +21,8 @@ const priorityLabel: MailLabel = {
   id: "label-2",
   name: "Priority"
 };
+const shortLabel: MailLabel = { ...label, id: "label-short", name: "HR" };
+const importantLabel: MailLabel = { ...label, id: "label-important", name: "Important" };
 
 afterEach(() => {
   document.body.replaceChildren();
@@ -39,6 +41,9 @@ describe("label controls", () => {
       />
     );
     const badges = renderToStaticMarkup(<LabelBadges labels={[label]} />);
+    const compact = renderToStaticMarkup(
+      <LabelStack compact labels={[shortLabel, importantLabel]} />
+    );
 
     expect(filter).toContain('aria-label="Filter by labels"');
     expect(filter).toContain('data-label-filter-icon="tag"');
@@ -50,6 +55,10 @@ describe("label controls", () => {
     expect(selectedFilter).toContain("text-muted-foreground");
     expect(badges).toContain("Customer");
     expect(badges).toContain("bg-blue-500/15");
+    expect(compact).toContain(">HR</span>");
+    expect(compact).toContain(">Important</span>");
+    expect(compact).toContain("min-w-10");
+    expect(compact).toContain("max-w-20");
   });
 
   it("names three labels and keeps overflow colors visible", () => {

@@ -234,12 +234,18 @@ describe("conversation reader", () => {
   });
 
   it("uses a Gmail-style information stack only below the small breakpoint", () => {
-    const customerLabel = {
+    const hrLabel = {
       color: "blue" as const,
       createdAt: "2026-07-27T14:00:00.000Z",
-      id: "label-customer",
-      name: "Customer",
+      id: "label-hr",
+      name: "HR",
       updatedAt: "2026-07-27T14:00:00.000Z"
+    };
+    const importantLabel = {
+      ...hrLabel,
+      color: "red" as const,
+      id: "label-important",
+      name: "Important"
     };
     const html = renderToStaticMarkup(
       <MessageListItem
@@ -249,11 +255,11 @@ describe("conversation reader", () => {
           direction: "inbound",
           fromAddress: "support@example.com",
           fromName: "Support Team",
-          labels: [customerLabel]
+          labels: [hrLabel, importantLabel]
         }}
         href="/mail/inbox/msg_1"
         isActive={false}
-        labels={[customerLabel]}
+        labels={[hrLabel, importantLabel]}
         onSelect={() => undefined}
         onToggleLabel={() => undefined}
         onToggleStar={() => undefined}
@@ -274,25 +280,33 @@ describe("conversation reader", () => {
     expect(html).toContain("text-[9px]");
     expect(html).toContain('aria-label="Labels"');
     expect(html).toContain("min-h-10");
-    expect(html).toContain("size-6 min-h-6 min-w-6");
     expect(html).toContain("sm:min-h-5");
     expect(html).toContain("group/label-pill col-start-2 row-start-2");
     expect(html).toContain("w-fit min-w-0 max-w-[75%]");
-    expect(html).toContain("self-center justify-self-end rounded-full bg-transparent p-0.5");
+    expect(html).toContain("self-end justify-self-end");
+    expect(html).toContain("sm:self-center");
     expect(html).toContain("sm:col-start-3 sm:row-start-1");
     expect(html).toContain("gap-0.5 sm:col-start-4 sm:row-start-1 sm:flex sm:w-7 sm:min-w-7");
     expect(html).toContain("bg-muted px-0.5 py-0.5 text-[11px]");
     expect(html).toContain("overflow-hidden sm:hidden");
-    expect(html).toContain("shadow-[0_0_6px_1px_hsl(var(--background)/0.14)]");
-    expect(html).toContain("backdrop-blur-[2px]");
     expect(html).toContain("hover:bg-transparent");
-    expect(html).not.toContain("bg-background/60");
     expect(html).not.toContain("group/label-pill absolute");
-    expect(html.match(/>Customer<\/span>/gu)).toHaveLength(2);
+    const labelContainer = html.match(/<span[^>]*data-message-labels[^>]*>/u)?.[0];
+    expect(labelContainer).not.toContain("bg-");
+    expect(labelContainer).not.toContain("shadow");
+    expect(labelContainer).not.toContain("backdrop-blur");
+    expect(labelContainer).not.toContain("rounded");
+    const labelButton = html.match(/<button[^>]*aria-label="Labels"[^>]*>/u)?.[0];
+    expect(labelButton).toContain("hidden");
+    expect(labelButton).toContain("sm:inline-flex");
+    expect(html.match(/>HR<\/span>/gu)).toHaveLength(2);
+    expect(html.match(/>Important<\/span>/gu)).toHaveLength(2);
+    expect(html).toContain("min-w-10");
+    expect(html).toContain("max-w-20");
     expect(html).toContain('data-label-menu-icon="tag"');
     expect(html.indexOf("Support Team")).toBeLessThan(html.indexOf("Account access"));
     expect(html.indexOf("Account access")).toBeLessThan(html.indexOf("We can help"));
-    expect(html.indexOf("We can help")).toBeLessThan(html.indexOf("Customer"));
+    expect(html.indexOf("We can help")).toBeLessThan(html.indexOf("Important"));
   });
 
   it("collapses messages between the first and final message behind a counted divider", () => {

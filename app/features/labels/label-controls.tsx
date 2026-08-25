@@ -250,7 +250,7 @@ export function LabelBadges({ labels }: { labels: MailLabel[] }): React.ReactEle
       {labels.map((label) => (
         <span
           className={cn(
-            "inline-flex max-w-28 items-center rounded-full px-2 py-0.5 text-[10px] font-medium",
+            "inline-flex min-w-10 max-w-28 items-center justify-center rounded-full px-2 py-0.5 text-[10px] font-medium",
             labelPillColorClass(label.color)
           )}
           key={label.id}
@@ -290,8 +290,8 @@ export function LabelStack({
       {named.map((label) => (
         <span
           className={cn(
-            "inline-flex min-w-0 max-w-14 items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium",
-            compact && "max-w-12 px-1 py-0 text-[9px]",
+            "inline-flex min-w-10 max-w-24 items-center justify-center rounded-full px-1.5 py-0.5 text-[10px] font-medium",
+            compact && "max-w-20 px-1 py-0 text-[9px]",
             labelPillColorClass(label.color)
           )}
           key={label.id}

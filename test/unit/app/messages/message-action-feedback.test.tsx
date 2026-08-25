@@ -102,11 +102,25 @@ describe("conversation action feedback", () => {
 
     const menu = document.body.querySelector<HTMLElement>("[data-mobile-thread-actions]");
     expect(menu?.textContent).toContain("Labels");
-    expect(menu?.textContent).toContain("Customer");
+    expect(menu?.textContent).not.toContain("Customer");
+    expect(menu?.querySelector('[role="menuitemcheckbox"]')).toBeNull();
     expect(menu?.querySelector('[data-mobile-thread-action="star"]')).not.toBeNull();
     expect(menu?.querySelector('[data-mobile-thread-action="archive"]')).not.toBeNull();
     expect(menu?.textContent).not.toContain("Mark conversation read");
     expect(menu?.textContent).not.toContain("Trash conversation");
+    let labelToggle = menu?.querySelector<HTMLElement>('[data-mobile-thread-action="labels"]');
+    expect(labelToggle?.getAttribute("aria-expanded")).toBe("false");
+    await flushHookEffects(() => labelToggle?.click());
+    expect(labelToggle?.getAttribute("aria-expanded")).toBe("true");
+    expect(menu?.textContent).toContain("Customer");
+    expect(menu?.querySelector('[role="menuitemcheckbox"]')).not.toBeNull();
+    await flushHookEffects(() => labelToggle?.click());
+    labelToggle = menu?.querySelector<HTMLElement>('[data-mobile-thread-action="labels"]');
+    expect(labelToggle?.getAttribute("aria-expanded")).toBe("false");
+    expect(menu?.textContent).not.toContain("Customer");
+    expect(menu?.querySelector('[role="menuitemcheckbox"]')).toBeNull();
+    expect(document.body.querySelector("[data-mobile-thread-actions]")).not.toBeNull();
+    await flushHookEffects(() => labelToggle?.click());
     const labelItem = [
       ...(menu?.querySelectorAll<HTMLElement>('[role="menuitemcheckbox"]') ?? [])
     ].find((item) => item.textContent?.includes("Customer"));

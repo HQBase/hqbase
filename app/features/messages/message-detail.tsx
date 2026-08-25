@@ -1,8 +1,9 @@
-import type * as React from "react";
+import * as React from "react";
 import {
   PiArchive,
   PiArrowCounterClockwise,
   PiArrowLeft,
+  PiCaretDown,
   PiDotsThree,
   PiEnvelopeOpen,
   PiStar,
@@ -17,7 +18,6 @@ import {
   DropdownMenuContent,
   DropdownMenuGroup,
   DropdownMenuItem,
-  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger
 } from "@/components/ui/dropdown-menu";
@@ -84,6 +84,7 @@ export function MessageDetail({
 }: MessageDetailProps): React.ReactElement {
   const composer = useComposer();
   const mobileLabelToggle = useLabelToggle(onToggleLabel);
+  const [mobileLabelsOpen, setMobileLabelsOpen] = React.useState(false);
 
   if (isLoading) {
     return <MessageReaderStatus label="Loading conversation" />;
@@ -206,7 +207,12 @@ export function MessageDetail({
                 </IconButton>
               </>
             )}
-            <DropdownMenu modal={false}>
+            <DropdownMenu
+              modal={false}
+              onOpenChange={(open) => {
+                if (!open) setMobileLabelsOpen(false);
+              }}
+            >
               <DropdownMenuTrigger asChild>
                 <Button
                   aria-label="More conversation actions"
@@ -226,20 +232,34 @@ export function MessageDetail({
               >
                 {labels.length > 0 && onToggleLabel ? (
                   <>
-                    <DropdownMenuLabel className="flex min-h-9 items-center gap-2 px-2 py-1 text-xs font-medium text-muted-foreground">
-                      <PiTag aria-hidden="true" className="size-4" />
-                      Labels
-                    </DropdownMenuLabel>
                     <DropdownMenuGroup>
-                      <LabelMenuItems
-                        assigned={assignedLabels}
-                        className="min-h-10 py-2 text-sm"
-                        disabled={!canOrganizeLabels}
-                        keepOpen
-                        labels={labels}
-                        pendingId={mobileLabelToggle.pendingId}
-                        onToggle={mobileLabelToggle.toggle}
-                      />
+                      <DropdownMenuItem
+                        aria-expanded={mobileLabelsOpen}
+                        className="min-h-10 gap-2"
+                        data-mobile-thread-action="labels"
+                        onSelect={(event) => {
+                          event.preventDefault();
+                          setMobileLabelsOpen((open) => !open);
+                        }}
+                      >
+                        <PiTag aria-hidden="true" className="size-4" />
+                        Labels
+                        <PiCaretDown
+                          aria-hidden="true"
+                          className={cn("ml-auto size-4", mobileLabelsOpen && "rotate-180")}
+                        />
+                      </DropdownMenuItem>
+                      {mobileLabelsOpen ? (
+                        <LabelMenuItems
+                          assigned={assignedLabels}
+                          className="min-h-10 py-2 text-sm"
+                          disabled={!canOrganizeLabels}
+                          keepOpen
+                          labels={labels}
+                          pendingId={mobileLabelToggle.pendingId}
+                          onToggle={mobileLabelToggle.toggle}
+                        />
+                      ) : null}
                     </DropdownMenuGroup>
                     <DropdownMenuSeparator />
                   </>
