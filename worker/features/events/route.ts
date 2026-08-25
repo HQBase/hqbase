@@ -32,7 +32,7 @@ export async function handleMailEventRoute(
 
     const principal = await requireMailApiPrincipal(env, request, "mail:read");
     validateSessionOrigin(request, principal.authentication);
-    const topics: MailEventTopic[] = ["messages", "mailboxes"];
+    const topics: MailEventTopic[] = ["messages", "mailboxes", "labels"];
     if (principal.scopes.has("mail:send")) topics.push("drafts");
 
     const headers = new Headers({ upgrade: "websocket" });

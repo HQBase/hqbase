@@ -55,6 +55,26 @@ export async function publishMailboxMailEvent(env: WorkerEnv, mailboxId: string)
   );
 }
 
+export async function publishWorkspaceMailEvent(
+  env: WorkerEnv,
+  topic: MailEventTopic
+): Promise<void> {
+  const rows = await getRows<{ id: string }>(
+    env.DB,
+    sql`SELECT principal.id
+        FROM principals principal
+        LEFT JOIN "user" user_row
+          ON user_row.id = principal.id AND principal.type = 'user'
+        WHERE principal.status = 'active'
+          AND (principal.type = 'agent' OR COALESCE(user_row.banned, 0) = 0)`
+  );
+  await publishMailEvent(
+    env,
+    rows.map((row) => row.id),
+    topic
+  );
+}
+
 export async function messageEventTarget(
   db: D1Database,
   messageId: string

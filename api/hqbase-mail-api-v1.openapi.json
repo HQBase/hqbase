@@ -129,7 +129,7 @@
     "/api/v1/events": {
       "get": {
         "summary": "Open change event WebSocket",
-        "description": "Opens an authenticated wake-only WebSocket. The server sends `changed` frames for messages, mailboxes, and permitted drafts. Frames contain no mail data or cursors. After a frame or reconnect, read the authoritative REST resources and change journals. OAuth tokens require `mail:read`; draft frames also require `mail:send`. The authorization decision at upgrade is an event-delivery lease for 10 minutes. Credential or session revocation does not close the current socket immediately. The server closes the socket when the lease ends, and reconnection must use current credentials and permissions.",
+        "description": "Opens an authenticated wake-only WebSocket. The server sends `changed` frames for messages, mailboxes, shared labels, and permitted drafts. Frames contain no mail data or cursors. After a frame or reconnect, read the authoritative REST resources and change journals. OAuth tokens require `mail:read`; draft frames also require `mail:send`. The authorization decision at upgrade is an event-delivery lease for 10 minutes. Credential or session revocation does not close the current socket immediately. The server closes the socket when the lease ends, and reconnection must use current credentials and permissions.",
         "security": [
           {
             "oauth2": ["mail:read"]
@@ -152,7 +152,7 @@
         ],
         "responses": {
           "101": {
-            "description": "WebSocket established. Text frames use `{\"type\":\"changed\",\"topic\":\"messages|drafts|mailboxes\"}`."
+            "description": "WebSocket established. Text frames use `{\"type\":\"changed\",\"topic\":\"messages|drafts|mailboxes|labels\"}`."
           },
           "401": {
             "description": "Missing or invalid authentication",

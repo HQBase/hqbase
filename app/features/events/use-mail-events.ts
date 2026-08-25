@@ -10,11 +10,12 @@ const fallbackPollMaxDelayMs = 60_000;
 const heartbeatIntervalMs = 30_000;
 const heartbeatTimeoutMs = 10_000;
 
-type MailEventTopic = "drafts" | "mailboxes" | "messages";
+type MailEventTopic = "drafts" | "labels" | "mailboxes" | "messages";
 
 type MailEventHandlers = {
   onDrafts: () => unknown;
   onFallbackPoll: () => unknown;
+  onLabels: () => unknown;
   onMailboxes: () => unknown;
   onMessages: () => unknown;
   onReconnect: () => unknown;
@@ -66,7 +67,9 @@ export function useMailEvents(
             ? currentHandlers.current.onMessages
             : topic === "drafts"
               ? currentHandlers.current.onDrafts
-              : currentHandlers.current.onMailboxes;
+              : topic === "labels"
+                ? currentHandlers.current.onLabels
+                : currentHandlers.current.onMailboxes;
         invoke(callback);
       }
       pendingTopics.clear();
@@ -272,7 +275,7 @@ function parseMailEvent(value: unknown): MailEvent | null {
     const candidate = parsed as Partial<MailEvent>;
     if (
       candidate.type !== "changed" ||
-      !["drafts", "mailboxes", "messages"].includes(candidate.topic ?? "")
+      !["drafts", "labels", "mailboxes", "messages"].includes(candidate.topic ?? "")
     ) {
       return null;
     }

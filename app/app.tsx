@@ -152,6 +152,7 @@ export function App(): React.ReactElement {
   const connectionStatus = useMailEvents(currentUserId, {
     onDrafts: draftState.refresh,
     onFallbackPoll: refreshRealtimeState,
+    onLabels: hardRefreshRealtimeState,
     onMailboxes: hardRefreshRealtimeState,
     onMessages: mailSync.refresh,
     onReconnect: hardRefreshRealtimeState

@@ -7,6 +7,7 @@ import type { HonoApp } from "../../lib/env";
 import { AppError } from "../../lib/errors";
 import { readJson } from "../../lib/json";
 import { recordAudit } from "../audit/service";
+import { ignoreMailEventFailure, publishWorkspaceMailEvent } from "../events/service";
 
 import { createLabel, deleteLabel, labelColors, listLabels, updateLabel } from "./queries";
 
@@ -39,6 +40,7 @@ labelRoutes.post("/", async (c) => {
   const input = labelInput(createLabelSchema, await readJson(c.req.raw));
   const label = await createLabel(c.env.DB, { ...input, userId: auth.user.id });
   await recordLabelAudit(c.env.DB, c.get("correlationId"), auth.user.id, "label.create", label.id);
+  c.executionCtx.waitUntil(ignoreMailEventFailure(publishWorkspaceMailEvent(c.env, "labels")));
   return c.json(label, 201);
 });
 
@@ -48,6 +50,7 @@ labelRoutes.patch("/:id", async (c) => {
   const input = labelInput(updateLabelSchema, await readJson(c.req.raw));
   const label = await updateLabel(c.env.DB, c.req.param("id"), input);
   await recordLabelAudit(c.env.DB, c.get("correlationId"), auth.user.id, "label.update", label.id);
+  c.executionCtx.waitUntil(ignoreMailEventFailure(publishWorkspaceMailEvent(c.env, "labels")));
   return c.json(label);
 });
 
@@ -62,6 +65,7 @@ labelRoutes.delete("/:id", async (c) => {
     "label.delete",
     c.req.param("id")
   );
+  c.executionCtx.waitUntil(ignoreMailEventFailure(publishWorkspaceMailEvent(c.env, "labels")));
   return c.body(null, 204);
 });
 

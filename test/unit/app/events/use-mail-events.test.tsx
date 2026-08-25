@@ -41,6 +41,7 @@ function handlers() {
   return {
     onDrafts: vi.fn(),
     onFallbackPoll: vi.fn(),
+    onLabels: vi.fn(),
     onMailboxes: vi.fn(),
     onMessages: vi.fn(),
     onReconnect: vi.fn()
@@ -81,12 +82,15 @@ describe("useMailEvents", () => {
       socket?.message('{"type":"changed","topic":"messages"}');
       socket?.message('{"type":"changed","topic":"messages"}');
       socket?.message('{"type":"changed","topic":"drafts"}');
+      socket?.message('{"type":"changed","topic":"labels"}');
+      socket?.message('{"type":"changed","topic":"labels"}');
       socket?.message('{"type":"unknown","topic":"mailboxes"}');
       socket?.message("not-json");
     });
 
     expect(callbacks.onMessages).toHaveBeenCalledOnce();
     expect(callbacks.onDrafts).toHaveBeenCalledOnce();
+    expect(callbacks.onLabels).toHaveBeenCalledOnce();
     expect(callbacks.onMailboxes).not.toHaveBeenCalled();
     await hook.unmount();
   });

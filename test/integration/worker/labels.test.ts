@@ -60,6 +60,8 @@ describe("labels", () => {
     expect(forbidden.status).toBe(403);
     expect(await forbidden.json()).toMatchObject({ error: { code: "LABEL_FORBIDDEN" } });
 
+    const memberSocket = await openEventSocket(memberCookie);
+    const labelFrame = nextSocketFrame(memberSocket);
     const created = await sessionFetch("/api/labels", ownerCookie, {
       body: JSON.stringify({ color: "blue", name: "Customer" }),
       headers: { "content-type": "application/json" },
@@ -69,6 +71,8 @@ describe("labels", () => {
     const label = (await created.json()) as { color: string; id: string; name: string };
     labelId = label.id;
     expect(label).toMatchObject({ color: "blue", name: "Customer" });
+    await expect(labelFrame).resolves.toEqual({ type: "changed", topic: "labels" });
+    memberSocket.close(1000, "Label event verified");
 
     const conflict = await sessionFetch("/api/labels", ownerCookie, {
       body: JSON.stringify({ color: "green", name: "customer" }),
@@ -232,6 +236,33 @@ function sessionFetch(path: string, cookie: string, init: RequestInit = {}): Pro
   const headers = new Headers(init.headers);
   headers.set("cookie", cookie);
   return SELF.fetch(`${origin}${path}`, { ...init, headers });
+}
+
+async function openEventSocket(cookie: string): Promise<WebSocket> {
+  const response = await SELF.fetch(`${origin}/api/v2/events`, {
+    headers: { cookie, origin, upgrade: "websocket" }
+  });
+  if (response.status !== 101 || !response.webSocket) {
+    throw new Error(`WebSocket upgrade failed (${response.status}): ${await response.text()}`);
+  }
+  response.webSocket.accept();
+  return response.webSocket;
+}
+
+function nextSocketFrame(socket: WebSocket): Promise<unknown> {
+  return new Promise((resolve, reject) => {
+    socket.addEventListener(
+      "message",
+      (event) => {
+        try {
+          resolve(JSON.parse(String(event.data)));
+        } catch (error) {
+          reject(error);
+        }
+      },
+      { once: true }
+    );
+  });
 }
 
 function sessionCookie(response: Response): string {

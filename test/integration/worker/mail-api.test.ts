@@ -535,6 +535,12 @@ describe("HQBase Mail API", () => {
       userIds: [userId]
     });
     await expect(messageFrame).resolves.toEqual({ type: "changed", topic: "messages" });
+    const labelFrame = nextSocketFrame(messageSocket);
+    await env.MAIL_EVENTS.getByName("workspace").publish({
+      topic: "labels",
+      userIds: [userId]
+    });
+    await expect(labelFrame).resolves.toEqual({ type: "changed", topic: "labels" });
     await closeEventSocket(messageSocket);
 
     const draftSocket = await openEventSocket({
