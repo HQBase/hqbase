@@ -3,7 +3,7 @@ import { PiChats, PiPaperclip, PiStar } from "react-icons/pi";
 
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { LabelBadges, LabelMenu } from "@/features/labels/label-controls";
+import { LabelMenu, LabelStack } from "@/features/labels/label-controls";
 import type { MailLabel } from "@/features/labels/types";
 import { cn } from "@/lib/cn";
 import { formatConversationTimestamp } from "@/lib/format";
@@ -46,7 +46,7 @@ export function MessageListItem({
   return (
     <a
       className={cn(
-        "group grid w-full grid-cols-[2.5rem_minmax(0,1fr)_5rem] items-start gap-x-3 rounded-xl px-3 py-3 text-left text-[14px] leading-5 transition-colors focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring sm:grid-cols-[2rem_minmax(8rem,22%)_minmax(0,1fr)_5rem] sm:gap-x-3 sm:py-2 sm:text-[13px]",
+        "group grid w-full grid-cols-[2.5rem_minmax(0,1fr)_5rem] items-start gap-x-3 rounded-xl px-3 py-3 text-left text-[14px] leading-5 transition-colors focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring sm:grid-cols-[2rem_minmax(8rem,20%)_minmax(0,1fr)_3.25rem_minmax(8rem,14rem)_5rem] sm:gap-x-2 sm:py-2 sm:text-[13px]",
         isActive
           ? "bg-selected [@media(hover:hover)]:hover:bg-selected"
           : "[@media(hover:hover)]:hover:bg-hover"
@@ -68,7 +68,7 @@ export function MessageListItem({
     >
       <Avatar
         aria-hidden="true"
-        className="row-span-3 size-10 sm:hidden"
+        className="row-span-2 size-10 sm:hidden"
         data-message-avatar="mobile"
       >
         <AvatarFallback className="font-medium uppercase">{avatarInitial}</AvatarFallback>
@@ -133,7 +133,28 @@ export function MessageListItem({
         </span>
         {conversation.messageCount > 1 ? (
           <span
-            className="mx-1 shrink-0 rounded-md bg-muted px-1.5 py-0.5 text-[11px] tabular-nums text-tertiary"
+            className="shrink-0 rounded-md bg-muted px-1.5 py-0.5 text-[11px] tabular-nums text-tertiary sm:hidden"
+            title={`${conversation.messageCount} messages`}
+          >
+            {conversation.messageCount}
+          </span>
+        ) : null}
+        {conversation.hasAttachments ? (
+          <PiPaperclip
+            aria-label="Has attachments"
+            className="pointer-events-none size-3.5 shrink-0 text-tertiary sm:hidden"
+          />
+        ) : null}
+        {activeFolder === "catchall" ? (
+          <Badge className="h-5 shrink-0 px-1.5 text-[10px]" variant="outline">
+            Unknown
+          </Badge>
+        ) : null}
+      </span>
+      <span className="hidden min-w-0 items-center justify-center gap-1 sm:col-start-4 sm:row-start-1 sm:flex">
+        {conversation.messageCount > 1 ? (
+          <span
+            className="rounded-md bg-muted px-1.5 py-0.5 text-[11px] tabular-nums text-tertiary"
             title={`${conversation.messageCount} messages`}
           >
             {conversation.messageCount}
@@ -145,15 +166,18 @@ export function MessageListItem({
             className="pointer-events-none size-3.5 shrink-0 text-tertiary"
           />
         ) : null}
-        {activeFolder === "catchall" ? (
-          <Badge className="h-5 shrink-0 px-1.5 text-[10px]" variant="outline">
-            Unknown
-          </Badge>
-        ) : null}
       </span>
       {(conversation.labels?.length ?? 0) > 0 || (labels.length > 0 && onToggleLabel) ? (
-        <span className="col-span-2 col-start-2 row-start-3 mt-1 flex min-w-0 items-center gap-1 sm:col-span-2 sm:col-start-3 sm:row-start-2 sm:mt-1">
-          <LabelBadges labels={conversation.labels ?? []} />
+        <span className="col-start-3 row-start-2 flex min-w-0 items-center justify-self-start sm:col-start-5 sm:row-start-1 sm:justify-self-stretch sm:gap-1">
+          {!onToggleLabel ? (
+            <LabelStack
+              className="sm:hidden"
+              compact
+              labels={conversation.labels ?? []}
+              namedLimit={0}
+            />
+          ) : null}
+          <LabelStack className="hidden sm:flex" labels={conversation.labels ?? []} />
           {labels.length > 0 && onToggleLabel ? (
             <LabelMenu
               assigned={conversation.labels ?? []}
@@ -167,7 +191,7 @@ export function MessageListItem({
       ) : null}
       <time
         className={cn(
-          "col-start-3 row-start-1 shrink-0 text-right text-[11px] tabular-nums sm:col-start-4 sm:row-start-1 sm:w-20 sm:text-[12px]",
+          "col-start-3 row-start-1 shrink-0 text-right text-[11px] tabular-nums sm:col-start-6 sm:row-start-1 sm:w-20 sm:text-[12px]",
           isUnread ? "font-medium text-foreground dark:text-white" : "text-muted-foreground"
         )}
       >

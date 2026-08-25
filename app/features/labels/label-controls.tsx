@@ -24,6 +24,7 @@ export function LabelFilter({
 }): React.ReactElement | null {
   if (labels.length === 0) return null;
   const selectedIds = new Set(values);
+  const selectedLabels = labels.filter((label) => selectedIds.has(label.id));
 
   function toggle(labelId: string, selected: boolean): void {
     const next = new Set(values);
@@ -37,28 +38,30 @@ export function LabelFilter({
       <DropdownMenuTrigger asChild>
         <Button
           aria-label={
-            values.length === 0 ? "Filter by labels" : `Filter by labels, ${values.length} selected`
+            values.length === 0
+              ? "Filter by labels"
+              : `Filter by labels: ${selectedLabels.map((label) => label.name).join(", ")}`
           }
-          className="h-8 min-h-8 rounded-full bg-muted/70 px-2.5 text-xs shadow-none"
+          className="h-7 min-h-7 max-w-[min(16rem,50vw)] gap-1 rounded-full bg-muted/70 px-2 text-[11px] shadow-none"
           size="sm"
           type="button"
           variant="ghost"
         >
-          <PiTag aria-hidden="true" />
-          <span>Labels</span>
-          {values.length > 0 ? (
-            <span className="rounded-full bg-background/80 px-1.5 text-[10px] tabular-nums">
-              {values.length}
-            </span>
-          ) : null}
+          <PiTag aria-hidden="true" className="size-3.5 shrink-0" />
+          {selectedLabels.length > 0 ? (
+            <LabelStack compact labels={selectedLabels} />
+          ) : (
+            <span>Labels</span>
+          )}
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-56">
-        <DropdownMenuLabel className="text-xs text-muted-foreground">
+      <DropdownMenuContent align="end" className="w-52 p-1 text-xs">
+        <DropdownMenuLabel className="px-2 py-1 text-[10px] text-muted-foreground">
           Filter by every selected label
         </DropdownMenuLabel>
         <DropdownMenuCheckboxItem
           checked={values.length === 0}
+          className="min-h-7 py-1 text-xs"
           onCheckedChange={(checked) => {
             if (checked) onChange([]);
           }}
@@ -69,6 +72,7 @@ export function LabelFilter({
         {labels.map((label) => (
           <DropdownMenuCheckboxItem
             checked={selectedIds.has(label.id)}
+            className="min-h-7 py-1 text-xs"
             key={label.id}
             onCheckedChange={(checked) => toggle(label.id, checked === true)}
             onSelect={(event) => event.preventDefault()}
@@ -122,7 +126,7 @@ export function LabelMenu({
         <Button
           aria-label="Labels"
           className={cn(
-            "size-10 min-h-10 min-w-10 text-muted-foreground sm:size-8 sm:min-h-8 sm:min-w-8",
+            "relative size-10 min-h-10 min-w-10 text-muted-foreground sm:size-8 sm:min-h-8 sm:min-w-8",
             className
           )}
           disabled={disabled || !canOrganizeLabels || labels.length === 0 || pendingId !== null}
@@ -142,6 +146,19 @@ export function LabelMenu({
           }}
         >
           <PiTag aria-hidden="true" className="pointer-events-none" />
+          {assigned.length > 0 ? (
+            <span
+              aria-hidden="true"
+              className="pointer-events-none absolute bottom-1 flex -space-x-0.5"
+            >
+              {assigned.slice(0, 3).map((label) => (
+                <span
+                  className={cn("size-1.5 rounded-full", labelPillColorClass(label.color))}
+                  key={label.id}
+                />
+              ))}
+            </span>
+          ) : null}
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent
@@ -187,6 +204,66 @@ export function LabelBadges({ labels }: { labels: MailLabel[] }): React.ReactEle
           <span className="truncate">{label.name}</span>
         </span>
       ))}
+    </span>
+  );
+}
+
+export function LabelStack({
+  className,
+  compact = false,
+  labels,
+  namedLimit = 3
+}: {
+  className?: string;
+  compact?: boolean;
+  labels: MailLabel[];
+  namedLimit?: number;
+}): React.ReactElement | null {
+  if (labels.length === 0) return null;
+  const named = labels.slice(0, namedLimit);
+  const stacked = labels.slice(namedLimit);
+  const shownColors = stacked.slice(0, 5);
+
+  return (
+    <span
+      aria-label={labels.map((label) => label.name).join(", ")}
+      className={cn("flex min-w-0 items-center gap-1", className)}
+      data-label-stack
+      role="img"
+      title={labels.map((label) => label.name).join(", ")}
+    >
+      {named.map((label) => (
+        <span
+          className={cn(
+            "inline-flex min-w-0 max-w-14 items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium",
+            compact && "max-w-12 px-1 py-0 text-[9px]",
+            labelPillColorClass(label.color)
+          )}
+          key={label.id}
+        >
+          <span className="truncate">{label.name}</span>
+        </span>
+      ))}
+      {shownColors.length > 0 ? (
+        <span aria-hidden="true" className="flex shrink-0 -space-x-1">
+          {shownColors.map((label) => (
+            <span
+              className={cn(
+                "h-4 w-1.5 rounded-full",
+                compact && "h-3.5 w-1",
+                labelPillColorClass(label.color)
+              )}
+              data-label-stack-color={label.color}
+              key={label.id}
+            />
+          ))}
+        </span>
+      ) : null}
+      {stacked.length > shownColors.length ? (
+        <span className="shrink-0 text-[9px] tabular-nums text-muted-foreground">
+          +{stacked.length - shownColors.length}
+        </span>
+      ) : null}
     </span>
   );
 }

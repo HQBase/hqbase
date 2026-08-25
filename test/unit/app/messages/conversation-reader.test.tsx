@@ -261,8 +261,14 @@ describe("conversation reader", () => {
     expect(html).toContain('data-message-avatar="mobile"');
     expect(html).toContain("grid-cols-[2.5rem_minmax(0,1fr)_5rem]");
     expect(html).toContain("rounded-xl px-3");
-    expect(html).toContain("sm:grid-cols-[2rem_minmax(8rem,22%)_minmax(0,1fr)_5rem]");
-    expect(html).toContain("row-start-3");
+    expect(html).toContain(
+      "sm:grid-cols-[2rem_minmax(8rem,20%)_minmax(0,1fr)_3.25rem_minmax(8rem,14rem)_5rem]"
+    );
+    expect(html).not.toContain("row-start-3");
+    expect(html).toContain("sm:col-start-4");
+    expect(html).toContain("sm:col-start-5");
+    expect(html).toContain("sm:col-start-6");
+    expect(html).not.toContain("sm:row-start-2 sm:mt-1");
     expect(html).toContain("bg-blue-500/15");
     expect(html).toContain('aria-label="Labels"');
     expect(html).toContain("min-h-10");

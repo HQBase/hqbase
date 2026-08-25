@@ -3,7 +3,7 @@ import * as React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { LabelBadges, LabelFilter } from "@/features/labels/label-controls";
+import { LabelBadges, LabelFilter, LabelStack } from "@/features/labels/label-controls";
 import { LabelSettings } from "@/features/labels/label-settings";
 import type { MailLabel } from "@/features/labels/types";
 import { flushHookEffects, renderComponent } from "../render-hook";
@@ -31,12 +31,41 @@ describe("label controls", () => {
     const filter = renderToStaticMarkup(
       <LabelFilter labels={[label]} values={[]} onChange={() => undefined} />
     );
+    const selectedFilter = renderToStaticMarkup(
+      <LabelFilter
+        labels={[label, priorityLabel]}
+        values={[label.id, priorityLabel.id]}
+        onChange={() => undefined}
+      />
+    );
     const badges = renderToStaticMarkup(<LabelBadges labels={[label]} />);
 
     expect(filter).toContain('aria-label="Filter by labels"');
     expect(filter).toContain(">Labels</span>");
+    expect(selectedFilter).toContain("Customer");
+    expect(selectedFilter).toContain("Priority");
+    expect(selectedFilter).toContain("h-7");
+    expect(selectedFilter).toContain("text-[11px]");
     expect(badges).toContain("Customer");
     expect(badges).toContain("bg-blue-500/15");
+  });
+
+  it("names three labels and keeps overflow colors visible", () => {
+    const labels = [
+      label,
+      priorityLabel,
+      { ...label, color: "amber" as const, id: "label-3", name: "Billing" },
+      { ...label, color: "green" as const, id: "label-4", name: "Follow up" },
+      { ...label, color: "purple" as const, id: "label-5", name: "Partner" }
+    ];
+    const stack = renderToStaticMarkup(<LabelStack labels={labels} />);
+
+    expect(stack).toContain(">Customer</span>");
+    expect(stack).toContain(">Priority</span>");
+    expect(stack).toContain(">Billing</span>");
+    expect(stack.match(/data-label-stack-color=/gu)).toHaveLength(2);
+    expect(stack).toContain('data-label-stack-color="green"');
+    expect(stack).toContain('data-label-stack-color="purple"');
   });
 
   it("keeps the compact filter open while selecting every required label", async () => {
@@ -74,7 +103,8 @@ describe("label controls", () => {
 
     expect(onChange).toHaveBeenNthCalledWith(1, ["label-1"]);
     expect(onChange).toHaveBeenNthCalledWith(2, ["label-1", "label-2"]);
-    expect(view.container.textContent).toContain("2");
+    expect(trigger?.textContent).toContain("Customer");
+    expect(trigger?.textContent).toContain("Priority");
     await view.unmount();
   });
 
