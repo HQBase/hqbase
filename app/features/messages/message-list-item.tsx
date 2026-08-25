@@ -73,7 +73,7 @@ export function MessageListItem({
       >
         <AvatarFallback className="font-medium uppercase">{avatarInitial}</AvatarFallback>
       </Avatar>
-      <span className="col-start-3 row-start-2 flex shrink-0 self-end justify-self-end sm:col-start-1 sm:row-start-1 sm:self-center sm:justify-self-auto">
+      <span className="col-start-3 row-start-2 flex shrink-0 self-center justify-self-end sm:col-start-1 sm:row-start-1 sm:justify-self-auto">
         <button
           aria-label={conversation.isStarred ? "Unstar conversation" : "Star conversation"}
           aria-pressed={conversation.isStarred}
@@ -109,7 +109,7 @@ export function MessageListItem({
           {correspondent}
         </span>
       </span>
-      <span className="relative col-start-2 row-start-2 flex min-w-0 items-end gap-2 overflow-hidden sm:col-start-3 sm:row-start-1 sm:h-8 sm:items-center">
+      <span className="col-start-2 row-start-2 flex min-w-0 items-end gap-2 overflow-hidden sm:col-start-3 sm:row-start-1 sm:h-8 sm:items-center">
         <span className="min-w-0 flex-1">
           <span
             className={cn(
@@ -150,29 +150,29 @@ export function MessageListItem({
             Unknown
           </Badge>
         ) : null}
-        {(conversation.labels?.length ?? 0) > 0 || (labels.length > 0 && onToggleLabel) ? (
-          <span className="group/label-pill absolute right-0 top-1/2 z-10 flex w-fit min-w-0 max-w-[75%] -translate-y-1/2 items-center justify-end gap-0.5 rounded-full bg-background/60 p-0.5 shadow-sm backdrop-blur-md">
-            <LabelStack
-              className="sm:hidden"
-              compact
-              labels={conversation.labels ?? []}
-              namedLimit={0}
-            />
-            <LabelStack className="hidden sm:flex" compact labels={conversation.labels ?? []} />
-            {labels.length > 0 && onToggleLabel ? (
-              <LabelMenu
-                assigned={conversation.labels ?? []}
-                canOrganizeLabels={canOrganizeLabels}
-                className="bg-transparent shadow-none group-hover/label-pill:text-foreground/80 [@media(hover:hover)]:hover:bg-transparent [@media(hover:hover)]:hover:text-foreground/80 sm:size-5 sm:min-h-5 sm:min-w-5"
-                labels={labels}
-                onToggle={onToggleLabel}
-                showTagIcon
-              />
-            ) : null}
-          </span>
-        ) : null}
       </span>
-      <span className="hidden min-w-0 items-center justify-center gap-1 sm:col-start-4 sm:row-start-1 sm:flex">
+      {(conversation.labels?.length ?? 0) > 0 || (labels.length > 0 && onToggleLabel) ? (
+        <span className="group/label-pill col-start-3 row-start-2 z-10 flex w-10 min-w-0 max-w-10 items-center justify-end gap-0 self-center justify-self-start rounded-full bg-transparent p-0.5 shadow-[0_0_10px_4px_hsl(var(--background)/0.55)] backdrop-blur-md sm:col-start-3 sm:row-start-1 sm:w-fit sm:max-w-[75%] sm:gap-0.5 sm:justify-self-end">
+          <LabelStack
+            className="max-w-1 overflow-hidden sm:hidden"
+            compact
+            labels={conversation.labels ?? []}
+            namedLimit={0}
+          />
+          <LabelStack className="hidden sm:flex" compact labels={conversation.labels ?? []} />
+          {labels.length > 0 && onToggleLabel ? (
+            <LabelMenu
+              assigned={conversation.labels ?? []}
+              canOrganizeLabels={canOrganizeLabels}
+              className="size-7 min-h-7 min-w-7 rounded-full bg-transparent shadow-none group-hover/label-pill:text-foreground/80 [@media(hover:hover)]:hover:bg-transparent [@media(hover:hover)]:hover:text-foreground/80 sm:size-5 sm:min-h-5 sm:min-w-5"
+              labels={labels}
+              onToggle={onToggleLabel}
+              showTagIcon
+            />
+          ) : null}
+        </span>
+      ) : null}
+      <span className="hidden min-w-0 items-center justify-center gap-1 sm:col-start-4 sm:row-start-1 sm:flex sm:w-12 sm:min-w-12">
         {conversation.messageCount > 1 ? (
           <span
             className="rounded-md bg-muted px-1.5 py-0.5 text-[11px] tabular-nums text-tertiary"
