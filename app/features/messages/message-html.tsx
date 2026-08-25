@@ -267,7 +267,7 @@ export function QuotedContentDivider({
       <button
         aria-expanded={expanded}
         aria-label={expanded ? "Hide quoted message history" : "Show quoted message history"}
-        className="inline-flex h-5 w-8 items-center justify-center rounded bg-muted text-muted-foreground transition-colors [@media(hover:hover)]:hover:bg-muted/80 [@media(hover:hover)]:hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        className="inline-flex h-5 w-8 cursor-pointer items-center justify-center rounded bg-muted text-muted-foreground transition-colors [@media(hover:hover)]:hover:bg-muted/80 [@media(hover:hover)]:hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         onClick={onToggle}
         type="button"
       >
