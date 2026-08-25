@@ -135,6 +135,14 @@ describe("workspace user onboarding", () => {
       .bind("future.example")
       .first();
     expect(rejectedDomain).toBeNull();
+
+    const longNestedDomain = `${"second-".padEnd(45, "a")}.future.example`;
+    const acceptedDomain = await SELF.fetch(`${origin}/api/domains`, {
+      body: JSON.stringify({ name: longNestedDomain }),
+      headers: { "content-type": "application/json", cookie: ownerCookie, origin },
+      method: "POST"
+    });
+    expect(acceptedDomain.status, await acceptedDomain.clone().text()).toBe(201);
   });
 
   it("regenerates a lost temporary password only while setup is pending", async () => {

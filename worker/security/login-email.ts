@@ -48,7 +48,9 @@ export async function assertDomainUnusedByLoginEmails(
   const normalized = domain.trim().toLowerCase();
   const user = await getRow<{ email: string }>(
     db,
-    sql`SELECT email FROM "user" WHERE lower(email) LIKE ${`%@${normalized}`} LIMIT 1`
+    sql`SELECT email FROM "user"
+        WHERE lower(substr(email, instr(email, '@') + 1)) = ${normalized}
+        LIMIT 1`
   );
   if (user) {
     throw new AppError(

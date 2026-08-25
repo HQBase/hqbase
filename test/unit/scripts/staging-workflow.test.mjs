@@ -55,7 +55,7 @@ describe("staging workflow lifecycle record", () => {
     expect(workflow).toContain('"$(basename "$migration")" < "0014_"');
     expect(workflow).toContain('"is_unassigned":1');
     expect(workflow).toContain('"delivered_to_address":"alias@sql-upgrade.example.test"');
-    expect(workflow).toContain('"migration_count":21');
+    expect(workflow).toContain('"migration_count":22');
     expect(workflow).toContain('"post_migration_count":2');
     expect(workflow).toContain('migrations_table = "d1_migrations_after_deploy"');
     expect(workflow).toContain("del(.d1_databases[0].migrations_pattern)");

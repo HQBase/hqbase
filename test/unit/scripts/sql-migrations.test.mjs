@@ -34,7 +34,8 @@ const expectedMigrationNames = [
   "0018_mailbox_lifecycle.sql",
   "0019_contacts.sql",
   "0020_labels.sql",
-  "0021_email_signatures.sql"
+  "0021_email_signatures.sql",
+  "0022_login_email_domain_exact_match.sql"
 ];
 const expectedAfterDeployMigrationNames = [
   "0001_remove_mailbox_alias_storage.sql",
@@ -464,6 +465,12 @@ describe("SQL migration contract", () => {
     expect(applyMigration(database, migrationNamed(migrations, "0021_email_signatures.sql"))).toBe(
       true
     );
+    expect(
+      applyMigration(
+        database,
+        migrationNamed(migrations, "0022_login_email_domain_exact_match.sql")
+      )
+    ).toBe(true);
 
     database.exec(`
       INSERT INTO contacts (
@@ -671,7 +678,7 @@ describe("SQL migration contract", () => {
       )
     ).toBe(false);
     expect(database.prepare("SELECT count(*) AS count FROM d1_migrations").get()).toEqual({
-      count: 21
+      count: 22
     });
     expect(
       database.prepare("SELECT count(*) AS count FROM d1_migrations_after_deploy").get()
