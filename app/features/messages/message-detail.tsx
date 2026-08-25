@@ -3,18 +3,35 @@ import {
   PiArchive,
   PiArrowCounterClockwise,
   PiArrowLeft,
+  PiDotsThree,
   PiEnvelopeOpen,
   PiStar,
+  PiTag,
   PiTrash
 } from "react-icons/pi";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger
+} from "@/components/ui/dropdown-menu";
 import { PullToRefresh } from "@/components/ui/pull-to-refresh";
 import { ComposerInlineTarget, useComposer } from "@/features/compose/composer-host";
-import { LabelBadges, LabelMenu } from "@/features/labels/label-controls";
+import {
+  LabelBadges,
+  LabelMenu,
+  LabelMenuItems,
+  useLabelToggle
+} from "@/features/labels/label-controls";
 import type { MailLabel } from "@/features/labels/types";
 import type { Mailbox } from "@/features/mailboxes/types";
+import { cn } from "@/lib/cn";
 import type { MailFolderId } from "@/lib/routes";
 import { ConversationMessages } from "./conversation-messages";
 import type { MessageDetail as MessageDetailType } from "./types";
@@ -66,6 +83,7 @@ export function MessageDetail({
   onToggleLabel
 }: MessageDetailProps): React.ReactElement {
   const composer = useComposer();
+  const mobileLabelToggle = useLabelToggle(onToggleLabel);
 
   if (isLoading) {
     return <MessageReaderStatus label="Loading conversation" />;
@@ -86,6 +104,7 @@ export function MessageDetail({
   const isStarred = messages.some((message) => message.starredAt !== null);
   const isArchived = activeFolder === "archived";
   const isTrash = activeFolder === "trash";
+  const assignedLabels = mergeMessageLabels(messages);
   const inlineSessions = composer.sessions.filter(
     (session) => !session.detached && session.origin?.threadId === selected.threadId
   );
@@ -121,10 +140,12 @@ export function MessageDetail({
           <div className="flex shrink-0 flex-wrap items-center gap-0.5">
             {labels.length > 0 && onToggleLabel ? (
               <LabelMenu
-                assigned={mergeMessageLabels(messages)}
+                assigned={assignedLabels}
                 canOrganizeLabels={canOrganizeLabels}
+                className="hidden sm:inline-flex"
                 labels={labels}
                 onToggle={onToggleLabel}
+                showTagIcon
               />
             ) : null}
             <IconButton
@@ -142,6 +163,7 @@ export function MessageDetail({
             <IconButton
               active={isStarred}
               activeClassName="text-star [@media(hover:hover)]:hover:text-star"
+              className="hidden sm:inline-flex"
               label={isStarred ? "Unstar conversation" : "Star conversation"}
               onClick={() => void applyAction(isStarred ? "unstar" : "star")}
             >
@@ -152,6 +174,7 @@ export function MessageDetail({
             </IconButton>
             {isTrash ? (
               <IconButton
+                className="hidden sm:inline-flex"
                 label="Restore conversation"
                 onClick={() => void applyAction("restore", "Conversation restored.")}
               >
@@ -160,6 +183,7 @@ export function MessageDetail({
             ) : (
               <>
                 <IconButton
+                  className="hidden sm:inline-flex"
                   label={isArchived ? "Unarchive conversation" : "Archive conversation"}
                   onClick={() =>
                     void applyAction(
@@ -182,13 +206,94 @@ export function MessageDetail({
                 </IconButton>
               </>
             )}
+            <DropdownMenu modal={false}>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  aria-label="More conversation actions"
+                  className="size-10 min-h-10 min-w-10 text-muted-foreground [@media(hover:hover)]:hover:text-foreground sm:hidden"
+                  size="icon"
+                  title="More conversation actions"
+                  type="button"
+                  variant="ghost"
+                >
+                  <PiDotsThree aria-hidden="true" className="pointer-events-none" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent
+                align="end"
+                className="w-52 p-1 text-sm"
+                data-mobile-thread-actions
+              >
+                {labels.length > 0 && onToggleLabel ? (
+                  <>
+                    <DropdownMenuLabel className="flex min-h-9 items-center gap-2 px-2 py-1 text-xs font-medium text-muted-foreground">
+                      <PiTag aria-hidden="true" className="size-4" />
+                      Labels
+                    </DropdownMenuLabel>
+                    <DropdownMenuGroup>
+                      <LabelMenuItems
+                        assigned={assignedLabels}
+                        className="min-h-10 py-2 text-sm"
+                        disabled={!canOrganizeLabels}
+                        keepOpen
+                        labels={labels}
+                        pendingId={mobileLabelToggle.pendingId}
+                        onToggle={mobileLabelToggle.toggle}
+                      />
+                    </DropdownMenuGroup>
+                    <DropdownMenuSeparator />
+                  </>
+                ) : null}
+                <DropdownMenuGroup>
+                  <DropdownMenuItem
+                    className="min-h-10 gap-2"
+                    data-mobile-thread-action={isStarred ? "unstar" : "star"}
+                    onSelect={() => void applyAction(isStarred ? "unstar" : "star")}
+                  >
+                    <PiStar
+                      aria-hidden="true"
+                      className={cn("size-4", isStarred && "fill-star text-star")}
+                    />
+                    {isStarred ? "Unstar conversation" : "Star conversation"}
+                  </DropdownMenuItem>
+                  {isTrash ? (
+                    <DropdownMenuItem
+                      className="min-h-10 gap-2"
+                      data-mobile-thread-action="restore"
+                      onSelect={() => void applyAction("restore", "Conversation restored.")}
+                    >
+                      <PiArrowCounterClockwise aria-hidden="true" className="size-4" />
+                      Restore conversation
+                    </DropdownMenuItem>
+                  ) : (
+                    <DropdownMenuItem
+                      className="min-h-10 gap-2"
+                      data-mobile-thread-action={isArchived ? "unarchive" : "archive"}
+                      onSelect={() =>
+                        void applyAction(
+                          isArchived ? "unarchive" : "archive",
+                          isArchived ? "Conversation unarchived." : "Conversation archived."
+                        )
+                      }
+                    >
+                      {isArchived ? (
+                        <PiArrowCounterClockwise aria-hidden="true" className="size-4" />
+                      ) : (
+                        <PiArchive aria-hidden="true" className="size-4" />
+                      )}
+                      {isArchived ? "Unarchive conversation" : "Archive conversation"}
+                    </DropdownMenuItem>
+                  )}
+                </DropdownMenuGroup>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
       </div>
       <PullToRefresh className="min-h-0 flex-1" onRefresh={onRefresh}>
-        {mergeMessageLabels(messages).length > 0 ? (
+        {assignedLabels.length > 0 ? (
           <div className="px-4 pt-4 sm:px-6">
-            <LabelBadges labels={mergeMessageLabels(messages)} />
+            <LabelBadges labels={assignedLabels} />
           </div>
         ) : null}
         <ConversationMessages
@@ -248,12 +353,14 @@ function IconButton({
   active = false,
   activeClassName = "",
   children,
+  className,
   label,
   onClick
 }: {
   active?: boolean;
   activeClassName?: string;
   children: React.ReactNode;
+  className?: string;
   label: string;
   onClick: () => void;
 }): React.ReactElement {
@@ -263,7 +370,7 @@ function IconButton({
     <Button
       aria-label={label}
       aria-pressed={active || undefined}
-      className={active ? `${base} ${activeClassName}` : base}
+      className={cn(base, className, active && activeClassName)}
       onClick={onClick}
       size="icon"
       title={label}

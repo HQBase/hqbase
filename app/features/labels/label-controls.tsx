@@ -1,11 +1,12 @@
 import * as React from "react";
-import { PiDotsThree, PiFunnelSimple, PiTag } from "react-icons/pi";
+import { PiDotsThree, PiTag } from "react-icons/pi";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuLabel,
   DropdownMenuTrigger
 } from "@/components/ui/dropdown-menu";
@@ -47,7 +48,7 @@ export function LabelFilter({
           type="button"
           variant="ghost"
         >
-          <PiFunnelSimple aria-hidden="true" className="size-3 shrink-0" />
+          <PiTag aria-hidden="true" className="size-3 shrink-0" data-label-filter-icon="tag" />
           {selectedLabels.length > 0 ? (
             <LabelStack compact labels={selectedLabels} />
           ) : (
@@ -105,22 +106,7 @@ export function LabelMenu({
   onToggle: (label: MailLabel, assigned: boolean) => Promise<void> | void;
   showTagIcon?: boolean;
 }): React.ReactElement {
-  const [pendingId, setPendingId] = React.useState<string | null>(null);
-  const assignedIds = new Set(assigned.map((label) => label.id));
-
-  async function toggle(label: MailLabel, nextAssigned: boolean): Promise<void> {
-    setPendingId(label.id);
-    try {
-      await onToggle(label, nextAssigned);
-      toast.success(
-        nextAssigned ? `Label “${label.name}” added.` : `Label “${label.name}” removed.`
-      );
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Label could not be updated.");
-    } finally {
-      setPendingId(null);
-    }
-  }
+  const { pendingId, toggle } = useLabelToggle(onToggle);
 
   return (
     <DropdownMenu>
@@ -179,26 +165,82 @@ export function LabelMenu({
         <DropdownMenuLabel className="px-2 py-1 text-[10px] text-muted-foreground">
           Labels
         </DropdownMenuLabel>
-        {labels.map((label) => {
-          const checked = assignedIds.has(label.id);
-          return (
-            <DropdownMenuCheckboxItem
-              checked={checked}
-              className="min-h-7 py-1 text-xs"
-              disabled={pendingId !== null}
-              key={label.id}
-              onCheckedChange={(next) => void toggle(label, next === true)}
-            >
-              <span className="flex min-w-0 items-center gap-2">
-                <LabelColorDot color={label.color} />
-                <span className="truncate">{label.name}</span>
-              </span>
-            </DropdownMenuCheckboxItem>
-          );
-        })}
+        <DropdownMenuGroup>
+          <LabelMenuItems
+            assigned={assigned}
+            disabled={!canOrganizeLabels}
+            labels={labels}
+            pendingId={pendingId}
+            onToggle={toggle}
+          />
+        </DropdownMenuGroup>
       </DropdownMenuContent>
     </DropdownMenu>
   );
+}
+
+export function LabelMenuItems({
+  assigned,
+  className,
+  disabled = false,
+  keepOpen = false,
+  labels,
+  onToggle,
+  pendingId = null
+}: {
+  assigned: MailLabel[];
+  className?: string;
+  disabled?: boolean;
+  keepOpen?: boolean;
+  labels: MailLabel[];
+  onToggle: (label: MailLabel, assigned: boolean) => Promise<void> | void;
+  pendingId?: string | null;
+}): React.ReactElement {
+  const assignedIds = new Set(assigned.map((label) => label.id));
+
+  return (
+    <>
+      {labels.map((label) => (
+        <DropdownMenuCheckboxItem
+          checked={assignedIds.has(label.id)}
+          className={cn("min-h-7 py-1 text-xs", className)}
+          disabled={disabled || pendingId !== null}
+          key={label.id}
+          onCheckedChange={(next) => void onToggle(label, next === true)}
+          {...(keepOpen ? { onSelect: (event: Event) => event.preventDefault() } : {})}
+        >
+          <span className="flex min-w-0 items-center gap-2">
+            <LabelColorDot color={label.color} />
+            <span className="truncate">{label.name}</span>
+          </span>
+        </DropdownMenuCheckboxItem>
+      ))}
+    </>
+  );
+}
+
+export function useLabelToggle(
+  onToggle?: (label: MailLabel, assigned: boolean) => Promise<void> | void
+): {
+  pendingId: string | null;
+  toggle: (label: MailLabel, assigned: boolean) => Promise<void>;
+} {
+  const [pendingId, setPendingId] = React.useState<string | null>(null);
+
+  async function toggle(label: MailLabel, assigned: boolean): Promise<void> {
+    if (!onToggle) return;
+    setPendingId(label.id);
+    try {
+      await onToggle(label, assigned);
+      toast.success(assigned ? `Label “${label.name}” added.` : `Label “${label.name}” removed.`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Label could not be updated.");
+    } finally {
+      setPendingId(null);
+    }
+  }
+
+  return { pendingId, toggle };
 }
 
 export function LabelBadges({ labels }: { labels: MailLabel[] }): React.ReactElement | null {

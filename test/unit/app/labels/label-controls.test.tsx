@@ -41,6 +41,7 @@ describe("label controls", () => {
     const badges = renderToStaticMarkup(<LabelBadges labels={[label]} />);
 
     expect(filter).toContain('aria-label="Filter by labels"');
+    expect(filter).toContain('data-label-filter-icon="tag"');
     expect(filter).toContain(">Labels</span>");
     expect(selectedFilter).toContain("Customer");
     expect(selectedFilter).toContain("Priority");
@@ -69,7 +70,7 @@ describe("label controls", () => {
     expect(stack).toContain('data-label-stack-color="purple"');
   });
 
-  it("uses the label icon only for the conversation-row action", () => {
+  it("switches the menu trigger between label and more icons", () => {
     const rowMenu = renderToStaticMarkup(
       <LabelMenu assigned={[label]} labels={[label]} onToggle={() => undefined} showTagIcon />
     );
@@ -83,6 +84,24 @@ describe("label controls", () => {
     expect(generalMenu).toContain('data-label-menu-icon="more"');
     expect(generalMenu).not.toContain('data-label-menu-icon="tag"');
     expect(generalMenu).toContain("bottom-1");
+  });
+
+  it("closes the standard assignment menu after a label choice", async () => {
+    const view = await renderComponent(
+      <LabelMenu assigned={[]} labels={[label]} onToggle={() => undefined} />
+    );
+    const trigger = view.container.querySelector<HTMLButtonElement>('[aria-label="Labels"]');
+    await flushHookEffects(() => {
+      trigger?.dispatchEvent(
+        new PointerEvent("pointerdown", { bubbles: true, button: 0, pointerType: "mouse" })
+      );
+      trigger?.click();
+    });
+    const item = document.body.querySelector<HTMLElement>('[role="menuitemcheckbox"]');
+    await flushHookEffects(() => item?.click());
+
+    expect(document.body.querySelector('[role="menuitemcheckbox"]')).toBeNull();
+    await view.unmount();
   });
 
   it("keeps the compact filter open while selecting every required label", async () => {
