@@ -88,7 +88,7 @@ export async function storeInboundEmail(
     receivedAt: timestamp,
     sentAt: null,
     readAt: null,
-    hasAttachments: input.parsed.attachments.length > 0,
+    hasAttachments: hasDownloadableAttachments(input.parsed.attachments),
     deliveredToAddress: recipient
   });
 
@@ -112,6 +112,16 @@ export async function storeInboundEmail(
     isUnassigned: plan.isUnassigned,
     message: (await getMessageDetail(db, message.id)) ?? message
   };
+}
+
+export function hasDownloadableAttachments(
+  attachments: ParsedEmail["attachments"]
+): boolean {
+  return attachments.some(
+    (attachment) =>
+      attachment.disposition === "attachment" ||
+      (attachment.disposition === null && !attachment.contentId)
+  );
 }
 
 async function findDuplicate(db: D1Database, dedupeKey: string): Promise<MessageSummary | null> {

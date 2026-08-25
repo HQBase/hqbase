@@ -7,6 +7,7 @@ type ParsedAttachment = {
   filename: string;
   contentType: string;
   contentId: string | null;
+  disposition: Attachment["disposition"];
   content: ArrayBuffer | Uint8Array | string;
 };
 
@@ -108,6 +109,7 @@ function mapAttachment(attachment: Attachment): ParsedAttachment {
     filename: attachment.filename ?? "attachment",
     contentType: attachment.mimeType,
     contentId: attachment.contentId ?? null,
+    disposition: attachment.disposition,
     content: attachment.content
   };
 }

@@ -1,5 +1,6 @@
 import { planInboundStorage } from "@worker/email/inbound-plan";
 import type { ParsedEmail } from "@worker/email/parse-email";
+import { hasDownloadableAttachments } from "@worker/email/store-email";
 import { describe, expect, it } from "vitest";
 
 const parsed: ParsedEmail = {
@@ -43,5 +44,24 @@ describe("planInboundStorage", () => {
     expect(plan.folder).toBe("catchall");
     expect(plan.mailboxId).toBeNull();
     expect(plan.dedupeKey).toBeNull();
+  });
+
+  it("does not count inline MIME images as downloadable attachments", () => {
+    const attachment = {
+      filename: "logo.png",
+      contentType: "image/png",
+      contentId: "logo@example.com",
+      content: new Uint8Array([1, 2, 3]).buffer
+    };
+
+    expect(
+      hasDownloadableAttachments([{ ...attachment, disposition: "inline" }])
+    ).toBe(false);
+    expect(
+      hasDownloadableAttachments([{ ...attachment, disposition: "attachment" }])
+    ).toBe(true);
+    expect(
+      hasDownloadableAttachments([{ ...attachment, contentId: null, disposition: null }])
+    ).toBe(true);
   });
 });
