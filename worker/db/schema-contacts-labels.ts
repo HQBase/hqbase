@@ -34,11 +34,7 @@ export const contacts = sqliteTable(
     check("contacts_email_length_check", sql`length(${table.email}) BETWEEN 3 AND 254`),
     check("contacts_name_length_check", sql`${table.name} IS NULL OR length(${table.name}) <= 200`),
     check("contacts_notes_length_check", sql`length(${table.notes}) <= 10000`),
-    index("contacts_user_updated_idx").on(
-      table.userId,
-      sql`${table.updatedAt} DESC`,
-      table.email
-    )
+    index("contacts_user_updated_idx").on(table.userId, sql`${table.updatedAt} DESC`, table.email)
   ]
 );
 

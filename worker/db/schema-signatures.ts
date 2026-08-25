@@ -10,7 +10,7 @@ import {
 } from "drizzle-orm/sqlite-core";
 
 import { users } from "./schema-auth";
-import { mailboxes, mailDomains } from "./schema-mail";
+import * as mailSchema from "./schema-mail";
 
 const nocaseText = customType<{ data: string; driverData: string }>({
   dataType: () => "text COLLATE NOCASE"
@@ -24,8 +24,10 @@ export const emailSignatures = sqliteTable(
     htmlBody: text("html_body").notNull(),
     textBody: text("text_body").notNull(),
     userId: text("user_id").references(() => users.id, { onDelete: "cascade" }),
-    mailboxId: text("mailbox_id").references(() => mailboxes.id, { onDelete: "cascade" }),
-    mailDomainId: text("mail_domain_id").references(() => mailDomains.id, {
+    mailboxId: text("mailbox_id").references(() => mailSchema.mailboxes.id, {
+      onDelete: "cascade"
+    }),
+    mailDomainId: text("mail_domain_id").references(() => mailSchema.mailDomains.id, {
       onDelete: "cascade"
     }),
     isDefault: integer("is_default", { mode: "boolean" }).default(false).notNull(),
