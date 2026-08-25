@@ -132,6 +132,63 @@ export function useDraftAutosave(options: DraftAutosaveOptions) {
     ]
   );
 
+  const saveFrom = React.useCallback(
+    (nextFrom: string): Promise<Draft> => {
+      const snapshot = serializeDraft(nextFrom, to, cc, bcc, subject, text, html);
+      latestSnapshot.current = snapshot;
+      setSaveState("saving");
+      return saveQueue.current.enqueue(async () => {
+        const current = draftRef.current;
+        if (!current || !initialized.current) throw new Error("Draft is not ready.");
+        const recipientsValid = !hasInvalidRecipients(to, cc, bcc);
+        try {
+          const next = await updateDraft(current.id, {
+            mailboxId:
+              identities.find((identity) => identity.address === nextFrom)?.mailboxId ?? null,
+            replyToMessageId,
+            forwardOfMessageId,
+            from: nextFrom,
+            to: recipientsValid ? splitRecipients(to) : current.to,
+            cc: recipientsValid ? splitRecipients(cc) : current.cc,
+            bcc: recipientsValid ? splitRecipients(bcc) : current.bcc,
+            subject,
+            text,
+            html: normalizeDraftHtml(text, html),
+            version: current.version
+          });
+          draftRef.current = next;
+          if (recipientsValid) {
+            lastSaved.current = snapshot;
+            localStorage.removeItem(recoveryKey);
+          }
+          setDraft(next);
+          setSaveState(
+            recipientsValid ? (latestSnapshot.current === snapshot ? "saved" : "saving") : "local"
+          );
+          return next;
+        } catch (error) {
+          setSaveState("error");
+          throw error;
+        }
+      });
+    },
+    [
+      initialized,
+      identities,
+      recoveryKey,
+      replyToMessageId,
+      forwardOfMessageId,
+      to,
+      cc,
+      bcc,
+      subject,
+      text,
+      html,
+      setDraft,
+      setSaveState
+    ]
+  );
+
   React.useEffect(() => {
     if (!open || !initialized.current) return;
     localStorage.setItem(
@@ -210,5 +267,5 @@ export function useDraftAutosave(options: DraftAutosaveOptions) {
     setSaveState
   ]);
 
-  return { initializeAutosave, resetAutosave, saveSignature };
+  return { initializeAutosave, resetAutosave, saveFrom, saveSignature };
 }

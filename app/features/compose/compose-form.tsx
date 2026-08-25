@@ -20,6 +20,7 @@ type ComposeFormProps = {
   contextLabel: string | null;
   formId: string;
   from: string;
+  fromDisabled: boolean;
   html: string;
   identities: SendingIdentity[];
   isPending: boolean;
@@ -27,6 +28,7 @@ type ComposeFormProps = {
   presentation: "window" | "thread";
   ready: boolean;
   sendDisabled: boolean;
+  signatureDisabled: boolean;
   signature: SignatureSnapshot;
   subject: string;
   threadContext?: React.ReactNode;
@@ -71,6 +73,7 @@ export function ComposeForm(props: ComposeFormProps): React.ReactElement {
             identities={props.identities}
             mode={props.mode}
             from={props.from}
+            fromDisabled={props.fromDisabled}
             to={props.to}
             cc={props.cc}
             bcc={props.bcc}
@@ -88,7 +91,7 @@ export function ComposeForm(props: ComposeFormProps): React.ReactElement {
             onChange={props.onEditorChange}
           />
           <ComposeSignature
-            disabled={props.isPending}
+            disabled={props.isPending || props.signatureDisabled}
             from={props.from}
             signature={props.signature}
             onManage={props.onManageSignatures}

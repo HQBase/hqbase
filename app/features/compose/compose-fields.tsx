@@ -9,6 +9,7 @@ export function ComposeFields(props: {
   identities: SendingIdentity[];
   mode: ComposeMode;
   from: string;
+  fromDisabled: boolean;
   to: string;
   cc: string;
   bcc: string;
@@ -25,6 +26,7 @@ export function ComposeFields(props: {
         <DropdownSelect
           ariaLabel="From"
           className="rounded-none border-0 bg-transparent px-0 shadow-none focus-visible:ring-0"
+          disabled={props.fromDisabled}
           options={props.identities.map((identity) => ({
             label: identity.address,
             value: identity.address

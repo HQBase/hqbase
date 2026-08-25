@@ -71,6 +71,7 @@ export function ComposeDialog({
   const [text, setText] = React.useState("");
   const [attachments, setAttachments] = React.useState<DraftAttachment[]>([]);
   const [isPending, setIsPending] = React.useState(false);
+  const [isSignaturePending, setIsSignaturePending] = React.useState(false);
   const [isUploading, setIsUploading] = React.useState(false);
   const [saveState, setSaveState] = React.useState<DraftSaveState>("saved");
   const initialized = React.useRef(false);
@@ -83,7 +84,7 @@ export function ComposeDialog({
   const forwardOfMessageId = mode === "forward" ? (message?.id ?? null) : null;
   const contextLabel = composeContextLabel(mode, message);
   const recoveryKey = `hqbase:compose:${mode}:${draftId ?? message?.id ?? "new"}`;
-  const { initializeAutosave, resetAutosave, saveSignature } = useDraftAutosave({
+  const { initializeAutosave, resetAutosave, saveFrom, saveSignature } = useDraftAutosave({
     open,
     initialized,
     draft,
@@ -182,7 +183,7 @@ export function ComposeDialog({
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
-    if (!draft || hasInvalidRecipients(to, cc, bcc)) return;
+    if (!draft || isSignaturePending || hasInvalidRecipients(to, cc, bcc)) return;
     setIsPending(true);
     try {
       const common = {
@@ -227,6 +228,21 @@ export function ComposeDialog({
     }
   }
 
+  async function changeFrom(nextFrom: string): Promise<void> {
+    if (nextFrom === from) return;
+    const previousFrom = from;
+    setFrom(nextFrom);
+    setIsSignaturePending(true);
+    try {
+      await saveFrom(nextFrom);
+    } catch (error) {
+      setFrom(previousFrom);
+      toast.error(error instanceof Error ? error.message : "From address could not be changed.");
+    } finally {
+      setIsSignaturePending(false);
+    }
+  }
+
   const upload = React.useCallback(
     async (files: File[]) => {
       if (!draft || files.length === 0) return;
@@ -264,6 +280,7 @@ export function ComposeDialog({
   if (!open) return null;
   const sendDisabled =
     isPending ||
+    isSignaturePending ||
     isUploading ||
     !draft ||
     identities.length === 0 ||
@@ -278,6 +295,7 @@ export function ComposeDialog({
       contextLabel={contextLabel}
       formId={formId}
       from={from}
+      fromDisabled={isSignaturePending}
       html={html}
       identities={identities}
       isPending={isPending}
@@ -285,6 +303,7 @@ export function ComposeDialog({
       presentation={presentation}
       ready={Boolean(draft && initialized.current)}
       sendDisabled={sendDisabled}
+      signatureDisabled={isSignaturePending}
       signature={draft?.signature ?? emptyAutomaticSignature}
       subject={subject}
       threadContext={threadContext}
@@ -299,10 +318,15 @@ export function ComposeDialog({
       onManageSignatures={() => window.location.assign("/settings/signatures")}
       onSetBcc={setBcc}
       onSetCc={setCc}
-      onSetFrom={setFrom}
+      onSetFrom={(nextFrom) => void changeFrom(nextFrom)}
       onSetSubject={setSubject}
       onSetSignature={async (selection) => {
-        await saveSignature(selection);
+        setIsSignaturePending(true);
+        try {
+          await saveSignature(selection);
+        } finally {
+          setIsSignaturePending(false);
+        }
       }}
       onSetTo={setTo}
       onSubmit={(event) => void handleSubmit(event)}

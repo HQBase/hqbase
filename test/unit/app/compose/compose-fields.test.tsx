@@ -9,6 +9,7 @@ describe("compose fields", () => {
         bcc=""
         cc=""
         from="support@example.com"
+        fromDisabled={false}
         identities={[{ mailboxId: "mbx_1", address: "support@example.com" }]}
         mode="reply"
         subject="Re: Account access"
