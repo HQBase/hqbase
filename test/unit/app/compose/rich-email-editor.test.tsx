@@ -12,7 +12,7 @@ afterEach(() => {
 });
 
 describe("rich email editor images", () => {
-  it("uploads a toolbar image, preserves its alt text, and makes it resizable", async () => {
+  it("uploads an image and shows its resize box only after selection", async () => {
     const onChange = vi.fn();
     const onImages = vi.fn(async (files: File[]) => [
       {
@@ -39,7 +39,23 @@ describe("rich email editor images", () => {
         expect.stringContaining("logo.png")
       )
     );
-    expect(view.container.querySelectorAll("[data-resize-handle]")).toHaveLength(4);
+    const editor = view.container.querySelector<HTMLElement>(".ProseMirror");
+    const renderedImage = view.container.querySelector<HTMLImageElement>(".ProseMirror img");
+    const resizeContainer = view.container.querySelector<HTMLElement>("[data-resize-container]");
+    if (!editor || !renderedImage || !resizeContainer) throw new Error("Expected resizable image");
+    expect(view.container.querySelectorAll("[data-resize-handle]")).toHaveLength(8);
+    expect(resizeContainer.classList.contains("ProseMirror-selectednode")).toBe(false);
+    expect(editor.className).toContain("[&_[data-resize-handle]]:hidden");
+    expect(editor.className).toContain("cursor-ns-resize");
+    expect(editor.className).toContain("cursor-ew-resize");
+    expect(editor.className).toContain("cursor-nwse-resize");
+    expect(editor.className).toContain("cursor-nesw-resize");
+    expect(editor.className).toContain("@media(pointer:coarse)");
+
+    renderedImage.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    await vi.waitFor(() =>
+      expect(resizeContainer.classList.contains("ProseMirror-selectednode")).toBe(true)
+    );
     await view.unmount();
   });
 
@@ -146,6 +162,15 @@ describe("rich email editor images", () => {
         get: () => Number.parseFloat(image.style.width) || 100
       }
     });
+
+    image.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    await vi.waitFor(() =>
+      expect(
+        view.container
+          .querySelector<HTMLElement>("[data-resize-container]")
+          ?.classList.contains("ProseMirror-selectednode")
+      ).toBe(true)
+    );
 
     const touchStart = new Event("touchstart", { bubbles: true, cancelable: true });
     Object.defineProperty(touchStart, "touches", { value: [{ clientX: 0, clientY: 0 }] });

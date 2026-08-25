@@ -131,6 +131,16 @@ export function RichEmailEditor({
       }).configure({
         allowBase64: allowDataImages,
         resize: {
+          directions: [
+            "top",
+            "right",
+            "bottom",
+            "left",
+            "top-left",
+            "top-right",
+            "bottom-left",
+            "bottom-right"
+          ],
           enabled: true,
           minHeight: 24,
           minWidth: 24,
@@ -150,9 +160,44 @@ export function RichEmailEditor({
       content: html,
       editorProps: {
         attributes: {
-          class:
-            "prose prose-sm min-h-60 max-w-none px-5 py-4 text-sm outline-none [&_a]:text-primary [&_a]:underline [&_blockquote]:border-l-2 [&_blockquote]:pl-3 [&_p]:my-2 [&_img]:h-auto [&_img]:max-w-full [&_[data-resize-container]]:max-w-full [&_[data-resize-handle]]:size-3 [&_[data-resize-handle]]:rounded-full [&_[data-resize-handle]]:border-2 [&_[data-resize-handle]]:border-primary [&_[data-resize-handle]]:bg-background",
+          class: cn(
+            "prose prose-sm min-h-60 max-w-none px-5 py-4 text-sm outline-none",
+            "[&_a]:text-primary [&_a]:underline [&_blockquote]:border-l-2 [&_blockquote]:pl-3 [&_p]:my-2",
+            "[&_img]:h-auto [&_img]:max-w-full [&_[data-resize-container]]:max-w-full",
+            "[&_[data-resize-handle]]:hidden [&_[data-resize-handle]]:touch-none",
+            "[&_[data-resize-container].ProseMirror-selectednode]:outline-none",
+            "[&_[data-resize-container].ProseMirror-selectednode_[data-resize-wrapper]]:ring-1",
+            "[&_[data-resize-container].ProseMirror-selectednode_[data-resize-wrapper]]:ring-primary",
+            "[&_[data-resize-container].ProseMirror-selectednode_[data-resize-handle]]:block",
+            "[&_[data-resize-handle*='-']]:size-3 [&_[data-resize-handle*='-']]:rounded-full",
+            "[&_[data-resize-handle*='-']]:border-2 [&_[data-resize-handle*='-']]:border-primary",
+            "[&_[data-resize-handle*='-']]:bg-background",
+            "[&_[data-resize-handle='top']]:h-2 [&_[data-resize-handle='top']]:cursor-ns-resize",
+            "[&_[data-resize-handle='bottom']]:h-2 [&_[data-resize-handle='bottom']]:cursor-ns-resize",
+            "[&_[data-resize-handle='left']]:w-2 [&_[data-resize-handle='left']]:cursor-ew-resize",
+            "[&_[data-resize-handle='right']]:w-2 [&_[data-resize-handle='right']]:cursor-ew-resize",
+            "[&_[data-resize-handle='top-left']]:cursor-nwse-resize",
+            "[&_[data-resize-handle='bottom-right']]:cursor-nwse-resize",
+            "[&_[data-resize-handle='top-right']]:cursor-nesw-resize",
+            "[&_[data-resize-handle='bottom-left']]:cursor-nesw-resize",
+            "[@media(pointer:coarse)]:[&_[data-resize-handle*='-']]:size-6",
+            "[@media(pointer:coarse)]:[&_[data-resize-handle='top']]:h-6",
+            "[@media(pointer:coarse)]:[&_[data-resize-handle='bottom']]:h-6",
+            "[@media(pointer:coarse)]:[&_[data-resize-handle='left']]:w-6",
+            "[@media(pointer:coarse)]:[&_[data-resize-handle='right']]:w-6"
+          ),
           "data-compose-autofocus": ""
+        },
+        handleDOMEvents: {
+          click: (view, event) => {
+            const image = event.target;
+            if (!(image instanceof HTMLImageElement)) return false;
+            const container = image.closest<HTMLElement>("[data-resize-container]");
+            if (!container || !view.dom.contains(container)) return false;
+            const position = view.posAtDOM(container, 0);
+            if (view.state.doc.nodeAt(position)?.type.name !== "image") return false;
+            return editorRef.current?.chain().focus().setNodeSelection(position).run() ?? false;
+          }
         },
         handleDrop: (view, event) => {
           const files = Array.from(event.dataTransfer?.files ?? []);
