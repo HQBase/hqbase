@@ -1,4 +1,4 @@
-import { and, eq, sql } from "drizzle-orm";
+import { sql } from "drizzle-orm";
 
 import type { MessageScope } from "../../auth/mailbox-access";
 import { messageScopeCondition } from "../../auth/mailbox-access";
@@ -37,6 +37,7 @@ export async function listContacts(
   db: D1Database,
   input: {
     limit: number;
+    offset?: number | undefined;
     scope: MessageScope;
     search?: string | undefined;
     userId: string;
@@ -48,8 +49,18 @@ export async function listContacts(
 
 export async function getContactDetail(
   db: D1Database,
-  input: { email: string; scope: MessageScope; userId: string }
-): Promise<{ contact: ContactDetail; conversations: ConversationSummary[] }> {
+  input: {
+    cursor?: string | undefined;
+    email: string;
+    limit?: number | undefined;
+    scope: MessageScope;
+    userId: string;
+  }
+): Promise<{
+  contact: ContactDetail;
+  conversations: ConversationSummary[];
+  nextCursor: string | null;
+}> {
   const rows = await contactRows(db, {
     exactEmail: input.email,
     limit: 1,
@@ -61,12 +72,14 @@ export async function getContactDetail(
 
   const page = await listConversationPage(db, {
     correspondentEmail: input.email,
-    limit: 50,
+    cursor: input.cursor,
+    limit: input.limit ?? 50,
     scope: input.scope
   });
   return {
     contact: { ...contactSummary(row), notes: row.notes ?? "" },
-    conversations: page.conversations
+    conversations: page.conversations,
+    nextCursor: page.nextCursor
   };
 }
 
@@ -76,18 +89,11 @@ export async function saveContact(
     email: string;
     name: string | null;
     notes: string;
-    previousEmail: string;
     userId: string;
   }
 ): Promise<void> {
   const timestamp = nowIso();
   const database = createDatabase(db);
-  if (input.previousEmail !== input.email) {
-    await database
-      .delete(contacts)
-      .where(and(eq(contacts.userId, input.userId), eq(contacts.email, input.previousEmail)))
-      .run();
-  }
   await database
     .insert(contacts)
     .values({
@@ -124,6 +130,7 @@ async function contactRows(
   input: {
     exactEmail?: string | undefined;
     limit: number;
+    offset?: number | undefined;
     scope: MessageScope;
     search?: string | undefined;
     userId: string;
@@ -236,7 +243,7 @@ async function contactRows(
           ON contact.user_id = ${input.userId} AND contact.email = known.email
         ${filter}
         ORDER BY ${rank}, known.last_contact_at DESC, known.email ASC
-        LIMIT ${input.limit}`
+        LIMIT ${input.limit} OFFSET ${input.offset ?? 0}`
   );
 }
 

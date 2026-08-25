@@ -18,4 +18,5 @@ export type ContactDetail = ContactSummary & {
 export type ContactDetailResponse = {
   contact: ContactDetail;
   conversations: ConversationSummary[];
+  nextCursor: string | null;
 };

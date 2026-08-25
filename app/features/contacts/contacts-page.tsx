@@ -20,6 +20,8 @@ import { listContacts, saveContact } from "./api";
 import { ContactDetailView, ContactRow } from "./contact-views";
 import type { ContactSummary } from "./types";
 
+const contactPageSize = 100;
+
 type ContactsPageProps = {
   selectedId: string | null;
   onBack: () => void;
@@ -38,6 +40,8 @@ export function ContactsPage({
   const [contacts, setContacts] = React.useState<ContactSummary[]>([]);
   const [search, setSearch] = React.useState("");
   const [isLoading, setIsLoading] = React.useState(true);
+  const [isLoadingMore, setIsLoadingMore] = React.useState(false);
+  const [hasMore, setHasMore] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [createOpen, setCreateOpen] = React.useState(false);
   const requestId = React.useRef(0);
@@ -46,8 +50,11 @@ export function ContactsPage({
     const currentRequest = ++requestId.current;
     setError(null);
     try {
-      const next = await listContacts(search, 100);
-      if (currentRequest === requestId.current) setContacts(next);
+      const next = await listContacts(search, contactPageSize, 0);
+      if (currentRequest === requestId.current) {
+        setContacts(next);
+        setHasMore(next.length === contactPageSize);
+      }
     } catch (nextError) {
       if (currentRequest === requestId.current) {
         setError(nextError instanceof Error ? nextError.message : "Contacts could not be loaded.");
@@ -56,6 +63,22 @@ export function ContactsPage({
       if (currentRequest === requestId.current) setIsLoading(false);
     }
   }, [search]);
+
+  async function loadMore(): Promise<void> {
+    if (isLoadingMore || !hasMore) return;
+    const currentRequest = requestId.current;
+    setIsLoadingMore(true);
+    try {
+      const next = await listContacts(search, contactPageSize, contacts.length);
+      if (currentRequest !== requestId.current) return;
+      setContacts((current) => [...current, ...next]);
+      setHasMore(next.length === contactPageSize);
+    } catch (nextError) {
+      toast.error(nextError instanceof Error ? nextError.message : "Contacts could not be loaded.");
+    } finally {
+      setIsLoadingMore(false);
+    }
+  }
 
   React.useEffect(() => {
     setIsLoading(true);
@@ -139,6 +162,20 @@ export function ContactsPage({
               ))}
             </div>
           )}
+          {hasMore && !isLoading ? (
+            <div className="mt-4 flex justify-center">
+              <Button
+                disabled={isLoadingMore}
+                size="sm"
+                type="button"
+                variant="outline"
+                onClick={loadMore}
+              >
+                {isLoadingMore ? <Spinner aria-hidden="true" /> : null}
+                Load more contacts
+              </Button>
+            </div>
+          ) : null}
         </div>
       </div>
       <CreateContactDialog

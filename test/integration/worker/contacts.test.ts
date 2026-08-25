@@ -109,6 +109,16 @@ describe("contacts", () => {
       await sessionFetch("/api/contacts?search=hidden", firstCookie)
     ).json()) as unknown[];
     expect(hidden).toEqual([]);
+
+    const firstPage = (await (
+      await sessionFetch("/api/contacts?limit=1&offset=0", firstCookie)
+    ).json()) as Array<{ id: string }>;
+    const secondPage = (await (
+      await sessionFetch("/api/contacts?limit=1&offset=1", firstCookie)
+    ).json()) as Array<{ id: string }>;
+    expect(firstPage).toHaveLength(1);
+    expect(secondPage).toHaveLength(1);
+    expect(secondPage[0]?.id).not.toBe(firstPage[0]?.id);
   });
 
   it("keeps saved names and notes private to one signed-in person", async () => {
@@ -140,13 +150,23 @@ describe("contacts", () => {
   });
 
   it("lists only exact accessible exchanges and keeps derived correspondents after deletion", async () => {
-    const detail = (await (
-      await sessionFetch("/api/contacts/pat%40example.net", firstCookie)
-    ).json()) as { conversations: Array<{ id: string }> };
-    expect(detail.conversations.map((conversation) => conversation.id).sort()).toEqual([
-      "msg_contacts_inbound",
-      "msg_contacts_outbound"
-    ]);
+    const firstPage = (await (
+      await sessionFetch("/api/contacts/pat%40example.net?limit=1", firstCookie)
+    ).json()) as { conversations: Array<{ id: string }>; nextCursor: string | null };
+    expect(firstPage.conversations).toHaveLength(1);
+    expect(firstPage.nextCursor).toEqual(expect.any(String));
+    const secondPage = (await (
+      await sessionFetch(
+        `/api/contacts/pat%40example.net?limit=1&cursor=${encodeURIComponent(firstPage.nextCursor ?? "")}`,
+        firstCookie
+      )
+    ).json()) as { conversations: Array<{ id: string }>; nextCursor: string | null };
+    expect(secondPage.nextCursor).toBeNull();
+    expect(
+      [...firstPage.conversations, ...secondPage.conversations]
+        .map((conversation) => conversation.id)
+        .sort()
+    ).toEqual(["msg_contacts_inbound", "msg_contacts_outbound"]);
 
     const removed = await sessionFetch("/api/contacts/pat%40example.net", firstCookie, {
       method: "DELETE"
@@ -162,6 +182,14 @@ describe("contacts", () => {
     const invalid = await sessionFetch("/api/contacts/not-an-email", firstCookie);
     expect(invalid.status).toBe(400);
     expect(await invalid.json()).toMatchObject({ error: { code: "CONTACT_INVALID" } });
+
+    const mismatched = await sessionFetch("/api/contacts/pat%40example.net", firstCookie, {
+      body: JSON.stringify({ email: "other@example.net", name: "Other", notes: "" }),
+      headers: { "content-type": "application/json" },
+      method: "PUT"
+    });
+    expect(mismatched.status).toBe(400);
+    expect(await mismatched.json()).toMatchObject({ error: { code: "CONTACT_INVALID" } });
 
     const missing = await sessionFetch("/api/contacts/missing%40example.net", firstCookie);
     expect(missing.status).toBe(404);

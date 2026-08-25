@@ -58,6 +58,7 @@ export function ContactDetailView({
   const [name, setName] = React.useState("");
   const [notes, setNotes] = React.useState("");
   const [error, setError] = React.useState<string | null>(null);
+  const [loadingMore, setLoadingMore] = React.useState(false);
   const [pending, setPending] = React.useState<"save" | "remove" | null>(null);
 
   React.useEffect(() => {
@@ -112,6 +113,29 @@ export function ContactDetailView({
     } catch (nextError) {
       toast.error(nextError instanceof Error ? nextError.message : "Contact could not be removed.");
       setPending(null);
+    }
+  }
+
+  async function loadMore(): Promise<void> {
+    if (!detail?.nextCursor || loadingMore) return;
+    setLoadingMore(true);
+    try {
+      const next = await getContact(id, detail.nextCursor);
+      setDetail((current) =>
+        current
+          ? {
+              ...current,
+              conversations: [...current.conversations, ...next.conversations],
+              nextCursor: next.nextCursor
+            }
+          : current
+      );
+    } catch (nextError) {
+      toast.error(
+        nextError instanceof Error ? nextError.message : "Exchanges could not be loaded."
+      );
+    } finally {
+      setLoadingMore(false);
     }
   }
 
@@ -222,6 +246,20 @@ export function ContactDetailView({
                   ))}
                 </div>
               )}
+              {detail.nextCursor ? (
+                <div className="mt-3 flex justify-center">
+                  <Button
+                    disabled={loadingMore}
+                    size="sm"
+                    type="button"
+                    variant="outline"
+                    onClick={loadMore}
+                  >
+                    {loadingMore ? <Spinner aria-hidden="true" /> : null}
+                    Load more exchanges
+                  </Button>
+                </div>
+              ) : null}
             </section>
           </div>
         )}

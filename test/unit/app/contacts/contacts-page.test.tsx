@@ -43,7 +43,8 @@ const detail = {
       to: ["support@example.com"],
       unreadCount: 1
     }
-  ]
+  ],
+  nextCursor: null
 };
 
 describe("contacts page", () => {
@@ -88,6 +89,38 @@ describe("contacts page", () => {
     expect(onOpenConversation).toHaveBeenCalledWith(
       expect.objectContaining({ folder: "inbox", id: "message-1" })
     );
+    await view.unmount();
+  });
+
+  it("loads every older exchange through the contact cursor", async () => {
+    const older = {
+      ...detail.conversations[0],
+      id: "message-older",
+      threadId: "thread-older",
+      subject: "Earlier project note"
+    };
+    mocks.getContact
+      .mockReset()
+      .mockResolvedValueOnce({ ...detail, nextCursor: "contact-cursor" })
+      .mockResolvedValueOnce({ ...detail, conversations: [older], nextCursor: null });
+    const view = await renderComponent(
+      <ContactsPage
+        selectedId="alice@example.com"
+        onBack={() => undefined}
+        onCompose={() => undefined}
+        onOpenConversation={() => undefined}
+        onSelect={() => undefined}
+      />
+    );
+    await flushHookEffects();
+
+    const loadMore = Array.from(view.container.querySelectorAll("button")).find((button) =>
+      button.textContent?.includes("Load more exchanges")
+    );
+    await flushHookEffects(() => loadMore?.click());
+
+    expect(mocks.getContact).toHaveBeenLastCalledWith("alice@example.com", "contact-cursor");
+    expect(view.container.textContent).toContain("Earlier project note");
     await view.unmount();
   });
 });

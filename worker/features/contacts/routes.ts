@@ -34,6 +34,7 @@ contactRoutes.get("/", async (c) => {
   return c.json(
     await listContacts(c.env.DB, {
       limit: contactLimit(c.req.query("limit")),
+      offset: contactOffset(c.req.query("offset")),
       scope,
       search,
       userId: auth.user.id
@@ -45,7 +46,13 @@ contactRoutes.get("/:email", async (c) => {
   const auth = await requireAuthContext(c.env, c.req.raw);
   const email = contactEmail(c.req.param("email"));
   const scope = await accessibleMessageScope(c.env.DB, auth.user.id, auth.user.role, "read");
-  const detail = await getContactDetail(c.env.DB, { email, scope, userId: auth.user.id });
+  const detail = await getContactDetail(c.env.DB, {
+    cursor: c.req.query("cursor"),
+    email,
+    limit: contactLimit(c.req.query("limit"), 50),
+    scope,
+    userId: auth.user.id
+  });
   return c.json({
     ...detail,
     conversations: await withConversationLabels(c.env.DB, detail.conversations, scope)
@@ -56,7 +63,14 @@ contactRoutes.put("/:email", async (c) => {
   const auth = await requireAuthContext(c.env, c.req.raw);
   const previousEmail = contactEmail(c.req.param("email"));
   const input = contactInput(await readJson(c.req.raw));
-  await saveContact(c.env.DB, { ...input, previousEmail, userId: auth.user.id });
+  if (input.email !== previousEmail) {
+    throw new AppError(
+      "CONTACT_INVALID",
+      "The contact email must match the requested contact.",
+      400
+    );
+  }
+  await saveContact(c.env.DB, { ...input, userId: auth.user.id });
   const scope = await accessibleMessageScope(c.env.DB, auth.user.id, auth.user.role, "read");
   const detail = await getContactDetail(c.env.DB, {
     email: input.email,
@@ -93,11 +107,20 @@ function contactInput(value: unknown): z.infer<typeof contactInputSchema> {
   return result.data;
 }
 
-function contactLimit(value: string | undefined): number {
-  if (value === undefined) return 100;
+function contactLimit(value: string | undefined, defaultValue = 100): number {
+  if (value === undefined) return defaultValue;
   const limit = Number(value);
   if (!/^\d+$/u.test(value) || !Number.isInteger(limit) || limit < 1 || limit > 100) {
     throw new AppError("CONTACT_INVALID", "Contact limit must be an integer from 1 to 100.", 400);
   }
   return limit;
+}
+
+function contactOffset(value: string | undefined): number {
+  if (value === undefined) return 0;
+  const offset = Number(value);
+  if (!/^\d+$/u.test(value) || !Number.isSafeInteger(offset) || offset > 1_000_000) {
+    throw new AppError("CONTACT_INVALID", "Contact offset is invalid.", 400);
+  }
+  return offset;
 }
