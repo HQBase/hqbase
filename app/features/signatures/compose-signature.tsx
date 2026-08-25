@@ -35,6 +35,10 @@ export function ComposeSignature({
   const [loading, setLoading] = React.useState(false);
   const [pending, setPending] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+  const signatureRef = React.useRef(signature);
+  const onSelectionChangeRef = React.useRef(onSelectionChange);
+  signatureRef.current = signature;
+  onSelectionChangeRef.current = onSelectionChange;
 
   React.useEffect(() => {
     if (!from) {
@@ -47,7 +51,27 @@ export function ComposeSignature({
     setError(null);
     void listUsableSignatures(from)
       .then((result) => {
-        if (active) setCandidates(result);
+        if (!active) return;
+        setCandidates(result);
+        if (
+          signatureRef.current.mode === "automatic" &&
+          !signatureRef.current.id &&
+          result.automaticSignatureId
+        ) {
+          setPending(true);
+          void Promise.resolve()
+            .then(() => onSelectionChangeRef.current({ mode: "automatic" }))
+            .catch((reason: unknown) => {
+              if (active) {
+                toast.error(
+                  reason instanceof Error ? reason.message : "Signature could not be changed."
+                );
+              }
+            })
+            .finally(() => {
+              if (active) setPending(false);
+            });
+        }
       })
       .catch((reason: unknown) => {
         if (active) {

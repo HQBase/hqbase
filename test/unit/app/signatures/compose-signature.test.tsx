@@ -79,7 +79,7 @@ describe("compose signature", () => {
     await view.unmount();
   });
 
-  it("shows No signature for an empty captured automatic selection", async () => {
+  it("re-resolves an empty automatic selection when a default is available", async () => {
     vi.mocked(listUsableSignatures).mockResolvedValue({
       automaticSignatureId: candidate.id,
       signatures: [candidate]
@@ -96,18 +96,66 @@ describe("compose signature", () => {
     document.body.appendChild(view.container);
     await flushHookEffects();
 
+    await vi.waitFor(() => expect(onSelectionChange).toHaveBeenCalledWith({ mode: "automatic" }));
+    await view.rerender(
+      <ComposeSignature
+        from="support@example.com"
+        signature={automatic}
+        onManage={() => undefined}
+        onSelectionChange={onSelectionChange}
+      />
+    );
+    expect(
+      view.container.querySelector<HTMLButtonElement>('[aria-label="Signature"]')?.textContent
+    ).toContain("Support · Support");
+    await view.unmount();
+  });
+
+  it("keeps No signature when no default is available", async () => {
+    vi.mocked(listUsableSignatures).mockResolvedValue({
+      automaticSignatureId: null,
+      signatures: [candidate]
+    });
+    const onSelectionChange = vi.fn().mockResolvedValue(undefined);
+    const view = await renderComponent(
+      <ComposeSignature
+        from="support@example.com"
+        signature={{ mode: "automatic", id: null, name: "", html: "", text: "" }}
+        onManage={() => undefined}
+        onSelectionChange={onSelectionChange}
+      />
+    );
+    document.body.appendChild(view.container);
+    await flushHookEffects();
+
+    expect(onSelectionChange).not.toHaveBeenCalled();
     expect(
       view.container.querySelector<HTMLButtonElement>('[aria-label="Signature"]')?.textContent
     ).toContain("No signature");
-    await openSignatureMenu(view.container);
-    const selected = Array.from(
-      document.body.querySelectorAll<HTMLElement>('[role="menuitemradio"]')
-    ).find((item) => item.textContent?.includes("Support · Support"));
-    await flushHookEffects(() => selected?.click());
-    expect(onSelectionChange).toHaveBeenCalledWith({
-      mode: "selected",
-      id: candidate.id
+    await view.unmount();
+  });
+
+  it("does not replace an explicit No signature choice", async () => {
+    vi.mocked(listUsableSignatures).mockResolvedValue({
+      automaticSignatureId: candidate.id,
+      signatures: [candidate]
     });
+    const onSelectionChange = vi.fn().mockResolvedValue(undefined);
+    const view = await renderComponent(
+      <ComposeSignature
+        from="support@example.com"
+        signature={{ mode: "none", id: null, name: "", html: "", text: "" }}
+        onManage={() => undefined}
+        onSelectionChange={onSelectionChange}
+      />
+    );
+    document.body.appendChild(view.container);
+    await flushHookEffects();
+
+    expect(onSelectionChange).not.toHaveBeenCalled();
+    expect(
+      view.container.querySelector<HTMLButtonElement>('[aria-label="Signature"]')?.textContent
+    ).toContain("No signature");
     await view.unmount();
   });
 
