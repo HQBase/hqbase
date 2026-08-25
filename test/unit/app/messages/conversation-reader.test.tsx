@@ -280,7 +280,8 @@ describe("conversation reader", () => {
     expect(html).toContain("w-fit min-w-0 max-w-[75%]");
     expect(html).toContain("self-center justify-self-end rounded-full bg-transparent p-0.5");
     expect(html).toContain("sm:col-start-3 sm:row-start-1");
-    expect(html).toContain("sm:w-12 sm:min-w-12");
+    expect(html).toContain("gap-0.5 sm:col-start-4 sm:row-start-1 sm:flex sm:w-7 sm:min-w-7");
+    expect(html).toContain("bg-muted px-0.5 py-0.5 text-[11px]");
     expect(html).toContain("overflow-hidden sm:hidden");
     expect(html).toContain("shadow-[0_0_6px_1px_hsl(var(--background)/0.14)]");
     expect(html).toContain("backdrop-blur-[2px]");

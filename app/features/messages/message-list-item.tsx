@@ -172,10 +172,10 @@ export function MessageListItem({
           ) : null}
         </span>
       ) : null}
-      <span className="hidden min-w-0 items-center justify-center gap-1 sm:col-start-4 sm:row-start-1 sm:flex sm:w-12 sm:min-w-12">
+      <span className="hidden min-w-0 items-center justify-center gap-0.5 sm:col-start-4 sm:row-start-1 sm:flex sm:w-7 sm:min-w-7">
         {conversation.messageCount > 1 ? (
           <span
-            className="rounded-md bg-muted px-1.5 py-0.5 text-[11px] tabular-nums text-tertiary"
+            className="rounded-md bg-muted px-0.5 py-0.5 text-[11px] tabular-nums text-tertiary"
             title={`${conversation.messageCount} messages`}
           >
             {conversation.messageCount}
