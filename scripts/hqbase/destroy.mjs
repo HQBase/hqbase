@@ -95,6 +95,7 @@ export function destroy(flags, options = {}) {
 export function destroyResources(scope, manifest, options = {}) {
   const checkpoint = options.checkpoint ?? writeManifest;
   const dryRun = options.dryRun ?? false;
+  const emptyBucket = options.emptyBucket ?? emptyRecordedR2Bucket;
   const runCommand = options.runCommand ?? run;
   const targets = destroyPlan(scope, manifest);
 
@@ -132,6 +133,7 @@ export function destroyResources(scope, manifest, options = {}) {
   }
 
   if (targets.storage) {
+    emptyBucket(manifest, { dryRun, runCommand });
     wrangler(manifest, ["r2", "bucket", "delete", manifest.r2.bucket], {
       dryRun,
       quiet: false,
@@ -163,6 +165,19 @@ export function destroyResources(scope, manifest, options = {}) {
   }
 
   return targets;
+}
+
+export function emptyRecordedR2Bucket(manifest, options = {}) {
+  const runCommand = options.runCommand ?? run;
+  return runCommand(
+    "node",
+    ["scripts/hqbase/empty-r2.mjs", manifest.accountId, manifest.r2.bucket],
+    {
+      dryRun: options.dryRun,
+      quiet: false,
+      env: { CLOUDFLARE_ACCOUNT_ID: manifest.accountId }
+    }
+  );
 }
 
 function assertDestroyManifest(manifest, targets) {
