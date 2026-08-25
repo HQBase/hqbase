@@ -753,7 +753,7 @@
                 }
               ]
             },
-            "description": "Records the file part's Content-Type, or application/octet-stream when no type is present. One file and all files in one draft can each total at most 25 MiB; larger uploads return 413 ATTACHMENTS_TOO_LARGE.",
+            "description": "Records the file part's Content-Type, or application/octet-stream when no type is present. Set the optional inline field to true for a safe raster image that can be placed in the draft body. One file and all files in one draft can each total at most 25 MiB; larger uploads return 413 ATTACHMENTS_TOO_LARGE.",
             "body": {
               "mode": "formdata",
               "formdata": [
@@ -761,9 +761,38 @@
                   "key": "file",
                   "type": "file",
                   "src": []
+                },
+                {
+                  "key": "inline",
+                  "type": "text",
+                  "value": "true",
+                  "disabled": true,
+                  "description": "Set to true to store a safe raster image for inline use."
                 }
               ]
             }
+          },
+          "response": []
+        },
+        {
+          "name": "Render a safe inline draft image",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/drafts/:draftId/attachments/:id/inline",
+              "variable": [
+                {
+                  "key": "draftId",
+                  "value": "{{draftId}}"
+                },
+                {
+                  "key": "id",
+                  "value": "{{id}}"
+                }
+              ]
+            },
+            "description": "Returns a private inline image owned by the authenticated draft author."
           },
           "response": []
         },

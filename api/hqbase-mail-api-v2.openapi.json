@@ -2408,7 +2408,7 @@
     "/api/v2/drafts/{id}/attachments": {
       "post": {
         "summary": "Add a draft attachment",
-        "description": "Records the file part's Content-Type, or application/octet-stream when no type is present. One file and all files in one draft can each total at most 25 MiB; larger uploads return 413 ATTACHMENTS_TOO_LARGE.",
+        "description": "Records the file part's Content-Type, or application/octet-stream when no type is present. Set the optional inline field to true for a safe raster image that can be placed in the draft body. One file and all files in one draft can each total at most 25 MiB; larger uploads return 413 ATTACHMENTS_TOO_LARGE.",
         "security": [
           {
             "oauth2": ["mail:send"]
@@ -2481,6 +2481,16 @@
               }
             }
           },
+          "415": {
+            "description": "Unsupported inline media",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
           "429": {
             "description": "Rate limit exceeded",
             "content": {
@@ -2518,6 +2528,11 @@
                     "type": "string",
                     "format": "binary",
                     "contentEncoding": "binary"
+                  },
+                  "inline": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Set to true to store a safe raster image for inline use."
                   }
                 }
               },
@@ -2529,6 +2544,121 @@
             }
           }
         },
+        "x-hqbase-agent-capabilities": ["mail:send"]
+      }
+    },
+    "/api/v2/drafts/{draftId}/attachments/{id}/inline": {
+      "get": {
+        "summary": "Render a safe inline draft image",
+        "description": "Returns a private inline image owned by the authenticated draft author.",
+        "security": [
+          {
+            "oauth2": ["mail:send"]
+          },
+          {
+            "cookieSession": []
+          },
+          {
+            "agentBearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Inline draft image",
+            "content": {
+              "image/*": {
+                "schema": {
+                  "type": "string",
+                  "contentEncoding": "binary"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid authentication",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient OAuth scope or mailbox access",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Draft, attachment, or stored object not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Unsupported inline media",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "tags": ["Drafts"],
+        "operationId": "getDraftInlineAttachment",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "draftId",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100
+            }
+          },
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100
+            }
+          }
+        ],
         "x-hqbase-agent-capabilities": ["mail:send"]
       }
     },
@@ -3659,7 +3789,7 @@
       },
       "DraftAttachment": {
         "type": "object",
-        "required": ["id", "filename", "contentType", "sizeBytes"],
+        "required": ["id", "filename", "contentType", "sizeBytes", "inline"],
         "properties": {
           "id": {
             "type": "string"
@@ -3672,6 +3802,9 @@
           },
           "sizeBytes": {
             "type": "integer"
+          },
+          "inline": {
+            "type": "boolean"
           }
         }
       },

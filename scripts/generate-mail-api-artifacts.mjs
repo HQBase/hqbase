@@ -267,9 +267,23 @@ function postmanRequest(route, method, operation) {
       options: { raw: { language: "json" } }
     };
   } else if (content["multipart/form-data"]) {
+    const inline = content["multipart/form-data"].schema?.properties?.inline;
     request.body = {
       mode: "formdata",
-      formdata: [{ key: "file", type: "file", src: [] }]
+      formdata: [
+        { key: "file", type: "file", src: [] },
+        ...(inline
+          ? [
+              {
+                key: "inline",
+                type: "text",
+                value: "true",
+                disabled: true,
+                description: inline.description
+              }
+            ]
+          : [])
+      ]
     };
   }
   return { name: operation.summary, request, response: [] };

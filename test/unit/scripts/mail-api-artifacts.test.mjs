@@ -79,6 +79,18 @@ describe("Mail API public artifacts", () => {
         "multipart/form-data"
       ].encoding.file.contentType
     ).toBe("*/*");
+    expect(
+      openApi.paths["/api/v2/drafts/{id}/attachments"].post.requestBody.content[
+        "multipart/form-data"
+      ].schema.properties.inline
+    ).toMatchObject({ type: "boolean", default: false });
+    expect(openApi.components.schemas.DraftAttachment.required).toContain("inline");
+    expect(
+      openApi.paths["/api/v2/drafts/{draftId}/attachments/{id}/inline"].get.security
+    ).toContainEqual({ oauth2: ["mail:send"] });
+    expect(
+      openApi.paths["/api/v2/drafts/{draftId}/attachments/{id}/inline"].get.responses["415"]
+    ).toBeDefined();
     expect(openApi.paths["/api/v2/users"]).toBeUndefined();
     expect(JSON.stringify(openApi)).not.toContain("r2Key");
   });
@@ -113,6 +125,10 @@ describe("Mail API public artifacts", () => {
       "sender name"
     );
     expect(v1OpenApi.components.schemas.MessageSummary.required).toContain("fromName");
+    expect(v1OpenApi.components.schemas.DraftAttachment.required).toContain("inline");
+    expect(
+      v1OpenApi.paths["/api/v1/drafts/{draftId}/attachments/{id}/inline"].get.security
+    ).toContainEqual({ oauth2: ["mail:send"] });
     expect(
       v1OpenApi.paths["/api/v1/messages"].get.parameters.find(
         (parameter) => parameter.name === "folder"
@@ -149,6 +165,12 @@ describe("Mail API public artifacts", () => {
     expect(JSON.parse(registrationRequest.request.body.raw).resources).toEqual([
       "{{api_resource}}"
     ]);
+    const addDraftAttachment = postman.item
+      .flatMap((folder) => folder.item)
+      .find((item) => item.name === "Add a draft attachment");
+    expect(addDraftAttachment.request.body.formdata).toContainEqual(
+      expect.objectContaining({ key: "inline", value: "true", disabled: true })
+    );
     for (const [route, pathItem] of Object.entries(openApi.paths)) {
       if (route === "/api/v2/events") continue;
       for (const operation of Object.values(pathItem)) {
