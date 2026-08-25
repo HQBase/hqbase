@@ -134,14 +134,13 @@ function signatureOptions(
   current: SignatureSnapshot
 ): DropdownSelectOption[] {
   const options: DropdownSelectOption[] = [
-    { label: "Automatic", value: "automatic" },
     ...signatures.map((signature) => ({
       label: `${signature.name} · ${scopeName(signature)}`,
       value: `selected:${signature.id}`
     }))
   ];
   if (
-    current.mode === "selected" &&
+    current.mode !== "none" &&
     current.name &&
     !signatures.some((signature) => signature.id === current.id)
   ) {
@@ -159,14 +158,12 @@ function signatureOptions(
 }
 
 function signatureValue(signature: SignatureSnapshot): string {
-  if (signature.mode === "selected") {
-    return signature.id ? `selected:${signature.id}` : "snapshot";
-  }
-  return signature.mode;
+  if (signature.mode === "none") return "none";
+  if (signature.id) return `selected:${signature.id}`;
+  return signature.name ? "snapshot" : "none";
 }
 
 function selectionFromValue(value: string): SignatureSelection | null {
-  if (value === "automatic") return { mode: "automatic" };
   if (value === "none") return { mode: "none" };
   if (value.startsWith("selected:") && value.length > "selected:".length) {
     return { mode: "selected", id: value.slice("selected:".length) };

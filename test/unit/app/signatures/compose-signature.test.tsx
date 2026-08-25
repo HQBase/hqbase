@@ -34,7 +34,7 @@ afterEach(() => {
 });
 
 describe("compose signature", () => {
-  it("renders the saved preview and offers exact-address choices", async () => {
+  it("shows a captured default by name without an Automatic option", async () => {
     vi.mocked(listUsableSignatures).mockResolvedValue({
       automaticSignatureId: candidate.id,
       signatures: [candidate]
@@ -57,16 +57,18 @@ describe("compose signature", () => {
       'iframe[title="Signature preview"]'
     );
     expect(preview?.srcdoc).toContain("HQBase Support");
+    expect(
+      view.container.querySelector<HTMLButtonElement>('[aria-label="Signature"]')?.textContent
+    ).toContain("Support · Support");
 
     await openSignatureMenu(view.container);
-    const selected = Array.from(
+    const options = Array.from(
       document.body.querySelectorAll<HTMLElement>('[role="menuitemradio"]')
-    ).find((item) => item.textContent?.includes("Support · Support"));
-    await flushHookEffects(() => selected?.click());
-    expect(onSelectionChange).toHaveBeenCalledWith({
-      mode: "selected",
-      id: candidate.id
-    });
+    );
+    expect(options.some((item) => item.textContent?.includes("Automatic"))).toBe(false);
+    const none = options.find((item) => item.textContent?.includes("No signature"));
+    await flushHookEffects(() => none?.click());
+    expect(onSelectionChange).toHaveBeenCalledWith({ mode: "none" });
 
     await openSignatureMenu(view.container);
     const manage = Array.from(
@@ -77,7 +79,39 @@ describe("compose signature", () => {
     await view.unmount();
   });
 
-  it("keeps a deleted source snapshot visible", async () => {
+  it("shows No signature for an empty captured automatic selection", async () => {
+    vi.mocked(listUsableSignatures).mockResolvedValue({
+      automaticSignatureId: candidate.id,
+      signatures: [candidate]
+    });
+    const onSelectionChange = vi.fn().mockResolvedValue(undefined);
+    const view = await renderComponent(
+      <ComposeSignature
+        from="support@example.com"
+        signature={{ mode: "automatic", id: null, name: "", html: "", text: "" }}
+        onManage={() => undefined}
+        onSelectionChange={onSelectionChange}
+      />
+    );
+    document.body.appendChild(view.container);
+    await flushHookEffects();
+
+    expect(
+      view.container.querySelector<HTMLButtonElement>('[aria-label="Signature"]')?.textContent
+    ).toContain("No signature");
+    await openSignatureMenu(view.container);
+    const selected = Array.from(
+      document.body.querySelectorAll<HTMLElement>('[role="menuitemradio"]')
+    ).find((item) => item.textContent?.includes("Support · Support"));
+    await flushHookEffects(() => selected?.click());
+    expect(onSelectionChange).toHaveBeenCalledWith({
+      mode: "selected",
+      id: candidate.id
+    });
+    await view.unmount();
+  });
+
+  it("keeps an unavailable automatic snapshot visible", async () => {
     vi.mocked(listUsableSignatures).mockResolvedValue({
       automaticSignatureId: null,
       signatures: []
@@ -85,7 +119,7 @@ describe("compose signature", () => {
     const view = await renderComponent(
       <ComposeSignature
         from="support@example.com"
-        signature={{ ...automatic, mode: "selected", id: "sig_deleted", name: "Old footer" }}
+        signature={{ ...automatic, id: "sig_deleted", name: "Old footer" }}
         onManage={() => undefined}
         onSelectionChange={() => undefined}
       />
