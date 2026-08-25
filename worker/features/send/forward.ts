@@ -204,7 +204,7 @@ export function forwardedContext(message: MessageDetail): { text: string; html: 
   const timestamp = message.receivedAt ?? message.sentAt ?? message.createdAt;
   const forwarded = [
     "---------- Forwarded message ---------",
-    `From: ${message.fromAddress}`,
+    `From: ${message.fromName ? `${message.fromName} <${message.fromAddress}>` : message.fromAddress}`,
     `Date: ${new Date(timestamp).toUTCString()}`,
     `Subject: ${message.subject}`,
     `To: ${message.to.join(", ")}`,

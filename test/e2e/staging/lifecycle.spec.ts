@@ -324,6 +324,7 @@ test("candidate mail experience contracts work together", async ({ request }) =>
   expect(mailboxesResponse.ok(), await mailboxesResponse.text()).toBeTruthy();
   const mailboxes = (await mailboxesResponse.json()) as Array<{
     address: string;
+    displayName: string;
     id: string;
     mailDomainId: string;
   }>;
@@ -387,6 +388,24 @@ test("candidate mail experience contracts work together", async ({ request }) =>
     user: admin
   });
   try {
+    const strictMailboxContacts = await memberRequest.get(
+      `/api/contacts?search=${encodeURIComponent(secondAddress)}`
+    );
+    expect(strictMailboxContacts.ok(), await strictMailboxContacts.text()).toBeTruthy();
+    expect(await strictMailboxContacts.json()).toEqual([]);
+
+    const mailboxSuggestions = await memberRequest.get(
+      `/api/contacts/suggestions?search=${encodeURIComponent(secondAddress)}`
+    );
+    expect(mailboxSuggestions.ok(), await mailboxSuggestions.text()).toBeTruthy();
+    expect(await mailboxSuggestions.json()).toEqual([
+      expect.objectContaining({
+        email: secondAddress,
+        name: `Second ${suffix}`,
+        source: "mailbox"
+      })
+    ]);
+
     const personalSignature = await createStagingSignature(memberRequest, {
       html: `<p>Personal ${searchTerm}</p>`,
       isDefault: true,
@@ -527,6 +546,12 @@ test("candidate mail experience contracts work together", async ({ request }) =>
       }
     });
 
+    const contactBeforeSend = await memberRequest.get(
+      `/api/contacts?search=${encodeURIComponent(contactEmail)}`
+    );
+    expect(contactBeforeSend.ok(), await contactBeforeSend.text()).toBeTruthy();
+    expect(await contactBeforeSend.json()).toEqual([]);
+
     const sendResponse = await memberRequest.post("/api/v2/send", {
       data: {
         bcc: reopenedDraft.bcc,
@@ -540,7 +565,16 @@ test("candidate mail experience contracts work together", async ({ request }) =>
       }
     });
     expect(sendResponse.status(), await sendResponse.text()).toBe(201);
-    const sent = (await sendResponse.json()) as { id: string; threadId: string };
+    const sent = (await sendResponse.json()) as {
+      fromAddress: string;
+      fromName: string | null;
+      id: string;
+      threadId: string;
+    };
+    expect(sent).toMatchObject({
+      fromAddress: sender,
+      fromName: primaryMailbox.displayName
+    });
     const sentBodies = await storedMessageBodies(memberRequest, sent.id);
     expect(sentBodies.text).toBe(`${authoredText}\n\n${signatureText}`);
     expectTextOrder(sentBodies.html, [authoredText, signatureText]);
@@ -548,6 +582,13 @@ test("candidate mail experience contracts work together", async ({ request }) =>
       expect(sentBodies.text).not.toContain(controlText);
       expect(sentBodies.html).not.toContain(controlText);
     }
+    const recentContact = await memberRequest.get(
+      `/api/contacts?search=${encodeURIComponent(contactEmail)}`
+    );
+    expect(recentContact.ok(), await recentContact.text()).toBeTruthy();
+    expect(await recentContact.json()).toEqual([
+      expect.objectContaining({ email: contactEmail, saved: false, source: "recent" })
+    ]);
     expect((await memberRequest.get(`/api/v2/drafts/${manualDraft.id}`)).status()).toBe(404);
 
     const fromDraftResponse = await memberRequest.post("/api/v2/drafts", {

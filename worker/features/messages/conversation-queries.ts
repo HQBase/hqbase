@@ -75,6 +75,7 @@ export async function listConversationPage(
     eligibilityWhere.push(
       sql`(accessible.subject LIKE ${like} ESCAPE '\\'
            OR accessible.from_address LIKE ${like} ESCAPE '\\'
+           OR accessible.from_name LIKE ${like} ESCAPE '\\'
            OR accessible.to_json LIKE ${like} ESCAPE '\\'
            OR accessible.snippet LIKE ${like} ESCAPE '\\'
            OR accessible.text_body LIKE ${like} ESCAPE '\\')`
@@ -281,6 +282,7 @@ function mapConversationSummary(row: ConversationRow): ConversationSummary {
     direction: row.direction,
     folder: row.folder,
     fromAddress: row.from_address,
+    fromName: row.from_name,
     to: parseJsonList(row.to_json),
     subject: row.subject,
     snippet: row.snippet,

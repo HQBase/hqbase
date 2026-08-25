@@ -8,9 +8,24 @@ describe("parseRawEmail", () => {
     const parsed = await parseRawEmail(raw);
 
     expect(parsed.fromAddress).toBe("alice@example.net");
+    expect(parsed.fromName).toBe("Alice Example");
     expect(parsed.to).toContain("support@example.com");
     expect(parsed.subject).toBe("Need help with billing");
     expect(parsed.snippet).toContain("Can you help me");
+  });
+
+  it("normalizes absent and long sender names", async () => {
+    const unnamed = await parseRawEmail(
+      rawEmail("From: plain@example.net\r\nTo: support@example.com\r\nSubject: Plain\r\n\r\nHello")
+    );
+    const long = await parseRawEmail(
+      rawEmail(
+        `From: ${"A".repeat(220)} <long@example.net>\r\nTo: support@example.com\r\nSubject: Long\r\n\r\nHello`
+      )
+    );
+
+    expect(unnamed.fromName).toBeNull();
+    expect(long.fromName).toHaveLength(200);
   });
 
   it("extracts html and attachments", async () => {
@@ -34,4 +49,8 @@ describe("parseRawEmail", () => {
 async function readFixture(name: string): Promise<ArrayBuffer> {
   const buffer = await readFile(new URL(`../../../fixtures/email/${name}`, import.meta.url));
   return buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength);
+}
+
+function rawEmail(value: string): ArrayBuffer {
+  return new TextEncoder().encode(value).buffer;
 }

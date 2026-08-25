@@ -285,7 +285,7 @@ function resultPresentation(result: GlobalSearchResult): {
       return {
         icon: PiPaperPlaneTilt,
         primary: result.subject || "(No subject)",
-        secondary: `${result.fromAddress}${result.snippet ? ` · ${result.snippet}` : ""}`
+        secondary: `${result.fromName ? `${result.fromName} · ` : ""}${result.fromAddress}${result.snippet ? ` · ${result.snippet}` : ""}`
       };
     case "contact":
       return {

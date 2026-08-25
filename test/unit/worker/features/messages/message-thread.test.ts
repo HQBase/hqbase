@@ -10,6 +10,7 @@ const row: MessageRow = {
   direction: "inbound",
   folder: "inbox",
   from_address: "customer@example.com",
+  from_name: "Customer",
   to_json: '["support@example.com"]',
   cc_json: "[]",
   bcc_json: "[]",

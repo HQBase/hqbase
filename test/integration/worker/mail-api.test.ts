@@ -212,10 +212,10 @@ describe("HQBase Mail API", () => {
       ),
       env.DB.prepare(
         `INSERT INTO messages
-         (id, thread_id, mailbox_id, direction, folder, from_address, to_json, cc_json, bcc_json,
+         (id, thread_id, mailbox_id, direction, folder, from_address, from_name, to_json, cc_json, bcc_json,
           subject, snippet, text_body, html_r2_key, message_id, dedupe_key, in_reply_to, references_json,
           received_at, sent_at, read_at, has_attachments, created_at, updated_at)
-         VALUES ('msg_api', 'thr_api', 'mbx_api', 'inbound', 'inbox', 'sender@example.net', ?,
+         VALUES ('msg_api', 'thr_api', 'mbx_api', 'inbound', 'inbox', 'sender@example.net', 'Sender Example', ?,
                  '[]', '[]', 'API message', 'Body', 'Body', 'mail/api/body.html',
                  '<api@example.net>', 'api-dedupe',
                  NULL, '[]', ?, NULL, NULL, 1, ?, ?)`
@@ -639,11 +639,17 @@ describe("HQBase Mail API", () => {
   it("reads mail with an audience-bound bearer token without exposing storage keys", async () => {
     const list = await apiFetch("/api/v2/messages", readToken);
     expect(list.status, await list.clone().text()).toBe(200);
-    await expect(list.json()).resolves.toMatchObject([{ id: "msg_api" }]);
+    await expect(list.json()).resolves.toMatchObject([
+      { id: "msg_api", fromAddress: "sender@example.net", fromName: "Sender Example" }
+    ]);
 
     const detail = await apiFetch("/api/v2/messages/msg_api", readToken);
     expect(detail.status).toBe(200);
-    const payload = (await detail.json()) as { attachments: Array<Record<string, unknown>> };
+    const payload = (await detail.json()) as {
+      attachments: Array<Record<string, unknown>>;
+      fromName: string | null;
+    };
+    expect(payload.fromName).toBe("Sender Example");
     expect(payload.attachments[0]).toMatchObject({ id: "att_api", filename: "hello.txt" });
     expect(payload.attachments[0]).not.toHaveProperty("r2Key");
 

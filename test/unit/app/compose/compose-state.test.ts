@@ -60,8 +60,8 @@ describe("composer state", () => {
         }
       ])
     ).toEqual([
-      { mailboxId: "mbx_1", address: "support@example.com" },
-      { mailboxId: "mbx_2", address: "sales@example.net" }
+      { mailboxId: "mbx_1", address: "support@example.com", displayName: "Support" },
+      { mailboxId: "mbx_2", address: "sales@example.net", displayName: "Sales" }
     ]);
   });
 
@@ -117,6 +117,7 @@ describe("composer state", () => {
       direction: "inbound",
       folder: "inbox",
       fromAddress: "sender@example.com",
+      fromName: "Sender Example",
       to: ["support@example.com"],
       cc: [],
       bcc: [],
@@ -139,19 +140,23 @@ describe("composer state", () => {
     const identity = replySendingIdentity(
       inboundMessage,
       [
-        { mailboxId: "mbx_1", address: "support@example.com" },
-        { mailboxId: "mbx_2", address: "privacy@example.com" }
+        { mailboxId: "mbx_1", address: "support@example.com", displayName: "Support" },
+        { mailboxId: "mbx_2", address: "privacy@example.com", displayName: "Privacy" }
       ],
-      { mailboxId: "mbx_2", address: "privacy@example.com" }
+      { mailboxId: "mbx_2", address: "privacy@example.com", displayName: "Privacy" }
     );
 
-    expect(identity).toEqual({ mailboxId: "mbx_1", address: "support@example.com" });
+    expect(identity).toEqual({
+      mailboxId: "mbx_1",
+      address: "support@example.com",
+      displayName: "Support"
+    });
     expect(replyRecipients(inboundMessage)).toEqual(["sender@example.com"]);
     expect(composeContextLabel("reply", inboundMessage)).toContain(
-      "Replying to sender@example.com ·"
+      "Replying to Sender Example <sender@example.com> ·"
     );
     expect(composeContextLabel("forward", inboundMessage)).toContain(
-      "Forwarding message from sender@example.com ·"
+      "Forwarding message from Sender Example <sender@example.com> ·"
     );
     expect(composeContextLabel("new", inboundMessage)).toBeNull();
     expect(
@@ -209,7 +214,8 @@ describe("composer state", () => {
 
     expect(defaultSendingIdentity("mbx_2", identities)).toEqual({
       mailboxId: "mbx_2",
-      address: "privacy@example.com"
+      address: "privacy@example.com",
+      displayName: "Privacy"
     });
   });
 
@@ -228,6 +234,7 @@ describe("composer state", () => {
       direction: "inbound",
       folder: "inbox",
       fromAddress: "sender@example.com",
+      fromName: "Sender Example",
       to: ["support@example.com"],
       cc: [],
       bcc: [],
@@ -249,7 +256,7 @@ describe("composer state", () => {
     });
 
     expect(forwarded.text).toContain("---------- Forwarded message ---------");
-    expect(forwarded.text).toContain("From: sender@example.com");
+    expect(forwarded.text).toContain("From: Sender Example <sender@example.com>");
     expect(forwarded.html).toContain("&lt;script&gt;");
     expect(forwarded.html).not.toContain("<script>");
   });

@@ -67,6 +67,7 @@ export async function insertMessage(
       direction: input.direction,
       folder: input.folder,
       fromAddress: input.fromAddress,
+      fromName: input.fromName,
       to: input.to,
       cc: input.cc,
       bcc: input.bcc,
@@ -156,6 +157,7 @@ export async function listMessagePage(
     const like = literalSearchPattern(filters.search);
     where.push(
       sql`(subject LIKE ${like} ESCAPE '\\' OR from_address LIKE ${like} ESCAPE '\\'
+           OR from_name LIKE ${like} ESCAPE '\\'
            OR to_json LIKE ${like} ESCAPE '\\' OR snippet LIKE ${like} ESCAPE '\\'
            OR text_body LIKE ${like} ESCAPE '\\')`
     );
@@ -332,6 +334,7 @@ export function mapMessageSummary(row: MessageRow): MessageSummary {
     direction: row.direction,
     folder: row.folder,
     fromAddress: row.from_address,
+    fromName: row.from_name,
     to: parseJsonList(row.to_json),
     subject: row.subject,
     snippet: row.snippet,

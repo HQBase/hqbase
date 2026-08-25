@@ -41,7 +41,7 @@ export async function sendNewMessage(
     context
   });
   const email = {
-    from: input.from,
+    from: { name: mailbox.displayName, email: mailbox.address },
     to: input.to,
     subject: input.subject,
     text: body.text
@@ -58,6 +58,7 @@ export async function sendNewMessage(
 
   return storeSentMessage(env, {
     ...input,
+    fromName: mailbox.displayName,
     text: body.text,
     ...(body.html ? { html: body.html } : { html: undefined }),
     inReplyTo: null,
@@ -114,7 +115,7 @@ export async function replyToMessage(
   });
   const outgoingAttachments = [...attachments, ...quoted.inlineAttachments];
   const sendResult = await env.MAIL_SENDER.send({
-    from: input.from,
+    from: { name: mailbox.displayName, email: mailbox.address },
     to,
     ...(input.cc.length ? { cc: input.cc } : {}),
     ...(input.bcc.length ? { bcc: input.bcc } : {}),
@@ -132,6 +133,7 @@ export async function replyToMessage(
 
   return storeSentMessage(env, {
     from: input.from,
+    fromName: mailbox.displayName,
     to,
     cc: input.cc,
     bcc: input.bcc,
@@ -165,6 +167,7 @@ async function storeSentMessage(
   env: WorkerEnv,
   input: {
     from: string;
+    fromName: string;
     to: string[];
     cc: string[];
     bcc: string[];
@@ -197,6 +200,7 @@ async function storeSentMessage(
     direction: "outbound",
     folder: "sent",
     fromAddress: input.from,
+    fromName: input.fromName,
     to: input.to,
     cc: input.cc,
     bcc: input.bcc,

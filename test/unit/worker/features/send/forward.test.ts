@@ -11,6 +11,7 @@ describe("forwarded mail body", () => {
         direction: "inbound",
         folder: "inbox",
         fromAddress: "sender@example.com",
+        fromName: "Sender Example",
         to: ["support@example.com"],
         cc: ["manager@example.com"],
         bcc: [],
@@ -35,7 +36,7 @@ describe("forwarded mail body", () => {
     );
 
     expect(body.text).toContain("Please review\n\n---------- Forwarded message ---------");
-    expect(body.text).toContain("From: sender@example.com");
+    expect(body.text).toContain("From: Sender Example <sender@example.com>");
     expect(body.html).toContain("<p><strong>Please review</strong></p>");
     expect(body.html).toContain("&lt;script&gt;alert(1)&lt;/script&gt;");
     expect(body.html).not.toContain("<script>");

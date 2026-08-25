@@ -96,7 +96,11 @@ export function sendingIdentities(mailboxes: Mailbox[]): SendingIdentity[] {
       (mailbox) =>
         mailbox.isActive && (mailbox.accessLevel === "agent" || mailbox.accessLevel === "manager")
     )
-    .map((mailbox) => ({ mailboxId: mailbox.id, address: mailbox.address }));
+    .map((mailbox) => ({
+      mailboxId: mailbox.id,
+      address: mailbox.address,
+      displayName: mailbox.displayName
+    }));
 }
 
 export const serializeDraft = (
@@ -145,7 +149,10 @@ export function composeContextLabel(
   if (mode === "new" || !message) return null;
   const timestamp = message.receivedAt ?? message.sentAt ?? message.createdAt;
   const action = mode === "reply" ? "Replying to" : "Forwarding message from";
-  return `${action} ${message.fromAddress} · ${formatDateTime(timestamp)}`;
+  const sender = message.fromName
+    ? `${message.fromName} <${message.fromAddress}>`
+    : message.fromAddress;
+  return `${action} ${sender} · ${formatDateTime(timestamp)}`;
 }
 
 export function draftStatus(state: DraftSaveState): string {
@@ -162,7 +169,7 @@ export function forwardedMessage(message: MessageDetail): { html: string; text: 
   const timestamp = message.receivedAt ?? message.sentAt ?? message.createdAt;
   const lines = [
     "---------- Forwarded message ---------",
-    `From: ${message.fromAddress}`,
+    `From: ${message.fromName ? `${message.fromName} <${message.fromAddress}>` : message.fromAddress}`,
     `Date: ${formatDateTime(timestamp)}`,
     `Subject: ${message.subject}`,
     `To: ${message.to.join(", ")}`,

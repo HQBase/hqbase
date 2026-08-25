@@ -21,14 +21,15 @@ export type ContactSummary = {
   source: ContactSource;
 };
 
-export type ContactDetail = ContactSummary & { notes: string };
+export type ContactDetail = ContactSummary & { notes: string; savedName: string | null };
 
 type ContactRow = {
   email: string;
   last_contact_at: string | null;
   mailbox_name: string | null;
-  name: string | null;
+  observed_name: string | null;
   notes: string | null;
+  saved_name: string | null;
   saved: number;
   source: ContactSource;
 };
@@ -91,7 +92,11 @@ export async function getContactDetail(
     scope: input.scope
   });
   return {
-    contact: { ...contactSummary(row), notes: row.notes ?? "" },
+    contact: {
+      ...contactSummary(row),
+      notes: row.notes ?? "",
+      savedName: row.saved_name
+    },
     conversations: page.conversations,
     nextCursor: page.nextCursor
   };
@@ -166,21 +171,21 @@ async function contactRows(
   const search = input.search?.trim();
   const contains = search ? literalSearchPattern(search) : null;
   const prefix = search ? literalSearchPattern(search).slice(1) : null;
+  const effectiveName = sql`CASE WHEN known.source = 'mailbox' THEN known.mailbox_name
+    ELSE COALESCE(contact.name, observed.observed_name) END`;
   const filter = input.exactEmail
     ? sql`WHERE known.email = ${input.exactEmail}`
     : search
       ? sql`WHERE known.email LIKE ${contains} ESCAPE '\\'
-            OR contact.name LIKE ${contains} ESCAPE '\\'
-            OR known.mailbox_name LIKE ${contains} ESCAPE '\\'`
+            OR ${effectiveName} LIKE ${contains} ESCAPE '\\'`
       : sql``;
   const rank = search
     ? sql`CASE
         WHEN known.saved = 1 AND (
-          known.email LIKE ${prefix} ESCAPE '\\' OR contact.name LIKE ${prefix} ESCAPE '\\'
+          known.email LIKE ${prefix} ESCAPE '\\' OR ${effectiveName} LIKE ${prefix} ESCAPE '\\'
         ) THEN 0
         WHEN known.email LIKE ${prefix} ESCAPE '\\'
-          OR contact.name LIKE ${prefix} ESCAPE '\\'
-          OR known.mailbox_name LIKE ${prefix} ESCAPE '\\' THEN 1
+          OR ${effectiveName} LIKE ${prefix} ESCAPE '\\' THEN 1
         WHEN known.saved = 1 THEN 2
         WHEN known.source = 'mailbox' THEN 3
         ELSE 4
@@ -209,6 +214,23 @@ async function contactRows(
           SELECT lower(mailbox.address) AS email
           FROM mailboxes mailbox
           WHERE mailbox.deleted_at IS NULL
+        ),
+        observed_sender_candidates AS (
+          SELECT lower(trim(message.from_address)) AS email,
+            message.from_name AS observed_name,
+            ROW_NUMBER() OVER (
+              PARTITION BY lower(trim(message.from_address))
+              ORDER BY COALESCE(message.received_at, message.sent_at, message.created_at) DESC,
+                message.id DESC
+            ) AS sender_position
+          FROM messages message
+          WHERE ${scope} AND message.direction = 'inbound'
+            AND message.from_name IS NOT NULL AND trim(message.from_name) <> ''
+        ),
+        observed_sender_names AS (
+          SELECT email, observed_name
+          FROM observed_sender_candidates
+          WHERE sender_position = 1
         ),
         recent AS (
           SELECT email, MAX(activity_at) AS last_contact_at
@@ -258,10 +280,12 @@ async function contactRows(
           GROUP BY email
         )
         SELECT known.email, known.saved, known.source, known.last_contact_at,
-          known.mailbox_name, contact.name, contact.notes
+          known.mailbox_name, contact.name AS saved_name, contact.notes,
+          observed.observed_name
         FROM known
         LEFT JOIN contacts contact
           ON contact.user_id = ${input.userId} AND contact.email = known.email
+        LEFT JOIN observed_sender_names observed ON observed.email = known.email
         ${filter}
         ORDER BY ${rank}, known.last_contact_at DESC, known.email ASC
         LIMIT ${input.limit} OFFSET ${input.offset ?? 0}`
@@ -283,7 +307,10 @@ function contactSummary(row: ContactRow): ContactSummary {
     email: row.email,
     id: row.email,
     lastContactAt: row.last_contact_at,
-    name: row.name ?? row.mailbox_name,
+    name:
+      row.source === "mailbox"
+        ? row.mailbox_name
+        : (row.saved_name ?? row.observed_name ?? row.mailbox_name),
     saved: row.saved === 1,
     source: row.source
   };

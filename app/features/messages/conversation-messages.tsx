@@ -76,9 +76,10 @@ export function ConversationMessages({
         <header className="mb-5 flex flex-wrap items-start justify-between gap-2">
           <div className="min-w-0">
             <div className="break-words text-sm font-medium text-balance [text-wrap:balance]">
-              {message.fromAddress}
+              {message.fromName ?? message.fromAddress}
             </div>
             <div className="mt-1 break-words text-xs text-muted-foreground">
+              {message.fromName ? `${message.fromAddress} · ` : ""}
               to {message.to.join(", ")}
               {message.cc.length > 0 ? ` · cc ${message.cc.join(", ")}` : ""}
             </div>

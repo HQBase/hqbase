@@ -213,7 +213,7 @@ export function AgentCreateForm({
                     />
                   </Field>
                   <Field>
-                    <FieldLabel htmlFor="new-agent-mailbox-name">Display name</FieldLabel>
+                    <FieldLabel htmlFor="new-agent-mailbox-name">Sender name</FieldLabel>
                     <Input
                       id="new-agent-mailbox-name"
                       placeholder="Support assistant"

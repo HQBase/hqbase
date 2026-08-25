@@ -157,7 +157,7 @@ export function MailboxSettings({
                     />
                   </Field>
                   <Field>
-                    <FieldLabel htmlFor="new-mailbox-name">Display name</FieldLabel>
+                    <FieldLabel htmlFor="new-mailbox-name">Sender name</FieldLabel>
                     <Input
                       id="new-mailbox-name"
                       placeholder="Support"
@@ -266,6 +266,7 @@ export function MailboxSettings({
         mailbox={detailsMailbox}
         policies={accessPolicies}
         users={users}
+        onChanged={onChanged}
         onDelete={(mailbox) => {
           setDetailsMailboxId(null);
           setDeleteConfirmation(mailbox);

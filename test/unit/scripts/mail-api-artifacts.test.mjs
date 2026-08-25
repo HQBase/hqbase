@@ -33,6 +33,13 @@ describe("Mail API public artifacts", () => {
       bearerFormat: "hqb_agent_<secret>"
     });
     expect(openApi.components.schemas.Mailbox.required).toContain("deletedAt");
+    expect(openApi.components.schemas.Mailbox.properties.displayName.description).toContain(
+      "sender name"
+    );
+    expect(openApi.components.schemas.MessageSummary.required).toContain("fromName");
+    expect(openApi.components.schemas.MessageSummary.properties.fromName).toMatchObject({
+      anyOf: expect.arrayContaining([{ type: "null" }])
+    });
     expect(openApi.paths["/api/v2/events"].get.security).toContainEqual({
       oauth2: ["mail:read"]
     });
@@ -102,6 +109,10 @@ describe("Mail API public artifacts", () => {
       items: { $ref: "#/components/schemas/MailboxAddress" }
     });
     expect(v1OpenApi.components.schemas.MailboxAddress).toBeDefined();
+    expect(v1OpenApi.components.schemas.Mailbox.properties.displayName.description).toContain(
+      "sender name"
+    );
+    expect(v1OpenApi.components.schemas.MessageSummary.required).toContain("fromName");
     expect(
       v1OpenApi.paths["/api/v1/messages"].get.parameters.find(
         (parameter) => parameter.name === "folder"

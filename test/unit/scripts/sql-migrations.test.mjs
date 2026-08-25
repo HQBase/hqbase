@@ -35,7 +35,8 @@ const expectedMigrationNames = [
   "0019_contacts.sql",
   "0020_labels.sql",
   "0021_email_signatures.sql",
-  "0022_login_email_domain_exact_match.sql"
+  "0022_login_email_domain_exact_match.sql",
+  "0023_message_sender_names.sql"
 ];
 const expectedAfterDeployMigrationNames = [
   "0001_remove_mailbox_alias_storage.sql",
@@ -371,6 +372,7 @@ describe("SQL migration contract", () => {
     expect(draftColumns.map((column) => column.name)).not.toContain("user_id");
     const messageColumns = database.prepare("PRAGMA table_info(messages)").all();
     expect(messageColumns.map((column) => column.name)).toContain("delivered_to_address");
+    expect(messageColumns.map((column) => column.name)).toContain("from_name");
     expect(messageColumns.map((column) => column.name)).not.toContain("delivered_to_address_id");
     expect(messageColumns.map((column) => column.name)).not.toContain("sent_from_address_id");
     expect(
@@ -471,6 +473,12 @@ describe("SQL migration contract", () => {
         migrationNamed(migrations, "0022_login_email_domain_exact_match.sql")
       )
     ).toBe(true);
+    expect(
+      applyMigration(database, migrationNamed(migrations, "0023_message_sender_names.sql"))
+    ).toBe(true);
+    expect(
+      database.prepare("SELECT from_name FROM messages WHERE id = 'msg_upgrade'").get()
+    ).toEqual({ from_name: null });
 
     database.exec(`
       INSERT INTO contacts (
@@ -678,7 +686,7 @@ describe("SQL migration contract", () => {
       )
     ).toBe(false);
     expect(database.prepare("SELECT count(*) AS count FROM d1_migrations").get()).toEqual({
-      count: 22
+      count: 23
     });
     expect(
       database.prepare("SELECT count(*) AS count FROM d1_migrations_after_deploy").get()

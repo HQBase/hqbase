@@ -72,6 +72,7 @@ export async function storeInboundEmail(
     direction: "inbound",
     folder: plan.folder,
     fromAddress: input.parsed.fromAddress,
+    fromName: input.parsed.fromName,
     to: plan.to,
     cc: input.parsed.cc,
     bcc: input.parsed.bcc,

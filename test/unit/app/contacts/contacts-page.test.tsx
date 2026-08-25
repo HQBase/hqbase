@@ -19,6 +19,7 @@ const detail = {
     lastContactAt: "2026-08-24T12:00:00.000Z",
     name: "Alice",
     notes: "Prefers email in the morning.",
+    savedName: "Alice",
     saved: true,
     source: "saved" as const
   },
@@ -89,6 +90,46 @@ describe("contacts page", () => {
     expect(onOpenConversation).toHaveBeenCalledWith(
       expect.objectContaining({ folder: "inbox", id: "message-1" })
     );
+    await view.unmount();
+  });
+
+  it("does not persist an observed sender name during a notes-only save", async () => {
+    const observed = {
+      ...detail,
+      contact: {
+        ...detail.contact,
+        name: "Alice Header",
+        notes: "Observed contact note.",
+        saved: false,
+        savedName: null,
+        source: "recent" as const
+      }
+    };
+    mocks.getContact.mockResolvedValue(observed);
+    mocks.saveContact.mockResolvedValue(observed);
+    const view = await renderComponent(
+      <ContactsPage
+        selectedId="alice@example.com"
+        onBack={() => undefined}
+        onCompose={() => undefined}
+        onOpenConversation={() => undefined}
+        onSelect={() => undefined}
+      />
+    );
+    await flushHookEffects();
+
+    const name = view.container.querySelector<HTMLInputElement>("#contact-name");
+    expect(name?.value).toBe("");
+    expect(name?.placeholder).toBe("Alice Header");
+    const save = Array.from(view.container.querySelectorAll("button")).find((button) =>
+      button.textContent?.includes("Save contact")
+    );
+    await flushHookEffects(() => save?.click());
+    expect(mocks.saveContact).toHaveBeenCalledWith("alice@example.com", {
+      email: "alice@example.com",
+      name: null,
+      notes: "Observed contact note."
+    });
     await view.unmount();
   });
 

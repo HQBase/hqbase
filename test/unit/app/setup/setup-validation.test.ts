@@ -137,7 +137,7 @@ describe("setup form validation", () => {
     expect(errors.rows).toEqual([
       {
         address: "Use one of the connected email domains.",
-        displayName: "Enter a display name."
+        displayName: "Enter a sender name."
       },
       { address: "Each mailbox address must be unique." },
       { address: "Each mailbox address must be unique." }

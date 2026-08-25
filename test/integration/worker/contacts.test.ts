@@ -49,9 +49,24 @@ describe("contacts", () => {
          (mailbox_id, principal_id, access_level, created_by_principal_id, created_at, updated_at)
          VALUES ('mbx_contacts_two', ?, 'read', ?, ?, ?)`
       ).bind(secondUserId, secondUserId, timestamp, timestamp),
+      env.DB.prepare(
+        `INSERT INTO contacts (user_id, email, name, notes, created_at, updated_at)
+         VALUES (?, 'support@contacts.example', 'Stale saved name', 'Hidden note', ?, ?)`
+      ).bind(firstUserId, timestamp, timestamp),
       thread("thr_contacts_inbound", "Inbound", "2026-08-24T12:01:00.000Z"),
       message({
         from: "pat@example.net",
+        fromName: "Pat Old Header",
+        id: "msg_contacts_inbound_old",
+        mailboxId: "mbx_contacts_one",
+        receivedAt: "2026-08-24T11:59:00.000Z",
+        subject: "Inbound",
+        threadId: "thr_contacts_inbound",
+        to: ["support@contacts.example"]
+      }),
+      message({
+        from: "pat@example.net",
+        fromName: "Pat Header",
         id: "msg_contacts_inbound",
         mailboxId: "mbx_contacts_one",
         receivedAt: "2026-08-24T12:01:00.000Z",
@@ -62,6 +77,7 @@ describe("contacts", () => {
       thread("thr_contacts_inbound_only", "Inbound only", "2026-08-24T12:01:30.000Z"),
       message({
         from: "inbound-only@example.net",
+        fromName: "Inbound Only",
         id: "msg_contacts_inbound_only",
         mailboxId: "mbx_contacts_one",
         receivedAt: "2026-08-24T12:01:30.000Z",
@@ -114,7 +130,7 @@ describe("contacts", () => {
         email: "pat@example.net",
         id: "pat@example.net",
         lastContactAt: "2026-08-24T12:02:00.000Z",
-        name: null,
+        name: "Pat Header",
         saved: false,
         source: "recent"
       }
@@ -139,15 +155,29 @@ describe("contacts", () => {
 
     const mailboxSuggestions = (await (
       await sessionFetch("/api/contacts/suggestions?search=support", firstCookie)
-    ).json()) as Array<{ email: string; source: string }>;
+    ).json()) as Array<{ email: string; name: string; source: string }>;
     expect(mailboxSuggestions).toEqual([
-      expect.objectContaining({ email: "support@contacts.example", source: "mailbox" })
+      expect.objectContaining({
+        email: "support@contacts.example",
+        name: "Support",
+        source: "mailbox"
+      })
     ]);
+
+    const staleMailboxName = (await (
+      await sessionFetch("/api/contacts/suggestions?search=stale", firstCookie)
+    ).json()) as unknown[];
+    expect(staleMailboxName).toEqual([]);
 
     const inaccessibleMailbox = (await (
       await sessionFetch("/api/contacts/suggestions?search=private", firstCookie)
     ).json()) as unknown[];
     expect(inaccessibleMailbox).toEqual([]);
+
+    const inaccessibleDirectoryMailbox = (await (
+      await sessionFetch("/api/contacts?search=private%40contacts.example", firstCookie)
+    ).json()) as unknown[];
+    expect(inaccessibleDirectoryMailbox).toEqual([]);
 
     const hidden = (await (
       await sessionFetch("/api/contacts?search=hidden", firstCookie)
@@ -173,7 +203,13 @@ describe("contacts", () => {
     });
     expect(firstSave.status, await firstSave.clone().text()).toBe(200);
     expect(await firstSave.json()).toMatchObject({
-      contact: { email: "pat@example.net", name: "Pat One", notes: "Private one", saved: true }
+      contact: {
+        email: "pat@example.net",
+        name: "Pat One",
+        notes: "Private one",
+        saved: true,
+        savedName: "Pat One"
+      }
     });
 
     const secondSave = await sessionFetch("/api/contacts/pat%40example.net", secondCookie, {
@@ -186,11 +222,15 @@ describe("contacts", () => {
     const firstDetail = await sessionFetch("/api/contacts/pat%40example.net", firstCookie);
     const secondDetail = await sessionFetch("/api/contacts/pat%40example.net", secondCookie);
     expect(await firstDetail.json()).toMatchObject({
-      contact: { name: "Pat One", notes: "Private one" }
+      contact: { name: "Pat One", notes: "Private one", savedName: "Pat One" }
     });
     expect(await secondDetail.json()).toMatchObject({
       contact: { name: "Pat Two", notes: "Private two" }
     });
+
+    const observedNameSearch = await sessionFetch("/api/contacts?search=Pat%20Header", firstCookie);
+    expect(observedNameSearch.status, await observedNameSearch.clone().text()).toBe(200);
+    expect(await observedNameSearch.json()).toEqual([]);
   });
 
   it("lists only exact accessible exchanges and keeps derived correspondents after deletion", async () => {
@@ -218,7 +258,14 @@ describe("contacts", () => {
     expect(removed.status).toBe(204);
     const after = await sessionFetch("/api/contacts/pat%40example.net", firstCookie);
     expect(await after.json()).toMatchObject({
-      contact: { email: "pat@example.net", name: null, notes: "", saved: false, source: "recent" }
+      contact: {
+        email: "pat@example.net",
+        name: "Pat Header",
+        notes: "",
+        saved: false,
+        savedName: null,
+        source: "recent"
+      }
     });
   });
 
@@ -298,6 +345,7 @@ function message(input: {
   cc?: string[];
   direction?: "inbound" | "outbound";
   from: string;
+  fromName?: string;
   id: string;
   mailboxId: string;
   receivedAt: string;
@@ -308,10 +356,10 @@ function message(input: {
   const direction = input.direction ?? "inbound";
   return env.DB.prepare(
     `INSERT INTO messages
-     (id, thread_id, mailbox_id, direction, folder, from_address, to_json, cc_json, bcc_json,
+     (id, thread_id, mailbox_id, direction, folder, from_address, from_name, to_json, cc_json, bcc_json,
       subject, snippet, text_body, references_json, received_at, sent_at, has_attachments,
       created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '', '[]', ?, ?, 0, ?, ?)`
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '', '[]', ?, ?, 0, ?, ?)`
   ).bind(
     input.id,
     input.threadId,
@@ -319,6 +367,7 @@ function message(input: {
     direction,
     direction === "outbound" ? "sent" : "inbox",
     input.from,
+    input.fromName ?? null,
     JSON.stringify(input.to),
     JSON.stringify(input.cc ?? []),
     JSON.stringify(input.bcc ?? []),

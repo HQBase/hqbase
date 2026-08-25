@@ -9,6 +9,7 @@ export type MessageSummary = {
   direction: "inbound" | "outbound";
   folder: MessageFolder;
   fromAddress: string;
+  fromName?: string | null;
   to: string[];
   subject: string;
   snippet: string;

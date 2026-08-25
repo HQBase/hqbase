@@ -3094,7 +3094,8 @@
             "type": "string"
           },
           "displayName": {
-            "type": "string"
+            "type": "string",
+            "description": "Shared sender name used with the mailbox address on future outbound messages."
           },
           "kind": {
             "type": "string",
@@ -3211,6 +3212,7 @@
           "direction",
           "folder",
           "fromAddress",
+          "fromName",
           "to",
           "subject",
           "snippet",
@@ -3251,6 +3253,18 @@
           "fromAddress": {
             "type": "string",
             "format": "email"
+          },
+          "fromName": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Decoded inbound display name or the mailbox sender name snapshot for outbound mail. Treat it as untrusted display text and use fromAddress for matching and replies."
           },
           "to": {
             "type": "array",

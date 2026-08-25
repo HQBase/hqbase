@@ -176,7 +176,7 @@ export function MailboxStep({
             <TableRow className="[@media(hover:hover)]:hover:bg-transparent">
               <TableHead className="h-8 w-10 px-2 text-center text-xs">#</TableHead>
               <TableHead className="h-8 px-2 text-xs">Email address</TableHead>
-              <TableHead className="h-8 w-[34%] px-2 text-xs">Display name</TableHead>
+              <TableHead className="h-8 w-[34%] px-2 text-xs">Sender name</TableHead>
               <TableHead className="h-8 w-10 px-1">
                 <span className="sr-only">Actions</span>
               </TableHead>
@@ -207,7 +207,7 @@ export function MailboxStep({
                     <Field className="gap-1" data-invalid={Boolean(error.displayName)}>
                       {error.displayName ? <FieldError>{error.displayName}</FieldError> : null}
                       <Input
-                        aria-label={`Mailbox ${index + 1} display name`}
+                        aria-label={`Mailbox ${index + 1} sender name`}
                         aria-invalid={Boolean(error.displayName)}
                         className="h-8 shadow-none"
                         placeholder="Support"

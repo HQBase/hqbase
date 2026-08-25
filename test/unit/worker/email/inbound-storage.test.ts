@@ -8,6 +8,7 @@ const parsed: ParsedEmail = {
   cc: [],
   date: "2026-06-24T14:00:00.000Z",
   fromAddress: "alice@example.net",
+  fromName: "Alice Example",
   htmlBody: null,
   inReplyTo: null,
   messageId: "<message@example.net>",

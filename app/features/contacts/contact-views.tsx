@@ -72,7 +72,7 @@ export function ContactDetailView({
       .then((next) => {
         if (cancelled) return;
         setDetail(next);
-        setName(next.contact.name ?? "");
+        setName(next.contact.savedName ?? "");
         setNotes(next.contact.notes);
       })
       .catch((nextError: unknown) => {
@@ -95,7 +95,7 @@ export function ContactDetailView({
         notes: notes.trim()
       });
       setDetail(next);
-      setName(next.contact.name ?? "");
+      setName(next.contact.savedName ?? "");
       setNotes(next.contact.notes);
       toast.success("Contact saved.");
       onSaved();
@@ -199,7 +199,7 @@ export function ContactDetailView({
                   <Input
                     id="contact-name"
                     maxLength={200}
-                    placeholder="Contact name"
+                    placeholder={detail.contact.name ?? "Contact name"}
                     value={name}
                     onChange={(event) => setName(event.target.value)}
                   />

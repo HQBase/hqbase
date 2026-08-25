@@ -139,6 +139,7 @@ describe("HQBase Mail API message changes", () => {
           id: "msg_changes_rapid",
           mailboxId: "mbx_changes",
           folder: "archived",
+          fromName: "Sender Example",
           readAt: stamp,
           starredAt: stamp
         }
@@ -373,10 +374,10 @@ function messageRow(
 ): D1PreparedStatement {
   return env.DB.prepare(
     `INSERT INTO messages
-     (id, thread_id, mailbox_id, direction, folder, from_address, to_json, cc_json, bcc_json,
+     (id, thread_id, mailbox_id, direction, folder, from_address, from_name, to_json, cc_json, bcc_json,
       subject, snippet, text_body, message_id, dedupe_key, in_reply_to, references_json,
       received_at, sent_at, read_at, has_attachments, created_at, updated_at)
-     VALUES (?, ?, ?, 'inbound', 'inbox', 'sender@example.net', '[]', '[]', '[]', ?, '', '',
+     VALUES (?, ?, ?, 'inbound', 'inbox', 'sender@example.net', 'Sender Example', '[]', '[]', '[]', ?, '', '',
              NULL, ?, NULL, '[]', ?, NULL, NULL, 0, ?, ?)`
   ).bind(id, threadId, mailboxId, id, `dedupe-${id}`, stamp, stamp, stamp);
 }

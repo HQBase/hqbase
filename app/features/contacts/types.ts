@@ -13,6 +13,7 @@ export type ContactSummary = {
 
 export type ContactDetail = ContactSummary & {
   notes: string;
+  savedName: string | null;
 };
 
 export type ContactDetailResponse = {

@@ -17,6 +17,7 @@ const firstMessage: MessageDetailType = {
   direction: "inbound",
   folder: "inbox",
   fromAddress: "customer@example.com",
+  fromName: "Customer Example",
   to: ["support@example.com"],
   cc: [],
   bcc: [],
@@ -43,6 +44,7 @@ const secondMessage: MessageDetailType = {
   direction: "outbound",
   folder: "sent",
   fromAddress: "support@example.com",
+  fromName: "Support",
   to: ["customer@example.com"],
   textBody: "We can help.",
   snippet: "We can help",
@@ -86,6 +88,8 @@ describe("conversation reader", () => {
     expect(html).toContain('data-compose-message-id="msg_2"');
     expect(html).toContain('aria-label="Back to messages"');
     expect(html).toContain('aria-label="Archive conversation"');
+    expect(html).toContain("Customer Example");
+    expect(html).toContain("customer@example.com · to support@example.com");
   });
 
   it("offers restore instead of archive and trash in Trash", () => {
@@ -231,7 +235,12 @@ describe("conversation reader", () => {
     const html = renderToStaticMarkup(
       <MessageListItem
         activeFolder="inbox"
-        conversation={{ ...conversation, fromAddress: "Support Team <support@example.com>" }}
+        conversation={{
+          ...conversation,
+          direction: "inbound",
+          fromAddress: "support@example.com",
+          fromName: "Support Team"
+        }}
         href="/mail/inbox/msg_1"
         isActive={false}
         onSelect={() => undefined}

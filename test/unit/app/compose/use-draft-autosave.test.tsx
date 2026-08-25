@@ -40,7 +40,7 @@ function options(overrides: Partial<Parameters<typeof useDraftAutosave>[0]> = {}
     open: false,
     initialized: { current: true },
     draft,
-    identities: [{ mailboxId: "mailbox-1", address: "sender@example.com" }],
+    identities: [{ mailboxId: "mailbox-1", address: "sender@example.com", displayName: "Sender" }],
     recoveryKey: "hqbase:draft-recovery:test",
     replyToMessageId: null,
     forwardOfMessageId: null,
@@ -155,8 +155,8 @@ describe("useDraftAutosave", () => {
     mocks.updateDraft.mockResolvedValue(nextDraft);
     const initial = options({
       identities: [
-        { mailboxId: "mailbox-1", address: "sender@example.com" },
-        { mailboxId: "mailbox-2", address: "other@example.com" }
+        { mailboxId: "mailbox-1", address: "sender@example.com", displayName: "Sender" },
+        { mailboxId: "mailbox-2", address: "other@example.com", displayName: "Other" }
       ]
     });
     localStorage.setItem(initial.recoveryKey, "pending recovery");

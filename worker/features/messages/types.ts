@@ -31,6 +31,7 @@ export type MessageSummary = {
   direction: MessageDirection;
   folder: MessageFolder;
   fromAddress: string;
+  fromName: string | null;
   to: string[];
   subject: string;
   snippet: string;
@@ -74,6 +75,7 @@ export type MessageRow = {
   direction: MessageDirection;
   folder: MessageFolder;
   from_address: string;
+  from_name: string | null;
   to_json: string;
   cc_json: string;
   bcc_json: string;
@@ -125,6 +127,7 @@ export type InsertMessageInput = {
   direction: MessageDirection;
   folder: MessageFolder;
   fromAddress: string;
+  fromName: string | null;
   to: string[];
   cc: string[];
   bcc: string[];

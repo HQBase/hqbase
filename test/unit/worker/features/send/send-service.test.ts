@@ -47,6 +47,7 @@ const sentSummary = {
   direction: "outbound" as const,
   folder: "sent" as const,
   fromAddress: mailbox.address,
+  fromName: mailbox.displayName,
   hasAttachments: false,
   id: "message-1",
   mailboxId: mailbox.id,
@@ -102,14 +103,17 @@ describe("send service", () => {
     });
 
     expect(send).toHaveBeenCalledWith({
-      from: mailbox.address,
+      from: { name: mailbox.displayName, email: mailbox.address },
       subject: "Hello",
       text: "Hello",
       to: ["owner@example.com"]
     });
     expect(insertMessage).toHaveBeenCalledWith(
       env.DB,
-      expect.objectContaining({ messageId: "<cloudflare-new@example.com>" })
+      expect.objectContaining({
+        fromName: mailbox.displayName,
+        messageId: "<cloudflare-new@example.com>"
+      })
     );
     expect(findMailboxForSending).toHaveBeenCalledOnce();
     expect(createThread).toHaveBeenCalledWith(env.DB, "Hello", "2026-07-10T00:00:00.000Z");
@@ -161,6 +165,7 @@ describe("send service", () => {
       direction: "inbound",
       folder: "inbox",
       fromAddress: "owner@example.com",
+      fromName: "Owner Example",
       htmlAvailable: false,
       inReplyTo: null,
       messageId: "<original@example.com>",
@@ -180,11 +185,12 @@ describe("send service", () => {
       to: ["alternate@example.com"]
     });
 
-    const quotedText = "Reply\n\nOn 2026-07-10 at 00:00 UTC, owner@example.com wrote:\n> Original";
+    const quotedText =
+      "Reply\n\nOn 2026-07-10 at 00:00 UTC, Owner Example <owner@example.com> wrote:\n> Original";
     const quotedHtml =
-      '<p>Reply</p><br><br><div class="gmail_quote gmail_quote_container"><div dir="ltr" class="gmail_attr"><br>On 2026-07-10 at 00:00 UTC, owner@example.com wrote:<br></div><blockquote class="gmail_quote" style="margin:0 0 0 .8ex;border-left:1px #ccc solid;padding-left:1ex">Original</blockquote></div>';
+      '<p>Reply</p><br><br><div class="gmail_quote gmail_quote_container"><div dir="ltr" class="gmail_attr"><br>On 2026-07-10 at 00:00 UTC, Owner Example &lt;owner@example.com&gt; wrote:<br></div><blockquote class="gmail_quote" style="margin:0 0 0 .8ex;border-left:1px #ccc solid;padding-left:1ex">Original</blockquote></div>';
     expect(send).toHaveBeenCalledWith({
-      from: mailbox.address,
+      from: { name: mailbox.displayName, email: mailbox.address },
       bcc: ["audit@example.com"],
       cc: ["manager@example.com"],
       headers: {
@@ -201,6 +207,7 @@ describe("send service", () => {
       expect.objectContaining({
         bcc: ["audit@example.com"],
         cc: ["manager@example.com"],
+        fromName: mailbox.displayName,
         htmlR2Key: "sent/2026-07-10/html-1.html",
         messageId: "<cloudflare-reply@example.com>",
         textBody: quotedText,

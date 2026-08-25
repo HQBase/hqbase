@@ -18,6 +18,7 @@ function conversation(overrides: Partial<ConversationSummary> = {}): Conversatio
     direction: "inbound",
     folder: "inbox",
     fromAddress: "sender@example.com",
+    fromName: null,
     to: ["me@example.com"],
     subject: "Subject",
     snippet: "Preview",
@@ -63,10 +64,10 @@ describe("conversation display helpers", () => {
     );
   });
 
-  it("prefers display names when an address includes one", () => {
-    expect(
-      correspondentLabel(conversation({ fromAddress: "Alex at Acme Inc <alex@test.local>" }))
-    ).toBe("Alex at Acme Inc");
+  it("prefers decoded sender display names", () => {
+    expect(correspondentLabel(conversation({ fromName: "Alex at Acme Inc" }))).toBe(
+      "Alex at Acme Inc"
+    );
     expect(
       correspondentLabel(
         conversation({ direction: "outbound", to: ['"Support" <support@example.com>'] })

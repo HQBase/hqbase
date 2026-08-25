@@ -30,6 +30,7 @@ export const messages = sqliteTable(
       enum: ["inbox", "sent", "drafts", "archived", "trash", "catchall"]
     }).notNull(),
     fromAddress: text("from_address").notNull(),
+    fromName: text("from_name"),
     to: text("to_json", { mode: "json" }).$type<string[]>().notNull(),
     cc: text("cc_json", { mode: "json" }).$type<string[]>().notNull(),
     bcc: text("bcc_json", { mode: "json" }).$type<string[]>().notNull(),

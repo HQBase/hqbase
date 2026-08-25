@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input";
 import type { ComposeMode } from "./compose-state";
 import { RecipientField } from "./recipient-field";
 
-export type SendingIdentity = { mailboxId: string; address: string };
+export type SendingIdentity = { mailboxId: string; address: string; displayName: string };
 export function ComposeFields(props: {
   identities: SendingIdentity[];
   mode: ComposeMode;
@@ -28,7 +28,7 @@ export function ComposeFields(props: {
           className="rounded-none border-0 bg-transparent px-0 shadow-none focus-visible:ring-0"
           disabled={props.fromDisabled}
           options={props.identities.map((identity) => ({
-            label: identity.address,
+            label: `${identity.displayName} — ${identity.address}`,
             value: identity.address
           }))}
           placeholder="Choose address"

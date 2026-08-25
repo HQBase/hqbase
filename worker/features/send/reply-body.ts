@@ -6,7 +6,7 @@ const truncationNotice = "[Previous message truncated by HQBase]";
 
 type ReplySource = Pick<
   MessageDetail,
-  "createdAt" | "fromAddress" | "receivedAt" | "sentAt" | "snippet" | "textBody"
+  "createdAt" | "fromAddress" | "fromName" | "receivedAt" | "sentAt" | "snippet" | "textBody"
 >;
 
 export function buildReplyBody(
@@ -32,7 +32,7 @@ export function buildReplyContext(
 ): { html: string; text: string } {
   const attribution = `On ${formatTimestamp(
     original.receivedAt ?? original.sentAt ?? original.createdAt
-  )}, ${original.fromAddress} wrote:`;
+  )}, ${senderLabel(original)} wrote:`;
   const source = original.textBody || original.snippet;
   let sourceLimit = Math.max(
     0,
@@ -49,6 +49,10 @@ export function buildReplyContext(
     text,
     html: quoteHtml(attribution, richQuoteHtml ?? plainTextHtml(quoted))
   };
+}
+
+function senderLabel(message: Pick<ReplySource, "fromAddress" | "fromName">): string {
+  return message.fromName ? `${message.fromName} <${message.fromAddress}>` : message.fromAddress;
 }
 
 function boundedQuoteSource(value: string, limit = maxQuotedCharacters): string {
