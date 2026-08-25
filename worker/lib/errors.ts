@@ -26,9 +26,5 @@ export function toAppError(error: unknown): AppError {
     return error;
   }
 
-  if (error instanceof Error) {
-    return new AppError("INTERNAL_ERROR", error.message, 500);
-  }
-
-  return new AppError("INTERNAL_ERROR", "Unexpected error.", 500);
+  return new AppError("INTERNAL_ERROR", "An internal error occurred.", 500);
 }
