@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { listDrafts } from "../../../../app/features/drafts/api";
+import { listDrafts, uploadDraftAttachment } from "../../../../app/features/drafts/api";
 
 describe("draft API", () => {
   afterEach(() => vi.unstubAllGlobals());
@@ -53,5 +53,31 @@ describe("draft API", () => {
     );
 
     await expect(listDrafts()).rejects.toThrow("Malformed Link header.");
+  });
+
+  it("marks an editor image as an inline draft attachment", async () => {
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValueOnce(
+      Response.json(
+        {
+          id: "attachment-1",
+          filename: "logo.png",
+          contentType: "image/png",
+          sizeBytes: 8,
+          inline: true
+        },
+        { status: 201 }
+      )
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const file = new File(["image"], "logo.png", { type: "image/png" });
+
+    await uploadDraftAttachment("draft-1", file, true);
+
+    const [url, init] = fetchMock.mock.calls[0] ?? [];
+    expect(url).toBe("/api/v2/drafts/draft-1/attachments");
+    expect(init).toMatchObject({ method: "POST", credentials: "include" });
+    const form = init?.body as FormData;
+    expect(form.get("file")).toBe(file);
+    expect(form.get("inline")).toBe("true");
   });
 });

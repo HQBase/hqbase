@@ -11,6 +11,7 @@ import { AttachmentList } from "./attachment-list";
 import { ComposeFields, type SendingIdentity } from "./compose-fields";
 import { submitComposeOnShortcut } from "./compose-shortcuts";
 import type { ComposeMode } from "./compose-state";
+import type { RichEmailImage } from "./email-images";
 import { RichEmailEditor } from "./rich-email-editor";
 
 type ComposeFormProps = {
@@ -35,7 +36,8 @@ type ComposeFormProps = {
   to: string;
   onDiscard: () => void;
   onEditorChange: (html: string, text: string) => void;
-  onFiles: (files: File[]) => void;
+  onFiles: (files: File[]) => Promise<void> | void;
+  onImages: (files: File[], currentHtml: string) => Promise<RichEmailImage[]>;
   onRemoveAttachment: (attachment: DraftAttachment) => void;
   onManageSignatures: () => void;
   onSetSignature: (selection: SignatureSelection) => Promise<void> | void;
@@ -88,6 +90,7 @@ export function ComposeForm(props: ComposeFormProps): React.ReactElement {
             contained={props.presentation === "window"}
             html={props.html}
             onFiles={props.onFiles}
+            onImages={props.onImages}
             onChange={props.onEditorChange}
           />
           <ComposeSignature
@@ -128,7 +131,7 @@ export function ComposeForm(props: ComposeFormProps): React.ReactElement {
                     multiple
                     type="file"
                     onChange={(event) => {
-                      props.onFiles(Array.from(event.target.files ?? []));
+                      void props.onFiles(Array.from(event.target.files ?? []));
                       event.currentTarget.value = "";
                     }}
                   />

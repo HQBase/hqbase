@@ -371,7 +371,15 @@ describe("mail shell", () => {
                 id: "attachment-1",
                 filename: "summary.pdf",
                 contentType: "application/pdf",
-                sizeBytes: 100
+                sizeBytes: 100,
+                inline: false
+              },
+              {
+                id: "inline-1",
+                filename: "logo.png",
+                contentType: "image/png",
+                sizeBytes: 8,
+                inline: true
               }
             ]
           }
@@ -391,6 +399,7 @@ describe("mail shell", () => {
     expect(html).toContain("Here is the requested summary.");
     expect(html).toContain('href="/mail/drafts/draft%2Fone"');
     expect(html).toContain("1 attachment");
+    expect(html).not.toContain("2 attachments");
   });
 
   it("combines the compact folder label and conversation count in one list header", () => {

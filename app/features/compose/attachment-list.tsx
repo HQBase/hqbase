@@ -8,10 +8,11 @@ export function AttachmentList({
   attachments: DraftAttachment[];
   onRemove: (item: DraftAttachment) => void;
 }) {
-  if (!attachments.length) return null;
+  const visibleAttachments = attachments.filter((attachment) => !attachment.inline);
+  if (!visibleAttachments.length) return null;
   return (
     <div className="flex flex-wrap gap-2 border-t px-5 py-3">
-      {attachments.map((item) => (
+      {visibleAttachments.map((item) => (
         <div
           className="flex items-center gap-2 rounded-md border bg-background px-3 py-1.5 text-xs"
           key={item.id}

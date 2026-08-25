@@ -24,6 +24,13 @@ describe("message HTML view", () => {
       origin: "https://mail.example.com",
       theme: "dark"
     });
+    const signature = buildEmailHtmlDocument({
+      allowDataImages: true,
+      allowRemoteImages: false,
+      html: '<img src="data:image/png;base64,iVBORw==">',
+      origin: "https://mail.example.com",
+      theme: "dark"
+    });
 
     expect(blocked).toContain("img-src https://mail.example.com;");
     expect(blocked).toContain("font-src https://mail.example.com;");
@@ -40,6 +47,7 @@ describe("message HTML view", () => {
     expect(blocked).not.toContain("max-width: 100%");
     expect(blocked).not.toContain("https: http:");
     expect(loaded).toContain("img-src https://mail.example.com https: http:");
+    expect(signature).toContain("img-src https://mail.example.com data:");
   });
 
   it("uses transparent light defaults without rewriting sender HTML", () => {

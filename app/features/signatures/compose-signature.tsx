@@ -112,6 +112,7 @@ function SignaturePreview({
   return signature.html ? (
     <EmailFrame
       srcDoc={buildEmailHtmlDocument({
+        allowDataImages: true,
         allowRemoteImages: false,
         html: signature.html,
         origin: window.location.origin,

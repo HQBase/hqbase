@@ -24,9 +24,14 @@ export const deleteDraft = (id: string) => apiDelete(`/api/v2/drafts/${id}`);
 export const deleteDraftAttachment = (draftId: string, id: string) =>
   apiDelete(`/api/v2/drafts/${draftId}/attachments/${id}`);
 
-export async function uploadDraftAttachment(draftId: string, file: File): Promise<DraftAttachment> {
+export async function uploadDraftAttachment(
+  draftId: string,
+  file: File,
+  inline = false
+): Promise<DraftAttachment> {
   const form = new FormData();
   form.set("file", file);
+  if (inline) form.set("inline", "true");
   const response = await fetch(`/api/v2/drafts/${draftId}/attachments`, {
     method: "POST",
     body: form,

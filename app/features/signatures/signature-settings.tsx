@@ -18,6 +18,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Spinner } from "@/components/ui/spinner";
 import type { CurrentUser } from "@/features/auth/types";
+import { signatureImagesFromFiles } from "@/features/compose/email-images";
 import { RichEmailEditor } from "@/features/compose/rich-email-editor";
 import type { Mailbox } from "@/features/mailboxes/types";
 import { SettingsSection } from "@/features/settings/settings-section";
@@ -248,7 +249,8 @@ function SignatureEditorDialog({
         <DialogHeader>
           <DialogTitle>{editing === "new" ? "Add signature" : "Edit signature"}</DialogTitle>
           <DialogDescription>
-            Use simple formatting. HQBase makes a safe plain-text version when you save.
+            Use simple formatting and up to five images (256 KiB total). HQBase makes a safe
+            plain-text version when you save.
           </DialogDescription>
         </DialogHeader>
         <form className="grid gap-4" onSubmit={(event) => void submit(event)}>
@@ -283,9 +285,22 @@ function SignatureEditorDialog({
             <Label>Content</Label>
             <div className="overflow-hidden rounded-lg border">
               <RichEmailEditor
+                allowDataImages
                 contained={false}
                 html={html}
-                onFiles={() => undefined}
+                onFiles={() => {
+                  toast.error("Use AVIF, GIF, JPEG, PNG, or WebP image files.");
+                }}
+                onImages={async (files, currentHtml) => {
+                  try {
+                    return await signatureImagesFromFiles(files, currentHtml);
+                  } catch (error) {
+                    toast.error(
+                      error instanceof Error ? error.message : "Image could not be added."
+                    );
+                    return [];
+                  }
+                }}
                 onChange={(nextHtml, nextText) => {
                   setHtml(nextHtml);
                   setText(nextText);

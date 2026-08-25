@@ -146,6 +146,7 @@ function DraftListItem({
   const recipients = draft.to.length > 0 ? draft.to.join(", ") : "No recipients";
   const subject = draft.subject.trim() || "No subject";
   const snippet = draft.text.trim().replace(/\s+/g, " ") || "No message content";
+  const attachmentCount = draft.attachments.filter((attachment) => !attachment.inline).length;
 
   return (
     <a
@@ -178,9 +179,9 @@ function DraftListItem({
             {snippet}
           </span>
         </span>
-        {draft.attachments.length > 0 ? (
+        {attachmentCount > 0 ? (
           <PiPaperclip
-            aria-label={`${draft.attachments.length} attachment${draft.attachments.length === 1 ? "" : "s"}`}
+            aria-label={`${attachmentCount} attachment${attachmentCount === 1 ? "" : "s"}`}
             className="pointer-events-none size-3.5 shrink-0 text-tertiary"
           />
         ) : null}

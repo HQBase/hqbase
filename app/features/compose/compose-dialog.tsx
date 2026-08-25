@@ -32,6 +32,7 @@ import {
   splitRecipients
 } from "./compose-state";
 import { ComposeSurface } from "./compose-surface";
+import { referencedInlineAttachmentIds } from "./email-images";
 import { useDraftAutosave } from "./use-draft-autosave";
 
 const emptyAutomaticSignature: SignatureSnapshot = {
@@ -41,6 +42,7 @@ const emptyAutomaticSignature: SignatureSnapshot = {
   html: "",
   text: ""
 };
+const inlineImageDeleteDelayMs = 1_000;
 
 export function ComposeDialog({
   defaultFromMailboxId = null,
@@ -72,9 +74,17 @@ export function ComposeDialog({
   const [attachments, setAttachments] = React.useState<DraftAttachment[]>([]);
   const [isPending, setIsPending] = React.useState(false);
   const [isSignaturePending, setIsSignaturePending] = React.useState(false);
-  const [isUploading, setIsUploading] = React.useState(false);
+  const [uploadCount, setUploadCount] = React.useState(0);
   const [saveState, setSaveState] = React.useState<DraftSaveState>("saved");
   const initialized = React.useRef(false);
+  const generationRef = React.useRef(0);
+  const draftRef = React.useRef<Draft | null>(null);
+  const attachmentsRef = React.useRef<DraftAttachment[]>([]);
+  const htmlRef = React.useRef(html);
+  const uploadTokensRef = React.useRef(new Set<symbol>());
+  const removingInlineIdsRef = React.useRef(new Set<string>());
+  const inlineRemovalTimersRef = React.useRef(new Map<string, ReturnType<typeof setTimeout>>());
+  const mountedRef = React.useRef(true);
   const onDraftsChangeRef = React.useRef(onDraftsChange);
   const onOpenChangeRef = React.useRef(onOpenChange);
   onDraftsChangeRef.current = onDraftsChange;
@@ -102,13 +112,67 @@ export function ComposeDialog({
     setDraft,
     setSaveState
   });
+  draftRef.current = draft;
+  attachmentsRef.current = attachments;
+  htmlRef.current = html;
+
+  const updateAttachments = React.useCallback(
+    (update: (current: DraftAttachment[]) => DraftAttachment[]) => {
+      setAttachments((current) => {
+        const next = update(current);
+        attachmentsRef.current = next;
+        return next;
+      });
+    },
+    []
+  );
+
+  const clearInlineRemovalTimers = React.useCallback(() => {
+    for (const timer of inlineRemovalTimersRef.current.values()) clearTimeout(timer);
+    inlineRemovalTimersRef.current.clear();
+  }, []);
+
+  const invalidateComposer = React.useCallback(() => {
+    generationRef.current += 1;
+    uploadTokensRef.current.clear();
+    clearInlineRemovalTimers();
+    setUploadCount(0);
+  }, [clearInlineRemovalTimers]);
+
+  const beginUpload = React.useCallback((): symbol => {
+    const token = Symbol("compose-upload");
+    uploadTokensRef.current.add(token);
+    setUploadCount(uploadTokensRef.current.size);
+    return token;
+  }, []);
+
+  const finishUpload = React.useCallback((token: symbol): void => {
+    uploadTokensRef.current.delete(token);
+    if (mountedRef.current) setUploadCount(uploadTokensRef.current.size);
+  }, []);
 
   React.useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      generationRef.current += 1;
+      uploadTokensRef.current.clear();
+      clearInlineRemovalTimers();
+    };
+  }, [clearInlineRemovalTimers]);
+
+  React.useEffect(() => {
+    const generation = ++generationRef.current;
+    uploadTokensRef.current.clear();
+    removingInlineIdsRef.current.clear();
+    clearInlineRemovalTimers();
+    setUploadCount(0);
     if (!open) return;
     initialized.current = false;
     void (async () => {
       try {
         const drafts = await listDrafts();
+        if (generation !== generationRef.current) return;
         const existing = findDraftForComposer(
           drafts,
           draftId,
@@ -148,8 +212,10 @@ export function ComposeDialog({
             html: forwarded?.html ?? "<p></p>",
             signature: { mode: "automatic" }
           }));
+        if (generation !== generationRef.current) return;
         if (!existing) onDraftsChangeRef.current?.();
         const recovered = readDraftRecovery(recoveryKey, initial.updatedAt);
+        draftRef.current = initial;
         setDraft(initial);
         initializeAutosave(initial);
         setFrom(recovered?.from ?? initial.from);
@@ -158,11 +224,15 @@ export function ComposeDialog({
         setBcc(recovered?.bcc ?? initial.bcc.join(", "));
         setSubject(recovered?.subject ?? initial.subject);
         setText(recovered?.text ?? initial.text);
-        setHtml(recovered?.html ?? (initial.html || "<p></p>"));
+        const initialHtml = recovered?.html ?? (initial.html || "<p></p>");
+        htmlRef.current = initialHtml;
+        setHtml(initialHtml);
+        attachmentsRef.current = initial.attachments;
         setAttachments(initial.attachments);
         setSaveState("saved");
         initialized.current = true;
       } catch (error) {
+        if (generation !== generationRef.current) return;
         toast.error(error instanceof Error ? error.message : "Draft could not be opened.");
         if (draftId) onOpenChangeRef.current(false);
       }
@@ -178,19 +248,24 @@ export function ComposeDialog({
     recoveryKey,
     replyToMessageId,
     forwardOfMessageId,
-    initializeAutosave
+    initializeAutosave,
+    clearInlineRemovalTimers
   ]);
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
-    if (!draft || isSignaturePending || hasInvalidRecipients(to, cc, bcc)) return;
+    if (!draft || uploadCount > 0 || isSignaturePending || hasInvalidRecipients(to, cc, bcc))
+      return;
     setIsPending(true);
     try {
+      const referencedInlineIds = referencedInlineAttachmentIds(html, draft.id);
       const common = {
         from,
         text,
         html: normalizeDraftHtml(text, html),
-        attachmentIds: attachments.map((attachment) => attachment.id),
+        attachmentIds: attachments
+          .filter((attachment) => !attachment.inline || referencedInlineIds.has(attachment.id))
+          .map((attachment) => attachment.id),
         draftId: draft.id
       };
       if (mode === "reply" && message) {
@@ -214,11 +289,13 @@ export function ComposeDialog({
       toast.success(mode === "reply" ? "Reply sent." : "Message sent.", {
         id: `outgoing-email:${draft.id}`
       });
+      invalidateComposer();
       initialized.current = false;
+      draftRef.current = null;
       setDraft(null);
       resetAutosave();
       localStorage.removeItem(recoveryKey);
-      onOpenChange(false);
+      onOpenChangeRef.current(false);
       onDraftsChange?.();
       onSent();
     } catch (error) {
@@ -245,35 +322,131 @@ export function ComposeDialog({
 
   const upload = React.useCallback(
     async (files: File[]) => {
-      if (!draft || files.length === 0) return;
-      setIsUploading(true);
+      const activeDraft = draftRef.current;
+      if (!activeDraft || files.length === 0) return;
+      const generation = generationRef.current;
+      const token = beginUpload();
+      let added = false;
       try {
         for (const file of files) {
-          const item = await uploadDraftAttachment(draft.id, file);
-          setAttachments((current) => [...current, item]);
+          if (generation !== generationRef.current || draftRef.current?.id !== activeDraft.id)
+            break;
+          const item = await uploadDraftAttachment(activeDraft.id, file);
+          if (generation !== generationRef.current || draftRef.current?.id !== activeDraft.id) {
+            await deleteDraftAttachment(activeDraft.id, item.id).catch(() => undefined);
+            break;
+          }
+          updateAttachments((current) => [...current, item]);
+          added = true;
         }
-        toast.success("Attachment added.");
+        if (added) toast.success("Attachment added.");
       } catch (error) {
-        toast.error(error instanceof Error ? error.message : "Upload failed.");
+        if (generation === generationRef.current) {
+          toast.error(error instanceof Error ? error.message : "Upload failed.");
+        }
       } finally {
-        setIsUploading(false);
+        finishUpload(token);
       }
     },
-    [draft]
+    [beginUpload, finishUpload, updateAttachments]
+  );
+  const uploadImages = React.useCallback(
+    async (files: File[]) => {
+      const activeDraft = draftRef.current;
+      if (!activeDraft || files.length === 0) return [];
+      const generation = generationRef.current;
+      const token = beginUpload();
+      const images = [];
+      let failed = false;
+      try {
+        for (const file of files) {
+          if (generation !== generationRef.current || draftRef.current?.id !== activeDraft.id)
+            break;
+          try {
+            const item = await uploadDraftAttachment(activeDraft.id, file, true);
+            if (generation !== generationRef.current || draftRef.current?.id !== activeDraft.id) {
+              await deleteDraftAttachment(activeDraft.id, item.id).catch(() => undefined);
+              break;
+            }
+            updateAttachments((current) => [...current, item]);
+            images.push({
+              alt: file.name || "Image",
+              src: `/api/v2/drafts/${encodeURIComponent(activeDraft.id)}/attachments/${encodeURIComponent(item.id)}/inline`
+            });
+          } catch {
+            failed = true;
+          }
+        }
+        if (generation === generationRef.current) {
+          if (images.length) toast.success(images.length === 1 ? "Image added." : "Images added.");
+          if (failed) toast.error("Some images could not be uploaded.");
+        }
+        return images;
+      } finally {
+        finishUpload(token);
+      }
+    },
+    [beginUpload, finishUpload, updateAttachments]
   );
   async function removeAttachment(item: DraftAttachment) {
     if (!draft) return;
     await deleteDraftAttachment(draft.id, item.id);
-    setAttachments((current) => current.filter((attachment) => attachment.id !== item.id));
+    updateAttachments((current) => current.filter((attachment) => attachment.id !== item.id));
+  }
+
+  function removeUnreferencedInlineAttachments(nextHtml: string): void {
+    const activeDraft = draftRef.current;
+    if (!activeDraft) return;
+    htmlRef.current = nextHtml;
+    const referencedIds = referencedInlineAttachmentIds(nextHtml, activeDraft.id);
+    for (const item of attachmentsRef.current) {
+      if (!item.inline) continue;
+      const existingTimer = inlineRemovalTimersRef.current.get(item.id);
+      if (referencedIds.has(item.id)) {
+        if (existingTimer !== undefined) clearTimeout(existingTimer);
+        inlineRemovalTimersRef.current.delete(item.id);
+        continue;
+      }
+      if (existingTimer !== undefined || removingInlineIdsRef.current.has(item.id)) continue;
+      const generation = generationRef.current;
+      const timer = setTimeout(() => {
+        inlineRemovalTimersRef.current.delete(item.id);
+        if (
+          generation !== generationRef.current ||
+          draftRef.current?.id !== activeDraft.id ||
+          referencedInlineAttachmentIds(htmlRef.current, activeDraft.id).has(item.id)
+        )
+          return;
+        removingInlineIdsRef.current.add(item.id);
+        void deleteDraftAttachment(activeDraft.id, item.id)
+          .then(() => {
+            removingInlineIdsRef.current.delete(item.id);
+            if (generation === generationRef.current && draftRef.current?.id === activeDraft.id) {
+              updateAttachments((current) =>
+                current.filter((attachment) => attachment.id !== item.id)
+              );
+            }
+          })
+          .catch((error: unknown) => {
+            removingInlineIdsRef.current.delete(item.id);
+            if (generation === generationRef.current) {
+              toast.error(error instanceof Error ? error.message : "Image could not be removed.");
+            }
+          });
+      }, inlineImageDeleteDelayMs);
+      inlineRemovalTimersRef.current.set(item.id, timer);
+    }
   }
 
   async function discard() {
+    invalidateComposer();
     if (draft) await deleteDraft(draft.id);
     initialized.current = false;
+    draftRef.current = null;
     setDraft(null);
     resetAutosave();
     localStorage.removeItem(recoveryKey);
-    onOpenChange(false);
+    onOpenChangeRef.current(false);
     onDraftsChange?.();
   }
 
@@ -281,7 +454,7 @@ export function ComposeDialog({
   const sendDisabled =
     isPending ||
     isSignaturePending ||
-    isUploading ||
+    uploadCount > 0 ||
     !draft ||
     identities.length === 0 ||
     !text.trim() ||
@@ -310,10 +483,13 @@ export function ComposeDialog({
       to={to}
       onDiscard={() => void discard()}
       onEditorChange={(nextHtml, nextText) => {
+        removeUnreferencedInlineAttachments(nextHtml);
+        htmlRef.current = nextHtml;
         setHtml(nextHtml);
         setText(nextText);
       }}
-      onFiles={(files) => void upload(files)}
+      onFiles={upload}
+      onImages={uploadImages}
       onRemoveAttachment={(item) => void removeAttachment(item)}
       onManageSignatures={() => window.location.assign("/settings/signatures")}
       onSetBcc={setBcc}
@@ -341,7 +517,10 @@ export function ComposeDialog({
       sendDisabled={sendDisabled}
       status={draftStatus(saveState)}
       title={composeTitle(mode)}
-      onOpenChange={onOpenChange}
+      onOpenChange={(nextOpen) => {
+        if (!nextOpen) invalidateComposer();
+        onOpenChangeRef.current(nextOpen);
+      }}
     >
       {content}
     </ComposeSurface>
