@@ -46,7 +46,7 @@ export function MessageListItem({
   return (
     <a
       className={cn(
-        "group grid w-full grid-cols-[2.5rem_minmax(0,1fr)_5rem] items-start gap-x-3 rounded-xl px-3 py-3 text-left text-[14px] leading-5 transition-colors focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring sm:grid-cols-[2rem_minmax(7rem,18%)_minmax(0,1fr)_3rem_minmax(6rem,10rem)_5rem] sm:items-center sm:gap-x-2 sm:py-2 sm:text-[13px]",
+        "group grid w-full grid-cols-[2.5rem_minmax(0,1fr)_5rem] items-start gap-x-3 rounded-xl px-3 py-3 text-left text-[14px] leading-5 transition-colors focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring sm:grid-cols-[2rem_minmax(7rem,18%)_minmax(0,1fr)_auto_4.5rem] sm:items-center sm:gap-x-1.5 sm:py-2 sm:text-[13px]",
         isActive
           ? "bg-selected [@media(hover:hover)]:hover:bg-selected"
           : "[@media(hover:hover)]:hover:bg-hover"
@@ -109,7 +109,7 @@ export function MessageListItem({
           {correspondent}
         </span>
       </span>
-      <span className="col-start-2 row-start-2 flex min-w-0 items-end gap-2 overflow-hidden sm:col-start-3 sm:row-start-1 sm:items-center">
+      <span className="relative col-start-2 row-start-2 flex min-w-0 items-end gap-2 overflow-hidden sm:col-start-3 sm:row-start-1 sm:h-8 sm:items-center">
         <span className="min-w-0 flex-1">
           <span
             className={cn(
@@ -150,6 +150,27 @@ export function MessageListItem({
             Unknown
           </Badge>
         ) : null}
+        {(conversation.labels?.length ?? 0) > 0 || (labels.length > 0 && onToggleLabel) ? (
+          <span className="absolute inset-y-0 right-0 z-10 flex min-w-0 max-w-[75%] items-center justify-end gap-0.5 rounded-md bg-background/60 pl-2 pr-0.5 backdrop-blur-md">
+            <LabelStack
+              className="sm:hidden"
+              compact
+              labels={conversation.labels ?? []}
+              namedLimit={0}
+            />
+            <LabelStack className="hidden sm:flex" compact labels={conversation.labels ?? []} />
+            {labels.length > 0 && onToggleLabel ? (
+              <LabelMenu
+                assigned={conversation.labels ?? []}
+                canOrganizeLabels={canOrganizeLabels}
+                className="sm:size-7 sm:min-h-7 sm:min-w-7"
+                labels={labels}
+                onToggle={onToggleLabel}
+                showTagIcon
+              />
+            ) : null}
+          </span>
+        ) : null}
       </span>
       <span className="hidden min-w-0 items-center justify-center gap-1 sm:col-start-4 sm:row-start-1 sm:flex">
         {conversation.messageCount > 1 ? (
@@ -167,31 +188,9 @@ export function MessageListItem({
           />
         ) : null}
       </span>
-      {(conversation.labels?.length ?? 0) > 0 || (labels.length > 0 && onToggleLabel) ? (
-        <span className="col-start-3 row-start-2 flex min-w-0 items-center justify-self-start sm:col-start-5 sm:row-start-1 sm:justify-self-stretch sm:gap-1">
-          {!onToggleLabel ? (
-            <LabelStack
-              className="sm:hidden"
-              compact
-              labels={conversation.labels ?? []}
-              namedLimit={0}
-            />
-          ) : null}
-          <LabelStack className="hidden sm:flex" compact labels={conversation.labels ?? []} />
-          {labels.length > 0 && onToggleLabel ? (
-            <LabelMenu
-              assigned={conversation.labels ?? []}
-              canOrganizeLabels={canOrganizeLabels}
-              className="sm:size-7 sm:min-h-7 sm:min-w-7"
-              labels={labels}
-              onToggle={onToggleLabel}
-            />
-          ) : null}
-        </span>
-      ) : null}
       <time
         className={cn(
-          "col-start-3 row-start-1 shrink-0 text-right text-[11px] tabular-nums sm:col-start-6 sm:row-start-1 sm:w-20 sm:text-[12px]",
+          "col-start-3 row-start-1 shrink-0 text-right text-[11px] tabular-nums sm:col-start-5 sm:row-start-1 sm:text-[12px]",
           isUnread ? "font-medium text-foreground dark:text-white" : "text-muted-foreground"
         )}
       >

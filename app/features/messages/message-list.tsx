@@ -67,11 +67,11 @@ export function MessageList({
   return (
     <PullToRefresh className="h-full" onRefresh={onRefresh} scrollContainerRef={scrollContainerRef}>
       {conversations.length === 0 ? (
-        <div className="mx-auto w-full max-w-[1200px] px-4 sm:px-6 lg:px-8">
+        <div className="mx-auto w-full max-w-[960px] px-4 sm:px-6 lg:px-8">
           <EmptyMessageList />
         </div>
       ) : (
-        <div className="mx-auto w-full max-w-[1200px] px-1 pb-5 sm:px-6 lg:px-8">
+        <div className="mx-auto w-full max-w-[960px] px-1 pb-5 sm:px-6 lg:px-8">
           {groups.map((group) => (
             <section
               aria-labelledby={`conversation-group-${group.key}`}

@@ -201,6 +201,8 @@ describe("conversation reader", () => {
     expect(html).toContain("237 conversations");
     expect(html).not.toContain(">1+<");
     expect(html).toContain("Load more conversations");
+    expect(html.match(/max-w-\[960px\]/gu)).toHaveLength(2);
+    expect(html).not.toContain("max-w-[1200px]");
   });
 
   it("labels the unread indicator and removes it once the message is read", () => {
@@ -261,20 +263,21 @@ describe("conversation reader", () => {
     expect(html).toContain('data-message-avatar="mobile"');
     expect(html).toContain("grid-cols-[2.5rem_minmax(0,1fr)_5rem]");
     expect(html).toContain("rounded-xl px-3");
-    expect(html).toContain(
-      "sm:grid-cols-[2rem_minmax(7rem,18%)_minmax(0,1fr)_3rem_minmax(6rem,10rem)_5rem]"
-    );
+    expect(html).toContain("sm:grid-cols-[2rem_minmax(7rem,18%)_minmax(0,1fr)_auto_4.5rem]");
     expect(html).toContain("sm:items-center");
     expect(html).not.toContain("row-start-3");
     expect(html).toContain("sm:col-start-4");
     expect(html).toContain("sm:col-start-5");
-    expect(html).toContain("sm:col-start-6");
+    expect(html).not.toContain("sm:col-start-6");
     expect(html).not.toContain("sm:row-start-2 sm:mt-1");
     expect(html).toContain("bg-blue-500/15");
     expect(html).toContain("text-[9px]");
     expect(html).toContain('aria-label="Labels"');
     expect(html).toContain("min-h-10");
     expect(html).toContain("sm:min-h-7");
+    expect(html).toContain("absolute inset-y-0 right-0");
+    expect(html).toContain("backdrop-blur-md");
+    expect(html).toContain('data-label-menu-icon="tag"');
     expect(html.indexOf("Support Team")).toBeLessThan(html.indexOf("Account access"));
     expect(html.indexOf("Account access")).toBeLessThan(html.indexOf("We can help"));
   });

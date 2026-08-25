@@ -1,5 +1,5 @@
 import * as React from "react";
-import { PiDotsThree, PiFunnelSimple } from "react-icons/pi";
+import { PiDotsThree, PiFunnelSimple, PiTag } from "react-icons/pi";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -94,7 +94,8 @@ export function LabelMenu({
   className,
   disabled = false,
   labels,
-  onToggle
+  onToggle,
+  showTagIcon = false
 }: {
   assigned: MailLabel[];
   canOrganizeLabels?: boolean;
@@ -102,6 +103,7 @@ export function LabelMenu({
   disabled?: boolean;
   labels: MailLabel[];
   onToggle: (label: MailLabel, assigned: boolean) => Promise<void> | void;
+  showTagIcon?: boolean;
 }): React.ReactElement {
   const [pendingId, setPendingId] = React.useState<string | null>(null);
   const assignedIds = new Set(assigned.map((label) => label.id));
@@ -145,7 +147,15 @@ export function LabelMenu({
             event.stopPropagation();
           }}
         >
-          <PiDotsThree aria-hidden="true" className="pointer-events-none" />
+          {showTagIcon ? (
+            <PiTag aria-hidden="true" className="pointer-events-none" data-label-menu-icon="tag" />
+          ) : (
+            <PiDotsThree
+              aria-hidden="true"
+              className="pointer-events-none"
+              data-label-menu-icon="more"
+            />
+          )}
           {assigned.length > 0 ? (
             <span
               aria-hidden="true"

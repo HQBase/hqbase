@@ -257,7 +257,7 @@ export function InboxPage({
   return (
     <div className="flex h-full flex-col bg-list" data-mobile-view="message-list">
       <div className="flex h-11 shrink-0 items-center border-b border-divider bg-toolbar">
-        <div className="mx-auto flex w-full max-w-[1200px] items-center gap-3 px-4 sm:px-6 lg:px-8">
+        <div className="mx-auto flex w-full max-w-[960px] items-center gap-3 px-4 sm:px-6 lg:px-8">
           <span className="shrink-0 text-sm font-medium text-foreground">{activeLabel}</span>
           <div className="mr-3 flex min-w-0 flex-1 items-center sm:mr-6">
             <LabelFilter labels={labels} values={labelIds} onChange={onLabelChange} />

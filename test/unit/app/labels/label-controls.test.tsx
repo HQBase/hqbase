@@ -3,7 +3,7 @@ import * as React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { LabelBadges, LabelFilter, LabelStack } from "@/features/labels/label-controls";
+import { LabelBadges, LabelFilter, LabelMenu, LabelStack } from "@/features/labels/label-controls";
 import { LabelSettings } from "@/features/labels/label-settings";
 import type { MailLabel } from "@/features/labels/types";
 import { flushHookEffects, renderComponent } from "../render-hook";
@@ -67,6 +67,20 @@ describe("label controls", () => {
     expect(stack.match(/data-label-stack-color=/gu)).toHaveLength(2);
     expect(stack).toContain('data-label-stack-color="green"');
     expect(stack).toContain('data-label-stack-color="purple"');
+  });
+
+  it("uses the label icon only for the conversation-row action", () => {
+    const rowMenu = renderToStaticMarkup(
+      <LabelMenu assigned={[label]} labels={[label]} onToggle={() => undefined} showTagIcon />
+    );
+    const generalMenu = renderToStaticMarkup(
+      <LabelMenu assigned={[label]} labels={[label]} onToggle={() => undefined} />
+    );
+
+    expect(rowMenu).toContain('data-label-menu-icon="tag"');
+    expect(rowMenu).not.toContain('data-label-menu-icon="more"');
+    expect(generalMenu).toContain('data-label-menu-icon="more"');
+    expect(generalMenu).not.toContain('data-label-menu-icon="tag"');
   });
 
   it("keeps the compact filter open while selecting every required label", async () => {
