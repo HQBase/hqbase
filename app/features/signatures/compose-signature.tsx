@@ -60,7 +60,10 @@ export function ComposeSignature({
         ) {
           setPending(true);
           void Promise.resolve()
-            .then(() => onSelectionChangeRef.current({ mode: "automatic" }))
+            .then(() => {
+              if (!active) return;
+              return onSelectionChangeRef.current({ mode: "automatic" });
+            })
             .catch((reason: unknown) => {
               if (active) {
                 toast.error(
