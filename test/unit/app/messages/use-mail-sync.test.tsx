@@ -130,13 +130,11 @@ describe("useMailSync", () => {
     const second = conversation("message-2", "2026-07-30T11:00:00.000Z");
     const newest = conversation("message-0", "2026-07-30T13:00:00.000Z");
     const replacement = conversation("message-new", "2026-07-30T14:00:00.000Z");
-    let resolveReplacement:
-      | ((page: {
-          conversations: ConversationSummary[];
-          nextCursor: string | null;
-          totalCount: number | null;
-        }) => void)
-      | null = null;
+    let resolveReplacement = (_page: {
+      conversations: ConversationSummary[];
+      nextCursor: string | null;
+      totalCount: number | null;
+    }): void => undefined;
     const replacementRequest = new Promise<{
       conversations: ConversationSummary[];
       nextCursor: string | null;
@@ -209,7 +207,7 @@ describe("useMailSync", () => {
     ]);
     expect(hook.result.totalCount).toBe(3);
 
-    resolveReplacement?.({ conversations: [replacement], nextCursor: null, totalCount: 1 });
+    resolveReplacement({ conversations: [replacement], nextCursor: null, totalCount: 1 });
     await flushHookEffects(() => hardRefresh);
     expect(hook.result.conversations.map((item) => item.id)).toEqual(["message-new"]);
     expect(hook.result.hasMore).toBe(false);
