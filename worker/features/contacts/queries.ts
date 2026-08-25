@@ -1,7 +1,6 @@
 import { sql } from "drizzle-orm";
 
 import type { MessageScope } from "../../auth/mailbox-access";
-import { messageScopeCondition } from "../../auth/mailbox-access";
 import { nowIso } from "../../db/client";
 import { createDatabase, getRow, getRows } from "../../db/drizzle";
 import { contacts } from "../../db/schema";
@@ -159,15 +158,10 @@ async function contactRows(
     userId: string;
   }
 ): Promise<ContactRow[]> {
-  const scope =
-    messageScopeCondition(input.scope, "message.mailbox_id", "message.is_unassigned") ?? sql`0`;
-  const mailboxScope =
-    input.scope.mailboxIds.length > 0
-      ? sql`mailbox.id IN (${sql.join(
-          input.scope.mailboxIds.map((id) => sql`${id}`),
-          sql`, `
-        )})`
-      : sql`0`;
+  const scope = input.scope.includeUnassigned
+    ? sql`(message.is_unassigned = 1
+        OR message.mailbox_id IN (SELECT id FROM scoped_mailboxes))`
+    : sql`message.mailbox_id IN (SELECT id FROM scoped_mailboxes)`;
   const search = input.search?.trim();
   const effectiveName = sql`CASE WHEN known.source = 'mailbox' THEN known.mailbox_name
     ELSE COALESCE(contact.name, observed.observed_name) END`;
@@ -193,7 +187,11 @@ async function contactRows(
 
   return getRows<ContactRow>(
     db,
-    sql`WITH accessible_messages AS (
+    sql`WITH scoped_mailboxes(id) AS (
+          SELECT CAST(value AS TEXT)
+          FROM json_each(${JSON.stringify(input.scope.mailboxIds)})
+        ),
+        accessible_messages AS (
           SELECT message.to_json, message.cc_json, message.bcc_json,
             COALESCE(message.received_at, message.sent_at, message.created_at) AS activity_at
           FROM messages message
@@ -244,7 +242,8 @@ async function contactRows(
         available_mailboxes AS (
           SELECT lower(mailbox.address) AS email, mailbox.display_name AS mailbox_name
           FROM mailboxes mailbox
-          WHERE ${mailboxScope} AND mailbox.deleted_at IS NULL
+          WHERE mailbox.id IN (SELECT id FROM scoped_mailboxes)
+            AND mailbox.deleted_at IS NULL
         ),
         known_addresses AS (
           SELECT lower(saved.email) AS email, 1 AS saved, 'saved' AS source,
