@@ -309,7 +309,8 @@ describe("conversation reader", () => {
     expect(html).toContain("sm:col-start-4");
     expect(html).toContain("sm:col-start-5");
     expect(html).toContain("sm:col-start-6");
-    expect(html).toContain("sm:pr-2");
+    expect(html).toContain("sm:mr-2 sm:overflow-hidden");
+    expect(html).not.toContain("sm:pr-2");
     expect(html).not.toContain("sm:row-start-2 sm:mt-1");
     const time = html.match(/<time[^>]*>/u)?.[0];
     expect(time).toContain("whitespace-nowrap");
@@ -365,7 +366,7 @@ describe("conversation reader", () => {
     expect(labelButton).toContain("bg-[hsl(var(--message-row-surface))]");
     expect(labelButton).toContain("p-0.5");
     expect(labelButton).toContain("shadow-[0_0_6px_1px_hsl(var(--message-row-surface)/0.14)]");
-    expect(labelButton).toContain("sm:shadow-[0_0_6px_1px_hsl(var(--message-row-surface))]");
+    expect(labelButton).toContain("sm:shadow-[-8px_0_8px_2px_hsl(var(--message-row-surface))]");
     expect(labelButton).toContain("hover:bg-[hsl(var(--message-row-surface))]");
     expect(labelButton).not.toContain("backdrop-blur");
     expect(labelButton).toContain("sm:inline-flex");
