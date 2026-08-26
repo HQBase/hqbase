@@ -255,7 +255,7 @@ function automaticSignature(signatures: Signature[]): Signature | null {
     const selected = signatures.find((item) => item.scope === scope && item.isDefault);
     if (selected) return selected;
   }
-  return signatures.length === 1 ? (signatures[0] ?? null) : null;
+  return null;
 }
 
 function snapshot(mode: SignatureSnapshot["mode"], signature: Signature): SignatureSnapshot {

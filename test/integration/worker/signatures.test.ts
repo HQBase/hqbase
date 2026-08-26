@@ -49,25 +49,22 @@ describe("email signatures", () => {
            (id, name, receiving_status, sending_status, dns_status, is_enabled, created_at, updated_at)
            VALUES
              ('dom_signature_one', 'signature-one.example', 'ready', 'ready', 'ready', 1, ?, ?),
-             ('dom_signature_two', 'signature-two.example', 'ready', 'ready', 'ready', 1, ?, ?),
-             ('dom_signature_three', 'signature-three.example', 'ready', 'ready', 'ready', 1, ?, ?)`
-      ).bind(timestamp, timestamp, timestamp, timestamp, timestamp, timestamp),
+             ('dom_signature_two', 'signature-two.example', 'ready', 'ready', 'ready', 1, ?, ?)`
+      ).bind(timestamp, timestamp, timestamp, timestamp),
       env.DB.prepare(
         `INSERT INTO mailboxes
            (id, address, mail_domain_id, display_name, is_active, created_at, updated_at)
            VALUES
              ('mbx_signature_one', 'one@signature-one.example', 'dom_signature_one', 'One', 1, ?, ?),
-             ('mbx_signature_two', 'two@signature-two.example', 'dom_signature_two', 'Two', 1, ?, ?),
-             ('mbx_signature_three', 'three@signature-three.example', 'dom_signature_three', 'Three', 1, ?, ?)`
-      ).bind(timestamp, timestamp, timestamp, timestamp, timestamp, timestamp),
+             ('mbx_signature_two', 'two@signature-two.example', 'dom_signature_two', 'Two', 1, ?, ?)`
+      ).bind(timestamp, timestamp, timestamp, timestamp),
       grantRow("mbx_signature_one", member.id, "agent"),
       grantRow("mbx_signature_two", member.id, "agent"),
       env.DB.prepare(
         `INSERT INTO principals (id, type, name, status, created_at, updated_at)
          VALUES ('agt_signature', 'agent', 'Signature Agent', 'active', ?, ?)`
       ).bind(timestamp, timestamp),
-      grantRow("mbx_signature_one", "agt_signature", "agent"),
-      grantRow("mbx_signature_three", "agt_signature", "agent")
+      grantRow("mbx_signature_one", "agt_signature", "agent")
     ]);
 
     personal = await createSignature(env.DB, member, {
@@ -136,38 +133,6 @@ describe("email signatures", () => {
     );
     expect(result.signatures.map((signature) => signature.id)).not.toContain(personal.id);
     expect(result.automaticSignatureId).toBe(mailbox.id);
-  });
-
-  it("uses the sole applicable signature when no default exists", async () => {
-    const agent = {
-      id: "agt_signature",
-      type: "agent" as const,
-      name: "Signature Agent",
-      role: null,
-      profile: "mailbox" as const
-    };
-    const only = await createSignature(env.DB, owner, {
-      name: "Only domain signature",
-      html: "<p>Only domain signature</p>",
-      scope: { type: "domain", id: "dom_signature_three" },
-      isDefault: false
-    });
-
-    expect(
-      (await listUsableSignatures(env.DB, agent, "three@signature-three.example"))
-        .automaticSignatureId
-    ).toBe(only.id);
-
-    await createSignature(env.DB, owner, {
-      name: "Second domain signature",
-      html: "<p>Second domain signature</p>",
-      scope: { type: "domain", id: "dom_signature_three" },
-      isDefault: false
-    });
-    expect(
-      (await listUsableSignatures(env.DB, agent, "three@signature-three.example"))
-        .automaticSignatureId
-    ).toBeNull();
   });
 
   it("enforces management and selected-signature access", async () => {
