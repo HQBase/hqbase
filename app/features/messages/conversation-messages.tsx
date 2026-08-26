@@ -17,12 +17,10 @@ import type { MessageDetail } from "./types";
 
 export function ConversationMessages({
   compact = false,
-  lastMessageHeaderLabels,
   messages,
   onCompose
 }: {
   compact?: boolean;
-  lastMessageHeaderLabels?: React.ReactNode;
   messages: MessageDetail[];
   onCompose?: (message: MessageDetail, mode: "reply" | "forward") => void;
 }): React.ReactElement {
@@ -78,38 +76,27 @@ export function ConversationMessages({
         data-thread-message-id={message.id}
         key={message.id}
       >
-        <header className="mb-5 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-2 gap-y-1 sm:grid-cols-[minmax(0,1fr)_auto_auto_auto]">
-          <div className="contents sm:block sm:min-w-0">
-            <div className="col-span-2 break-words text-sm font-medium text-balance [text-wrap:balance] sm:col-auto">
+        <header className="mb-5 flex flex-wrap items-start justify-between gap-2">
+          <div className="min-w-0">
+            <div className="break-words text-sm font-medium text-balance [text-wrap:balance]">
               {message.fromName ?? message.fromAddress}
             </div>
-            <div className="min-w-0 break-words text-xs text-muted-foreground sm:mt-1">
+            <div className="mt-1 break-words text-xs text-muted-foreground">
               {message.fromName ? `${message.fromAddress} · ` : ""}
               to {message.to.join(", ")}
               {message.cc.length > 0 ? ` · cc ${message.cc.join(", ")}` : ""}
             </div>
           </div>
-          {message.direction === "outbound" ? (
-            <Badge
-              className="col-start-1 row-start-3 h-5 w-fit px-1.5 text-[10px] sm:col-start-2 sm:row-start-1"
-              variant="outline"
-            >
-              Sent
-            </Badge>
-          ) : null}
-          {isLast && lastMessageHeaderLabels ? (
-            <div className="col-start-2 row-start-2 min-w-0 justify-self-end sm:col-start-3 sm:row-start-1 sm:ml-1">
-              {lastMessageHeaderLabels}
-            </div>
-          ) : null}
-          <time
-            className={cn(
-              "col-start-2 justify-self-end font-mono text-[10px] tabular-nums text-muted-foreground sm:col-start-4 sm:row-start-1",
-              isLast && lastMessageHeaderLabels ? "row-start-3" : "row-start-2"
-            )}
-          >
-            {formatDateTime(timestamp)}
-          </time>
+          <div className="flex shrink-0 items-center gap-2">
+            {message.direction === "outbound" ? (
+              <Badge className="h-5 px-1.5 text-[10px]" variant="outline">
+                Sent
+              </Badge>
+            ) : null}
+            <time className="font-mono text-[10px] tabular-nums text-muted-foreground">
+              {formatDateTime(timestamp)}
+            </time>
+          </div>
         </header>
         <div className="min-w-0">
           {message.htmlAvailable ? (

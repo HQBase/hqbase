@@ -51,7 +51,7 @@ const customerLabel: MailLabel = {
 beforeEach(() => vi.clearAllMocks());
 
 describe("conversation action feedback", () => {
-  it("keeps only Star and More visible on mobile and edits labels in the message header", async () => {
+  it("keeps thread labels in the responsive reader controls", async () => {
     const onToggleLabel = vi.fn();
     const view = await renderComponent(
       <MessageDetail
@@ -81,8 +81,11 @@ describe("conversation action feedback", () => {
     const archive = view.container.querySelector<HTMLButtonElement>(
       '[aria-label="Archive conversation"]'
     );
-    const readerLabels = view.container.querySelector<HTMLButtonElement>(
-      '[aria-label="Labels: Customer"]'
+    const desktopLabels = view.container.querySelector<HTMLButtonElement>(
+      '[data-reader-labels="desktop"] [aria-label="Labels: Customer"]'
+    );
+    const mobileLabels = view.container.querySelector<HTMLButtonElement>(
+      '[data-reader-labels="mobile"] [aria-label="Labels: Customer"]'
     );
     const more = view.container.querySelector<HTMLButtonElement>(
       '[aria-label="More conversation actions"]'
@@ -92,30 +95,28 @@ describe("conversation action feedback", () => {
     expect(trash?.className).toContain("hidden sm:inline-flex");
     expect(star?.className).not.toContain("hidden sm:inline-flex");
     expect(archive?.className).toContain("hidden sm:inline-flex");
-    const readerLabelsRow = readerLabels?.closest<HTMLElement>("[data-reader-labels]");
-    const readerLabelsSlot = readerLabelsRow?.parentElement;
-    const messageHeader = readerLabels?.closest("header");
-    const messageTime = messageHeader?.querySelector("time");
-    expect(readerLabelsRow).not.toBeNull();
-    expect(messageHeader).not.toBeNull();
-    expect(readerLabelsSlot?.className).toContain("col-start-2");
-    expect(readerLabelsSlot?.className).toContain("row-start-2");
-    expect(readerLabelsSlot?.className).toContain("sm:col-start-3");
-    expect(messageTime?.className).toContain("row-start-3");
-    expect(messageTime?.className).toContain("sm:col-start-4");
-    expect([...(messageHeader?.children ?? [])].indexOf(readerLabelsSlot as Element)).toBeLessThan(
-      [...(messageHeader?.children ?? [])].indexOf(messageTime as Element)
-    );
-    expect(readerLabels?.className).not.toContain("sm:hidden");
-    expect(readerLabels?.className).toContain("bg-muted/40");
-    expect(readerLabels?.className).toContain("hover:bg-muted/60");
-    expect(readerLabels?.className).toContain("flex-row-reverse");
-    expect(readerLabels?.className).toContain("gap-1.5");
-    expect(readerLabels?.className).toContain("px-1");
-    expect(readerLabels?.className).toContain("[&_svg]:-translate-y-px");
-    expect(readerLabels?.querySelector('[data-label-menu-icon="tag"]')).not.toBeNull();
-    expect(readerLabels?.innerHTML).toContain("text-[10px]");
-    expect(readerLabels?.innerHTML).not.toContain("text-[9px]");
+    const desktopWrapper = desktopLabels?.closest<HTMLElement>('[data-reader-labels="desktop"]');
+    const mobileWrapper = mobileLabels?.closest<HTMLElement>('[data-reader-labels="mobile"]');
+    expect(desktopWrapper?.className).toContain("hidden");
+    expect(desktopWrapper?.className).toContain("sm:block");
+    expect(desktopWrapper?.parentElement).toBe(unread?.parentElement);
+    expect(
+      [...(unread?.parentElement?.children ?? [])].indexOf(desktopWrapper as Element)
+    ).toBeLessThan([...(unread?.parentElement?.children ?? [])].indexOf(unread as Element));
+    expect(desktopLabels?.className).toContain("h-10");
+    expect(desktopLabels?.className).toContain("rounded-md");
+    expect(desktopLabels?.className).toContain("bg-transparent");
+    expect(desktopLabels?.className).toContain("px-2");
+    expect(desktopLabels?.className).toContain("flex-row-reverse");
+    expect(desktopLabels?.querySelector('[data-label-menu-icon="tag"]')).not.toBeNull();
+    expect(mobileWrapper?.className).toContain("flex justify-end");
+    expect(mobileWrapper?.className).toContain("pt-4");
+    expect(mobileWrapper?.className).toContain("sm:hidden");
+    expect(mobileLabels?.className).toContain("bg-muted/40");
+    expect(mobileLabels?.className).toContain("px-1");
+    expect(
+      view.container.querySelector("[data-thread-message-id] header [data-reader-labels]")
+    ).toBeNull();
     expect(more?.className).toContain("sm:hidden");
 
     await flushHookEffects(() => {
@@ -136,10 +137,10 @@ describe("conversation action feedback", () => {
     expect(menu?.textContent).toContain("Trash conversation");
 
     await flushHookEffects(() => {
-      readerLabels?.dispatchEvent(
+      desktopLabels?.dispatchEvent(
         new PointerEvent("pointerdown", { bubbles: true, button: 0, pointerType: "mouse" })
       );
-      readerLabels?.click();
+      desktopLabels?.click();
     });
     const labelItem = [
       ...document.body.querySelectorAll<HTMLElement>('[role="menuitemcheckbox"]')
@@ -165,16 +166,22 @@ describe("conversation action feedback", () => {
         onToggleLabel={() => undefined}
       />
     );
-    const emptyControl = editable.container.querySelector<HTMLButtonElement>(
-      '[aria-label="Add label"]'
+    const desktopEmpty = editable.container.querySelector<HTMLButtonElement>(
+      '[data-reader-labels="desktop"] [aria-label="Add label"]'
     );
-    expect(emptyControl?.closest("header")).not.toBeNull();
-    expect(emptyControl?.textContent).toContain("Add label");
-    expect(emptyControl?.className).toContain("border-dashed");
-    expect(emptyControl?.className).toContain("border-divider");
-    expect(emptyControl?.className).toContain("flex-row-reverse");
-    expect(emptyControl?.className).toContain("px-1");
-    expect(emptyControl?.querySelector('[data-label-menu-icon="tag"]')).not.toBeNull();
+    const mobileEmpty = editable.container.querySelector<HTMLButtonElement>(
+      '[data-reader-labels="mobile"] [aria-label="Add label"]'
+    );
+    expect(desktopEmpty?.textContent).toContain("Add label");
+    expect(desktopEmpty?.className).toContain("h-10");
+    expect(desktopEmpty?.className).toContain("bg-transparent");
+    expect(desktopEmpty?.className).not.toContain("border-dashed");
+    expect(mobileEmpty?.textContent).toContain("Add label");
+    expect(mobileEmpty?.className).toContain("border-dashed");
+    expect(mobileEmpty?.className).toContain("border-divider");
+    expect(mobileEmpty?.className).toContain("flex-row-reverse");
+    expect(mobileEmpty?.className).toContain("px-1");
+    expect(mobileEmpty?.querySelector('[data-label-menu-icon="tag"]')).not.toBeNull();
     await editable.unmount();
 
     const readOnly = await renderComponent(
@@ -191,14 +198,16 @@ describe("conversation action feedback", () => {
         onToggleLabel={() => undefined}
       />
     );
-    const staticControl = readOnly.container.querySelector<HTMLElement>("[data-reader-labels]");
+    const staticControl = readOnly.container.querySelector<HTMLElement>(
+      '[data-reader-labels="desktop"]'
+    );
     const staticPill = staticControl?.firstElementChild;
-    expect(staticControl?.closest("header")).not.toBeNull();
     expect(staticControl?.textContent).toContain("Customer");
     expect(staticControl?.querySelector("svg")).not.toBeNull();
     expect(staticControl?.querySelector("button")).toBeNull();
     expect(staticPill?.className).toContain("gap-1.5");
-    expect(staticPill?.className).toContain("px-1");
+    expect(staticPill?.className).toContain("px-2");
+    expect(staticPill?.className).toContain("h-10");
     expect(staticPill?.firstElementChild?.tagName).toBe("svg");
     expect(staticPill?.firstElementChild?.getAttribute("class")).toContain("-translate-y-px");
     await readOnly.unmount();
