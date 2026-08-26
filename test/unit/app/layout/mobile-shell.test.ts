@@ -88,12 +88,14 @@ describe("mobile application shell", () => {
   });
 
   it("keeps delegated connections separate from machine identities", () => {
-    expect(agentConnectionDetails).toContain('label="or"');
-    expect(agentConnectionDetails).toContain('title="Skill + API"');
+    expect(agentConnectionDetails).toContain("export function AgentSkillDetails");
     expect(agentConnectionDetails).not.toContain('aria-label="Connection method"');
     expect(mcpConnectionDetails).toContain("text-base sm:text-xs");
     expect(mcpConnectionDetails).toContain('value="read-only"');
     expect(mcpConnectionDetails).toContain('value="mail-actions"');
+    expect(connectedAppsPage).toContain('value="mcp"');
+    expect(connectedAppsPage).toContain('value="skill"');
+    expect(connectedAppsPage).toContain('value="connections"');
     expect(connectedAppsPage).toContain("/mcp/full");
     expect(connectedAppsPage).toContain("/skills/hqbase-mail/SKILL.md");
     expect(connectedAppsPage).toContain("Your connections");

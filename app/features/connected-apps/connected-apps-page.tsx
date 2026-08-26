@@ -21,10 +21,14 @@ import {
   TableHeader,
   TableRow
 } from "@/components/ui/table";
-import { AgentConnectionDetails } from "@/features/agents/connection-dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { AgentSkillDetails } from "@/features/agents/connection-dialog";
 import type { CurrentUser } from "@/features/auth/types";
+import { McpConnectionDetails } from "@/features/mcp/connection-dialog";
 import { SettingsSection } from "@/features/settings/settings-section";
 import { listOAuthConnections, type OAuthConnection, revokeOAuthConnection } from "./api";
+
+type ConnectedAppsTab = "mcp" | "skill" | "connections";
 
 export function ConnectedAppsPage({ user }: { user: CurrentUser }): React.ReactElement {
   const [readOnlyEndpoint, setReadOnlyEndpoint] = React.useState("/mcp");
@@ -33,6 +37,9 @@ export function ConnectedAppsPage({ user }: { user: CurrentUser }): React.ReactE
   const readOnlyEndpointId = React.useId();
   const fullEndpointId = React.useId();
   const skillUrlId = React.useId();
+  const [connections, setConnections] = React.useState<OAuthConnection[]>([]);
+  const [loading, setLoading] = React.useState(true);
+  const [activeTab, setActiveTab] = React.useState<ConnectedAppsTab | null>(null);
 
   React.useEffect(() => {
     setReadOnlyEndpoint(new URL("/mcp", window.location.origin).toString());
@@ -40,53 +47,111 @@ export function ConnectedAppsPage({ user }: { user: CurrentUser }): React.ReactE
     setSkillUrl(new URL("/skills/hqbase-mail/SKILL.md", window.location.origin).toString());
   }, []);
 
-  return (
-    <div className="flex flex-col gap-8">
-      <SettingsSection
-        description="Connect software to mail available to your account through OAuth."
-        title="Connect an app"
-      >
-        <AgentConnectionDetails
-          fullEndpoint={fullEndpoint}
-          fullEndpointId={fullEndpointId}
-          readOnlyEndpoint={readOnlyEndpoint}
-          readOnlyEndpointId={readOnlyEndpointId}
-          skillUrl={skillUrl}
-          skillUrlId={skillUrlId}
-          user={user}
-        />
-      </SettingsSection>
-      <ConnectionList />
-    </div>
-  );
-}
-
-function ConnectionList(): React.ReactElement {
-  const [connections, setConnections] = React.useState<OAuthConnection[]>([]);
-  const [loading, setLoading] = React.useState(true);
-  const [selected, setSelected] = React.useState<OAuthConnection | null>(null);
-  const [pending, setPending] = React.useState(false);
-
   React.useEffect(() => {
     let active = true;
     void listOAuthConnections()
-      .then((next) => active && setConnections(next))
-      .catch((error: unknown) => {
-        if (active)
-          toast.error(error instanceof Error ? error.message : "Connections could not be loaded.");
+      .then((next) => {
+        if (!active) return;
+        setConnections(next);
+        setActiveTab((current) => current ?? (next.length > 0 ? "connections" : "mcp"));
       })
-      .finally(() => active && setLoading(false));
+      .catch((error: unknown) => {
+        if (!active) return;
+        setActiveTab((current) => current ?? "mcp");
+        toast.error(error instanceof Error ? error.message : "Connections could not be loaded.");
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
     return () => {
       active = false;
     };
   }, []);
+
+  return (
+    <Tabs
+      className="flex flex-col gap-2"
+      value={activeTab ?? "mcp"}
+      onValueChange={(value) => setActiveTab(value as ConnectedAppsTab)}
+    >
+      <TabsList
+        aria-label="Connected apps view"
+        className="grid h-9 w-full grid-cols-3 rounded-full"
+      >
+        <TabsTrigger className="h-7 min-h-0 rounded-full px-2 text-xs" value="mcp">
+          MCP
+        </TabsTrigger>
+        <TabsTrigger className="h-7 min-h-0 rounded-full px-2 text-xs" value="skill">
+          Skill + API
+        </TabsTrigger>
+        <TabsTrigger className="h-7 min-h-0 rounded-full px-2 text-xs" value="connections">
+          Connections
+        </TabsTrigger>
+      </TabsList>
+
+      {activeTab === null ? (
+        <p className="py-16 text-center text-sm text-muted-foreground">Loading connected apps…</p>
+      ) : (
+        <>
+          <TabsContent value="mcp">
+            <SettingsSection
+              description="Connect an AI tool through HQBase's remote MCP server."
+              title="MCP"
+            >
+              <McpConnectionDetails
+                fullEndpoint={fullEndpoint}
+                fullEndpointId={fullEndpointId}
+                readOnlyEndpoint={readOnlyEndpoint}
+                readOnlyEndpointId={readOnlyEndpointId}
+                user={user}
+              />
+            </SettingsSection>
+          </TabsContent>
+
+          <TabsContent value="skill">
+            <SettingsSection
+              description="Give an agent the public skill for HQBase's v2 Mail API."
+              title="Skill + API"
+            >
+              <AgentSkillDetails flat skillUrl={skillUrl} skillUrlId={skillUrlId} />
+            </SettingsSection>
+          </TabsContent>
+
+          <TabsContent value="connections">
+            <ConnectionList
+              connections={connections}
+              loading={loading}
+              onRevoked={(clientId) =>
+                setConnections((current) =>
+                  current.filter((connection) => connection.clientId !== clientId)
+                )
+              }
+            />
+          </TabsContent>
+        </>
+      )}
+    </Tabs>
+  );
+}
+
+function ConnectionList({
+  connections,
+  loading,
+  onRevoked
+}: {
+  connections: OAuthConnection[];
+  loading: boolean;
+  onRevoked: (clientId: string) => void;
+}): React.ReactElement {
+  const [selected, setSelected] = React.useState<OAuthConnection | null>(null);
+  const [pending, setPending] = React.useState(false);
 
   async function revoke(): Promise<void> {
     if (!selected) return;
     setPending(true);
     try {
       await revokeOAuthConnection(selected.clientId);
-      setConnections((current) => current.filter((item) => item.clientId !== selected.clientId));
+      onRevoked(selected.clientId);
       toast.success(`${selected.name} disconnected.`);
       setSelected(null);
     } catch (error) {

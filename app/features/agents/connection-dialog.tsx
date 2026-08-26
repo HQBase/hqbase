@@ -3,60 +3,7 @@ import { PiCheck, PiCopy, PiDownload, PiFileText } from "react-icons/pi";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Separator } from "@/components/ui/separator";
-import type { CurrentUser } from "@/features/auth/types";
-import { McpConnectionDetails } from "@/features/mcp/connection-dialog";
 import { cn } from "@/lib/cn";
-
-export function AgentConnectionDetails({
-  fullEndpoint,
-  fullEndpointId,
-  skillUrl,
-  skillUrlId,
-  readOnlyEndpoint,
-  readOnlyEndpointId,
-  user
-}: {
-  fullEndpoint: string;
-  fullEndpointId: string;
-  skillUrl: string;
-  skillUrlId: string;
-  readOnlyEndpoint: string;
-  readOnlyEndpointId: string;
-  user: CurrentUser;
-}): React.ReactElement {
-  return (
-    <div className="flex flex-col gap-7">
-      <ConnectionIdentity user={user} />
-      <section className="flex flex-col gap-5">
-        <div className="flex flex-col gap-1">
-          <h3 className="font-medium text-foreground">MCP</h3>
-          <p className="text-xs text-muted-foreground">
-            Connect an AI tool through HQBase&apos;s remote MCP server.
-          </p>
-        </div>
-        <McpConnectionDetails
-          fullEndpoint={fullEndpoint}
-          fullEndpointId={fullEndpointId}
-          readOnlyEndpoint={readOnlyEndpoint}
-          readOnlyEndpointId={readOnlyEndpointId}
-          showIdentity={false}
-          user={user}
-        />
-      </section>
-
-      <ConnectionDivider label="or" />
-
-      <AgentSkillDetails
-        flat
-        description="Connect through the HQBase Mail API using a skill file."
-        skillUrl={skillUrl}
-        skillUrlId={skillUrlId}
-        title="Skill + API"
-      />
-    </div>
-  );
-}
 
 export function AgentSkillDetails({
   action,
@@ -156,33 +103,5 @@ export function AgentSkillDetails({
         </section>
       ) : null}
     </div>
-  );
-}
-
-export function ConnectionDivider({ label }: { label: string }): React.ReactElement {
-  return (
-    <div className="flex items-center gap-3 text-xs text-muted-foreground">
-      <Separator className="flex-1" />
-      <span>{label}</span>
-      <Separator className="flex-1" />
-    </div>
-  );
-}
-
-function ConnectionIdentity({ user }: { user: CurrentUser }): React.ReactElement {
-  return (
-    <section className="flex flex-col gap-1 text-sm">
-      <p className="text-xs font-medium text-muted-foreground">Connecting as</p>
-      <div className="flex flex-wrap items-baseline gap-x-2">
-        <p className="font-medium">{user.name}</p>
-        <p className="text-xs text-muted-foreground">
-          {user.email} · {user.role}
-        </p>
-      </div>
-      <p className="text-xs leading-4 text-muted-foreground">
-        After consent, HQBase rechecks this user&apos;s current workspace role and live mailbox
-        grants.
-      </p>
-    </section>
   );
 }
