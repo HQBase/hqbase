@@ -47,6 +47,7 @@ describe("label controls", () => {
 
     expect(filter).toContain('aria-label="Filter by labels"');
     expect(filter).toContain('data-label-filter-icon="tag"');
+    expect(filter).toContain("size-[11px]");
     expect(filter).toContain(">Labels</span>");
     expect(selectedFilter).toContain("Customer");
     expect(selectedFilter).toContain("Priority");
@@ -159,6 +160,45 @@ describe("label controls", () => {
     await flushHookEffects(() => item?.click());
 
     expect(document.body.querySelector('[role="menuitemcheckbox"]')).toBeNull();
+    await view.unmount();
+  });
+
+  it("updates assignments optimistically without fading the trigger", async () => {
+    let rejectToggle: (reason: Error) => void = () => undefined;
+    const pendingToggle = new Promise<void>((_resolve, reject) => {
+      rejectToggle = reject;
+    });
+    const view = await renderComponent(
+      <LabelMenu
+        assigned={[label]}
+        labels={[label]}
+        onToggle={() => pendingToggle}
+        showAssignedLabels
+        showTagIcon
+      />
+    );
+    const trigger = view.container.querySelector<HTMLButtonElement>(
+      '[aria-label="Labels: Customer"]'
+    );
+    await flushHookEffects(() => {
+      trigger?.dispatchEvent(
+        new PointerEvent("pointerdown", { bubbles: true, button: 0, pointerType: "mouse" })
+      );
+      trigger?.click();
+    });
+    const item = document.body.querySelector<HTMLElement>('[role="menuitemcheckbox"]');
+    await flushHookEffects(() => item?.click());
+
+    expect(trigger?.getAttribute("aria-label")).toBe("Labels");
+    expect(trigger?.textContent).not.toContain("Customer");
+    expect(trigger?.disabled).toBe(false);
+    expect(trigger?.getAttribute("aria-busy")).toBe("true");
+
+    await flushHookEffects(() => rejectToggle(new Error("Label update failed.")));
+
+    expect(trigger?.getAttribute("aria-label")).toBe("Labels: Customer");
+    expect(trigger?.textContent).toContain("Customer");
+    expect(trigger?.disabled).toBe(false);
     await view.unmount();
   });
 

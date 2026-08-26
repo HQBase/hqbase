@@ -48,7 +48,7 @@ export function LabelFilter({
           type="button"
           variant="ghost"
         >
-          <PiTag aria-hidden="true" className="size-3 shrink-0" data-label-filter-icon="tag" />
+          <PiTag aria-hidden="true" className="size-[11px] shrink-0" data-label-filter-icon="tag" />
           {selectedLabels.length > 0 ? (
             <LabelStack compact labels={selectedLabels} />
           ) : (
@@ -115,10 +115,32 @@ export function LabelMenu({
   showTagIcon?: boolean;
 }): React.ReactElement {
   const { pendingId, toggle } = useLabelToggle(onToggle);
+  const [optimisticAssigned, updateOptimisticAssigned] = React.useOptimistic(
+    assigned,
+    (
+      current,
+      change: {
+        assigned: boolean;
+        label: MailLabel;
+      }
+    ) => {
+      if (!change.assigned) return current.filter((label) => label.id !== change.label.id);
+      if (current.some((label) => label.id === change.label.id)) return current;
+      return [...current, change.label].sort((left, right) => left.name.localeCompare(right.name));
+    }
+  );
   const triggerLabel =
-    showAssignedLabels && assigned.length > 0
-      ? `Labels: ${assigned.map((label) => label.name).join(", ")}`
+    showAssignedLabels && optimisticAssigned.length > 0
+      ? `Labels: ${optimisticAssigned.map((label) => label.name).join(", ")}`
       : (emptyAssignedText ?? "Labels");
+
+  function toggleOptimistically(label: MailLabel, nextAssigned: boolean): void {
+    const request = toggle(label, nextAssigned);
+    React.startTransition(async () => {
+      updateOptimisticAssigned({ assigned: nextAssigned, label });
+      await request;
+    });
+  }
 
   return (
     <DropdownMenu>
@@ -132,8 +154,9 @@ export function LabelMenu({
               : "size-10 min-h-10 min-w-10 sm:size-8 sm:min-h-8 sm:min-w-8",
             className
           )}
+          aria-busy={pendingId !== null}
           data-message-labels={showAssignedLabels ? "desktop" : undefined}
-          disabled={disabled || !canOrganizeLabels || labels.length === 0 || pendingId !== null}
+          disabled={disabled || !canOrganizeLabels || labels.length === 0}
           size="icon"
           title={
             labels.length === 0
@@ -149,8 +172,8 @@ export function LabelMenu({
             event.stopPropagation();
           }}
         >
-          {showAssignedLabels && assigned.length > 0 ? (
-            <LabelStack compact={compactAssignedLabels} labels={assigned} />
+          {showAssignedLabels && optimisticAssigned.length > 0 ? (
+            <LabelStack compact={compactAssignedLabels} labels={optimisticAssigned} />
           ) : showAssignedLabels && emptyAssignedText ? (
             <span
               className={cn(
@@ -170,12 +193,12 @@ export function LabelMenu({
               data-label-menu-icon="more"
             />
           )}
-          {assigned.length > 0 && !showTagIcon ? (
+          {optimisticAssigned.length > 0 && !showTagIcon ? (
             <span
               aria-hidden="true"
               className="pointer-events-none absolute bottom-1 flex -space-x-0.5"
             >
-              {assigned.slice(0, 3).map((label) => (
+              {optimisticAssigned.slice(0, 3).map((label) => (
                 <span
                   className={cn("size-1.5 rounded-full", labelPillColorClass(label.color))}
                   key={label.id}
@@ -195,11 +218,11 @@ export function LabelMenu({
         </DropdownMenuLabel>
         <DropdownMenuGroup>
           <LabelMenuItems
-            assigned={assigned}
+            assigned={optimisticAssigned}
             disabled={!canOrganizeLabels}
             labels={labels}
             pendingId={pendingId}
-            onToggle={toggle}
+            onToggle={toggleOptimistically}
           />
         </DropdownMenuGroup>
       </DropdownMenuContent>

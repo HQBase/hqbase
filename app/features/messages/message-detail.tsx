@@ -100,6 +100,33 @@ export function MessageDetail({
   const inlineSessions = composer.sessions.filter(
     (session) => !session.detached && session.origin?.threadId === selected.threadId
   );
+  const readerLabels =
+    labels.length > 0 && onToggleLabel && canOrganizeLabels ? (
+      <div className="min-w-0 max-w-[55vw] sm:max-w-[min(32rem,45vw)]" data-reader-labels>
+        <LabelMenu
+          align="end"
+          assigned={assignedLabels}
+          canOrganizeLabels={canOrganizeLabels}
+          className={cn(
+            "max-w-full flex-row-reverse gap-1.5 overflow-hidden bg-muted/40 px-1 [&_svg]:-translate-y-px [@media(hover:hover)]:hover:bg-muted/60",
+            assignedLabels.length === 0 && "border border-dashed border-divider"
+          )}
+          compactAssignedLabels={false}
+          emptyAssignedText="Add label"
+          labels={labels}
+          onToggle={onToggleLabel}
+          showAssignedLabels
+          showTagIcon
+        />
+      </div>
+    ) : labels.length > 0 || assignedLabels.length > 0 ? (
+      <div className="min-w-0 max-w-[55vw] sm:max-w-[min(32rem,45vw)]" data-reader-labels>
+        <span className="inline-flex h-auto min-h-0 w-fit max-w-full items-center gap-1.5 overflow-hidden rounded-full bg-muted/40 p-0.5 px-1 text-muted-foreground [&_svg]:size-3.5 [&_svg]:shrink-0">
+          <PiTag aria-hidden="true" className="pointer-events-none -translate-y-px" />
+          <LabelStack labels={assignedLabels} />
+        </span>
+      </div>
+    ) : null;
 
   async function applyAction(action: MessageAction, successMessage?: string): Promise<void> {
     try {
@@ -267,33 +294,8 @@ export function MessageDetail({
         </div>
       </div>
       <PullToRefresh className="min-h-0 flex-1" onRefresh={onRefresh}>
-        {labels.length > 0 && onToggleLabel && canOrganizeLabels ? (
-          <div className="flex justify-end px-4 pt-4 sm:px-6" data-reader-labels>
-            <LabelMenu
-              align="end"
-              assigned={assignedLabels}
-              canOrganizeLabels={canOrganizeLabels}
-              className={cn(
-                "max-w-full flex-row-reverse gap-1.5 overflow-hidden bg-muted/40 [&_svg]:-translate-y-px [@media(hover:hover)]:hover:bg-muted/60",
-                assignedLabels.length === 0 && "border border-dashed border-divider"
-              )}
-              compactAssignedLabels={false}
-              emptyAssignedText="Add label"
-              labels={labels}
-              onToggle={onToggleLabel}
-              showAssignedLabels
-              showTagIcon
-            />
-          </div>
-        ) : labels.length > 0 || assignedLabels.length > 0 ? (
-          <div className="flex justify-end px-4 pt-4 sm:px-6" data-reader-labels>
-            <span className="inline-flex h-auto min-h-0 w-fit max-w-full items-center gap-1.5 overflow-hidden rounded-full bg-muted/40 p-0.5 text-muted-foreground [&_svg]:size-3.5 [&_svg]:shrink-0">
-              <PiTag aria-hidden="true" className="pointer-events-none -translate-y-px" />
-              <LabelStack labels={assignedLabels} />
-            </span>
-          </div>
-        ) : null}
         <ConversationMessages
+          lastMessageHeaderLabels={readerLabels}
           messages={messages}
           onCompose={(message, mode) => {
             const folder = activeFolder ?? message.folder;

@@ -51,7 +51,7 @@ const customerLabel: MailLabel = {
 beforeEach(() => vi.clearAllMocks());
 
 describe("conversation action feedback", () => {
-  it("keeps only Star and More visible on mobile and edits labels below the header", async () => {
+  it("keeps only Star and More visible on mobile and edits labels in the message header", async () => {
     const onToggleLabel = vi.fn();
     const view = await renderComponent(
       <MessageDetail
@@ -93,13 +93,25 @@ describe("conversation action feedback", () => {
     expect(star?.className).not.toContain("hidden sm:inline-flex");
     expect(archive?.className).toContain("hidden sm:inline-flex");
     const readerLabelsRow = readerLabels?.closest<HTMLElement>("[data-reader-labels]");
+    const readerLabelsSlot = readerLabelsRow?.parentElement;
+    const messageHeader = readerLabels?.closest("header");
+    const messageTime = messageHeader?.querySelector("time");
     expect(readerLabelsRow).not.toBeNull();
-    expect(readerLabelsRow?.className).toContain("flex justify-end");
+    expect(messageHeader).not.toBeNull();
+    expect(readerLabelsSlot?.className).toContain("col-start-2");
+    expect(readerLabelsSlot?.className).toContain("row-start-2");
+    expect(readerLabelsSlot?.className).toContain("sm:col-start-3");
+    expect(messageTime?.className).toContain("row-start-3");
+    expect(messageTime?.className).toContain("sm:col-start-4");
+    expect([...(messageHeader?.children ?? [])].indexOf(readerLabelsSlot as Element)).toBeLessThan(
+      [...(messageHeader?.children ?? [])].indexOf(messageTime as Element)
+    );
     expect(readerLabels?.className).not.toContain("sm:hidden");
     expect(readerLabels?.className).toContain("bg-muted/40");
     expect(readerLabels?.className).toContain("hover:bg-muted/60");
     expect(readerLabels?.className).toContain("flex-row-reverse");
     expect(readerLabels?.className).toContain("gap-1.5");
+    expect(readerLabels?.className).toContain("px-1");
     expect(readerLabels?.className).toContain("[&_svg]:-translate-y-px");
     expect(readerLabels?.querySelector('[data-label-menu-icon="tag"]')).not.toBeNull();
     expect(readerLabels?.innerHTML).toContain("text-[10px]");
@@ -156,13 +168,12 @@ describe("conversation action feedback", () => {
     const emptyControl = editable.container.querySelector<HTMLButtonElement>(
       '[aria-label="Add label"]'
     );
-    expect(emptyControl?.closest<HTMLElement>("[data-reader-labels]")?.className).toContain(
-      "flex justify-end"
-    );
+    expect(emptyControl?.closest("header")).not.toBeNull();
     expect(emptyControl?.textContent).toContain("Add label");
     expect(emptyControl?.className).toContain("border-dashed");
     expect(emptyControl?.className).toContain("border-divider");
     expect(emptyControl?.className).toContain("flex-row-reverse");
+    expect(emptyControl?.className).toContain("px-1");
     expect(emptyControl?.querySelector('[data-label-menu-icon="tag"]')).not.toBeNull();
     await editable.unmount();
 
@@ -182,11 +193,12 @@ describe("conversation action feedback", () => {
     );
     const staticControl = readOnly.container.querySelector<HTMLElement>("[data-reader-labels]");
     const staticPill = staticControl?.firstElementChild;
-    expect(staticControl?.className).toContain("flex justify-end");
+    expect(staticControl?.closest("header")).not.toBeNull();
     expect(staticControl?.textContent).toContain("Customer");
     expect(staticControl?.querySelector("svg")).not.toBeNull();
     expect(staticControl?.querySelector("button")).toBeNull();
     expect(staticPill?.className).toContain("gap-1.5");
+    expect(staticPill?.className).toContain("px-1");
     expect(staticPill?.firstElementChild?.tagName).toBe("svg");
     expect(staticPill?.firstElementChild?.getAttribute("class")).toContain("-translate-y-px");
     await readOnly.unmount();

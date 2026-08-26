@@ -467,6 +467,21 @@ describe("conversation reader", () => {
     expect(html).toContain('data-thread-arrow="bottom-outward"');
   });
 
+  it("puts the conversation label control only in the final message header", () => {
+    const html = renderToStaticMarkup(
+      <ConversationMessages
+        lastMessageHeaderLabels={<span data-reader-labels>Labels</span>}
+        messages={[firstMessage, secondMessage]}
+      />
+    );
+    const firstMessageStart = html.indexOf('data-thread-message-id="msg_1"');
+    const finalMessageStart = html.indexOf('data-thread-message-id="msg_2"');
+
+    expect(html.match(/data-reader-labels/g)).toHaveLength(1);
+    expect(html.slice(firstMessageStart, finalMessageStart)).not.toContain("data-reader-labels");
+    expect(html.slice(finalMessageStart)).toContain("data-reader-labels");
+  });
+
   it("keeps inline images out of the downloadable attachment list", () => {
     const html = renderToStaticMarkup(
       <ConversationMessages
