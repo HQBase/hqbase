@@ -92,10 +92,15 @@ describe("conversation action feedback", () => {
     expect(trash?.className).toContain("hidden sm:inline-flex");
     expect(star?.className).not.toContain("hidden sm:inline-flex");
     expect(archive?.className).toContain("hidden sm:inline-flex");
-    expect(readerLabels?.closest("[data-reader-labels]")).not.toBeNull();
+    const readerLabelsRow = readerLabels?.closest<HTMLElement>("[data-reader-labels]");
+    expect(readerLabelsRow).not.toBeNull();
+    expect(readerLabelsRow?.className).toContain("flex justify-end");
     expect(readerLabels?.className).not.toContain("sm:hidden");
     expect(readerLabels?.className).toContain("bg-muted/40");
     expect(readerLabels?.className).toContain("hover:bg-muted/60");
+    expect(readerLabels?.className).toContain("flex-row-reverse");
+    expect(readerLabels?.className).toContain("gap-1.5");
+    expect(readerLabels?.className).toContain("[&_svg]:-translate-y-px");
     expect(readerLabels?.querySelector('[data-label-menu-icon="tag"]')).not.toBeNull();
     expect(readerLabels?.innerHTML).toContain("text-[10px]");
     expect(readerLabels?.innerHTML).not.toContain("text-[9px]");
@@ -148,9 +153,16 @@ describe("conversation action feedback", () => {
         onToggleLabel={() => undefined}
       />
     );
-    const emptyControl =
-      editable.container.querySelector<HTMLButtonElement>('[aria-label="Labels"]');
-    expect(emptyControl?.closest("[data-reader-labels]")).not.toBeNull();
+    const emptyControl = editable.container.querySelector<HTMLButtonElement>(
+      '[aria-label="Add label"]'
+    );
+    expect(emptyControl?.closest<HTMLElement>("[data-reader-labels]")?.className).toContain(
+      "flex justify-end"
+    );
+    expect(emptyControl?.textContent).toContain("Add label");
+    expect(emptyControl?.className).toContain("border-dashed");
+    expect(emptyControl?.className).toContain("border-divider");
+    expect(emptyControl?.className).toContain("flex-row-reverse");
     expect(emptyControl?.querySelector('[data-label-menu-icon="tag"]')).not.toBeNull();
     await editable.unmount();
 
@@ -169,9 +181,14 @@ describe("conversation action feedback", () => {
       />
     );
     const staticControl = readOnly.container.querySelector<HTMLElement>("[data-reader-labels]");
+    const staticPill = staticControl?.firstElementChild;
+    expect(staticControl?.className).toContain("flex justify-end");
     expect(staticControl?.textContent).toContain("Customer");
     expect(staticControl?.querySelector("svg")).not.toBeNull();
     expect(staticControl?.querySelector("button")).toBeNull();
+    expect(staticPill?.className).toContain("gap-1.5");
+    expect(staticPill?.firstElementChild?.tagName).toBe("svg");
+    expect(staticPill?.firstElementChild?.getAttribute("class")).toContain("-translate-y-px");
     await readOnly.unmount();
   });
 

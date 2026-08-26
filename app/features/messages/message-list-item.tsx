@@ -103,20 +103,18 @@ export function MessageListItem({
           />
         </button>
       </span>
-      <span className="col-start-2 row-start-1 flex min-w-0 items-center gap-1 sm:col-start-2 sm:row-start-1">
-        <span
-          className={cn(
-            "min-w-0 truncate",
-            isUnread
-              ? "font-bold text-foreground dark:text-white"
-              : "font-normal text-foreground/85 dark:text-white/65"
-          )}
-        >
-          {correspondent}
-        </span>
+      <span
+        className={cn(
+          "col-start-2 row-start-1 flex min-w-0 items-center gap-1 sm:col-start-2 sm:row-start-1",
+          isUnread
+            ? "font-bold text-foreground dark:text-white"
+            : "font-normal text-foreground/85 dark:text-white/65"
+        )}
+      >
+        <span className="min-w-0 truncate">{correspondent}</span>
         {conversation.messageCount > 1 ? (
           <span
-            className="shrink-0 text-[11px] font-normal tabular-nums text-tertiary sm:hidden"
+            className="shrink-0 tabular-nums sm:hidden"
             title={`${conversation.messageCount} messages`}
           >
             ({conversation.messageCount})
@@ -138,7 +136,7 @@ export function MessageListItem({
             className="pointer-events-none size-3.5 shrink-0 self-center text-tertiary sm:hidden"
           />
         ) : null}
-        <span className="min-w-0 flex-1">
+        <span className="min-w-0 flex-1 sm:pr-[5px]">
           <span
             className={cn(
               "block truncate sm:inline",
@@ -174,7 +172,7 @@ export function MessageListItem({
           data-message-labels="compact"
         >
           <LabelStack
-            className="w-max shrink-0"
+            className="w-max shrink-0 leading-4"
             compact
             labels={assignedLabels}
             namedLimit={assignedLabels.length}

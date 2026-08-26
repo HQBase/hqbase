@@ -96,6 +96,7 @@ export function LabelMenu({
   className,
   compactAssignedLabels = true,
   disabled = false,
+  emptyAssignedText,
   labels,
   onToggle,
   showAssignedLabels = false,
@@ -107,6 +108,7 @@ export function LabelMenu({
   className?: string;
   compactAssignedLabels?: boolean;
   disabled?: boolean;
+  emptyAssignedText?: string;
   labels: MailLabel[];
   onToggle: (label: MailLabel, assigned: boolean) => Promise<void> | void;
   showAssignedLabels?: boolean;
@@ -116,7 +118,7 @@ export function LabelMenu({
   const triggerLabel =
     showAssignedLabels && assigned.length > 0
       ? `Labels: ${assigned.map((label) => label.name).join(", ")}`
-      : "Labels";
+      : (emptyAssignedText ?? "Labels");
 
   return (
     <DropdownMenu>
@@ -147,8 +149,17 @@ export function LabelMenu({
             event.stopPropagation();
           }}
         >
-          {showAssignedLabels ? (
+          {showAssignedLabels && assigned.length > 0 ? (
             <LabelStack compact={compactAssignedLabels} labels={assigned} />
+          ) : showAssignedLabels && emptyAssignedText ? (
+            <span
+              className={cn(
+                "shrink-0 leading-4",
+                compactAssignedLabels ? "text-[9px]" : "text-[10px]"
+              )}
+            >
+              {emptyAssignedText}
+            </span>
           ) : null}
           {showTagIcon ? (
             <PiTag aria-hidden="true" className="pointer-events-none" data-label-menu-icon="tag" />

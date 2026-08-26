@@ -309,6 +309,7 @@ describe("conversation reader", () => {
     expect(html).toContain("sm:col-start-4");
     expect(html).toContain("sm:col-start-5");
     expect(html).toContain("sm:col-start-6");
+    expect(html).toContain("sm:pr-[5px]");
     expect(html).not.toContain("sm:row-start-2 sm:mt-1");
     const time = html.match(/<time[^>]*>/u)?.[0];
     expect(time).toContain("whitespace-nowrap");
@@ -324,6 +325,10 @@ describe("conversation reader", () => {
     expect(html).toContain("sm:col-start-5 sm:row-start-1 sm:flex sm:w-7 sm:min-w-7");
     expect(html).toContain("bg-muted px-0.5 py-0.5 text-[11px]");
     expect(html).toContain(">(2)</span>");
+    expect(html).toContain('class="shrink-0 tabular-nums sm:hidden"');
+    expect(html).not.toContain(
+      'class="shrink-0 text-[11px] font-normal tabular-nums text-tertiary sm:hidden"'
+    );
     expect(html).not.toContain("bg-muted px-1.5 py-0.5");
     const starSlot = html.match(/<span class="col-start-3 row-start-2[^>]*>[\s\S]*?<\/span>/u)?.[0];
     expect(starSlot).toContain("self-end");
@@ -352,6 +357,7 @@ describe("conversation reader", () => {
       "shadow-[0_0_6px_1px_hsl(var(--message-row-surface)/0.14)]"
     );
     expect(compactLabelContainer).not.toContain("backdrop-blur");
+    expect(html).toContain("w-max shrink-0 leading-4");
     const labelButton = html.match(
       /<button[^>]*data-message-labels="desktop"[^>]*>[\s\S]*?<\/button>/u
     )?.[0];

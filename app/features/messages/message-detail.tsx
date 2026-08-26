@@ -268,13 +268,17 @@ export function MessageDetail({
       </div>
       <PullToRefresh className="min-h-0 flex-1" onRefresh={onRefresh}>
         {labels.length > 0 && onToggleLabel && canOrganizeLabels ? (
-          <div className="px-4 pt-4 sm:px-6" data-reader-labels>
+          <div className="flex justify-end px-4 pt-4 sm:px-6" data-reader-labels>
             <LabelMenu
-              align="start"
+              align="end"
               assigned={assignedLabels}
               canOrganizeLabels={canOrganizeLabels}
-              className="max-w-full overflow-hidden bg-muted/40 [@media(hover:hover)]:hover:bg-muted/60"
+              className={cn(
+                "max-w-full flex-row-reverse gap-1.5 overflow-hidden bg-muted/40 [&_svg]:-translate-y-px [@media(hover:hover)]:hover:bg-muted/60",
+                assignedLabels.length === 0 && "border border-dashed border-divider"
+              )}
               compactAssignedLabels={false}
+              emptyAssignedText="Add label"
               labels={labels}
               onToggle={onToggleLabel}
               showAssignedLabels
@@ -282,10 +286,10 @@ export function MessageDetail({
             />
           </div>
         ) : labels.length > 0 || assignedLabels.length > 0 ? (
-          <div className="px-4 pt-4 sm:px-6" data-reader-labels>
-            <span className="inline-flex h-auto min-h-0 w-fit max-w-full items-center gap-0.5 overflow-hidden rounded-full bg-muted/40 p-0.5 text-muted-foreground [&_svg]:size-3.5 [&_svg]:shrink-0">
+          <div className="flex justify-end px-4 pt-4 sm:px-6" data-reader-labels>
+            <span className="inline-flex h-auto min-h-0 w-fit max-w-full items-center gap-1.5 overflow-hidden rounded-full bg-muted/40 p-0.5 text-muted-foreground [&_svg]:size-3.5 [&_svg]:shrink-0">
+              <PiTag aria-hidden="true" className="pointer-events-none -translate-y-px" />
               <LabelStack labels={assignedLabels} />
-              <PiTag aria-hidden="true" className="pointer-events-none" />
             </span>
           </div>
         ) : null}
