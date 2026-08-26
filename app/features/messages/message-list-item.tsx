@@ -49,7 +49,7 @@ export function MessageListItem({
   return (
     <a
       className={cn(
-        "group grid w-full grid-cols-[2.5rem_minmax(0,1fr)_4rem] items-start gap-x-3 rounded-xl px-3 py-3 text-left text-[14px] leading-5 [--message-row-surface:var(--surface-list)] transition-colors focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring sm:grid-cols-[2rem_minmax(7rem,18%)_1rem_minmax(0,1fr)_1.75rem_4rem] sm:items-center sm:gap-x-1.5 sm:py-2 sm:text-[13px]",
+        "group grid w-full grid-cols-[2.5rem_minmax(0,1fr)_0_2.5rem] items-start gap-x-3 rounded-xl px-3 py-3 text-left text-[14px] leading-5 [--message-row-surface:var(--surface-list)] transition-colors focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring sm:grid-cols-[2rem_minmax(7rem,18%)_1rem_minmax(0,1fr)_1.75rem_auto_4rem] sm:items-center sm:gap-x-1.5 sm:py-2 sm:text-[13px]",
         isActive
           ? "bg-selected [--message-row-surface:var(--surface-selected)] [@media(hover:hover)]:hover:bg-selected"
           : "[@media(hover:hover)]:hover:bg-hover [@media(hover:hover)]:hover:[--message-row-surface:var(--surface-hover)]"
@@ -76,7 +76,7 @@ export function MessageListItem({
       >
         <AvatarFallback className="font-medium uppercase">{avatarInitial}</AvatarFallback>
       </Avatar>
-      <span className="col-start-3 row-start-2 flex shrink-0 self-end justify-self-end sm:col-start-1 sm:row-start-1 sm:self-center sm:justify-self-auto">
+      <span className="col-start-4 row-start-2 flex shrink-0 self-end justify-self-end sm:col-start-1 sm:row-start-1 sm:self-center sm:justify-self-auto">
         <button
           aria-label={conversation.isStarred ? "Unstar conversation" : "Star conversation"}
           aria-pressed={conversation.isStarred}
@@ -136,7 +136,7 @@ export function MessageListItem({
             className="pointer-events-none size-3.5 shrink-0 self-center text-tertiary sm:hidden"
           />
         ) : null}
-        <span className="min-w-0 flex-1 sm:pr-[5px]">
+        <span className="min-w-0 flex-1">
           <span
             className={cn(
               "block truncate sm:inline",
@@ -166,7 +166,7 @@ export function MessageListItem({
       {assignedLabels.length > 0 ? (
         <span
           className={cn(
-            "col-start-2 row-start-2 z-10 flex w-max items-center justify-end self-end justify-self-end overflow-visible sm:hidden",
+            "col-start-3 row-start-1 z-10 flex w-max items-center justify-end self-center justify-self-end overflow-visible sm:hidden",
             labelContainerClass
           )}
           data-message-labels="compact"
@@ -184,7 +184,7 @@ export function MessageListItem({
           assigned={assignedLabels}
           canOrganizeLabels={canOrganizeLabels}
           className={cn(
-            "z-10 hidden max-w-[75%] justify-self-end overflow-hidden [@media(hover:hover)]:hover:bg-[hsl(var(--message-row-surface))] [@media(hover:hover)]:hover:text-foreground/80 sm:col-start-4 sm:row-start-1 sm:inline-flex",
+            "z-10 hidden max-w-60 justify-self-end overflow-hidden [@media(hover:hover)]:hover:bg-[hsl(var(--message-row-surface))] [@media(hover:hover)]:hover:text-foreground/80 sm:col-start-6 sm:row-start-1 sm:inline-flex",
             labelContainerClass
           )}
           labels={labels}
@@ -195,7 +195,7 @@ export function MessageListItem({
       ) : assignedLabels.length > 0 ? (
         <span
           className={cn(
-            "z-10 hidden w-fit min-w-0 max-w-[75%] items-center justify-self-end overflow-hidden sm:col-start-4 sm:row-start-1 sm:flex",
+            "z-10 hidden w-fit min-w-0 max-w-60 items-center justify-self-end overflow-hidden sm:col-start-6 sm:row-start-1 sm:flex",
             labelContainerClass
           )}
           data-message-labels="desktop"
@@ -215,7 +215,7 @@ export function MessageListItem({
       </span>
       <time
         className={cn(
-          "col-start-3 row-start-1 shrink-0 whitespace-nowrap text-right text-[11px] tabular-nums sm:col-start-6 sm:row-start-1 sm:text-[12px]",
+          "col-start-3 row-start-2 z-10 shrink-0 self-start justify-self-end whitespace-nowrap bg-[hsl(var(--message-row-surface))] pl-1 text-right text-[11px] tabular-nums shadow-[-4px_0_4px_hsl(var(--message-row-surface))] sm:col-start-7 sm:row-start-1 sm:self-center sm:justify-self-auto sm:bg-transparent sm:pl-0 sm:text-[12px] sm:shadow-none",
           isUnread ? "font-medium text-foreground dark:text-white" : "text-muted-foreground"
         )}
       >

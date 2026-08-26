@@ -222,11 +222,12 @@ describe("conversation reader", () => {
     expect(html).not.toContain("max-w-[1200px]");
     const header = html.match(/<div[^>]*data-inbox-header-layout[^>]*>/u)?.[0];
     expect(header).toContain(
-      "sm:grid-cols-[2rem_minmax(7rem,18%)_1rem_minmax(0,1fr)_1.75rem_4rem]"
+      "sm:grid-cols-[2rem_minmax(7rem,18%)_1rem_minmax(0,1fr)_1.75rem_auto_4rem]"
     );
     expect(html).toContain(
-      "col-start-2 flex min-w-0 items-center justify-end sm:col-start-4 sm:row-start-1"
+      "col-start-2 flex min-w-0 items-center justify-end sm:col-start-6 sm:row-start-1"
     );
+    expect(html).toContain("sm:col-start-7 sm:row-start-1 sm:inline sm:justify-self-start");
   });
 
   it("labels the unread indicator and removes it once the message is read", () => {
@@ -295,10 +296,12 @@ describe("conversation reader", () => {
     );
 
     expect(html).toContain('data-message-avatar="mobile"');
-    expect(html).toContain("grid-cols-[2.5rem_minmax(0,1fr)_4rem]");
+    expect(html).toContain("grid-cols-[2.5rem_minmax(0,1fr)_0_2.5rem]");
     expect(html).not.toContain("grid-cols-[2.5rem_minmax(0,1fr)_5rem]");
     expect(html).toContain("rounded-xl px-3");
-    expect(html).toContain("sm:grid-cols-[2rem_minmax(7rem,18%)_1rem_minmax(0,1fr)_1.75rem_4rem]");
+    expect(html).toContain(
+      "sm:grid-cols-[2rem_minmax(7rem,18%)_1rem_minmax(0,1fr)_1.75rem_auto_4rem]"
+    );
     expect(html).not.toContain("sm:grid-cols-[2rem_minmax(7rem,18%)_minmax(0,1fr)_auto_4rem]");
     expect(html).toContain("sm:items-center");
     expect(html).not.toContain("row-start-3");
@@ -309,19 +312,23 @@ describe("conversation reader", () => {
     expect(html).toContain("sm:col-start-4");
     expect(html).toContain("sm:col-start-5");
     expect(html).toContain("sm:col-start-6");
-    expect(html).toContain("sm:pr-[5px]");
+    expect(html).toContain("sm:col-start-7");
+    expect(html).not.toContain("sm:pr-[5px]");
     expect(html).not.toContain("sm:row-start-2 sm:mt-1");
     const time = html.match(/<time[^>]*>/u)?.[0];
     expect(time).toContain("whitespace-nowrap");
+    expect(time).toContain("col-start-3 row-start-2");
+    expect(time).toContain("self-start justify-self-end");
+    expect(time).toContain("sm:col-start-7 sm:row-start-1 sm:self-center");
     expect(html).toContain("bg-blue-500/15");
     expect(html).toContain("text-blue-700");
     expect(html).toContain("text-[9px]");
     expect(html).toContain('aria-label="Labels: HR, Important"');
     expect(html).toContain("min-h-10");
     expect(html).toContain("min-h-0");
-    expect(html).toContain("col-start-2 row-start-2");
-    expect(html).toContain("self-end justify-self-end");
-    expect(html).toContain("sm:col-start-4 sm:row-start-1 sm:inline-flex");
+    expect(html).toContain("col-start-3 row-start-1");
+    expect(html).toContain("self-center justify-self-end");
+    expect(html).toContain("sm:col-start-6 sm:row-start-1 sm:inline-flex");
     expect(html).toContain("sm:col-start-5 sm:row-start-1 sm:flex sm:w-7 sm:min-w-7");
     expect(html).toContain("bg-muted px-0.5 py-0.5 text-[11px]");
     expect(html).toContain(">(2)</span>");
@@ -330,7 +337,7 @@ describe("conversation reader", () => {
       'class="shrink-0 text-[11px] font-normal tabular-nums text-tertiary sm:hidden"'
     );
     expect(html).not.toContain("bg-muted px-1.5 py-0.5");
-    const starSlot = html.match(/<span class="col-start-3 row-start-2[^>]*>[\s\S]*?<\/span>/u)?.[0];
+    const starSlot = html.match(/<span class="col-start-4 row-start-2[^>]*>[\s\S]*?<\/span>/u)?.[0];
     expect(starSlot).toContain("self-end");
     expect(starSlot).toContain("sm:self-center");
     expect(starSlot).toContain("items-end");
