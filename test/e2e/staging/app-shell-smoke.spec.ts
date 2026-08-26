@@ -95,7 +95,7 @@ test("deployed HQBase publishes the v2 Mail API OAuth resource", async ({ reques
   expect(provisionerSkill).toContain(`DELETE ${origin}/management/v1/agents/{agent-id}`);
 
   const retiredInstructions = await getSuccessfulResponseBody(request, "/agents.md");
-  expect(retiredInstructions).toContain("Settings → Connect AI agents");
+  expect(retiredInstructions).toContain("Open **Agents** in HQBase");
 });
 
 test("customer-managed OAuth starts directly with the exact staging callback", async ({

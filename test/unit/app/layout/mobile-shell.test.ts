@@ -53,8 +53,12 @@ const mcpConnectionDetails = readFileSync(
   new URL("../../../../app/features/mcp/connection-dialog.tsx", import.meta.url),
   "utf8"
 );
-const mcpSettings = readFileSync(
-  new URL("../../../../app/features/mcp/mcp-settings.tsx", import.meta.url),
+const connectedAppsPage = readFileSync(
+  new URL("../../../../app/features/connected-apps/connected-apps-page.tsx", import.meta.url),
+  "utf8"
+);
+const agentsPage = readFileSync(
+  new URL("../../../../app/features/agents/agents-page.tsx", import.meta.url),
   "utf8"
 );
 const threadComposeSurface = readFileSync(
@@ -83,43 +87,25 @@ describe("mobile application shell", () => {
     expect(composeForm).toContain("pb-[max(1rem,env(safe-area-inset-bottom))]");
   });
 
-  it("keeps account and agentic-mailbox connections in Settings", () => {
+  it("keeps delegated connections separate from machine identities", () => {
     expect(agentConnectionDetails).toContain('label="or"');
     expect(agentConnectionDetails).toContain('title="Skill + API"');
     expect(agentConnectionDetails).not.toContain('aria-label="Connection method"');
     expect(mcpConnectionDetails).toContain("text-base sm:text-xs");
     expect(mcpConnectionDetails).toContain('value="read-only"');
     expect(mcpConnectionDetails).toContain('value="mail-actions"');
-    expect(mcpSettings).toContain("/mcp/full");
-    expect(mcpSettings).toContain("/skills/hqbase-mail/SKILL.md");
-    expect(mcpSettings).toContain("/skills/hqbase-mailbox/SKILL.md");
-    expect(mcpSettings).toContain("/skills/hqbase-provisioner/SKILL.md");
-    expect(mcpSettings).toContain('value="your-account"');
-    expect(mcpSettings).toContain('value="agentic-mailbox"');
-    expect(mcpSettings).not.toContain('value="mailbox-agent"');
-    expect(mcpSettings).not.toContain('value="provisioner"');
-    expect(mcpSettings).toContain('profile="mailbox"');
-    expect(mcpSettings).toContain('profile="provisioner"');
-    expect(mcpSettings).toContain('label="Automate mailbox creation"');
-
-    const mailboxAgentIndex = mcpSettings.indexOf('title="Mailbox agent"');
-    const provisionerAgentIndex = mcpSettings.indexOf('title="Provisioner agent"');
-
-    expect(mailboxAgentIndex).toBeGreaterThan(-1);
-    expect(provisionerAgentIndex).toBeGreaterThan(mailboxAgentIndex);
-    expect(mcpSettings).toContain("<ConnectionDivider");
-    expect(mcpSettings).toContain("grid-cols-2");
+    expect(connectedAppsPage).toContain("/mcp/full");
+    expect(connectedAppsPage).toContain("/skills/hqbase-mail/SKILL.md");
+    expect(connectedAppsPage).toContain("Your connections");
+    expect(agentsPage).toContain('profile="mailbox"');
+    expect(agentsPage).toContain('profile="provisioner"');
   });
 
-  it("keeps agent connection in MCP settings instead of standalone navigation", () => {
-    expect(settingsPage).toContain("McpSettings");
-    expect(settingsPage).toContain('"mcp"');
-    expect(appShell).not.toContain("Connect MCP");
-    expect(appShell).not.toContain("Connect AI agent");
-    expect(mobileNavigation).not.toContain("Connect MCP");
-    expect(mobileNavigation).not.toContain("Connect AI agent");
-    expect(topBar).not.toContain("Connect MCP");
-    expect(topBar).not.toContain("Connect AI agent");
+  it("removes agent connections from Settings", () => {
+    expect(settingsPage).not.toContain("McpSettings");
+    expect(settingsPage).not.toContain("AgentSettings");
+    expect(appShell).toContain("activeAgentTab");
+    expect(mobileNavigation).toContain("onAgentTabChange");
   });
 
   it("uses a compact desktop mailbox dropdown with agent mailboxes last", () => {
@@ -153,11 +139,12 @@ describe("mobile application shell", () => {
     expect(styles).toContain("overflow: hidden");
   });
 
-  it("uses the inbox content width for Contacts and Settings", () => {
+  it("uses the inbox content width for Contacts, Agents, and Settings", () => {
     expect(settingsPage).toContain("max-w-[960px]");
     expect(settingsPage).not.toContain("max-w-6xl");
     expect(contactsPage).toContain("max-w-[960px]");
     expect(contactsPage).not.toContain("max-w-[1200px]");
+    expect(agentsPage).toContain("max-w-[960px]");
     expect(contactViews).toContain("max-w-[960px]");
     expect(contactViews).not.toContain("max-w-3xl");
   });

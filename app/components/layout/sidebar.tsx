@@ -8,13 +8,13 @@ import type { MailConnectionStatus } from "@/features/events/types";
 import type { Mailbox } from "@/features/mailboxes/types";
 import type { UnreadCounts } from "@/features/notifications/types";
 import { cn } from "@/lib/cn";
-import type { FolderId, SettingsTabId } from "@/lib/routes";
+import type { AgentTabId, FolderId, SettingsTabId } from "@/lib/routes";
 import { appRoutePath } from "@/lib/routes";
 import { AccountMenu } from "./account-menu";
 import { quickAccess } from "./sidebar/constants";
 import { MailConnectionIndicator } from "./sidebar/mail-connection-indicator";
 import { isModifiedNavigation } from "./sidebar/sidebar-helpers";
-import { ContactsNav, MailNav, SettingsNav } from "./sidebar/sidebar-nav";
+import { AgentsNav, ContactsNav, MailNav, SettingsNav } from "./sidebar/sidebar-nav";
 
 type SidebarProps = {
   activeFolder: FolderId;
@@ -33,9 +33,11 @@ type SidebarProps = {
   onSignedOut: () => void;
   variant?: "desktop" | "drawer";
   sidebarCollapsed?: boolean;
+  activeAgentTab?: AgentTabId | undefined;
   activeSettingsTab?: SettingsTabId | undefined;
   canManage?: boolean | undefined;
   connectionStatus?: MailConnectionStatus | undefined;
+  onAgentTabChange?: ((tab: AgentTabId) => void) | undefined;
   onSettingsTabChange?: ((tab: SettingsTabId) => void) | undefined;
   onToggleSidebar?: () => void;
 };
@@ -53,9 +55,11 @@ export function Sidebar({
   onSignedOut,
   variant = "desktop",
   sidebarCollapsed = false,
+  activeAgentTab,
   activeSettingsTab,
   canManage = false,
   connectionStatus = "connecting",
+  onAgentTabChange,
   onSettingsTabChange,
   onToggleSidebar
 }: SidebarProps): React.ReactElement {
@@ -95,7 +99,7 @@ export function Sidebar({
             {quickAccess.map(({ folder, icon: Icon, label }) => {
               const isActive =
                 folder === "inbox"
-                  ? activeFolder !== "settings" && activeFolder !== "contacts"
+                  ? !["settings", "contacts", "agents"].includes(activeFolder)
                   : activeFolder === folder;
               return (
                 <Button
@@ -118,9 +122,11 @@ export function Sidebar({
                     href={
                       folder === "settings"
                         ? appRoutePath({ kind: "settings", tab: "mailboxes" })
-                        : folder === "contacts"
-                          ? appRoutePath({ kind: "contacts", contactId: null })
-                          : appRoutePath({ kind: "mail", folder, messageId: null })
+                        : folder === "agents"
+                          ? appRoutePath({ kind: "agents", tab: "connections" })
+                          : folder === "contacts"
+                            ? appRoutePath({ kind: "contacts", contactId: null })
+                            : appRoutePath({ kind: "mail", folder, messageId: null })
                     }
                     onClick={(event) => {
                       if (isModifiedNavigation(event)) return;
@@ -144,9 +150,11 @@ export function Sidebar({
               <span className="truncate text-sm font-semibold leading-none tracking-tight">
                 {activeFolder === "settings"
                   ? "Settings"
-                  : activeFolder === "contacts"
-                    ? "Contacts"
-                    : "Mail"}
+                  : activeFolder === "agents"
+                    ? "Agents"
+                    : activeFolder === "contacts"
+                      ? "Contacts"
+                      : "Mail"}
               </span>
               <MailConnectionIndicator status={connectionStatus} />
             </div>
@@ -180,6 +188,14 @@ export function Sidebar({
               isDrawer={isDrawer}
               onCompose={onCompose}
               onSettingsTabChange={onSettingsTabChange}
+            />
+          ) : activeFolder === "agents" ? (
+            <AgentsNav
+              activeAgentTab={activeAgentTab}
+              canManage={canManage}
+              isDrawer={isDrawer}
+              onAgentTabChange={onAgentTabChange}
+              onCompose={onCompose}
             />
           ) : activeFolder === "contacts" ? (
             <ContactsNav

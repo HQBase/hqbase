@@ -80,7 +80,7 @@ description: Use human OAuth to operate mail available to a signed-in person in 
 
 # HQBase Mail for Your Account
 
-Use this skill when a person asks an AI agent to work with mail available to their HQBase account. For a machine identity, use the separate mailbox-agent or provisioner skill shown in **Settings → Connect AI agents**.
+Use this skill when a person asks an AI agent to work with mail available to their HQBase account. For a machine identity, use the separate mailbox-agent or provisioning skill shown under **Agents**.
 
 ## Instance
 
@@ -254,7 +254,7 @@ JSON errors contain a stable \`error.code\` and human-readable \`error.message\`
 function buildRetirementNotice(): string {
   return `# HQBase AI connections
 
-This file is retired. Open **Settings → Connect AI agents** in HQBase to choose the correct Agent Skill or MCP server.
+This file is retired. Open **Agents** in HQBase to choose the correct Agent Skill or MCP server.
 `;
 }
 

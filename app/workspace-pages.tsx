@@ -1,5 +1,6 @@
 import * as React from "react";
 
+import { AgentsPage } from "@/features/agents/agents-page";
 import type { CurrentUser } from "@/features/auth/types";
 import { ContactsPage } from "@/features/contacts/contacts-page";
 import { DraftsPage } from "@/features/drafts/drafts-page";
@@ -12,7 +13,7 @@ import { SettingsPage } from "@/features/settings/settings-page";
 import type { SetupStatus } from "@/features/setup/types";
 import type { useUpdateMonitor } from "@/features/updates/use-update-monitor";
 import type { WorkspaceUser } from "@/features/users/types";
-import type { AppRoute, FolderId, MailFolderId, SettingsTabId } from "@/lib/routes";
+import type { AgentTabId, AppRoute, FolderId, MailFolderId, SettingsTabId } from "@/lib/routes";
 import type { useAppRoute } from "@/lib/use-app-route";
 
 const DraftComposeDialog = React.lazy(() =>
@@ -23,6 +24,7 @@ const DraftComposeDialog = React.lazy(() =>
 
 type WorkspacePagesProps = {
   activeFolder: FolderId;
+  agentTab: AgentTabId;
   contentMailboxes: Mailbox[];
   deletedMailboxes: Mailbox[];
   draftState: ReturnType<typeof useDrafts>;
@@ -48,6 +50,7 @@ type WorkspacePagesProps = {
 
 export function WorkspacePages({
   activeFolder,
+  agentTab,
   contentMailboxes,
   deletedMailboxes,
   draftState,
@@ -85,7 +88,16 @@ export function WorkspacePages({
 
   return (
     <>
-      {activeFolder === "contacts" ? (
+      {activeFolder === "agents" ? (
+        <AgentsPage
+          activeTab={agentTab}
+          canManage={user.role === "owner" || user.role === "admin"}
+          domains={setup.domains}
+          mailboxes={mailboxes}
+          user={user}
+          onChanged={onReload}
+        />
+      ) : activeFolder === "contacts" ? (
         <ContactsPage
           selectedId={selectedContactId}
           onBack={() => navigate({ kind: "contacts", contactId: null })}

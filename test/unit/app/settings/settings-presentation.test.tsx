@@ -7,7 +7,6 @@ import { formatMailboxAccessSummary } from "@/features/mailbox-access/mailbox-ac
 import { MailboxSettings } from "@/features/mailboxes/mailbox-settings";
 import { MailboxSelectionBar } from "@/features/mailboxes/mailbox-table";
 import type { Mailbox } from "@/features/mailboxes/types";
-import { McpSettings } from "@/features/mcp/mcp-settings";
 import { SettingsPage } from "@/features/settings/settings-page";
 import { RoleGuidanceCopy } from "@/features/users/role-guidance";
 import type { WorkspaceUser } from "@/features/users/types";
@@ -84,33 +83,6 @@ const notifications = {
 };
 
 describe("settings presentation", () => {
-  it("offers account and agentic-mailbox connection paths in Settings", () => {
-    const html = renderToStaticMarkup(
-      <McpSettings
-        canManage
-        domains={[{ id: "domain-1", name: "example.com", isEnabled: true }]}
-        mailboxes={[mailbox]}
-        onChanged={async () => undefined}
-        user={{
-          defaultFromMailboxId: null,
-          email: "owner@example.com",
-          id: "user-1",
-          name: "Owner",
-          passwordSetupRequired: false,
-          role: "owner"
-        }}
-      />
-    );
-
-    expect(html).toContain("Connect AI agents");
-    expect(html).toContain("Your account");
-    expect(html).toContain("Agentic mailbox");
-    expect(html).toContain("MCP");
-    expect(html).toContain("Skill + API");
-    expect(html).toContain(">or<");
-    expect(html).not.toContain('aria-label="Connection method"');
-  });
-
   it("renders mailbox content at the top level and opens creation from a dialog trigger", () => {
     const html = renderToStaticMarkup(
       <MailboxSettings

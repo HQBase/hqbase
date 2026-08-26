@@ -428,7 +428,7 @@ describe("HQBase Mail API", () => {
       const retired = await SELF.fetch(`${origin}${retiredPath}`, { redirect: "manual" });
       expect(retired.status).toBe(200);
       expect(retired.headers.get("location")).toBeNull();
-      expect(await retired.text()).toContain("Open **Settings → Connect AI agents** in HQBase");
+      expect(await retired.text()).toContain("Open **Agents** in HQBase");
     }
   });
 

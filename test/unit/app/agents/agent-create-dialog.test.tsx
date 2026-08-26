@@ -33,13 +33,13 @@ describe("agent creation form", () => {
         <AgentCreateForm
           domains={[{ id: "dom_example", name: "example.com", isEnabled: true }]}
           mailboxes={[mailbox]}
+          profile="mailbox"
           onCreated={() => undefined}
         />
       </Dialog>
     );
 
-    expect(view.container.textContent).toContain("Mailbox agent");
-    expect(view.container.textContent).toContain("Provisioner");
+    expect(view.container.textContent).toContain("Create mailbox agent");
     expect(view.container.textContent).toContain("Full mailbox access");
     expect(view.container.textContent).toContain("all current and future mail");
     expect(view.container.textContent).toContain("Handle mail");
@@ -52,19 +52,10 @@ describe("agent creation form", () => {
         <AgentCreateForm
           domains={[{ id: "dom_example", name: "example.com", isEnabled: true }]}
           mailboxes={[mailbox]}
+          profile="provisioner"
           onCreated={() => undefined}
         />
       </Dialog>
-    );
-    document.body.appendChild(view.container);
-
-    const provisioner = Array.from(view.container.querySelectorAll("button")).find(
-      (button) => button.textContent === "Provisioner"
-    );
-    await flushHookEffects(() =>
-      provisioner?.dispatchEvent(
-        new MouseEvent("mousedown", { bubbles: true, button: 0, ctrlKey: false })
-      )
     );
 
     expect(view.container.textContent).toContain("Allowed domain");
@@ -89,7 +80,7 @@ describe("agent creation form", () => {
     );
 
     expect(view.container.querySelector('[role="tablist"]')).toBeNull();
-    expect(view.container.textContent).toContain("Create provisioner agent");
+    expect(view.container.textContent).toContain("Create provisioning key");
     expect(view.container.textContent).toContain("Allowed domain");
     expect(view.container.textContent).toContain("Trusted provisioning");
     await view.unmount();
@@ -117,7 +108,7 @@ describe("agent creation form", () => {
     const onCreated = vi.fn();
     const view = await renderComponent(
       <Dialog>
-        <AgentCreateForm domains={[]} mailboxes={[]} onCreated={onCreated} />
+        <AgentCreateForm domains={[]} mailboxes={[]} profile="mailbox" onCreated={onCreated} />
       </Dialog>
     );
     document.body.appendChild(view.container);

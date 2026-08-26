@@ -31,7 +31,8 @@ import { SettingsSection } from "@/features/settings/settings-section";
 import { AgentCreateDialog } from "./agent-create-dialog";
 import { AgentCredentialDialog, type AgentCredentialReveal } from "./agent-credential-dialog";
 import { listAgents, rotateAgentCredential, setAgentActive } from "./api";
-import type { AgentCredentialResult, ManagedAgent } from "./types";
+import { AgentSkillDetails } from "./connection-dialog";
+import type { AgentCredentialResult, AgentProfile, ManagedAgent } from "./types";
 
 type DomainOption = { id: string; name: string; isEnabled: boolean };
 type Confirmation = { action: "disable" | "rotate"; agent: ManagedAgent };
@@ -41,10 +42,12 @@ type CredentialState = AgentCredentialReveal & { refreshWorkspace: boolean };
 export function AgentSettings({
   domains,
   mailboxes,
+  profile,
   onChanged
 }: {
   domains: DomainOption[];
   mailboxes: Mailbox[];
+  profile: AgentProfile;
   onChanged: () => Promise<void>;
 }): React.ReactElement {
   const [agents, setAgents] = React.useState<ManagedAgent[]>([]);
@@ -52,21 +55,31 @@ export function AgentSettings({
   const [confirmation, setConfirmation] = React.useState<Confirmation | null>(null);
   const [pending, setPending] = React.useState<PendingAction | null>(null);
   const [credential, setCredential] = React.useState<CredentialState | null>(null);
+  const skillPath =
+    profile === "mailbox"
+      ? "/skills/hqbase-mailbox/SKILL.md"
+      : "/skills/hqbase-provisioner/SKILL.md";
+  const [skillUrl, setSkillUrl] = React.useState(skillPath);
+  const skillUrlId = React.useId();
 
   const refresh = React.useCallback(async () => {
     setLoading(true);
     try {
-      setAgents(await listAgents());
+      setAgents((await listAgents()).filter((agent) => agent.profile === profile));
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Agents could not be loaded.");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [profile]);
 
   React.useEffect(() => {
     void refresh();
   }, [refresh]);
+
+  React.useEffect(() => {
+    setSkillUrl(new URL(skillPath, window.location.origin).toString());
+  }, [skillPath]);
 
   function updateAgent(agent: ManagedAgent): void {
     setAgents((current) => {
@@ -118,7 +131,7 @@ export function AgentSettings({
         toast.success(
           agent.profile === "mailbox"
             ? "Agent disabled. Its mailbox remains active."
-            : "Provisioner disabled."
+            : "Provisioning key disabled."
         );
       }
       setConfirmation(null);
@@ -144,18 +157,42 @@ export function AgentSettings({
     <>
       <SettingsSection
         action={
-          <AgentCreateDialog domains={domains} mailboxes={mailboxes} onCreated={handleCreated} />
+          <AgentCreateDialog
+            domains={domains}
+            mailboxes={mailboxes}
+            profile={profile}
+            onCreated={handleCreated}
+          />
         }
-        description="Give software a restricted mailbox or permission to create mailboxes."
-        title="Agents"
+        description={
+          profile === "mailbox"
+            ? "Give software its own identity and access to one exact mailbox."
+            : "Let trusted control-plane software create and deprovision mailbox agents."
+        }
+        title={profile === "mailbox" ? "Mailbox agents" : "Provisioning keys"}
       >
-        <AgentTable
-          agents={agents}
-          loading={loading}
-          pending={pending}
-          onConfirm={setConfirmation}
-          onReactivate={(agent) => void reactivate(agent)}
-        />
+        <div className="flex flex-col gap-6">
+          <AgentSkillDetails
+            flat
+            description={
+              profile === "mailbox"
+                ? "Give this public skill to software that uses a mailbox-agent credential."
+                : "Give this public skill only to trusted provisioning software."
+            }
+            nextStep="Create the identity, then give its one-time credential and this skill to the service that will run it."
+            skillUrl={skillUrl}
+            skillUrlId={skillUrlId}
+            title={profile === "mailbox" ? "Mailbox agent skill" : "Provisioning skill"}
+          />
+          <AgentTable
+            agents={agents}
+            loading={loading}
+            pending={pending}
+            profile={profile}
+            onConfirm={setConfirmation}
+            onReactivate={(agent) => void reactivate(agent)}
+          />
+        </div>
       </SettingsSection>
 
       <AgentCredentialDialog reveal={credential} onDone={() => void finishCredentialReveal()} />
@@ -164,14 +201,18 @@ export function AgentSettings({
         <DialogContent className="w-[min(92vw,480px)]">
           <DialogHeader>
             <DialogTitle>
-              {confirmation?.action === "rotate" ? "Rotate credential?" : "Disable agent?"}
+              {confirmation?.action === "rotate"
+                ? "Rotate credential?"
+                : confirmation?.agent.profile === "provisioner"
+                  ? "Disable provisioning key?"
+                  : "Disable mailbox agent?"}
             </DialogTitle>
             <DialogDescription>
               {confirmation?.action === "rotate"
                 ? "The current credential will stop working immediately."
                 : confirmation?.agent.profile === "mailbox"
                   ? "The mailbox and address will keep receiving mail. Existing messages and audit history will remain."
-                  : "This provisioner will no longer be able to create mailboxes."}
+                  : "This provisioning key will no longer be able to create mailboxes."}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -186,7 +227,11 @@ export function AgentSettings({
               variant={confirmation?.action === "disable" ? "destructive" : "default"}
               onClick={() => void confirmAction()}
             >
-              {confirmation?.action === "rotate" ? "Rotate credential" : "Disable agent"}
+              {confirmation?.action === "rotate"
+                ? "Rotate credential"
+                : confirmation?.agent.profile === "provisioner"
+                  ? "Disable key"
+                  : "Disable agent"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -199,12 +244,14 @@ function AgentTable({
   agents,
   loading,
   pending,
+  profile,
   onConfirm,
   onReactivate
 }: {
   agents: ManagedAgent[];
   loading: boolean;
   pending: PendingAction | null;
+  profile: AgentProfile;
   onConfirm: (confirmation: Confirmation) => void;
   onReactivate: (agent: ManagedAgent) => void;
 }): React.ReactElement {
@@ -213,7 +260,6 @@ function AgentTable({
       <TableHeader className="bg-muted/40">
         <TableRow className="[@media(hover:hover)]:hover:bg-transparent">
           <TableHead>Name</TableHead>
-          <TableHead className="hidden w-36 sm:table-cell">Type</TableHead>
           <TableHead>Access</TableHead>
           <TableHead className="w-24">Status</TableHead>
           <TableHead className="w-28 text-right">
@@ -224,15 +270,15 @@ function AgentTable({
       <TableBody>
         {loading ? (
           <TableRow>
-            <TableCell className="h-24 text-center text-muted-foreground" colSpan={5}>
-              Loading agents…
+            <TableCell className="h-24 text-center text-muted-foreground" colSpan={4}>
+              Loading {profile === "mailbox" ? "mailbox agents" : "provisioning keys"}…
             </TableCell>
           </TableRow>
         ) : null}
         {!loading && agents.length === 0 ? (
           <TableRow>
-            <TableCell className="h-24 text-center text-muted-foreground" colSpan={5}>
-              No agents yet.
+            <TableCell className="h-24 text-center text-muted-foreground" colSpan={4}>
+              No {profile === "mailbox" ? "mailbox agents" : "provisioning keys"} yet.
             </TableCell>
           </TableRow>
         ) : null}
@@ -245,12 +291,6 @@ function AgentTable({
                 <TableRow key={agent.id}>
                   <TableCell>
                     <span className="block font-medium">{agent.name}</span>
-                    <span className="mt-0.5 block text-xs text-muted-foreground sm:hidden">
-                      {agent.profile === "mailbox" ? "Mailbox agent" : "Provisioner"}
-                    </span>
-                  </TableCell>
-                  <TableCell className="hidden sm:table-cell">
-                    {agent.profile === "mailbox" ? "Mailbox agent" : "Provisioner"}
                   </TableCell>
                   <TableCell>
                     <AgentScope agent={agent} />

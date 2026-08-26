@@ -1,12 +1,10 @@
 import type * as React from "react";
-import { AgentSettings } from "@/features/agents/agent-settings";
 import type { CurrentUser } from "@/features/auth/types";
 import { DomainSettings } from "@/features/domains/domain-settings";
 import { LabelSettings } from "@/features/labels/label-settings";
 import type { MailLabel } from "@/features/labels/types";
 import { MailboxSettings } from "@/features/mailboxes/mailbox-settings";
 import type { Mailbox } from "@/features/mailboxes/types";
-import { McpSettings } from "@/features/mcp/mcp-settings";
 import { NotificationSettings } from "@/features/notifications/notification-settings";
 import type { NotificationController } from "@/features/notifications/types";
 import { DebugSettings } from "@/features/settings/debug-settings";
@@ -74,9 +72,6 @@ export function SettingsPage({
             onChanged={onRefresh}
           />
         ) : null}
-        {activeTab === "agents" && canManage ? (
-          <AgentSettings domains={setup.domains} mailboxes={mailboxes} onChanged={onRefresh} />
-        ) : null}
         {activeTab === "users" ? (
           canManage ? (
             <UserSettings
@@ -100,15 +95,6 @@ export function SettingsPage({
         ) : null}
         {activeTab === "signatures" ? (
           <SignatureSettings domains={setup.domains} mailboxes={mailboxes} user={currentUser} />
-        ) : null}
-        {activeTab === "mcp" ? (
-          <McpSettings
-            canManage={canManage}
-            domains={setup.domains}
-            mailboxes={mailboxes}
-            user={currentUser}
-            onChanged={onRefresh}
-          />
         ) : null}
         {activeTab === "updates" && canManage ? (
           <UpdateSettings

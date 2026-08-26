@@ -18,5 +18,11 @@ describe("global search destinations", () => {
       expect.objectContaining({ id: "mailboxes" }),
       expect.objectContaining({ id: "inbox" })
     ]);
+    expect(searchDestinations("oauth", "member", 5)).toEqual([
+      expect.objectContaining({ id: "connected-apps", path: "/agents/connections" })
+    ]);
+    expect(searchDestinations("provision", "admin", 5)).toEqual([
+      expect.objectContaining({ id: "provisioning-keys", path: "/agents/provisioning" })
+    ]);
   });
 });

@@ -14,6 +14,7 @@ import { TopBar } from "./top-bar";
 
 type AppShellProps = {
   activeFolder: FolderId;
+  activeAgentTab?: import("@/lib/routes").AgentTabId | undefined;
   activeSettingsTab?: import("@/lib/routes").SettingsTabId | undefined;
   canManage?: boolean | undefined;
   connectionStatus: MailConnectionStatus;
@@ -28,6 +29,7 @@ type AppShellProps = {
   unread: UnreadCounts;
   draftCount: number;
   onCompose: () => void;
+  onAgentTabChange?: ((tab: import("@/lib/routes").AgentTabId) => void) | undefined;
   onFolderChange: (folder: FolderId) => void;
   onSettingsTabChange?: ((tab: import("@/lib/routes").SettingsTabId) => void) | undefined;
   onMailboxChange: (mailboxId: string) => void;
@@ -65,6 +67,7 @@ export function AppShell(props: AppShellProps): React.ReactElement {
         >
           <Sidebar
             activeFolder={props.activeFolder}
+            activeAgentTab={props.activeAgentTab}
             activeSettingsTab={props.activeSettingsTab}
             canManage={props.canManage}
             connectionStatus={props.connectionStatus}
@@ -74,6 +77,7 @@ export function AppShell(props: AppShellProps): React.ReactElement {
             unread={props.unread}
             user={props.user}
             onCompose={props.onCompose}
+            onAgentTabChange={props.onAgentTabChange}
             onFolderChange={props.onFolderChange}
             onSettingsTabChange={props.onSettingsTabChange}
             onSignedOut={props.onSignedOut}
@@ -103,6 +107,7 @@ export function AppShell(props: AppShellProps): React.ReactElement {
 
 function ShellContent({
   activeFolder,
+  activeAgentTab,
   activeSettingsTab,
   canManage,
   children,
@@ -117,6 +122,7 @@ function ShellContent({
   updateStatus,
   user,
   onCompose,
+  onAgentTabChange,
   onFolderChange,
   onMailboxChange,
   onOpenUpdates,
@@ -135,6 +141,7 @@ function ShellContent({
     <div className="flex h-full min-w-0 flex-1 flex-col">
       <TopBar
         activeFolder={activeFolder}
+        activeAgentTab={activeAgentTab}
         activeSettingsTab={activeSettingsTab}
         canManage={canManage}
         connectionStatus={connectionStatus}
@@ -146,6 +153,7 @@ function ShellContent({
         user={user}
         sidebarCollapsed={sidebarCollapsed}
         onCompose={onCompose}
+        onAgentTabChange={onAgentTabChange}
         onFolderChange={onFolderChange}
         onMailboxChange={onMailboxChange}
         onSearchChange={onSearchChange}

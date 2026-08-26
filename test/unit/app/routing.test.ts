@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { type AppRoute, appRoutePath, mailFolders, readAppRoute, settingsTabs } from "@/lib/routes";
+import {
+  type AppRoute,
+  agentTabs,
+  appRoutePath,
+  mailFolders,
+  readAppRoute,
+  settingsTabs
+} from "@/lib/routes";
 
 describe("application routing", () => {
   it("gives every mail folder a canonical route", () => {
@@ -42,9 +49,14 @@ describe("application routing", () => {
     expect(readAppRoute(appRoutePath(route))).toEqual(route);
   });
 
-  it("gives agent management its own settings route", () => {
-    expect(readAppRoute("/settings/agents")).toEqual({ kind: "settings", tab: "agents" });
-    expect(appRoutePath({ kind: "settings", tab: "agents" })).toBe("/settings/agents");
+  it("gives every Agents page a canonical route", () => {
+    for (const tab of agentTabs) {
+      const path = `/agents/${tab}`;
+      expect(readAppRoute(path)).toEqual({ kind: "agents", tab });
+      expect(appRoutePath(readAppRoute(path))).toBe(path);
+    }
+    expect(readAppRoute("/settings/mcp")).toEqual({ kind: "agents", tab: "connections" });
+    expect(readAppRoute("/settings/agents")).toEqual({ kind: "agents", tab: "mailboxes" });
   });
 
   it("keeps OAuth return aliases and the retired General tab compatible", () => {

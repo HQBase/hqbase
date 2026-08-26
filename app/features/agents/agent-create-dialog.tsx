@@ -17,7 +17,6 @@ import { DropdownSelect } from "@/components/ui/dropdown-select";
 import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { Mailbox } from "@/features/mailboxes/types";
 import { createAgent } from "./api";
 import type {
@@ -39,16 +38,11 @@ export function AgentCreateDialog({
 }: {
   domains: AgentDomainOption[];
   mailboxes: Mailbox[];
-  profile?: AgentProfile;
+  profile: AgentProfile;
   onCreated: (result: AgentCredentialResult) => void;
 }): React.ReactElement {
   const [open, setOpen] = React.useState(false);
-  const createLabel =
-    profile === "mailbox"
-      ? "Create mailbox agent"
-      : profile === "provisioner"
-        ? "Create provisioner agent"
-        : "Create agent";
+  const createLabel = profile === "mailbox" ? "Create mailbox agent" : "Create provisioning key";
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -62,7 +56,7 @@ export function AgentCreateDialog({
         <AgentCreateForm
           domains={domains}
           mailboxes={mailboxes}
-          {...(profile ? { profile } : {})}
+          profile={profile}
           onCreated={(result) => {
             setOpen(false);
             onCreated(result);
@@ -76,17 +70,16 @@ export function AgentCreateDialog({
 export function AgentCreateForm({
   domains,
   mailboxes,
-  profile: fixedProfile,
+  profile,
   onCreated
 }: {
   domains: AgentDomainOption[];
   mailboxes: Mailbox[];
-  profile?: AgentProfile;
+  profile: AgentProfile;
   onCreated: (result: AgentCredentialResult) => void;
 }): React.ReactElement {
   const enabledDomains = domains.filter((domain) => domain.isEnabled);
   const activeMailboxes = mailboxes.filter((mailbox) => mailbox.isActive);
-  const [profile, setProfile] = React.useState<AgentProfile>(fixedProfile ?? "mailbox");
   const [name, setName] = React.useState("");
   const [mailboxChoice, setMailboxChoice] = React.useState(newMailboxValue);
   const [address, setAddress] = React.useState("");
@@ -151,13 +144,13 @@ export function AgentCreateForm({
     <>
       <DialogHeader>
         <DialogTitle>
-          {fixedProfile === "mailbox"
-            ? "Create mailbox agent"
-            : fixedProfile === "provisioner"
-              ? "Create provisioner agent"
-              : "Create agent"}
+          {profile === "mailbox" ? "Create mailbox agent" : "Create provisioning key"}
         </DialogTitle>
-        <DialogDescription>Give software restricted access to HQBase.</DialogDescription>
+        <DialogDescription>
+          {profile === "provisioner"
+            ? "Give trusted software restricted provisioning access to HQBase."
+            : "Give software restricted access to HQBase."}
+        </DialogDescription>
       </DialogHeader>
       <form className="flex flex-col gap-5" onSubmit={(event) => void submit(event)}>
         <FieldGroup>
@@ -174,15 +167,8 @@ export function AgentCreateForm({
           </Field>
         </FieldGroup>
 
-        <Tabs value={profile} onValueChange={(value) => setProfile(value as AgentProfile)}>
-          {fixedProfile ? null : (
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="mailbox">Mailbox agent</TabsTrigger>
-              <TabsTrigger value="provisioner">Provisioner</TabsTrigger>
-            </TabsList>
-          )}
-
-          <TabsContent className="mt-5" value="mailbox">
+        {profile === "mailbox" ? (
+          <div>
             <FieldGroup>
               <Field>
                 <FieldLabel>Mailbox</FieldLabel>
@@ -248,9 +234,9 @@ export function AgentCreateForm({
                 {selectedMailbox?.address ?? "this mailbox"}.
               </AlertDescription>
             </Alert>
-          </TabsContent>
-
-          <TabsContent className="mt-5" value="provisioner">
+          </div>
+        ) : (
+          <div>
             <FieldGroup>
               <Field>
                 <FieldLabel>Allowed domain</FieldLabel>
@@ -266,7 +252,7 @@ export function AgentCreateForm({
                 />
                 {enabledDomains.length === 0 ? (
                   <FieldDescription>
-                    Enable an email domain before creating a provisioner.
+                    Enable an email domain before creating a provisioning key.
                   </FieldDescription>
                 ) : null}
               </Field>
@@ -287,14 +273,14 @@ export function AgentCreateForm({
               <PiWarning />
               <AlertTitle>Trusted provisioning</AlertTitle>
               <AlertDescription>
-                This agent can create up to {mailboxLimit || "0"} mailboxes
+                This key can create up to {mailboxLimit || "0"} mailboxes
                 {selectedDomain ? ` on ${selectedDomain.name}` : " on the selected domain"}. It
                 receives each new mailbox agent credential. Its own credential cannot call the Mail
                 API. Keep it in a trusted control-plane service.
               </AlertDescription>
             </Alert>
-          </TabsContent>
-        </Tabs>
+          </div>
+        )}
 
         <DialogFooter>
           <DialogClose asChild>
@@ -304,7 +290,7 @@ export function AgentCreateForm({
           </DialogClose>
           <Button disabled={pending || !canSubmit} type="submit">
             {pending ? <Spinner data-icon="inline-start" /> : null}
-            {pending ? "Creating…" : fixedProfile ? "Create" : "Create agent"}
+            {pending ? "Creating…" : "Create"}
           </Button>
         </DialogFooter>
       </form>

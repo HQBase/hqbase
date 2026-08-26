@@ -38,7 +38,7 @@ describe("agent credential reveal", () => {
       </Dialog>
     );
 
-    expect(html).toContain("Provisioner skill");
+    expect(html).toContain("Provisioning skill");
     expect(html).toContain("/skills/hqbase-provisioner/SKILL.md");
     expect(html).not.toContain("/skills/hqbase-mailbox/SKILL.md");
   });

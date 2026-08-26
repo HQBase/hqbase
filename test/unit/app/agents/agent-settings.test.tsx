@@ -55,28 +55,25 @@ afterEach(() => {
 });
 
 describe("agent settings", () => {
-  it("lists mailbox and provisioner agents with their scopes and status", async () => {
+  it("keeps mailbox agents separate from provisioning keys", async () => {
     vi.mocked(listAgents).mockResolvedValue([mailboxAgent, provisioner]);
     const view = await renderComponent(
       <AgentSettings
         domains={[{ id: "dom_example", name: "agents.example.com", isEnabled: true }]}
         mailboxes={[]}
+        profile="mailbox"
         onChanged={async () => undefined}
       />
     );
     document.body.appendChild(view.container);
     await flushHookEffects();
 
-    expect(view.container.textContent).toContain("Create agent");
+    expect(view.container.textContent).toContain("Create mailbox agent");
     expect(view.container.textContent).toContain("Support assistant");
     expect(view.container.textContent).toContain("support@example.com");
     expect(view.container.textContent).toContain("Handle mail");
-    expect(view.container.textContent).toContain("Browser provisioner");
-    expect(view.container.textContent).toContain("agents.example.com");
-    expect(view.container.textContent).toContain("3 of 20 mailboxes");
+    expect(view.container.textContent).not.toContain("Browser provisioner");
     expect(view.container.textContent).toContain("Active");
-    expect(view.container.textContent).toContain("Disabled");
-    expect(view.container.textContent).toContain("Reactivate");
     expect(
       view.container.querySelector('[aria-label="Actions for Support assistant"]')
     ).not.toBeNull();
@@ -90,7 +87,12 @@ describe("agent settings", () => {
       credential: "hqb_agent_reactivated"
     });
     const view = await renderComponent(
-      <AgentSettings domains={[]} mailboxes={[]} onChanged={async () => undefined} />
+      <AgentSettings
+        domains={[]}
+        mailboxes={[]}
+        profile="provisioner"
+        onChanged={async () => undefined}
+      />
     );
     document.body.appendChild(view.container);
     await flushHookEffects();
@@ -125,7 +127,12 @@ describe("agent settings", () => {
       }
     ]);
     const view = await renderComponent(
-      <AgentSettings domains={[]} mailboxes={[]} onChanged={async () => undefined} />
+      <AgentSettings
+        domains={[]}
+        mailboxes={[]}
+        profile="mailbox"
+        onChanged={async () => undefined}
+      />
     );
     document.body.appendChild(view.container);
     await flushHookEffects();
@@ -146,7 +153,12 @@ describe("agent settings", () => {
       credential: "hqb_agent_rotated"
     });
     const view = await renderComponent(
-      <AgentSettings domains={[]} mailboxes={[]} onChanged={async () => undefined} />
+      <AgentSettings
+        domains={[]}
+        mailboxes={[]}
+        profile="mailbox"
+        onChanged={async () => undefined}
+      />
     );
     document.body.appendChild(view.container);
     await flushHookEffects();
@@ -192,13 +204,13 @@ describe("agent settings", () => {
     });
     const onChanged = vi.fn().mockRejectedValue(new Error("Workspace refresh failed."));
     const view = await renderComponent(
-      <AgentSettings domains={[]} mailboxes={[]} onChanged={onChanged} />
+      <AgentSettings domains={[]} mailboxes={[]} profile="mailbox" onChanged={onChanged} />
     );
     document.body.appendChild(view.container);
     await flushHookEffects();
 
     const create = Array.from(view.container.querySelectorAll("button")).find(
-      (button) => button.textContent === "Create agent"
+      (button) => button.textContent === "Create mailbox agent"
     );
     await flushHookEffects(() => create?.click());
     setInput(document.body, "#new-agent-name", "Support assistant");

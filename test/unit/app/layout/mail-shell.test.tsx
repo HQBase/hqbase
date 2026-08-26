@@ -264,6 +264,7 @@ describe("mail shell", () => {
     expect(html).toContain('aria-label="Quick access"');
     expect(html).toContain('aria-label="Mail"');
     expect(html).toContain('aria-label="Contacts"');
+    expect(html).toContain('aria-label="Agents"');
     expect(html).toContain('aria-label="Settings"');
     expect(html).not.toContain(">Contacts</span>");
     expect(html).not.toContain(">Settings</span>");
@@ -286,13 +287,36 @@ describe("mail shell", () => {
 
     expect(html).toContain('aria-label="Settings navigation"');
     expect(html).toContain("Mailboxes");
-    expect(html).toContain("Agents");
     expect(html).toContain("Notifications");
     expect(html).toContain("Debug");
     expect(html).toContain('href="/settings/notifications"');
-    expect(html).toContain('href="/settings/agents"');
+    expect(html).not.toContain('href="/settings/agents"');
     expect(html).toContain('aria-current="page"');
     expect(html).not.toContain("Your mail");
+  });
+
+  it("shows connected apps and machine identities in the Agents navigation", () => {
+    const html = renderToStaticMarkup(
+      <Sidebar
+        activeAgentTab="connections"
+        activeFolder="agents"
+        canManage
+        mailboxId="all"
+        unread={unread}
+        user={user}
+        onAgentTabChange={() => undefined}
+        onFolderChange={() => undefined}
+        onSignedOut={() => undefined}
+      />
+    );
+
+    expect(html).toContain('aria-label="Agents navigation"');
+    expect(html).toContain('href="/agents/connections"');
+    expect(html).toContain('href="/agents/mailboxes"');
+    expect(html).toContain('href="/agents/provisioning"');
+    expect(html).toContain("Connected apps");
+    expect(html).toContain("Mailbox agents");
+    expect(html).toContain("Provisioning keys");
   });
 
   it("scopes the Inbox count to the selected mailbox", () => {

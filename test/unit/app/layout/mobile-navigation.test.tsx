@@ -10,11 +10,11 @@ afterEach(() => {
 
 describe("mobile navigation", () => {
   it("lets an admin open agent management", async () => {
-    const onSettingsTabChange = vi.fn();
+    const onAgentTabChange = vi.fn();
     const view = await renderComponent(
       <MobileNavigation
-        activeFolder="settings"
-        activeSettingsTab="users"
+        activeAgentTab="connections"
+        activeFolder="agents"
         canManage
         draftCount={0}
         mailboxId="all"
@@ -28,9 +28,9 @@ describe("mobile navigation", () => {
           passwordSetupRequired: false,
           role: "admin"
         }}
+        onAgentTabChange={onAgentTabChange}
         onFolderChange={() => undefined}
         onMailboxChange={() => undefined}
-        onSettingsTabChange={onSettingsTabChange}
         onSignedOut={() => undefined}
       />
     );
@@ -39,11 +39,11 @@ describe("mobile navigation", () => {
     await flushHookEffects(() =>
       view.container.querySelector<HTMLButtonElement>('[aria-label="Open navigation"]')?.click()
     );
-    const agents = document.body.querySelector<HTMLAnchorElement>('a[href="/settings/agents"]');
+    const agents = document.body.querySelector<HTMLAnchorElement>('a[href="/agents/mailboxes"]');
     expect(agents).not.toBeNull();
 
     await flushHookEffects(() => agents?.click());
-    expect(onSettingsTabChange).toHaveBeenCalledWith("agents");
+    expect(onAgentTabChange).toHaveBeenCalledWith("mailboxes");
     await view.unmount();
   });
 
@@ -97,11 +97,11 @@ describe("mobile navigation", () => {
     await view.unmount();
   });
 
-  it("hides agent management from workspace members", async () => {
+  it("shows personal connections but hides machine management from workspace members", async () => {
     const view = await renderComponent(
       <MobileNavigation
-        activeFolder="settings"
-        activeSettingsTab="users"
+        activeAgentTab="connections"
+        activeFolder="agents"
         canManage={false}
         draftCount={0}
         mailboxId="all"
@@ -115,9 +115,9 @@ describe("mobile navigation", () => {
           passwordSetupRequired: false,
           role: "member"
         }}
+        onAgentTabChange={() => undefined}
         onFolderChange={() => undefined}
         onMailboxChange={() => undefined}
-        onSettingsTabChange={() => undefined}
         onSignedOut={() => undefined}
       />
     );
@@ -126,9 +126,9 @@ describe("mobile navigation", () => {
     await flushHookEffects(() =>
       view.container.querySelector<HTMLButtonElement>('[aria-label="Open navigation"]')?.click()
     );
-    expect(document.body.querySelector('a[href="/settings/agents"]')).toBeNull();
-    expect(document.body.querySelector('a[href="/settings/domains"]')).toBeNull();
-    expect(document.body.querySelector('a[href="/settings/users"]')).not.toBeNull();
+    expect(document.body.querySelector('a[href="/agents/connections"]')).not.toBeNull();
+    expect(document.body.querySelector('a[href="/agents/mailboxes"]')).toBeNull();
+    expect(document.body.querySelector('a[href="/agents/provisioning"]')).toBeNull();
     await view.unmount();
   });
 

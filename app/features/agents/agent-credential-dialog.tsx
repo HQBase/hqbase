@@ -64,7 +64,7 @@ export function AgentCredentialContent({
   async function copyCredential(): Promise<void> {
     try {
       await navigator.clipboard.writeText(credential);
-      toast.success("Agent credential copied.");
+      toast.success("Credential copied.");
     } catch {
       toast.error("Agent credential could not be copied.");
     }
@@ -73,7 +73,9 @@ export function AgentCredentialContent({
   return (
     <>
       <DialogHeader>
-        <DialogTitle>Agent credential created</DialogTitle>
+        <DialogTitle>
+          {agentProfile === "mailbox" ? "Agent credential created" : "Provisioning key created"}
+        </DialogTitle>
         <DialogDescription>Use this credential to connect {agentName} to HQBase.</DialogDescription>
       </DialogHeader>
       <Alert>
@@ -104,7 +106,7 @@ export function AgentCredentialContent({
         nextStep="Give the credential and skill URL to the agent through a secure channel. The skill is public; the credential is secret."
         skillUrl={skillUrl}
         skillUrlId={skillUrlId}
-        title={agentProfile === "mailbox" ? "Mailbox agent skill" : "Provisioner skill"}
+        title={agentProfile === "mailbox" ? "Mailbox agent skill" : "Provisioning skill"}
       />
       <DialogFooter>
         <Button onClick={onDone} type="button">

@@ -91,7 +91,10 @@ export function useMailSync({
 
       const [notificationResult, conversationResult] = await Promise.allSettled([
         refreshNotifications(),
-        activeFolder === "settings" || activeFolder === "contacts" || activeFolder === "drafts"
+        activeFolder === "settings" ||
+        activeFolder === "contacts" ||
+        activeFolder === "agents" ||
+        activeFolder === "drafts"
           ? Promise.resolve<null>(null)
           : listConversations({
               folder: activeFolder,
@@ -205,6 +208,7 @@ export function useMailSync({
       !nextCursor ||
       activeFolder === "settings" ||
       activeFolder === "contacts" ||
+      activeFolder === "agents" ||
       activeFolder === "drafts"
     ) {
       return Promise.resolve();
