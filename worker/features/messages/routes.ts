@@ -138,9 +138,8 @@ messageRoutes.get("/:id/html", async (c) => {
     throw new AppError("MESSAGE_HTML_OBJECT_NOT_FOUND", "HTML body not found.", 404);
   }
   const trusted =
-    message.direction === "outbound" ||
-    (auth.principal.type === "user" &&
-      (await isRemoteMediaTrusted(c.env.DB, auth.principal.id, message.fromAddress)));
+    auth.principal.type === "user" &&
+    (await isRemoteMediaTrusted(c.env.DB, auth.principal.id, message.fromAddress));
   const rendered = sanitizeMessageHtml({
     allowRemoteImages: trusted || c.req.query("loadRemoteImages") === "1",
     attachments: message.attachments,

@@ -682,6 +682,26 @@ describe("HQBase Mail API", () => {
     expect(payload.remoteMediaTrusted).toBe(false);
   });
 
+  it("does not treat a sent message as consent to load quoted remote images", async () => {
+    await env.DB.prepare("UPDATE messages SET direction = 'outbound' WHERE id = 'msg_api'").run();
+    try {
+      const response = await apiFetch("/api/v2/messages/msg_api/html", readToken);
+      expect(response.status, await response.clone().text()).toBe(200);
+      const payload = (await response.json()) as {
+        quotedHtml: string | null;
+        quotedHtmlHasRemoteImages: boolean;
+        remoteMediaTrusted: boolean;
+      };
+
+      expect(payload.quotedHtmlHasRemoteImages).toBe(true);
+      expect(payload.quotedHtml).toContain("Remote image hidden");
+      expect(payload.quotedHtml).not.toContain("images.example.net");
+      expect(payload.remoteMediaTrusted).toBe(false);
+    } finally {
+      await env.DB.prepare("UPDATE messages SET direction = 'inbound' WHERE id = 'msg_api'").run();
+    }
+  });
+
   it("unarchives and restores mail through the versioned action route", async () => {
     const socket = await openEventSocket({
       authorization: `Bearer ${readToken}`,
