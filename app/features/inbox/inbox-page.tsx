@@ -257,13 +257,18 @@ export function InboxPage({
   return (
     <div className="flex h-full flex-col bg-list" data-mobile-view="message-list">
       <div className="flex h-11 shrink-0 items-center border-b border-divider bg-toolbar">
-        <div className="mx-auto flex w-full max-w-[960px] items-center gap-3 px-4 sm:px-6 lg:px-8">
-          <span className="shrink-0 text-sm font-medium text-foreground">{activeLabel}</span>
-          <div className="mr-3 flex min-w-0 flex-1 items-center sm:mr-6">
+        <div
+          className="mx-auto grid w-full max-w-[960px] grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-4 sm:grid-cols-[2rem_minmax(7rem,18%)_1rem_minmax(0,1fr)_1.75rem_4rem] sm:gap-x-1.5 sm:px-9 lg:px-11"
+          data-inbox-header-layout
+        >
+          <span className="min-w-0 truncate text-sm font-medium text-foreground sm:col-span-2 sm:col-start-1">
+            {activeLabel}
+          </span>
+          <div className="col-start-2 flex min-w-0 items-center justify-end sm:col-start-4 sm:row-start-1">
             <LabelFilter labels={labels} values={labelIds} onChange={onLabelChange} />
           </div>
           {conversationCountLabel ? (
-            <span className="hidden shrink-0 text-[12px] tabular-nums text-tertiary sm:inline">
+            <span className="hidden shrink-0 justify-self-end whitespace-nowrap text-[12px] tabular-nums text-tertiary sm:col-span-2 sm:col-start-5 sm:row-start-1 sm:inline">
               {conversationCountLabel}
             </span>
           ) : null}

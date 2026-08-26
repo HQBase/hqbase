@@ -96,6 +96,7 @@ export function LabelMenu({
   disabled = false,
   labels,
   onToggle,
+  showAssignedLabels = false,
   showTagIcon = false
 }: {
   assigned: MailLabel[];
@@ -104,19 +105,28 @@ export function LabelMenu({
   disabled?: boolean;
   labels: MailLabel[];
   onToggle: (label: MailLabel, assigned: boolean) => Promise<void> | void;
+  showAssignedLabels?: boolean;
   showTagIcon?: boolean;
 }): React.ReactElement {
   const { pendingId, toggle } = useLabelToggle(onToggle);
+  const triggerLabel =
+    showAssignedLabels && assigned.length > 0
+      ? `Labels: ${assigned.map((label) => label.name).join(", ")}`
+      : "Labels";
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button
-          aria-label="Labels"
+          aria-label={triggerLabel}
           className={cn(
-            "relative size-10 min-h-10 min-w-10 text-muted-foreground sm:size-8 sm:min-h-8 sm:min-w-8 [&_svg]:size-3.5",
+            "relative text-muted-foreground [&_svg]:size-3.5",
+            showAssignedLabels
+              ? "h-auto min-h-0 w-fit min-w-0 gap-0.5 rounded-full p-0.5"
+              : "size-10 min-h-10 min-w-10 sm:size-8 sm:min-h-8 sm:min-w-8",
             className
           )}
+          data-message-labels={showAssignedLabels ? "desktop" : undefined}
           disabled={disabled || !canOrganizeLabels || labels.length === 0 || pendingId !== null}
           size="icon"
           title={
@@ -133,6 +143,7 @@ export function LabelMenu({
             event.stopPropagation();
           }}
         >
+          {showAssignedLabels ? <LabelStack compact labels={assigned} /> : null}
           {showTagIcon ? (
             <PiTag aria-hidden="true" className="pointer-events-none" data-label-menu-icon="tag" />
           ) : (

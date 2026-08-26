@@ -37,6 +37,9 @@ export function MessageListItem({
   const isUnread = conversation.unreadCount > 0;
   const timestamp = formatConversationTimestamp(conversationActivityTimestamp(conversation));
   const correspondent = correspondentLabel(conversation);
+  const assignedLabels = conversation.labels ?? [];
+  const labelContainerClass =
+    "rounded-full bg-background p-0.5 shadow-[0_0_6px_1px_hsl(var(--background)/0.14)]";
   const avatarInitial =
     correspondent
       .replace(/^To:\s*/u, "")
@@ -46,7 +49,7 @@ export function MessageListItem({
   return (
     <a
       className={cn(
-        "group grid w-full grid-cols-[2.5rem_minmax(0,1fr)_4rem] items-start gap-x-3 rounded-xl px-3 py-3 text-left text-[14px] leading-5 transition-colors focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring sm:grid-cols-[2rem_minmax(7rem,18%)_minmax(0,1fr)_auto_4rem] sm:items-center sm:gap-x-1.5 sm:py-2 sm:text-[13px]",
+        "group grid w-full grid-cols-[2.5rem_minmax(0,1fr)_4rem] items-start gap-x-3 rounded-xl px-3 py-3 text-left text-[14px] leading-5 transition-colors focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring sm:grid-cols-[2rem_minmax(7rem,18%)_1rem_minmax(0,1fr)_1.75rem_4rem] sm:items-center sm:gap-x-1.5 sm:py-2 sm:text-[13px]",
         isActive
           ? "bg-selected [@media(hover:hover)]:hover:bg-selected"
           : "[@media(hover:hover)]:hover:bg-hover"
@@ -109,7 +112,15 @@ export function MessageListItem({
           {correspondent}
         </span>
       </span>
-      <span className="col-start-2 row-start-2 flex min-w-0 items-end gap-2 overflow-hidden sm:col-start-3 sm:row-start-1 sm:h-8 sm:items-center">
+      <span className="hidden items-center justify-center sm:col-start-3 sm:row-start-1 sm:flex">
+        {conversation.hasAttachments ? (
+          <PiPaperclip
+            aria-label="Has attachments"
+            className="pointer-events-none size-3.5 shrink-0 text-tertiary"
+          />
+        ) : null}
+      </span>
+      <span className="col-start-2 row-start-2 flex min-w-0 items-end gap-2 overflow-hidden sm:col-start-4 sm:row-start-1 sm:h-8 sm:items-center">
         <span className="min-w-0 flex-1">
           <span
             className={cn(
@@ -151,34 +162,42 @@ export function MessageListItem({
           </Badge>
         ) : null}
       </span>
-      {(conversation.labels?.length ?? 0) > 0 || (labels.length > 0 && onToggleLabel) ? (
+      {assignedLabels.length > 0 ? (
         <span
           className={cn(
-            "group/label-pill col-start-2 row-start-2 z-10 flex w-fit min-w-0 max-w-[75%] items-center justify-end gap-0.5 self-end justify-self-end sm:col-start-3 sm:row-start-1 sm:self-center",
-            (conversation.labels?.length ?? 0) === 0 && "hidden sm:flex"
+            "col-start-2 row-start-2 z-10 flex w-fit min-w-0 max-w-[75%] items-center justify-end self-end justify-self-end overflow-hidden sm:hidden",
+            labelContainerClass
           )}
-          data-message-labels
+          data-message-labels="compact"
         >
-          <LabelStack
-            className="overflow-hidden sm:hidden"
-            compact
-            labels={conversation.labels ?? []}
-            namedLimit={2}
-          />
-          <LabelStack className="hidden sm:flex" compact labels={conversation.labels ?? []} />
-          {labels.length > 0 && onToggleLabel ? (
-            <LabelMenu
-              assigned={conversation.labels ?? []}
-              canOrganizeLabels={canOrganizeLabels}
-              className="hidden size-6 min-h-6 min-w-6 rounded-full group-hover/label-pill:text-foreground/80 [@media(hover:hover)]:hover:bg-transparent [@media(hover:hover)]:hover:text-foreground/80 sm:inline-flex sm:size-5 sm:min-h-5 sm:min-w-5"
-              labels={labels}
-              onToggle={onToggleLabel}
-              showTagIcon
-            />
-          ) : null}
+          <LabelStack compact labels={assignedLabels} namedLimit={2} />
         </span>
       ) : null}
-      <span className="hidden min-w-0 items-center justify-center gap-0.5 sm:col-start-4 sm:row-start-1 sm:flex sm:w-7 sm:min-w-7">
+      {labels.length > 0 && onToggleLabel && canOrganizeLabels ? (
+        <LabelMenu
+          assigned={assignedLabels}
+          canOrganizeLabels={canOrganizeLabels}
+          className={cn(
+            "z-10 hidden max-w-[75%] justify-self-end overflow-hidden [@media(hover:hover)]:hover:bg-background [@media(hover:hover)]:hover:text-foreground/80 sm:col-start-4 sm:row-start-1 sm:inline-flex",
+            labelContainerClass
+          )}
+          labels={labels}
+          onToggle={onToggleLabel}
+          showAssignedLabels
+          showTagIcon
+        />
+      ) : assignedLabels.length > 0 ? (
+        <span
+          className={cn(
+            "z-10 hidden w-fit min-w-0 max-w-[75%] items-center justify-self-end overflow-hidden sm:col-start-4 sm:row-start-1 sm:flex",
+            labelContainerClass
+          )}
+          data-message-labels="desktop"
+        >
+          <LabelStack compact labels={assignedLabels} />
+        </span>
+      ) : null}
+      <span className="hidden min-w-0 items-center justify-center sm:col-start-5 sm:row-start-1 sm:flex sm:w-7 sm:min-w-7">
         {conversation.messageCount > 1 ? (
           <span
             className="rounded-md bg-muted px-0.5 py-0.5 text-[11px] tabular-nums text-tertiary"
@@ -187,16 +206,10 @@ export function MessageListItem({
             {conversation.messageCount}
           </span>
         ) : null}
-        {conversation.hasAttachments ? (
-          <PiPaperclip
-            aria-label="Has attachments"
-            className="pointer-events-none size-3.5 shrink-0 text-tertiary"
-          />
-        ) : null}
       </span>
       <time
         className={cn(
-          "col-start-3 row-start-1 shrink-0 whitespace-nowrap text-right text-[11px] tabular-nums sm:col-start-5 sm:row-start-1 sm:text-[12px]",
+          "col-start-3 row-start-1 shrink-0 whitespace-nowrap text-right text-[11px] tabular-nums sm:col-start-6 sm:row-start-1 sm:text-[12px]",
           isUnread ? "font-medium text-foreground dark:text-white" : "text-muted-foreground"
         )}
       >

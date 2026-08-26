@@ -54,9 +54,10 @@ describe("label controls", () => {
     expect(selectedFilter).toContain("text-[11px]");
     expect(selectedFilter).toContain("text-muted-foreground");
     expect(badges).toContain("Customer");
-    expect(badges).toContain("bg-blue-500");
-    expect(badges).toContain("text-foreground");
-    expect(badges).not.toContain("bg-blue-500/15");
+    expect(badges).toContain("bg-blue-500/15");
+    expect(badges).toContain("text-blue-700");
+    expect(badges).toContain("dark:text-blue-300");
+    expect(badges).not.toContain("text-foreground");
     expect(compact).toContain(">HR</span>");
     expect(compact).toContain(">Important</span>");
     expect(compact).toContain("min-w-10");
@@ -83,32 +84,51 @@ describe("label controls", () => {
 
   it("switches the menu trigger between label and more icons", () => {
     const rowMenu = renderToStaticMarkup(
-      <LabelMenu assigned={[label]} labels={[label]} onToggle={() => undefined} showTagIcon />
+      <LabelMenu
+        assigned={[label]}
+        labels={[label]}
+        onToggle={() => undefined}
+        showAssignedLabels
+        showTagIcon
+      />
     );
     const generalMenu = renderToStaticMarkup(
       <LabelMenu assigned={[label]} labels={[label]} onToggle={() => undefined} />
     );
 
     expect(rowMenu).toContain('data-label-menu-icon="tag"');
+    expect(rowMenu).toContain('data-message-labels="desktop"');
+    expect(rowMenu).toContain('aria-label="Labels: Customer"');
+    expect(rowMenu).toContain("Customer");
     expect(rowMenu).not.toContain('data-label-menu-icon="more"');
     expect(rowMenu).not.toContain("bottom-1");
     expect(generalMenu).toContain('data-label-menu-icon="more"');
+    expect(generalMenu).toContain('aria-label="Labels"');
     expect(generalMenu).not.toContain('data-label-menu-icon="tag"');
     expect(generalMenu).toContain("bottom-1");
   });
 
-  it("closes the standard assignment menu after a label choice", async () => {
+  it("opens from an assigned label and closes after a label choice", async () => {
     const view = await renderComponent(
-      <LabelMenu assigned={[]} labels={[label]} onToggle={() => undefined} />
+      <LabelMenu
+        assigned={[label]}
+        labels={[label]}
+        onToggle={() => undefined}
+        showAssignedLabels
+        showTagIcon
+      />
     );
-    const trigger = view.container.querySelector<HTMLButtonElement>('[aria-label="Labels"]');
+    const assignedLabel = [...view.container.querySelectorAll<HTMLElement>("span")].find(
+      (entry) => entry.textContent === "Customer"
+    );
     await flushHookEffects(() => {
-      trigger?.dispatchEvent(
+      assignedLabel?.dispatchEvent(
         new PointerEvent("pointerdown", { bubbles: true, button: 0, pointerType: "mouse" })
       );
-      trigger?.click();
+      assignedLabel?.click();
     });
     const item = document.body.querySelector<HTMLElement>('[role="menuitemcheckbox"]');
+    expect(item).not.toBeNull();
     await flushHookEffects(() => item?.click());
 
     expect(document.body.querySelector('[role="menuitemcheckbox"]')).toBeNull();
