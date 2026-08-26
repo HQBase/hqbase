@@ -20,6 +20,7 @@ import type { MailLabel } from "@/features/labels/types";
 import { listDeletedMailboxes, listMailboxes } from "@/features/mailboxes/api";
 import type { Mailbox } from "@/features/mailboxes/types";
 import { useMailSync } from "@/features/messages/use-mail-sync";
+import { mailDocumentTitle } from "@/features/notifications/unread";
 import { type GlobalSearchResult, globalSearchResultPath } from "@/features/search/types";
 import { getSetupStatus } from "@/features/setup/api";
 import { SetupPage } from "@/features/setup/setup-page";
@@ -75,6 +76,15 @@ export function App(): React.ReactElement {
     search,
     userId: currentUserId
   });
+  const selectedMailboxAddress = contentMailboxes.find(
+    (mailbox) => mailbox.id === mailboxId
+  )?.address;
+
+  React.useEffect(() => {
+    document.title = currentUserId
+      ? mailDocumentTitle(mailSync.notifications.unread, mailboxId, selectedMailboxAddress)
+      : "HQBase";
+  }, [currentUserId, mailboxId, mailSync.notifications.unread, selectedMailboxAddress]);
 
   const loadWorkspace = React.useCallback(async (currentUser: CurrentUser) => {
     const [nextSetup, nextMailboxes, nextLabels] = await Promise.all([

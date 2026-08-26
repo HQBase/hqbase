@@ -5,17 +5,17 @@ import {
   serializePushSubscription,
   subscribeToPush
 } from "@/features/notifications/browser";
+import { mailDocumentTitle } from "@/features/notifications/unread";
 
 describe("browser notifications", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
   });
 
-  it("sets and clears the exact app badge and document title", async () => {
+  it("sets and clears the exact app badge", async () => {
     const setAppBadge = vi.fn().mockResolvedValue(undefined);
     const clearAppBadge = vi.fn().mockResolvedValue(undefined);
     vi.stubGlobal("navigator", { setAppBadge, clearAppBadge });
-    vi.stubGlobal("document", { title: "" });
 
     await applyUnreadIndicators({
       catchall: 1,
@@ -23,11 +23,24 @@ describe("browser notifications", () => {
       inboxByMailbox: { "mailbox-1": 2 },
       total: 3
     });
-    expect(document.title).toBe("(3) HQBase");
     expect(setAppBadge).toHaveBeenCalledWith(3);
     await applyUnreadIndicators({ catchall: 0, inbox: 0, inboxByMailbox: {}, total: 0 });
-    expect(document.title).toBe("HQBase");
     expect(clearAppBadge).toHaveBeenCalledOnce();
+  });
+
+  it("builds the mail title from the selected Inbox unread count", () => {
+    const unread = {
+      catchall: 7,
+      inbox: 15,
+      inboxByMailbox: { privacy: 2 },
+      total: 22
+    };
+
+    expect(mailDocumentTitle(unread, "all")).toBe("Inbox (15) - Mail");
+    expect(mailDocumentTitle(unread, "privacy", "privacy@berman.to")).toBe(
+      "privacy@berman.to (2) - Mail"
+    );
+    expect(mailDocumentTitle({ ...unread, inbox: 0 }, "all")).toBe("Inbox - Mail");
   });
 
   it("requests permission only when subscribing and uses the VAPID application key", async () => {
