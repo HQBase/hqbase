@@ -5,7 +5,8 @@ import {
   PiFileText,
   PiMagnifyingGlass,
   PiMapPin,
-  PiPaperPlaneTilt
+  PiPaperPlaneTilt,
+  PiX
 } from "react-icons/pi";
 
 import { Input } from "@/components/ui/input";
@@ -46,6 +47,7 @@ export function GlobalSearch({
   const [results, setResults] = React.useState<WorkspaceSearchResults>(emptyResults);
   const [status, setStatus] = React.useState<"error" | "idle" | "loading" | "ready">("idle");
   const listId = React.useId();
+  const inputRef = React.useRef<HTMLInputElement>(null);
   const requestId = React.useRef(0);
   const rootRef = React.useRef<HTMLDivElement>(null);
   const groups = React.useMemo(() => groupSearchResults(results), [results]);
@@ -129,6 +131,7 @@ export function GlobalSearch({
         className="pointer-events-none absolute left-2.5 top-4 z-10 size-3.5 -translate-y-1/2 text-muted-foreground"
       />
       <Input
+        ref={inputRef}
         aria-activedescendant={
           listOpen && activeIndex >= 0 ? `${listId}-option-${activeIndex}` : undefined
         }
@@ -137,7 +140,7 @@ export function GlobalSearch({
         aria-expanded={listOpen}
         aria-label="Search HQBase"
         autoComplete="off"
-        className="h-8 border-transparent bg-muted/70 pl-8 text-xs shadow-none focus-visible:border-input focus-visible:ring-1"
+        className="h-8 border-transparent bg-muted/70 pl-8 pr-9 text-xs shadow-none focus-visible:border-input focus-visible:ring-1"
         maxLength={200}
         placeholder="Search HQBase"
         role="combobox"
@@ -156,6 +159,22 @@ export function GlobalSearch({
         }}
         onKeyDown={handleKeyDown}
       />
+      {query.length > 0 ? (
+        <button
+          aria-label="Clear search"
+          className="absolute right-0.5 top-0.5 z-10 grid size-7 place-items-center rounded-md text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+          title="Clear search"
+          type="button"
+          onClick={() => {
+            setActiveIndex(-1);
+            setOpen(false);
+            onQueryChange("");
+            inputRef.current?.focus();
+          }}
+        >
+          <PiX aria-hidden="true" className="size-3.5" />
+        </button>
+      ) : null}
       {listOpen ? (
         <div
           aria-busy={status === "loading"}

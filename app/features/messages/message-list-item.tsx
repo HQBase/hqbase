@@ -136,7 +136,7 @@ export function MessageListItem({
             className="pointer-events-none size-3.5 shrink-0 self-center text-tertiary sm:hidden"
           />
         ) : null}
-        <span className="min-w-0 flex-1 sm:pr-[5px]">
+        <span className="min-w-0 flex-1 sm:pr-2">
           <span
             className={cn(
               "block truncate sm:inline",

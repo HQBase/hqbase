@@ -100,6 +100,27 @@ describe("global search", () => {
     await view.unmount();
   });
 
+  it("clears a non-empty query and keeps focus in the search field", async () => {
+    mocks.searchWorkspace.mockResolvedValue(emptyResults);
+    const view = await renderComponent(
+      <SearchHost onSelect={() => undefined} onSubmit={() => undefined} />
+    );
+    const input = requiredInput(view.container);
+
+    expect(view.container.querySelector('[aria-label="Clear search"]')).toBeNull();
+    await setInput(input, "hello");
+    const clear = view.container.querySelector<HTMLButtonElement>('[aria-label="Clear search"]');
+    const focus = vi.spyOn(input, "focus");
+    expect(clear).not.toBeNull();
+
+    await flushHookEffects(() => clear?.click());
+
+    expect(input.value).toBe("");
+    expect(focus).toHaveBeenCalledOnce();
+    expect(view.container.querySelector('[aria-label="Clear search"]')).toBeNull();
+    await view.unmount();
+  });
+
   it("builds canonical paths for selectable results", () => {
     expect(
       globalSearchResultPath({

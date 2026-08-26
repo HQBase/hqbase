@@ -309,7 +309,7 @@ describe("conversation reader", () => {
     expect(html).toContain("sm:col-start-4");
     expect(html).toContain("sm:col-start-5");
     expect(html).toContain("sm:col-start-6");
-    expect(html).toContain("sm:pr-[5px]");
+    expect(html).toContain("sm:pr-2");
     expect(html).not.toContain("sm:row-start-2 sm:mt-1");
     const time = html.match(/<time[^>]*>/u)?.[0];
     expect(time).toContain("whitespace-nowrap");
