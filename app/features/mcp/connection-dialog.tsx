@@ -1,5 +1,5 @@
 import * as React from "react";
-import { PiCheck, PiCopy, PiPaperPlaneTilt, PiShieldCheck } from "react-icons/pi";
+import { PiCheck, PiCopy, PiPaperPlaneTilt, PiShieldCheck, PiUser } from "react-icons/pi";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,18 +24,23 @@ export function McpConnectionDetails({
   return (
     <div className="flex flex-col gap-5 text-sm">
       {showIdentity ? (
-        <section className="flex flex-col gap-1">
-          <p className="text-xs font-medium text-muted-foreground">Connecting as</p>
-          <div className="flex flex-wrap items-baseline gap-x-2">
-            <p className="font-medium">{user.name}</p>
-            <p className="text-xs text-muted-foreground">
-              {user.email} · {user.role}
-            </p>
+        <section className="rounded-xl border bg-muted/30 p-3.5">
+          <div className="flex items-start gap-3">
+            <span className="inline-flex size-9 shrink-0 items-center justify-center rounded-full border bg-background text-muted-foreground shadow-xs">
+              <PiUser aria-hidden="true" className="size-4.5" data-icon="connection-identity" />
+            </span>
+            <div className="min-w-0">
+              <p className="text-xs font-medium text-foreground">Connecting as</p>
+              <p className="mt-0.5 font-semibold text-foreground">{user.name}</p>
+              <p className="break-all text-xs text-muted-foreground">
+                {user.email} · {user.role}
+              </p>
+              <p className="mt-2 text-xs leading-4 text-muted-foreground">
+                After consent, HQBase rechecks this user&apos;s current workspace role and live
+                mailbox grants.
+              </p>
+            </div>
           </div>
-          <p className="text-xs leading-4 text-muted-foreground">
-            After consent, HQBase rechecks this user&apos;s current workspace role and live mailbox
-            grants.
-          </p>
         </section>
       ) : null}
 

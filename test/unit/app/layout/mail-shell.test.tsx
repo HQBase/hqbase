@@ -478,6 +478,9 @@ describe("mail shell", () => {
     expect(html).toContain("Copy Read only endpoint");
     expect(html).toContain("OAuth 2.1");
     expect(html).toContain("registers dynamically with PKCE");
+    expect(html).toContain("Connecting as");
+    expect(html).toContain('data-icon="connection-identity"');
+    expect(html).toContain("olivia@example.com");
     expect(html).toContain("current workspace role");
     expect(html).toContain("live mailbox grants");
     expect(html).not.toContain("Community");
