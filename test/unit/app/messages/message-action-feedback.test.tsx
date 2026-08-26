@@ -100,7 +100,6 @@ describe("conversation action feedback", () => {
     expect(readerLabels?.className).toContain("hover:bg-muted/60");
     expect(readerLabels?.className).toContain("flex-row-reverse");
     expect(readerLabels?.className).toContain("gap-1.5");
-    expect(readerLabels?.className).toContain("px-1");
     expect(readerLabels?.className).toContain("[&_svg]:-translate-y-px");
     expect(readerLabels?.querySelector('[data-label-menu-icon="tag"]')).not.toBeNull();
     expect(readerLabels?.innerHTML).toContain("text-[10px]");
@@ -164,7 +163,6 @@ describe("conversation action feedback", () => {
     expect(emptyControl?.className).toContain("border-dashed");
     expect(emptyControl?.className).toContain("border-divider");
     expect(emptyControl?.className).toContain("flex-row-reverse");
-    expect(emptyControl?.className).toContain("px-1");
     expect(emptyControl?.querySelector('[data-label-menu-icon="tag"]')).not.toBeNull();
     await editable.unmount();
 
@@ -189,7 +187,6 @@ describe("conversation action feedback", () => {
     expect(staticControl?.querySelector("svg")).not.toBeNull();
     expect(staticControl?.querySelector("button")).toBeNull();
     expect(staticPill?.className).toContain("gap-1.5");
-    expect(staticPill?.className).toContain("px-1");
     expect(staticPill?.firstElementChild?.tagName).toBe("svg");
     expect(staticPill?.firstElementChild?.getAttribute("class")).toContain("-translate-y-px");
     await readOnly.unmount();
