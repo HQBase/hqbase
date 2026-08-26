@@ -109,7 +109,7 @@ describe("conversation action feedback", () => {
     expect(desktopLabels?.className).toContain("px-2");
     expect(desktopLabels?.className).toContain("flex-row-reverse");
     expect(desktopLabels?.querySelector('[data-label-menu-icon="tag"]')).not.toBeNull();
-    expect(mobileWrapper?.className).toContain("flex justify-end");
+    expect(mobileWrapper?.className).toContain("flex justify-center");
     expect(mobileWrapper?.className).toContain("pt-4");
     expect(mobileWrapper?.className).toContain("sm:hidden");
     expect(mobileLabels?.className).toContain("bg-muted/40");

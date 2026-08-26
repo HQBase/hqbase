@@ -84,7 +84,7 @@ export function MessageListItem({
             "flex size-10 min-h-10 min-w-10 shrink-0 items-end justify-center rounded-md pb-px transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:size-8 sm:min-h-8 sm:min-w-8 sm:items-center sm:pb-0",
             conversation.isStarred
               ? "text-star"
-              : "text-muted-foreground/45 [@media(hover:hover)]:hover:bg-accent [@media(hover:hover)]:hover:text-muted-foreground group-hover:text-muted-foreground"
+              : "text-muted-foreground/45 [@media(hover:hover)]:hover:text-muted-foreground group-hover:text-muted-foreground"
           )}
           onClick={(event) => {
             event.preventDefault();
@@ -97,7 +97,7 @@ export function MessageListItem({
           <PiStar
             aria-hidden="true"
             className={cn(
-              "pointer-events-none size-[18px] sm:size-4",
+              "pointer-events-none size-[18px] -translate-y-px sm:size-4 sm:translate-y-0",
               conversation.isStarred && "fill-star"
             )}
           />

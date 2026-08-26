@@ -112,7 +112,7 @@ export function MessageDetail({
     const desktop = placement === "desktop";
     const wrapperClassName = desktop
       ? "hidden min-w-0 max-w-[min(28rem,40vw)] shrink-0 sm:block"
-      : "flex justify-end px-4 pt-4 sm:hidden";
+      : "flex justify-center px-4 pt-4 sm:hidden";
     const controlClassName = desktop
       ? "h-10 min-h-10 max-w-full flex-row-reverse gap-1.5 overflow-hidden rounded-md bg-transparent px-2 py-0 shadow-none [&_svg]:-translate-y-px [@media(hover:hover)]:hover:text-foreground"
       : "max-w-full flex-row-reverse gap-1.5 overflow-hidden bg-muted/40 px-1 [&_svg]:-translate-y-px [@media(hover:hover)]:hover:bg-muted/60";

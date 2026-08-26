@@ -337,8 +337,8 @@ describe("conversation reader", () => {
     expect(starSlot).toContain("pb-px");
     expect(starSlot).toContain("sm:items-center");
     expect(starSlot).toContain("sm:pb-0");
-    expect(starSlot).toContain("size-[18px] sm:size-4");
-    expect(starSlot).not.toContain("translate-y-px");
+    expect(starSlot).toContain("size-[18px] -translate-y-px sm:size-4 sm:translate-y-0");
+    expect(starSlot).not.toContain("hover:bg-accent");
     const row = html.match(/<a[^>]*>/u)?.[0];
     expect(row).toContain("[--message-row-surface:var(--surface-list)]");
     expect(row).toContain("hover:[--message-row-surface:var(--surface-hover)]");
