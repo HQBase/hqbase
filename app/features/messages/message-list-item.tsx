@@ -2,17 +2,14 @@ import type * as React from "react";
 import { PiChats, PiPaperclip, PiStar } from "react-icons/pi";
 
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
 import { LabelMenu, LabelStack } from "@/features/labels/label-controls";
 import type { MailLabel } from "@/features/labels/types";
 import { cn } from "@/lib/cn";
 import { formatConversationTimestamp } from "@/lib/format";
-import type { MailFolderId } from "@/lib/routes";
 import { conversationActivityTimestamp, correspondentLabel } from "./conversation-display";
 import type { ConversationSummary } from "./types";
 
 type MessageListItemProps = {
-  activeFolder: MailFolderId;
   conversation: ConversationSummary;
   href: string;
   isActive: boolean;
@@ -24,7 +21,6 @@ type MessageListItemProps = {
 };
 
 export function MessageListItem({
-  activeFolder,
   conversation,
   href,
   isActive,
@@ -157,11 +153,6 @@ export function MessageListItem({
             {conversation.snippet || "No preview"}
           </span>
         </span>
-        {activeFolder === "catchall" ? (
-          <Badge className="h-5 shrink-0 px-1.5 text-[10px]" variant="outline">
-            Unknown
-          </Badge>
-        ) : null}
       </span>
       {assignedLabels.length > 0 ? (
         <span

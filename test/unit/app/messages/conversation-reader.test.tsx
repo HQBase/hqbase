@@ -232,7 +232,6 @@ describe("conversation reader", () => {
   it("labels the unread indicator and removes it once the message is read", () => {
     const unreadHtml = renderToStaticMarkup(
       <MessageListItem
-        activeFolder="inbox"
         conversation={conversation}
         href="/mail/inbox/msg_1"
         isActive={false}
@@ -242,7 +241,6 @@ describe("conversation reader", () => {
     );
     const readHtml = renderToStaticMarkup(
       <MessageListItem
-        activeFolder="inbox"
         conversation={{ ...conversation, unreadCount: 0 }}
         href="/mail/inbox/msg_1"
         isActive={false}
@@ -275,7 +273,6 @@ describe("conversation reader", () => {
     };
     const html = renderToStaticMarkup(
       <MessageListItem
-        activeFolder="inbox"
         conversation={{
           ...conversation,
           direction: "inbound",
@@ -384,7 +381,6 @@ describe("conversation reader", () => {
 
     const readOnlyHtml = renderToStaticMarkup(
       <MessageListItem
-        activeFolder="inbox"
         conversation={{ ...conversation, labels: [hrLabel] }}
         href="/mail/inbox/msg_1"
         isActive={false}
@@ -400,7 +396,6 @@ describe("conversation reader", () => {
 
     const activeHtml = renderToStaticMarkup(
       <MessageListItem
-        activeFolder="inbox"
         conversation={conversation}
         href="/mail/inbox/msg_1"
         isActive
@@ -424,7 +419,6 @@ describe("conversation reader", () => {
     }));
     const html = renderToStaticMarkup(
       <MessageListItem
-        activeFolder="inbox"
         conversation={{ ...conversation, labels }}
         href="/mail/inbox/msg_1"
         isActive={false}

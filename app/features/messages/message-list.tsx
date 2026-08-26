@@ -87,7 +87,6 @@ export function MessageList({
               <div className="flex flex-col gap-0.5">
                 {group.conversations.map((conversation) => (
                   <MessageListItem
-                    activeFolder={activeFolder}
                     conversation={conversation}
                     href={appRoutePath({
                       kind: "mail",
