@@ -91,7 +91,7 @@ describe("message HTML view", () => {
       "Remote images are hidden. Loading them may reveal that you opened this email."
     );
     expect(html).toContain("Load images");
-    expect(html).toContain("Always load");
+    expect(html).toContain("Always load from this sender");
     expect(html).toContain("line-clamp-2");
     expect(html).toContain("bg-muted/50");
     expect(html).toContain("sm:grid-cols-[auto_minmax(0,1fr)_auto]");

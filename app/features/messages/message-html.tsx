@@ -340,7 +340,7 @@ export function RemoteImagesAlert({
             type="button"
             variant="outline"
           >
-            Always load
+            Always load from this sender
           </Button>
         )}
       </AlertDescription>
