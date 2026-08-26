@@ -1,13 +1,11 @@
-import * as React from "react";
+import type * as React from "react";
 import {
   PiArchive,
   PiArrowCounterClockwise,
   PiArrowLeft,
-  PiCaretDown,
   PiDotsThree,
   PiEnvelopeOpen,
   PiStar,
-  PiTag,
   PiTrash
 } from "react-icons/pi";
 import { toast } from "sonner";
@@ -18,17 +16,11 @@ import {
   DropdownMenuContent,
   DropdownMenuGroup,
   DropdownMenuItem,
-  DropdownMenuSeparator,
   DropdownMenuTrigger
 } from "@/components/ui/dropdown-menu";
 import { PullToRefresh } from "@/components/ui/pull-to-refresh";
 import { ComposerInlineTarget, useComposer } from "@/features/compose/composer-host";
-import {
-  LabelBadges,
-  LabelMenu,
-  LabelMenuItems,
-  useLabelToggle
-} from "@/features/labels/label-controls";
+import { LabelBadges, LabelMenu } from "@/features/labels/label-controls";
 import type { MailLabel } from "@/features/labels/types";
 import type { Mailbox } from "@/features/mailboxes/types";
 import { cn } from "@/lib/cn";
@@ -83,8 +75,6 @@ export function MessageDetail({
   onToggleLabel
 }: MessageDetailProps): React.ReactElement {
   const composer = useComposer();
-  const mobileLabelToggle = useLabelToggle(onToggleLabel);
-  const [mobileLabelsOpen, setMobileLabelsOpen] = React.useState(false);
 
   if (isLoading) {
     return <MessageReaderStatus label="Loading conversation" />;
@@ -122,7 +112,7 @@ export function MessageDetail({
   return (
     <article className="flex h-full flex-col bg-reader">
       <div className="shrink-0 border-b border-divider bg-toolbar px-3 sm:px-5">
-        <div className="flex h-11 items-center gap-2 py-2">
+        <div className="relative flex h-11 items-center gap-2 py-2">
           {showBack ? (
             <Button
               aria-label="Back to messages"
@@ -135,10 +125,10 @@ export function MessageDetail({
               <PiArrowLeft aria-hidden="true" className="pointer-events-none size-3.5" />
             </Button>
           ) : null}
-          <h1 className="min-w-0 flex-1 break-words text-balance text-sm font-medium leading-none tracking-tight [text-wrap:balance] sm:text-sm">
+          <h1 className="min-w-0 flex-1 truncate whitespace-nowrap text-sm font-medium leading-none tracking-tight">
             {selected.subject}
           </h1>
-          <div className="flex shrink-0 flex-wrap items-center gap-0.5">
+          <div className="absolute inset-y-0 right-0 z-10 flex shrink-0 items-center gap-0.5 bg-toolbar shadow-[-10px_0_8px_2px_hsl(var(--surface-toolbar))] sm:static sm:flex-wrap sm:bg-transparent sm:shadow-none">
             {labels.length > 0 && onToggleLabel ? (
               <LabelMenu
                 assigned={assignedLabels}
@@ -150,6 +140,7 @@ export function MessageDetail({
               />
             ) : null}
             <IconButton
+              className="hidden sm:inline-flex"
               label={isUnread ? "Mark conversation read" : "Mark conversation unread"}
               onClick={() => {
                 const action = isUnread ? "read" : "unread";
@@ -164,7 +155,6 @@ export function MessageDetail({
             <IconButton
               active={isStarred}
               activeClassName="text-star [@media(hover:hover)]:hover:text-star"
-              className="hidden sm:inline-flex"
               label={isStarred ? "Unstar conversation" : "Star conversation"}
               onClick={() => void applyAction(isStarred ? "unstar" : "star")}
             >
@@ -200,6 +190,7 @@ export function MessageDetail({
                   )}
                 </IconButton>
                 <IconButton
+                  className="hidden sm:inline-flex"
                   label="Trash conversation"
                   onClick={() => void applyAction("trash", "Conversation moved to Trash.")}
                 >
@@ -207,12 +198,7 @@ export function MessageDetail({
                 </IconButton>
               </>
             )}
-            <DropdownMenu
-              modal={false}
-              onOpenChange={(open) => {
-                if (!open) setMobileLabelsOpen(false);
-              }}
-            >
+            <DropdownMenu modal={false}>
               <DropdownMenuTrigger asChild>
                 <Button
                   aria-label="More conversation actions"
@@ -230,51 +216,20 @@ export function MessageDetail({
                 className="w-52 p-1 text-sm"
                 data-mobile-thread-actions
               >
-                {labels.length > 0 && onToggleLabel ? (
-                  <>
-                    <DropdownMenuGroup>
-                      <DropdownMenuItem
-                        aria-expanded={mobileLabelsOpen}
-                        className="min-h-10 gap-2"
-                        data-mobile-thread-action="labels"
-                        onSelect={(event) => {
-                          event.preventDefault();
-                          setMobileLabelsOpen((open) => !open);
-                        }}
-                      >
-                        <PiTag aria-hidden="true" className="size-4" />
-                        Labels
-                        <PiCaretDown
-                          aria-hidden="true"
-                          className={cn("ml-auto size-4", mobileLabelsOpen && "rotate-180")}
-                        />
-                      </DropdownMenuItem>
-                      {mobileLabelsOpen ? (
-                        <LabelMenuItems
-                          assigned={assignedLabels}
-                          className="min-h-10 py-2 text-sm"
-                          disabled={!canOrganizeLabels}
-                          keepOpen
-                          labels={labels}
-                          pendingId={mobileLabelToggle.pendingId}
-                          onToggle={mobileLabelToggle.toggle}
-                        />
-                      ) : null}
-                    </DropdownMenuGroup>
-                    <DropdownMenuSeparator />
-                  </>
-                ) : null}
                 <DropdownMenuGroup>
                   <DropdownMenuItem
                     className="min-h-10 gap-2"
-                    data-mobile-thread-action={isStarred ? "unstar" : "star"}
-                    onSelect={() => void applyAction(isStarred ? "unstar" : "star")}
+                    data-mobile-thread-action={isUnread ? "read" : "unread"}
+                    onSelect={() => {
+                      const action = isUnread ? "read" : "unread";
+                      void applyAction(
+                        action,
+                        action === "read" ? "Marked as read." : "Marked as unread."
+                      );
+                    }}
                   >
-                    <PiStar
-                      aria-hidden="true"
-                      className={cn("size-4", isStarred && "fill-star text-star")}
-                    />
-                    {isStarred ? "Unstar conversation" : "Star conversation"}
+                    <PiEnvelopeOpen aria-hidden="true" className="size-4" />
+                    {isUnread ? "Mark conversation read" : "Mark conversation unread"}
                   </DropdownMenuItem>
                   {isTrash ? (
                     <DropdownMenuItem
@@ -304,6 +259,16 @@ export function MessageDetail({
                       {isArchived ? "Unarchive conversation" : "Archive conversation"}
                     </DropdownMenuItem>
                   )}
+                  {!isTrash ? (
+                    <DropdownMenuItem
+                      className="min-h-10 gap-2"
+                      data-mobile-thread-action="trash"
+                      onSelect={() => void applyAction("trash", "Conversation moved to Trash.")}
+                    >
+                      <PiTrash aria-hidden="true" className="size-4" />
+                      Trash conversation
+                    </DropdownMenuItem>
+                  ) : null}
                 </DropdownMenuGroup>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -311,8 +276,26 @@ export function MessageDetail({
         </div>
       </div>
       <PullToRefresh className="min-h-0 flex-1" onRefresh={onRefresh}>
+        {labels.length > 0 && onToggleLabel && canOrganizeLabels ? (
+          <div className="px-4 pt-4 sm:hidden" data-mobile-reader-labels>
+            <LabelMenu
+              align="start"
+              assigned={assignedLabels}
+              canOrganizeLabels={canOrganizeLabels}
+              className="max-w-full overflow-hidden"
+              labels={labels}
+              onToggle={onToggleLabel}
+              showAssignedLabels
+              showTagIcon
+            />
+          </div>
+        ) : assignedLabels.length > 0 ? (
+          <div className="px-4 pt-4 sm:hidden" data-mobile-reader-labels>
+            <LabelBadges labels={assignedLabels} />
+          </div>
+        ) : null}
         {assignedLabels.length > 0 ? (
-          <div className="px-4 pt-4 sm:px-6">
+          <div className="hidden px-4 pt-4 sm:block sm:px-6">
             <LabelBadges labels={assignedLabels} />
           </div>
         ) : null}

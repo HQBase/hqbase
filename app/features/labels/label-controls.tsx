@@ -90,6 +90,7 @@ export function LabelFilter({
 }
 
 export function LabelMenu({
+  align = "end",
   assigned,
   canOrganizeLabels = true,
   className,
@@ -99,6 +100,7 @@ export function LabelMenu({
   showAssignedLabels = false,
   showTagIcon = false
 }: {
+  align?: "start" | "center" | "end";
   assigned: MailLabel[];
   canOrganizeLabels?: boolean;
   className?: string;
@@ -169,7 +171,7 @@ export function LabelMenu({
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent
-        align="end"
+        align={align}
         className="w-52 p-1 text-xs"
         onClick={(event) => event.stopPropagation()}
       >

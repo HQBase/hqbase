@@ -39,7 +39,7 @@ export function MessageListItem({
   const correspondent = correspondentLabel(conversation);
   const assignedLabels = conversation.labels ?? [];
   const labelContainerClass =
-    "rounded-full bg-background p-0.5 shadow-[0_0_6px_1px_hsl(var(--background)/0.14)] sm:shadow-[0_0_6px_1px_hsl(var(--background))]";
+    "rounded-full bg-[hsl(var(--message-row-surface))] p-0.5 shadow-[0_0_6px_1px_hsl(var(--message-row-surface)/0.14)] sm:shadow-[0_0_6px_1px_hsl(var(--message-row-surface))]";
   const avatarInitial =
     correspondent
       .replace(/^To:\s*/u, "")
@@ -49,10 +49,10 @@ export function MessageListItem({
   return (
     <a
       className={cn(
-        "group grid w-full grid-cols-[2.5rem_minmax(0,1fr)_4rem] items-start gap-x-3 rounded-xl px-3 py-3 text-left text-[14px] leading-5 transition-colors focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring sm:grid-cols-[2rem_minmax(7rem,18%)_1rem_minmax(0,1fr)_1.75rem_4rem] sm:items-center sm:gap-x-1.5 sm:py-2 sm:text-[13px]",
+        "group grid w-full grid-cols-[2.5rem_minmax(0,1fr)_4rem] items-start gap-x-3 rounded-xl px-3 py-3 text-left text-[14px] leading-5 [--message-row-surface:var(--surface-list)] transition-colors focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring sm:grid-cols-[2rem_minmax(7rem,18%)_1rem_minmax(0,1fr)_1.75rem_4rem] sm:items-center sm:gap-x-1.5 sm:py-2 sm:text-[13px]",
         isActive
-          ? "bg-selected [@media(hover:hover)]:hover:bg-selected"
-          : "[@media(hover:hover)]:hover:bg-hover"
+          ? "bg-selected [--message-row-surface:var(--surface-selected)] [@media(hover:hover)]:hover:bg-selected"
+          : "[@media(hover:hover)]:hover:bg-hover [@media(hover:hover)]:hover:[--message-row-surface:var(--surface-hover)]"
       )}
       href={href}
       onClick={(event) => {
@@ -96,7 +96,10 @@ export function MessageListItem({
         >
           <PiStar
             aria-hidden="true"
-            className={cn("pointer-events-none size-4", conversation.isStarred && "fill-star")}
+            className={cn(
+              "pointer-events-none size-[18px] translate-y-px sm:size-4 sm:translate-y-0",
+              conversation.isStarred && "fill-star"
+            )}
           />
         </button>
       </span>
@@ -121,6 +124,12 @@ export function MessageListItem({
         ) : null}
       </span>
       <span className="col-start-2 row-start-2 flex min-w-0 items-end gap-2 overflow-hidden sm:col-start-4 sm:row-start-1 sm:h-8 sm:items-center">
+        {conversation.hasAttachments ? (
+          <PiPaperclip
+            aria-label="Has attachments"
+            className="pointer-events-none size-3.5 shrink-0 self-center text-tertiary sm:hidden"
+          />
+        ) : null}
         <span className="min-w-0 flex-1">
           <span
             className={cn(
@@ -131,6 +140,14 @@ export function MessageListItem({
             )}
           >
             {conversation.subject || "No subject"}
+            {conversation.messageCount > 1 ? (
+              <span
+                className="ml-1 text-[11px] font-normal tabular-nums text-tertiary sm:hidden"
+                title={`${conversation.messageCount} messages`}
+              >
+                ({conversation.messageCount})
+              </span>
+            ) : null}
           </span>
           <span
             className={cn(
@@ -142,20 +159,6 @@ export function MessageListItem({
             {conversation.snippet || "No preview"}
           </span>
         </span>
-        {conversation.messageCount > 1 ? (
-          <span
-            className="shrink-0 rounded-md bg-muted px-1.5 py-0.5 text-[11px] tabular-nums text-tertiary sm:hidden"
-            title={`${conversation.messageCount} messages`}
-          >
-            {conversation.messageCount}
-          </span>
-        ) : null}
-        {conversation.hasAttachments ? (
-          <PiPaperclip
-            aria-label="Has attachments"
-            className="pointer-events-none size-3.5 shrink-0 text-tertiary sm:hidden"
-          />
-        ) : null}
         {activeFolder === "catchall" ? (
           <Badge className="h-5 shrink-0 px-1.5 text-[10px]" variant="outline">
             Unknown
@@ -183,7 +186,7 @@ export function MessageListItem({
           assigned={assignedLabels}
           canOrganizeLabels={canOrganizeLabels}
           className={cn(
-            "z-10 hidden max-w-[75%] justify-self-end overflow-hidden [@media(hover:hover)]:hover:bg-background [@media(hover:hover)]:hover:text-foreground/80 sm:col-start-4 sm:row-start-1 sm:inline-flex",
+            "z-10 hidden max-w-[75%] justify-self-end overflow-hidden [@media(hover:hover)]:hover:bg-[hsl(var(--message-row-surface))] [@media(hover:hover)]:hover:text-foreground/80 sm:col-start-4 sm:row-start-1 sm:inline-flex",
             labelContainerClass
           )}
           labels={labels}

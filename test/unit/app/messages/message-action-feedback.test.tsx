@@ -51,7 +51,8 @@ const customerLabel: MailLabel = {
 beforeEach(() => vi.clearAllMocks());
 
 describe("conversation action feedback", () => {
-  it("keeps unread and Trash visible and moves the other mobile actions into More", async () => {
+  it("keeps only Star and More visible and edits labels below the mobile header", async () => {
+    const onToggleLabel = vi.fn();
     const view = await renderComponent(
       <MessageDetail
         canOrganizeLabels
@@ -64,7 +65,7 @@ describe("conversation action feedback", () => {
         onBack={() => undefined}
         onRefresh={() => undefined}
         onSent={() => undefined}
-        onToggleLabel={() => undefined}
+        onToggleLabel={onToggleLabel}
       />
     );
 
@@ -80,17 +81,21 @@ describe("conversation action feedback", () => {
     const archive = view.container.querySelector<HTMLButtonElement>(
       '[aria-label="Archive conversation"]'
     );
-    const labels = view.container.querySelector<HTMLButtonElement>('[aria-label="Labels"]');
+    const desktopLabels = view.container.querySelector<HTMLButtonElement>('[aria-label="Labels"]');
+    const mobileLabels = view.container.querySelector<HTMLButtonElement>(
+      '[aria-label="Labels: Customer"]'
+    );
     const more = view.container.querySelector<HTMLButtonElement>(
       '[aria-label="More conversation actions"]'
     );
 
-    expect(unread?.className).not.toContain("sm:hidden");
-    expect(trash?.className).not.toContain("sm:hidden");
-    expect(star?.className).toContain("hidden sm:inline-flex");
+    expect(unread?.className).toContain("hidden sm:inline-flex");
+    expect(trash?.className).toContain("hidden sm:inline-flex");
+    expect(star?.className).not.toContain("hidden sm:inline-flex");
     expect(archive?.className).toContain("hidden sm:inline-flex");
-    expect(labels?.className).toContain("hidden sm:inline-flex");
-    expect(labels?.querySelector('[data-label-menu-icon="tag"]')).not.toBeNull();
+    expect(desktopLabels?.className).toContain("hidden sm:inline-flex");
+    expect(mobileLabels?.closest("[data-mobile-reader-labels]")).not.toBeNull();
+    expect(mobileLabels?.querySelector('[data-label-menu-icon="tag"]')).not.toBeNull();
     expect(more?.className).toContain("sm:hidden");
 
     await flushHookEffects(() => {
@@ -101,31 +106,26 @@ describe("conversation action feedback", () => {
     });
 
     const menu = document.body.querySelector<HTMLElement>("[data-mobile-thread-actions]");
-    expect(menu?.textContent).toContain("Labels");
-    expect(menu?.textContent).not.toContain("Customer");
-    expect(menu?.querySelector('[role="menuitemcheckbox"]')).toBeNull();
-    expect(menu?.querySelector('[data-mobile-thread-action="star"]')).not.toBeNull();
+    expect(menu?.textContent).not.toContain("Labels");
+    expect(menu?.textContent).not.toContain("Star conversation");
+    expect(menu?.querySelector('[data-mobile-thread-action="star"]')).toBeNull();
+    expect(menu?.querySelector('[data-mobile-thread-action="read"]')).not.toBeNull();
     expect(menu?.querySelector('[data-mobile-thread-action="archive"]')).not.toBeNull();
-    expect(menu?.textContent).not.toContain("Mark conversation read");
-    expect(menu?.textContent).not.toContain("Trash conversation");
-    let labelToggle = menu?.querySelector<HTMLElement>('[data-mobile-thread-action="labels"]');
-    expect(labelToggle?.getAttribute("aria-expanded")).toBe("false");
-    await flushHookEffects(() => labelToggle?.click());
-    expect(labelToggle?.getAttribute("aria-expanded")).toBe("true");
-    expect(menu?.textContent).toContain("Customer");
-    expect(menu?.querySelector('[role="menuitemcheckbox"]')).not.toBeNull();
-    await flushHookEffects(() => labelToggle?.click());
-    labelToggle = menu?.querySelector<HTMLElement>('[data-mobile-thread-action="labels"]');
-    expect(labelToggle?.getAttribute("aria-expanded")).toBe("false");
-    expect(menu?.textContent).not.toContain("Customer");
-    expect(menu?.querySelector('[role="menuitemcheckbox"]')).toBeNull();
-    expect(document.body.querySelector("[data-mobile-thread-actions]")).not.toBeNull();
-    await flushHookEffects(() => labelToggle?.click());
+    expect(menu?.querySelector('[data-mobile-thread-action="trash"]')).not.toBeNull();
+    expect(menu?.textContent).toContain("Mark conversation read");
+    expect(menu?.textContent).toContain("Trash conversation");
+
+    await flushHookEffects(() => {
+      mobileLabels?.dispatchEvent(
+        new PointerEvent("pointerdown", { bubbles: true, button: 0, pointerType: "mouse" })
+      );
+      mobileLabels?.click();
+    });
     const labelItem = [
-      ...(menu?.querySelectorAll<HTMLElement>('[role="menuitemcheckbox"]') ?? [])
+      ...document.body.querySelectorAll<HTMLElement>('[role="menuitemcheckbox"]')
     ].find((item) => item.textContent?.includes("Customer"));
     await flushHookEffects(() => labelItem?.click());
-    expect(document.body.querySelector("[data-mobile-thread-actions]")).not.toBeNull();
+    expect(onToggleLabel).toHaveBeenCalledWith(customerLabel, false);
     await view.unmount();
   });
 
@@ -166,6 +166,12 @@ describe("conversation action feedback", () => {
       expect(
         document.body.querySelector(`[data-mobile-thread-action="${testCase.action}"]`)
       ).not.toBeNull();
+      expect(document.body.querySelector('[data-mobile-thread-action="read"]')).not.toBeNull();
+      expect(document.body.querySelector('[data-mobile-thread-action="star"]')).toBeNull();
+      expect(document.body.querySelector('[data-mobile-thread-action="labels"]')).toBeNull();
+      expect(document.body.querySelector('[data-mobile-thread-action="trash"]') !== null).toBe(
+        testCase.folder !== "trash"
+      );
       await view.unmount();
     }
   });

@@ -90,6 +90,15 @@ describe("conversation reader", () => {
     expect(html).toContain('aria-label="Archive conversation"');
     expect(html).toContain("Customer Example");
     expect(html).toContain("customer@example.com · to support@example.com");
+    const title = html.match(/<h1[^>]*>/u)?.[0];
+    expect(title).toContain("truncate whitespace-nowrap");
+    expect(title).not.toContain("break-words");
+    expect(title).not.toContain("text-balance");
+    const mobileActions = html.match(/<div class="absolute inset-y-0 right-0[^>]*>/u)?.[0];
+    expect(mobileActions).toContain("bg-toolbar");
+    expect(mobileActions).toContain("shadow-[-10px_0_8px_2px_hsl(var(--surface-toolbar))]");
+    expect(mobileActions).toContain("sm:static");
+    expect(mobileActions).toContain("sm:shadow-none");
   });
 
   it("offers restore instead of archive and trash in Trash", () => {
@@ -245,6 +254,8 @@ describe("conversation reader", () => {
     expect(unreadHtml).toContain('aria-label="Star conversation"');
     expect(unreadHtml).toContain('title="2 messages"');
     expect(unreadHtml).toContain(">2<");
+    expect(unreadHtml).toContain(">(2)</span>");
+    expect(unreadHtml).not.toContain("bg-muted px-1.5 py-0.5");
     expect(readHtml).toContain('aria-label="Star conversation"');
   });
 
@@ -312,25 +323,36 @@ describe("conversation reader", () => {
     expect(html).toContain("sm:col-start-4 sm:row-start-1 sm:inline-flex");
     expect(html).toContain("sm:col-start-5 sm:row-start-1 sm:flex sm:w-7 sm:min-w-7");
     expect(html).toContain("bg-muted px-0.5 py-0.5 text-[11px]");
-    expect(html).toContain("hover:bg-background");
+    expect(html).toContain(">(2)</span>");
+    expect(html).not.toContain("bg-muted px-1.5 py-0.5");
+    expect(html).toContain("size-[18px] translate-y-px sm:size-4 sm:translate-y-0");
+    const row = html.match(/<a[^>]*>/u)?.[0];
+    expect(row).toContain("[--message-row-surface:var(--surface-list)]");
+    expect(row).toContain("hover:[--message-row-surface:var(--surface-hover)]");
+    const attachmentMarkers = [...html.matchAll(/aria-label="Has attachments"/gu)];
+    expect(attachmentMarkers).toHaveLength(2);
+    expect(attachmentMarkers[1]?.index).toBeLessThan(html.indexOf(">Account access"));
     const compactLabelContainer = html.match(/<span[^>]*data-message-labels="compact"[^>]*>/u)?.[0];
     expect(compactLabelContainer).toContain("w-max");
     expect(compactLabelContainer).toContain("overflow-visible");
     expect(compactLabelContainer).not.toContain("max-w-[75%]");
     expect(compactLabelContainer).not.toContain("overflow-hidden");
     expect(compactLabelContainer).toContain("rounded-full");
-    expect(compactLabelContainer).toContain("bg-background");
+    expect(compactLabelContainer).toContain("bg-[hsl(var(--message-row-surface))]");
     expect(compactLabelContainer).toContain("p-0.5");
-    expect(compactLabelContainer).toContain("shadow-[0_0_6px_1px_hsl(var(--background)/0.14)]");
+    expect(compactLabelContainer).toContain(
+      "shadow-[0_0_6px_1px_hsl(var(--message-row-surface)/0.14)]"
+    );
     expect(compactLabelContainer).not.toContain("backdrop-blur");
     const labelButton = html.match(
       /<button[^>]*data-message-labels="desktop"[^>]*>[\s\S]*?<\/button>/u
     )?.[0];
     expect(labelButton).toContain("rounded-full");
-    expect(labelButton).toContain("bg-background");
+    expect(labelButton).toContain("bg-[hsl(var(--message-row-surface))]");
     expect(labelButton).toContain("p-0.5");
-    expect(labelButton).toContain("shadow-[0_0_6px_1px_hsl(var(--background)/0.14)]");
-    expect(labelButton).toContain("sm:shadow-[0_0_6px_1px_hsl(var(--background))]");
+    expect(labelButton).toContain("shadow-[0_0_6px_1px_hsl(var(--message-row-surface)/0.14)]");
+    expect(labelButton).toContain("sm:shadow-[0_0_6px_1px_hsl(var(--message-row-surface))]");
+    expect(labelButton).toContain("hover:bg-[hsl(var(--message-row-surface))]");
     expect(labelButton).not.toContain("backdrop-blur");
     expect(labelButton).toContain("sm:inline-flex");
     expect(labelButton).toContain(">HR</span>");
@@ -359,6 +381,20 @@ describe("conversation reader", () => {
     expect(readOnlyHtml).not.toContain('<button aria-label="Labels: HR"');
     expect(readOnlyHtml).toContain('<span class="z-10 hidden');
     expect(readOnlyHtml).toContain('data-message-labels="desktop"');
+
+    const activeHtml = renderToStaticMarkup(
+      <MessageListItem
+        activeFolder="inbox"
+        conversation={conversation}
+        href="/mail/inbox/msg_1"
+        isActive
+        onSelect={() => undefined}
+        onToggleStar={() => undefined}
+      />
+    );
+    expect(activeHtml.match(/<a[^>]*>/u)?.[0]).toContain(
+      "[--message-row-surface:var(--surface-selected)]"
+    );
   });
 
   it("keeps every compact label visible in a right-aligned row", () => {
