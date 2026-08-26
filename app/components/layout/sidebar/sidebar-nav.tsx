@@ -176,7 +176,15 @@ export function MailNav({
   activeFolder: FolderId;
   draftCount: number;
   mailboxId: string;
-  mailboxFilter: { mailboxes: Mailbox[]; value: string; onChange: (v: string) => void } | undefined;
+  mailboxFilter:
+    | {
+        mailboxes: Mailbox[];
+        open?: boolean;
+        value: string;
+        onChange: (v: string) => void;
+        onOpenChange?: (open: boolean) => void;
+      }
+    | undefined;
   unread: UnreadCounts;
   isDrawer: boolean;
   onFolderChange: (folder: FolderId) => void;
@@ -228,6 +236,8 @@ export function MailNav({
               ]}
               placeholder="All mailboxes"
               value={mailboxFilter.value}
+              {...(mailboxFilter.open === undefined ? {} : { open: mailboxFilter.open })}
+              {...(mailboxFilter.onOpenChange ? { onOpenChange: mailboxFilter.onOpenChange } : {})}
               onValueChange={mailboxFilter.onChange}
             />
           </Field>

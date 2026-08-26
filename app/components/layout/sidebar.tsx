@@ -22,8 +22,10 @@ type SidebarProps = {
   mailboxId: string;
   mailboxFilter?: {
     mailboxes: Mailbox[];
+    open?: boolean;
     value: string;
     onChange: (mailboxId: string) => void;
+    onOpenChange?: (open: boolean) => void;
   };
   user: CurrentUser;
   unread: UnreadCounts;

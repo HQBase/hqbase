@@ -48,7 +48,9 @@ export function MobileNavigation({
   onSignedOut
 }: MobileNavigationProps): React.ReactElement {
   const [open, setOpen] = React.useState(false);
+  const [mailboxFilterOpen, setMailboxFilterOpen] = React.useState(false);
   const drawerRef = React.useRef<HTMLDivElement>(null);
+  const suppressNextDrawerClickRef = React.useRef(false);
 
   function handleFolderChange(folder: FolderId): void {
     onFolderChange(folder);
@@ -60,8 +62,24 @@ export function MobileNavigation({
   }
 
   function handleMailboxChange(nextMailboxId: string): void {
+    suppressNextDrawerClickRef.current = false;
+    setMailboxFilterOpen(false);
     onMailboxChange(nextMailboxId);
     setOpen(false);
+  }
+
+  function handleDrawerPointerDownCapture(event: React.PointerEvent<HTMLDivElement>): void {
+    if (!mailboxFilterOpen) return;
+    suppressNextDrawerClickRef.current = true;
+    event.stopPropagation();
+    setMailboxFilterOpen(false);
+  }
+
+  function handleDrawerClickCapture(event: React.MouseEvent<HTMLDivElement>): void {
+    if (!suppressNextDrawerClickRef.current) return;
+    suppressNextDrawerClickRef.current = false;
+    event.preventDefault();
+    event.stopPropagation();
   }
 
   function handleCompose(): void {
@@ -80,7 +98,16 @@ export function MobileNavigation({
   }
 
   return (
-    <Sheet open={open} onOpenChange={setOpen}>
+    <Sheet
+      open={open}
+      onOpenChange={(nextOpen) => {
+        setOpen(nextOpen);
+        if (!nextOpen) {
+          suppressNextDrawerClickRef.current = false;
+          setMailboxFilterOpen(false);
+        }
+      }}
+    >
       <SheetTrigger asChild>
         <Button
           aria-label="Open navigation"
@@ -99,10 +126,12 @@ export function MobileNavigation({
         overlayClassName="before:pointer-events-none before:fixed before:inset-x-0 before:top-0 before:h-[env(safe-area-inset-top)] before:bg-background after:pointer-events-none after:fixed after:inset-x-0 after:bottom-0 after:h-[env(safe-area-inset-bottom)] after:bg-background"
         ref={drawerRef}
         side="left"
+        onClickCapture={handleDrawerClickCapture}
         onOpenAutoFocus={(event) => {
           event.preventDefault();
           drawerRef.current?.querySelector<HTMLElement>("[data-navigation-item]")?.focus();
         }}
+        onPointerDownCapture={handleDrawerPointerDownCapture}
       >
         <SheetTitle className="sr-only">Navigation</SheetTitle>
         <Sidebar
@@ -115,8 +144,10 @@ export function MobileNavigation({
           mailboxId={mailboxId}
           mailboxFilter={{
             mailboxes,
+            open: mailboxFilterOpen,
             value: mailboxId,
-            onChange: handleMailboxChange
+            onChange: handleMailboxChange,
+            onOpenChange: setMailboxFilterOpen
           }}
           unread={unread}
           user={user}

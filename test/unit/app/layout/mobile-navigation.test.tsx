@@ -177,11 +177,89 @@ describe("mobile navigation", () => {
       view.container.querySelector<HTMLButtonElement>('[aria-label="Open navigation"]')?.click()
     );
     await flushHookEffects(() =>
-      document.body.querySelector<HTMLButtonElement>('[aria-label="Mailbox filter"]')?.click()
+      document.body
+        .querySelector<HTMLButtonElement>('[aria-label="Mailbox filter"]')
+        ?.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, button: 0 }))
     );
 
     expect(document.body.textContent).toContain("support@example.com");
     expect(document.body.textContent).not.toContain("support@example.com (4)");
+    await view.unmount();
+  });
+
+  it("dismisses the mailbox selector without closing the drawer", async () => {
+    const onMailboxChange = vi.fn();
+    const view = await renderComponent(
+      <MobileNavigation
+        activeFolder="inbox"
+        draftCount={0}
+        mailboxId="all"
+        mailboxes={[
+          {
+            accessLevel: "manager",
+            address: "support@example.com",
+            createdAt: "2026-08-24T12:00:00.000Z",
+            deletedAt: null,
+            displayName: "Support",
+            id: "mailbox-1",
+            isActive: true,
+            kind: "human",
+            mailDomainId: "domain-1",
+            updatedAt: "2026-08-24T12:00:00.000Z"
+          }
+        ]}
+        unread={{ catchall: 0, inbox: 0, inboxByMailbox: {}, total: 0 }}
+        user={{
+          defaultFromMailboxId: null,
+          email: "member@example.com",
+          id: "user-2",
+          name: "Member",
+          passwordSetupRequired: false,
+          role: "member"
+        }}
+        onFolderChange={() => undefined}
+        onMailboxChange={onMailboxChange}
+        onSignedOut={() => undefined}
+      />
+    );
+    document.body.appendChild(view.container);
+
+    await flushHookEffects(() =>
+      view.container.querySelector<HTMLButtonElement>('[aria-label="Open navigation"]')?.click()
+    );
+    await flushHookEffects(() =>
+      document.body
+        .querySelector<HTMLButtonElement>('[aria-label="Mailbox filter"]')
+        ?.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, button: 0 }))
+    );
+    expect(document.body.querySelector('[role="menu"]')).not.toBeNull();
+
+    await flushHookEffects(() => {
+      const destination = document.body.querySelector<HTMLAnchorElement>(
+        'nav[aria-label="Mail folders"] a[href="/mail/sent"]'
+      );
+      destination?.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }));
+      destination?.dispatchEvent(new PointerEvent("pointerup", { bubbles: true }));
+      destination?.click();
+    });
+
+    expect(document.body.querySelector('[role="menu"]')).toBeNull();
+    expect(document.body.querySelector('[role="dialog"]')?.getAttribute("data-state")).toBe("open");
+
+    await flushHookEffects(() =>
+      document.body
+        .querySelector<HTMLButtonElement>('[aria-label="Mailbox filter"]')
+        ?.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, button: 0 }))
+    );
+    const supportMailbox = Array.from(
+      document.body.querySelectorAll<HTMLElement>('[role="menuitemradio"]')
+    ).find((item) => item.textContent?.includes("support@example.com"));
+    await flushHookEffects(() => supportMailbox?.click());
+
+    expect(onMailboxChange).toHaveBeenCalledWith("mailbox-1");
+    expect(document.body.querySelector('[role="dialog"]')?.getAttribute("data-state")).not.toBe(
+      "open"
+    );
     await view.unmount();
   });
 });
