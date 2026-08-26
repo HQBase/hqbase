@@ -77,6 +77,8 @@ describe("mobile navigation", () => {
     );
     const drawer = () => document.body.querySelector<HTMLElement>('[role="dialog"]');
     expect(drawer()?.getAttribute("data-state")).toBe("open");
+    expect(drawer()?.classList.contains("border-r-0")).toBe(true);
+    expect(drawer()?.classList.contains("shadow-none")).toBe(true);
 
     await flushHookEffects(() =>
       document.body

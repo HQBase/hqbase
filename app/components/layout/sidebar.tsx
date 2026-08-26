@@ -72,17 +72,17 @@ export function Sidebar({
     <aside
       className={cn(
         "flex-col text-foreground",
-        isDrawer
-          ? "flex h-full w-full bg-sidebar pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-[max(0.75rem,env(safe-area-inset-top))]"
-          : "hidden h-full w-full bg-rail lg:flex"
+        isDrawer ? "flex h-full w-full bg-sidebar" : "hidden h-full w-full bg-rail lg:flex"
       )}
     >
       <div className="flex h-full min-h-0 flex-1">
         <nav
           aria-label="Quick access"
           className={cn(
-            "flex w-12 shrink-0 flex-col items-center py-2",
-            isDrawer ? "px-1" : "pr-2 pl-1"
+            "flex w-12 shrink-0 flex-col items-center",
+            isDrawer
+              ? "px-1 pb-[max(1.25rem,calc(env(safe-area-inset-bottom)+0.5rem))] pt-[max(1.25rem,calc(env(safe-area-inset-top)+0.5rem))]"
+              : "py-2 pr-2 pl-1"
           )}
         >
           <a
@@ -97,7 +97,7 @@ export function Sidebar({
           >
             <img alt="" className="size-7 rounded-md object-contain" src="/logo.svg" />
           </a>
-          <div className="mt-5 flex flex-col gap-1">
+          <div className={cn("mt-5 flex flex-col gap-1", isDrawer && "w-full items-center")}>
             {quickAccess.map(({ folder, icon: Icon, label }) => {
               const isActive =
                 folder === "inbox"
@@ -142,11 +142,18 @@ export function Sidebar({
               );
             })}
           </div>
-          <div className="mt-auto flex flex-col items-center gap-1">
+          <div className={cn("mt-auto flex flex-col items-center gap-1", isDrawer && "w-full")}>
             <AccountMenu compact user={user} onSignedOut={onSignedOut} />
           </div>
         </nav>
-        <div className="ml-2 flex h-full min-w-0 flex-1 flex-col overflow-hidden rounded-[24px] border border-divider bg-sidebar p-2 shadow-sm">
+        <div
+          className={cn(
+            "flex h-full min-w-0 flex-1 flex-col overflow-hidden bg-sidebar",
+            isDrawer
+              ? "border-l border-divider px-2 pb-[max(1.25rem,calc(env(safe-area-inset-bottom)+0.5rem))] pt-[max(1.25rem,calc(env(safe-area-inset-top)+0.5rem))]"
+              : "ml-2 rounded-[24px] border border-divider p-2 shadow-sm"
+          )}
+        >
           <div className="mb-5 flex h-9 items-center justify-between gap-3 px-3.5 pr-0">
             <div className="flex min-w-0 items-center gap-3">
               <span className="truncate text-sm font-semibold leading-none tracking-tight">
