@@ -39,7 +39,7 @@ export function MessageListItem({
   const correspondent = correspondentLabel(conversation);
   const assignedLabels = conversation.labels ?? [];
   const labelContainerClass =
-    "rounded-full bg-[hsl(var(--message-row-surface))] p-0.5 shadow-[0_0_6px_1px_hsl(var(--message-row-surface)/0.14)] sm:shadow-[-8px_0_8px_2px_hsl(var(--message-row-surface))]";
+    "rounded-full bg-[hsl(var(--message-row-surface))] p-0.5 shadow-[-5px_0_5px_1px_hsl(var(--message-row-surface))] sm:shadow-[-8px_0_8px_2px_hsl(var(--message-row-surface))]";
   const avatarInitial =
     correspondent
       .replace(/^To:\s*/u, "")

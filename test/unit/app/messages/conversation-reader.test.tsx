@@ -355,7 +355,7 @@ describe("conversation reader", () => {
     expect(compactLabelContainer).toContain("bg-[hsl(var(--message-row-surface))]");
     expect(compactLabelContainer).toContain("p-0.5");
     expect(compactLabelContainer).toContain(
-      "shadow-[0_0_6px_1px_hsl(var(--message-row-surface)/0.14)]"
+      "shadow-[-5px_0_5px_1px_hsl(var(--message-row-surface))]"
     );
     expect(compactLabelContainer).not.toContain("backdrop-blur");
     expect(html).toContain("w-max shrink-0 leading-4");
@@ -365,7 +365,7 @@ describe("conversation reader", () => {
     expect(labelButton).toContain("rounded-full");
     expect(labelButton).toContain("bg-[hsl(var(--message-row-surface))]");
     expect(labelButton).toContain("p-0.5");
-    expect(labelButton).toContain("shadow-[0_0_6px_1px_hsl(var(--message-row-surface)/0.14)]");
+    expect(labelButton).toContain("shadow-[-5px_0_5px_1px_hsl(var(--message-row-surface))]");
     expect(labelButton).toContain("sm:shadow-[-8px_0_8px_2px_hsl(var(--message-row-surface))]");
     expect(labelButton).toContain("hover:bg-[hsl(var(--message-row-surface))]");
     expect(labelButton).not.toContain("backdrop-blur");

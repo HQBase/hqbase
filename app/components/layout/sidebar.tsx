@@ -29,6 +29,7 @@ type SidebarProps = {
   unread: UnreadCounts;
   onCompose?: () => void;
   onFolderChange: (folder: FolderId) => void;
+  onSectionChange?: ((folder: FolderId) => void) | undefined;
   onSignedOut: () => void;
   variant?: "desktop" | "drawer";
   sidebarCollapsed?: boolean;
@@ -48,6 +49,7 @@ export function Sidebar({
   user,
   onCompose,
   onFolderChange,
+  onSectionChange,
   onSignedOut,
   variant = "desktop",
   sidebarCollapsed = false,
@@ -58,6 +60,7 @@ export function Sidebar({
   onToggleSidebar
 }: SidebarProps): React.ReactElement {
   const isDrawer = variant === "drawer";
+  const handleSectionChange = onSectionChange ?? onFolderChange;
 
   return (
     <aside
@@ -83,7 +86,7 @@ export function Sidebar({
             onClick={(event) => {
               if (isModifiedNavigation(event)) return;
               event.preventDefault();
-              onFolderChange("inbox");
+              handleSectionChange("inbox");
             }}
           >
             <img alt="" className="size-7 rounded-md object-contain" src="/logo.svg" />
@@ -122,7 +125,7 @@ export function Sidebar({
                     onClick={(event) => {
                       if (isModifiedNavigation(event)) return;
                       event.preventDefault();
-                      onFolderChange(folder);
+                      handleSectionChange(folder);
                     }}
                   >
                     <Icon />

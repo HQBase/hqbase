@@ -47,6 +47,56 @@ describe("mobile navigation", () => {
     await view.unmount();
   });
 
+  it("keeps the drawer open for a section switch and closes it for a destination", async () => {
+    const onFolderChange = vi.fn();
+    const navigation = (activeFolder: "contacts" | "inbox") => (
+      <MobileNavigation
+        activeFolder={activeFolder}
+        draftCount={0}
+        mailboxId="all"
+        mailboxes={[]}
+        unread={{ catchall: 0, inbox: 0, inboxByMailbox: {}, total: 0 }}
+        user={{
+          defaultFromMailboxId: null,
+          email: "member@example.com",
+          id: "user-2",
+          name: "Member",
+          passwordSetupRequired: false,
+          role: "member"
+        }}
+        onFolderChange={onFolderChange}
+        onMailboxChange={() => undefined}
+        onSignedOut={() => undefined}
+      />
+    );
+    const view = await renderComponent(navigation("inbox"));
+    document.body.appendChild(view.container);
+
+    await flushHookEffects(() =>
+      view.container.querySelector<HTMLButtonElement>('[aria-label="Open navigation"]')?.click()
+    );
+    const drawer = () => document.body.querySelector<HTMLElement>('[role="dialog"]');
+    expect(drawer()?.getAttribute("data-state")).toBe("open");
+
+    await flushHookEffects(() =>
+      document.body
+        .querySelector<HTMLAnchorElement>('nav[aria-label="Quick access"] a[aria-label="Contacts"]')
+        ?.click()
+    );
+    expect(onFolderChange).toHaveBeenLastCalledWith("contacts");
+    expect(drawer()?.getAttribute("data-state")).toBe("open");
+
+    await view.rerender(navigation("contacts"));
+    const allContacts = document.body.querySelector<HTMLAnchorElement>(
+      'nav[aria-label="Contacts navigation"] a[href="/contacts"]'
+    );
+    expect(allContacts).not.toBeNull();
+    await flushHookEffects(() => allContacts?.click());
+    expect(onFolderChange).toHaveBeenLastCalledWith("contacts");
+    expect(drawer()?.getAttribute("data-state")).not.toBe("open");
+    await view.unmount();
+  });
+
   it("hides agent management from workspace members", async () => {
     const view = await renderComponent(
       <MobileNavigation

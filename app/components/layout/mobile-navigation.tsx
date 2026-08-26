@@ -51,6 +51,10 @@ export function MobileNavigation({
     setOpen(false);
   }
 
+  function handleSectionChange(folder: FolderId): void {
+    onFolderChange(folder);
+  }
+
   function handleMailboxChange(nextMailboxId: string): void {
     onMailboxChange(nextMailboxId);
     setOpen(false);
@@ -108,6 +112,7 @@ export function MobileNavigation({
           user={user}
           {...(onCompose ? { onCompose: handleCompose } : {})}
           onFolderChange={handleFolderChange}
+          onSectionChange={handleSectionChange}
           {...(onSettingsTabChange ? { onSettingsTabChange: handleSettingsTabChange } : {})}
           onSignedOut={onSignedOut}
           variant="drawer"
