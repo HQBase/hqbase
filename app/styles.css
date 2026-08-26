@@ -171,6 +171,14 @@
     min-height: 100dvh;
   }
 
+  html[data-hqbase-shell="fixed"],
+  html[data-hqbase-shell="fixed"] body,
+  html[data-hqbase-shell="fixed"] #root {
+    height: 100dvh;
+    min-height: 0;
+    overflow: hidden;
+  }
+
   [id] {
     scroll-margin-top: 2rem;
   }

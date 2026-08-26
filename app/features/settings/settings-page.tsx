@@ -62,7 +62,7 @@ export function SettingsPage({
 }: SettingsPageProps): React.ReactElement {
   return (
     <div className="h-full overflow-auto">
-      <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-8">
+      <div className="mx-auto w-full max-w-[960px] px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
         {activeTab === "mailboxes" ? (
           <MailboxSettings
             canManage={canManage}

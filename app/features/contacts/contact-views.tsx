@@ -150,22 +150,24 @@ export function ContactDetailView({
 
   return (
     <div className="flex h-full flex-col bg-list">
-      <header className="flex h-12 shrink-0 items-center gap-2 border-b border-divider bg-toolbar px-3">
-        <Button
-          aria-label="Back to contacts"
-          className="size-9 shrink-0 text-tertiary"
-          onClick={onBack}
-          size="icon"
-          type="button"
-          variant="ghost"
-        >
-          <PiArrowLeft aria-hidden="true" />
-        </Button>
-        <span className="text-sm font-medium">Contact</span>
+      <header className="flex h-12 shrink-0 items-center border-b border-divider bg-toolbar">
+        <div className="mx-auto flex w-full max-w-[960px] items-center gap-2 px-3 sm:px-6 lg:px-8">
+          <Button
+            aria-label="Back to contacts"
+            className="size-9 shrink-0 text-tertiary"
+            onClick={onBack}
+            size="icon"
+            type="button"
+            variant="ghost"
+          >
+            <PiArrowLeft aria-hidden="true" />
+          </Button>
+          <span className="text-sm font-medium">Contact</span>
+        </div>
       </header>
       <div className="min-h-0 flex-1 overflow-auto">
         {error ? (
-          <div className="mx-auto max-w-3xl p-6 text-sm text-destructive">{error}</div>
+          <div className="mx-auto w-full max-w-[960px] p-6 text-sm text-destructive">{error}</div>
         ) : !detail ? (
           <div className="grid min-h-64 place-items-center text-sm text-muted-foreground">
             <span className="flex items-center gap-2">
@@ -174,7 +176,7 @@ export function ContactDetailView({
             </span>
           </div>
         ) : (
-          <div className="mx-auto max-w-3xl space-y-6 px-4 py-6 sm:px-6 sm:py-8">
+          <div className="mx-auto w-full max-w-[960px] space-y-6 px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
             <div className="flex flex-wrap items-center gap-4">
               <ContactAvatar className="size-14" contact={detail.contact} />
               <div className="min-w-0 flex-1">

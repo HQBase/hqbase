@@ -261,7 +261,12 @@ describe("mail shell", () => {
     expect(html.indexOf(">Mailbox</label>")).toBeLessThan(html.indexOf(">Inbox</span>"));
     expect(html).toContain('aria-current="page"');
     expect(html).not.toContain("Connect MCP");
-    expect(html).toContain("border-t border-divider pt-2");
+    expect(html).toContain('aria-label="Quick access"');
+    expect(html).toContain('aria-label="Mail"');
+    expect(html).toContain('aria-label="Contacts"');
+    expect(html).toContain('aria-label="Settings"');
+    expect(html).not.toContain(">Contacts</span>");
+    expect(html).not.toContain(">Settings</span>");
   });
 
   it("shows settings tabs in the left navigation instead of a top tab bar", () => {

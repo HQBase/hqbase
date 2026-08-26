@@ -110,13 +110,17 @@ describe("conversation action feedback", () => {
     expect(desktopLabels?.className).toContain("flex-row-reverse");
     expect(desktopLabels?.querySelector('[data-label-menu-icon="tag"]')).not.toBeNull();
     expect(mobileWrapper?.className).toContain("flex justify-end");
-    expect(mobileWrapper?.className).toContain("py-0.5");
+    expect(mobileWrapper?.className).toContain("pt-1.5");
+    expect(mobileWrapper?.className).toContain("pb-0");
     expect(mobileWrapper?.className).toContain("sm:hidden");
     expect(mobileLabels?.className).toContain("bg-muted/40");
     expect(mobileLabels?.className).toContain("px-1");
     expect(
       view.container.querySelector("[data-thread-message-id] header [data-reader-labels]")
     ).toBeNull();
+    expect(
+      view.container.querySelector<HTMLElement>("[data-thread-message-id]")?.className
+    ).toContain("pt-2");
     expect(more?.className).toContain("sm:hidden");
 
     await flushHookEffects(() => {

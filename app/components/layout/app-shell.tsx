@@ -43,6 +43,13 @@ export function AppShell(props: AppShellProps): React.ReactElement {
     readStoredBoolean(sidebarCollapsedStorageKey, false)
   );
 
+  React.useEffect(() => {
+    document.documentElement.dataset.hqbaseShell = "fixed";
+    return () => {
+      delete document.documentElement.dataset.hqbaseShell;
+    };
+  }, []);
+
   const toggleSidebar = React.useCallback((): void => {
     const next = !sidebarCollapsed;
     setSidebarCollapsed(next);

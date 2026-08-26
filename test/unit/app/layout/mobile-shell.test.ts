@@ -13,6 +13,14 @@ const settingsPage = readFileSync(
   new URL("../../../../app/features/settings/settings-page.tsx", import.meta.url),
   "utf8"
 );
+const contactsPage = readFileSync(
+  new URL("../../../../app/features/contacts/contacts-page.tsx", import.meta.url),
+  "utf8"
+);
+const contactViews = readFileSync(
+  new URL("../../../../app/features/contacts/contact-views.tsx", import.meta.url),
+  "utf8"
+);
 const topBar = readFileSync(
   new URL("../../../../app/components/layout/top-bar.tsx", import.meta.url),
   "utf8"
@@ -137,9 +145,21 @@ describe("mobile application shell", () => {
   it("keeps persistent mail chrome fixed and ignores pans that begin in the header", () => {
     expect(appShell).not.toContain("immersiveOnCompact");
     expect(appShell).toContain("touch-manipulation");
+    expect(appShell).toContain('dataset.hqbaseShell = "fixed"');
     expect(appShell).toContain("h-[env(safe-area-inset-top)] touch-none");
     expect(topBar).toContain("shrink-0 touch-none");
     expect(styles).toContain("overscroll-behavior: none");
+    expect(styles).toContain('html[data-hqbase-shell="fixed"] #root');
+    expect(styles).toContain("overflow: hidden");
+  });
+
+  it("uses the inbox content width for Contacts and Settings", () => {
+    expect(settingsPage).toContain("max-w-[960px]");
+    expect(settingsPage).not.toContain("max-w-6xl");
+    expect(contactsPage).toContain("max-w-[960px]");
+    expect(contactsPage).not.toContain("max-w-[1200px]");
+    expect(contactViews).toContain("max-w-[960px]");
+    expect(contactViews).not.toContain("max-w-3xl");
   });
 
   it("refreshes inside mail scroll surfaces without disabling deliberate pinch zoom", () => {

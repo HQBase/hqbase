@@ -104,18 +104,22 @@ export function ContactsPage({
 
   return (
     <div className="flex h-full flex-col bg-list">
-      <header className="flex min-h-14 shrink-0 items-center gap-3 border-b border-divider bg-toolbar px-4 sm:px-6">
-        <div className="min-w-0 flex-1">
-          <h1 className="text-sm font-semibold">Contacts</h1>
-          <p className="text-xs text-muted-foreground">Saved contacts and recent correspondents</p>
+      <header className="flex min-h-14 shrink-0 items-center border-b border-divider bg-toolbar">
+        <div className="mx-auto flex w-full max-w-[960px] items-center gap-3 px-4 sm:px-6 lg:px-8">
+          <div className="min-w-0 flex-1">
+            <h1 className="text-sm font-semibold">Contacts</h1>
+            <p className="text-xs text-muted-foreground">
+              Saved contacts and recent correspondents
+            </p>
+          </div>
+          <Button size="sm" type="button" onClick={() => setCreateOpen(true)}>
+            <PiPlus aria-hidden="true" />
+            Add contact
+          </Button>
         </div>
-        <Button size="sm" type="button" onClick={() => setCreateOpen(true)}>
-          <PiPlus aria-hidden="true" />
-          Add contact
-        </Button>
       </header>
       <div className="min-h-0 flex-1 overflow-auto">
-        <div className="mx-auto w-full max-w-[1200px] px-4 py-5 sm:px-6 lg:px-8">
+        <div className="mx-auto w-full max-w-[960px] px-4 py-5 sm:px-6 lg:px-8">
           <div className="relative mb-4">
             <PiMagnifyingGlass
               aria-hidden="true"

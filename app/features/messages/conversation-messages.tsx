@@ -72,7 +72,10 @@ export function ConversationMessages({
     );
     return (
       <article
-        className={cn("px-4 py-5 sm:px-6 sm:py-6", compact && "px-4 py-4 sm:px-4 sm:py-4")}
+        className={cn(
+          compact ? "px-4 py-4 sm:px-4 sm:py-4" : "px-4 pb-5 sm:px-6 sm:py-6",
+          !compact && (message === messages[0] ? "pt-2" : "pt-5")
+        )}
         data-thread-message-id={message.id}
         key={message.id}
       >

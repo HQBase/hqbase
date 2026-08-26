@@ -3,7 +3,6 @@ import type * as React from "react";
 import { Button } from "@/components/ui/button";
 import { DropdownSelect } from "@/components/ui/dropdown-select";
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
-import type { CurrentUser } from "@/features/auth/types";
 import type { Mailbox } from "@/features/mailboxes/types";
 import type { UnreadCounts } from "@/features/notifications/types";
 import { inboxUnreadForMailbox } from "@/features/notifications/unread";
@@ -17,31 +16,20 @@ import {
   settingsTabIcons,
   settingsTabLabels
 } from "./constants";
-import {
-  DrawerContactsFooter,
-  DrawerMailFooter,
-  DrawerSettingsFooter
-} from "./sidebar-drawer-extras";
 import { isModifiedNavigation } from "./sidebar-helpers";
 
 export function SettingsNav({
   activeSettingsTab,
   canManage,
   isDrawer,
-  onFolderChange,
   onSettingsTabChange,
-  onCompose,
-  user,
-  onSignedOut
+  onCompose
 }: {
   activeSettingsTab: SettingsTabId | undefined;
   canManage: boolean;
   isDrawer: boolean;
-  onFolderChange: (folder: FolderId) => void;
   onSettingsTabChange: ((tab: SettingsTabId) => void) | undefined;
   onCompose: (() => void) | undefined;
-  user: CurrentUser;
-  onSignedOut: () => void;
 }): React.ReactElement {
   return (
     <>
@@ -99,13 +87,6 @@ export function SettingsNav({
               </Button>
             );
           })}
-        {isDrawer ? (
-          <DrawerSettingsFooter
-            user={user}
-            onFolderChange={onFolderChange}
-            onSignedOut={onSignedOut}
-          />
-        ) : null}
       </nav>
     </>
   );
@@ -119,9 +100,7 @@ export function MailNav({
   unread,
   isDrawer,
   onFolderChange,
-  onCompose,
-  user,
-  onSignedOut
+  onCompose
 }: {
   activeFolder: FolderId;
   draftCount: number;
@@ -131,8 +110,6 @@ export function MailNav({
   isDrawer: boolean;
   onFolderChange: (folder: FolderId) => void;
   onCompose: (() => void) | undefined;
-  user: CurrentUser;
-  onSignedOut: () => void;
 }): React.ReactElement {
   const navigationFolders: Array<(typeof mailFolders)[number] | typeof draftFolder> = [];
   for (const folder of mailFolders) {
@@ -239,9 +216,6 @@ export function MailNav({
             </Button>
           );
         })}
-        {isDrawer ? (
-          <DrawerMailFooter user={user} onFolderChange={onFolderChange} onSignedOut={onSignedOut} />
-        ) : null}
       </nav>
     </>
   );
@@ -250,15 +224,11 @@ export function MailNav({
 export function ContactsNav({
   isDrawer,
   onFolderChange,
-  onCompose,
-  user,
-  onSignedOut
+  onCompose
 }: {
   isDrawer: boolean;
   onFolderChange: (folder: FolderId) => void;
   onCompose: (() => void) | undefined;
-  user: CurrentUser;
-  onSignedOut: () => void;
 }): React.ReactElement {
   return (
     <>
@@ -299,13 +269,6 @@ export function ContactsNav({
             <span className="min-w-0 flex-1 truncate leading-none">All contacts</span>
           </a>
         </Button>
-        {isDrawer ? (
-          <DrawerContactsFooter
-            user={user}
-            onFolderChange={onFolderChange}
-            onSignedOut={onSignedOut}
-          />
-        ) : null}
       </nav>
     </>
   );

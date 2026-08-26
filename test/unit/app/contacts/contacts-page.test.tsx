@@ -71,6 +71,21 @@ describe("contacts page", () => {
     expect(html).not.toContain("border-b");
   });
 
+  it("uses the inbox content width for the contacts directory", () => {
+    const html = renderToStaticMarkup(
+      <ContactsPage
+        selectedId={null}
+        onBack={() => undefined}
+        onCompose={() => undefined}
+        onOpenConversation={() => undefined}
+        onSelect={() => undefined}
+      />
+    );
+
+    expect(html).toContain("max-w-[960px]");
+    expect(html).not.toContain("max-w-[1200px]");
+  });
+
   it("shows private notes, exact exchanges, and the normal compose action", async () => {
     const onCompose = vi.fn();
     const onOpenConversation = vi.fn();
@@ -91,6 +106,7 @@ describe("contacts page", () => {
     );
     expect(view.container.textContent).toContain("Project timing");
     expect(view.container.textContent).toContain("Can we talk tomorrow?");
+    expect(view.container.innerHTML).toContain("max-w-[960px]");
 
     const newEmail = Array.from(view.container.querySelectorAll("button")).find((button) =>
       button.textContent?.includes("New email")
