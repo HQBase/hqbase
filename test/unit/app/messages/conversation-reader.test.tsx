@@ -308,14 +308,16 @@ describe("conversation reader", () => {
     expect(html).toContain("min-h-10");
     expect(html).toContain("min-h-0");
     expect(html).toContain("col-start-2 row-start-2");
-    expect(html).toContain("w-fit min-w-0 max-w-[75%]");
     expect(html).toContain("self-end justify-self-end");
     expect(html).toContain("sm:col-start-4 sm:row-start-1 sm:inline-flex");
     expect(html).toContain("sm:col-start-5 sm:row-start-1 sm:flex sm:w-7 sm:min-w-7");
     expect(html).toContain("bg-muted px-0.5 py-0.5 text-[11px]");
-    expect(html).toContain("overflow-hidden sm:hidden");
     expect(html).toContain("hover:bg-background");
     const compactLabelContainer = html.match(/<span[^>]*data-message-labels="compact"[^>]*>/u)?.[0];
+    expect(compactLabelContainer).toContain("w-max");
+    expect(compactLabelContainer).toContain("overflow-visible");
+    expect(compactLabelContainer).not.toContain("max-w-[75%]");
+    expect(compactLabelContainer).not.toContain("overflow-hidden");
     expect(compactLabelContainer).toContain("rounded-full");
     expect(compactLabelContainer).toContain("bg-background");
     expect(compactLabelContainer).toContain("p-0.5");
@@ -328,6 +330,7 @@ describe("conversation reader", () => {
     expect(labelButton).toContain("bg-background");
     expect(labelButton).toContain("p-0.5");
     expect(labelButton).toContain("shadow-[0_0_6px_1px_hsl(var(--background)/0.14)]");
+    expect(labelButton).toContain("sm:shadow-[0_0_6px_1px_hsl(var(--background))]");
     expect(labelButton).not.toContain("backdrop-blur");
     expect(labelButton).toContain("sm:inline-flex");
     expect(labelButton).toContain(">HR</span>");
@@ -356,6 +359,39 @@ describe("conversation reader", () => {
     expect(readOnlyHtml).not.toContain('<button aria-label="Labels: HR"');
     expect(readOnlyHtml).toContain('<span class="z-10 hidden');
     expect(readOnlyHtml).toContain('data-message-labels="desktop"');
+  });
+
+  it("keeps every compact label visible in a right-aligned row", () => {
+    const names = ["Customer", "Priority", "Billing", "Follow up", "Partner", "HR", "Important"];
+    const labels = names.map((name, index) => ({
+      color: "blue" as const,
+      createdAt: "2026-08-25T12:00:00.000Z",
+      id: `label-${index + 1}`,
+      name,
+      updatedAt: "2026-08-25T12:00:00.000Z"
+    }));
+    const html = renderToStaticMarkup(
+      <MessageListItem
+        activeFolder="inbox"
+        conversation={{ ...conversation, labels }}
+        href="/mail/inbox/msg_1"
+        isActive={false}
+        onSelect={() => undefined}
+        onToggleStar={() => undefined}
+      />
+    );
+    const compactLabels = html.match(
+      /<span[^>]*data-message-labels="compact"[^>]*>[\s\S]*?(?=<span class="z-10 hidden)/u
+    )?.[0];
+
+    expect(compactLabels).toContain("w-max");
+    expect(compactLabels).toContain("shrink-0");
+    expect(compactLabels).toContain("justify-self-end");
+    expect(compactLabels).toContain("overflow-visible");
+    expect(compactLabels).not.toContain("max-w-[75%]");
+    expect(compactLabels).not.toContain("overflow-hidden");
+    expect(compactLabels).not.toContain("data-label-stack-color");
+    for (const name of names) expect(compactLabels).toContain(`>${name}</span>`);
   });
 
   it("collapses messages between the first and final message behind a counted divider", () => {

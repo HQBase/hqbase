@@ -39,7 +39,7 @@ export function MessageListItem({
   const correspondent = correspondentLabel(conversation);
   const assignedLabels = conversation.labels ?? [];
   const labelContainerClass =
-    "rounded-full bg-background p-0.5 shadow-[0_0_6px_1px_hsl(var(--background)/0.14)]";
+    "rounded-full bg-background p-0.5 shadow-[0_0_6px_1px_hsl(var(--background)/0.14)] sm:shadow-[0_0_6px_1px_hsl(var(--background))]";
   const avatarInitial =
     correspondent
       .replace(/^To:\s*/u, "")
@@ -165,12 +165,17 @@ export function MessageListItem({
       {assignedLabels.length > 0 ? (
         <span
           className={cn(
-            "col-start-2 row-start-2 z-10 flex w-fit min-w-0 max-w-[75%] items-center justify-end self-end justify-self-end overflow-hidden sm:hidden",
+            "col-start-2 row-start-2 z-10 flex w-max items-center justify-end self-end justify-self-end overflow-visible sm:hidden",
             labelContainerClass
           )}
           data-message-labels="compact"
         >
-          <LabelStack compact labels={assignedLabels} namedLimit={2} />
+          <LabelStack
+            className="w-max shrink-0"
+            compact
+            labels={assignedLabels}
+            namedLimit={assignedLabels.length}
+          />
         </span>
       ) : null}
       {labels.length > 0 && onToggleLabel && canOrganizeLabels ? (
