@@ -2,8 +2,8 @@ import * as React from "react";
 import {
   PiArrowBendUpLeft,
   PiArrowBendUpRight,
-  PiArrowDown,
-  PiArrowUp,
+  PiArrowDownBold,
+  PiArrowUpBold,
   PiDownloadSimple
 } from "react-icons/pi";
 
@@ -50,7 +50,7 @@ export function ConversationMessages({
   const middle = messages.slice(1, -1);
   const final = messages.at(-1);
   return (
-    <div className="divide-y divide-border">
+    <div className={showMiddle ? "divide-y divide-border" : undefined}>
       {first ? renderMessage(first, false) : null}
       {showMiddle ? null : (
         <ThreadMessagesDivider
@@ -168,30 +168,28 @@ function ThreadMessagesDivider({
   const noun = count === 1 ? "message" : "messages";
   const label = `Expand ${count} earlier ${noun}`;
   return (
-    <div className="flex items-center gap-3 px-4 py-3 sm:px-6" data-thread-messages-control>
+    <div className="flex items-center gap-2 px-4 py-2 sm:px-6" data-thread-messages-control>
       <Separator className="flex-1" />
-      <Button
+      <button
         aria-label={label}
         aria-expanded="false"
-        className="size-11 shrink-0 rounded-full p-0 [&_svg]:size-3.5"
+        className="group inline-flex size-11 shrink-0 items-center justify-center rounded-full text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         data-thread-disclosure-state="collapsed"
         onClick={onExpand}
-        size="icon"
         title={label}
         type="button"
-        variant="outline"
       >
         <span
           aria-hidden="true"
-          className="grid grid-rows-[0.875rem_0.875rem_0.875rem] place-items-center"
+          className="grid size-8 grid-rows-[0.625rem_0.75rem_0.625rem] place-items-center rounded-full bg-muted transition-colors group-hover:bg-muted/80 group-hover:text-foreground"
         >
-          <PiArrowUp data-thread-arrow="top-outward" />
-          <span className="min-w-4 text-center font-mono text-[10px] font-semibold leading-none tabular-nums">
+          <PiArrowUpBold className="size-2.5" data-thread-arrow="top-outward" />
+          <span className="min-w-4 text-center font-mono text-[9px] font-semibold leading-none tabular-nums">
             {count}
           </span>
-          <PiArrowDown data-thread-arrow="bottom-outward" />
+          <PiArrowDownBold className="size-2.5" data-thread-arrow="bottom-outward" />
         </span>
-      </Button>
+      </button>
       <Separator className="flex-1" />
     </div>
   );

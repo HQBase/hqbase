@@ -465,6 +465,11 @@ describe("conversation reader", () => {
     expect(html).toContain('data-thread-disclosure-state="collapsed"');
     expect(html).toContain('data-thread-arrow="top-outward"');
     expect(html).toContain('data-thread-arrow="bottom-outward"');
+    expect(html).toContain("grid size-8");
+    expect(html).toContain("rounded-full bg-muted");
+    expect(html).toContain("size-2.5");
+    expect(html).not.toContain('<div class="divide-y divide-border"><article');
+    expect(html.match(/data-orientation="horizontal"/gu)).toHaveLength(2);
   });
 
   it("keeps inline images out of the downloadable attachment list", () => {
