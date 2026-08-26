@@ -95,6 +95,16 @@ describe("label controls", () => {
     const generalMenu = renderToStaticMarkup(
       <LabelMenu assigned={[label]} labels={[label]} onToggle={() => undefined} />
     );
+    const readerMenu = renderToStaticMarkup(
+      <LabelMenu
+        assigned={[label]}
+        compactAssignedLabels={false}
+        labels={[label]}
+        onToggle={() => undefined}
+        showAssignedLabels
+        showTagIcon
+      />
+    );
 
     expect(rowMenu).toContain('data-label-menu-icon="tag"');
     expect(rowMenu).toContain('data-message-labels="desktop"');
@@ -106,6 +116,9 @@ describe("label controls", () => {
     expect(generalMenu).toContain('aria-label="Labels"');
     expect(generalMenu).not.toContain('data-label-menu-icon="tag"');
     expect(generalMenu).toContain("bottom-1");
+    expect(readerMenu).toContain("max-w-24");
+    expect(readerMenu).toContain("text-[10px]");
+    expect(readerMenu).not.toContain("max-w-20");
   });
 
   it("opens from an assigned label and closes after a label choice", async () => {

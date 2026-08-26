@@ -325,7 +325,15 @@ describe("conversation reader", () => {
     expect(html).toContain("bg-muted px-0.5 py-0.5 text-[11px]");
     expect(html).toContain(">(2)</span>");
     expect(html).not.toContain("bg-muted px-1.5 py-0.5");
-    expect(html).toContain("size-[18px] translate-y-px sm:size-4 sm:translate-y-0");
+    const starSlot = html.match(/<span class="col-start-3 row-start-2[^>]*>[\s\S]*?<\/span>/u)?.[0];
+    expect(starSlot).toContain("self-end");
+    expect(starSlot).toContain("sm:self-center");
+    expect(starSlot).toContain("items-end");
+    expect(starSlot).toContain("pb-px");
+    expect(starSlot).toContain("sm:items-center");
+    expect(starSlot).toContain("sm:pb-0");
+    expect(starSlot).toContain("size-[18px] sm:size-4");
+    expect(starSlot).not.toContain("translate-y-px");
     const row = html.match(/<a[^>]*>/u)?.[0];
     expect(row).toContain("[--message-row-surface:var(--surface-list)]");
     expect(row).toContain("hover:[--message-row-surface:var(--surface-hover)]");
@@ -362,7 +370,8 @@ describe("conversation reader", () => {
     expect(html).toContain("min-w-10");
     expect(html).toContain("max-w-20");
     expect(html).toContain('data-label-menu-icon="tag"');
-    expect(html.indexOf("Support Team")).toBeLessThan(html.indexOf("Account access"));
+    expect(html.indexOf("Support Team")).toBeLessThan(html.indexOf(">(2)</span>"));
+    expect(html.indexOf(">(2)</span>")).toBeLessThan(html.indexOf("Account access"));
     expect(html.indexOf("Account access")).toBeLessThan(html.indexOf("We can help"));
     expect(html.indexOf("We can help")).toBeLessThan(html.indexOf("Important"));
 

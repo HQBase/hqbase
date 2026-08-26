@@ -94,6 +94,7 @@ export function LabelMenu({
   assigned,
   canOrganizeLabels = true,
   className,
+  compactAssignedLabels = true,
   disabled = false,
   labels,
   onToggle,
@@ -104,6 +105,7 @@ export function LabelMenu({
   assigned: MailLabel[];
   canOrganizeLabels?: boolean;
   className?: string;
+  compactAssignedLabels?: boolean;
   disabled?: boolean;
   labels: MailLabel[];
   onToggle: (label: MailLabel, assigned: boolean) => Promise<void> | void;
@@ -145,7 +147,9 @@ export function LabelMenu({
             event.stopPropagation();
           }}
         >
-          {showAssignedLabels ? <LabelStack compact labels={assigned} /> : null}
+          {showAssignedLabels ? (
+            <LabelStack compact={compactAssignedLabels} labels={assigned} />
+          ) : null}
           {showTagIcon ? (
             <PiTag aria-hidden="true" className="pointer-events-none" data-label-menu-icon="tag" />
           ) : (

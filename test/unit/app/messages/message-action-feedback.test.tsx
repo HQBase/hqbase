@@ -51,7 +51,7 @@ const customerLabel: MailLabel = {
 beforeEach(() => vi.clearAllMocks());
 
 describe("conversation action feedback", () => {
-  it("keeps only Star and More visible and edits labels below the mobile header", async () => {
+  it("keeps only Star and More visible on mobile and edits labels below the header", async () => {
     const onToggleLabel = vi.fn();
     const view = await renderComponent(
       <MessageDetail
@@ -81,8 +81,7 @@ describe("conversation action feedback", () => {
     const archive = view.container.querySelector<HTMLButtonElement>(
       '[aria-label="Archive conversation"]'
     );
-    const desktopLabels = view.container.querySelector<HTMLButtonElement>('[aria-label="Labels"]');
-    const mobileLabels = view.container.querySelector<HTMLButtonElement>(
+    const readerLabels = view.container.querySelector<HTMLButtonElement>(
       '[aria-label="Labels: Customer"]'
     );
     const more = view.container.querySelector<HTMLButtonElement>(
@@ -93,9 +92,13 @@ describe("conversation action feedback", () => {
     expect(trash?.className).toContain("hidden sm:inline-flex");
     expect(star?.className).not.toContain("hidden sm:inline-flex");
     expect(archive?.className).toContain("hidden sm:inline-flex");
-    expect(desktopLabels?.className).toContain("hidden sm:inline-flex");
-    expect(mobileLabels?.closest("[data-mobile-reader-labels]")).not.toBeNull();
-    expect(mobileLabels?.querySelector('[data-label-menu-icon="tag"]')).not.toBeNull();
+    expect(readerLabels?.closest("[data-reader-labels]")).not.toBeNull();
+    expect(readerLabels?.className).not.toContain("sm:hidden");
+    expect(readerLabels?.className).toContain("bg-muted/40");
+    expect(readerLabels?.className).toContain("hover:bg-muted/60");
+    expect(readerLabels?.querySelector('[data-label-menu-icon="tag"]')).not.toBeNull();
+    expect(readerLabels?.innerHTML).toContain("text-[10px]");
+    expect(readerLabels?.innerHTML).not.toContain("text-[9px]");
     expect(more?.className).toContain("sm:hidden");
 
     await flushHookEffects(() => {
@@ -116,16 +119,87 @@ describe("conversation action feedback", () => {
     expect(menu?.textContent).toContain("Trash conversation");
 
     await flushHookEffects(() => {
-      mobileLabels?.dispatchEvent(
+      readerLabels?.dispatchEvent(
         new PointerEvent("pointerdown", { bubbles: true, button: 0, pointerType: "mouse" })
       );
-      mobileLabels?.click();
+      readerLabels?.click();
     });
     const labelItem = [
       ...document.body.querySelectorAll<HTMLElement>('[role="menuitemcheckbox"]')
     ].find((item) => item.textContent?.includes("Customer"));
     await flushHookEffects(() => labelItem?.click());
     expect(onToggleLabel).toHaveBeenCalledWith(customerLabel, false);
+    await view.unmount();
+  });
+
+  it("keeps the reader label icon for empty and read-only assignments", async () => {
+    const editable = await renderComponent(
+      <MessageDetail
+        canOrganizeLabels
+        defaultFromMailboxId="mbx_1"
+        labels={[customerLabel]}
+        mailboxes={[]}
+        messages={[message]}
+        selectedId={message.id}
+        onAction={() => undefined}
+        onBack={() => undefined}
+        onRefresh={() => undefined}
+        onSent={() => undefined}
+        onToggleLabel={() => undefined}
+      />
+    );
+    const emptyControl =
+      editable.container.querySelector<HTMLButtonElement>('[aria-label="Labels"]');
+    expect(emptyControl?.closest("[data-reader-labels]")).not.toBeNull();
+    expect(emptyControl?.querySelector('[data-label-menu-icon="tag"]')).not.toBeNull();
+    await editable.unmount();
+
+    const readOnly = await renderComponent(
+      <MessageDetail
+        defaultFromMailboxId="mbx_1"
+        labels={[customerLabel]}
+        mailboxes={[]}
+        messages={[{ ...message, labels: [customerLabel] }]}
+        selectedId={message.id}
+        onAction={() => undefined}
+        onBack={() => undefined}
+        onRefresh={() => undefined}
+        onSent={() => undefined}
+        onToggleLabel={() => undefined}
+      />
+    );
+    const staticControl = readOnly.container.querySelector<HTMLElement>("[data-reader-labels]");
+    expect(staticControl?.textContent).toContain("Customer");
+    expect(staticControl?.querySelector("svg")).not.toBeNull();
+    expect(staticControl?.querySelector("button")).toBeNull();
+    await readOnly.unmount();
+  });
+
+  it("uses the compact Mark Unread label in mobile More", async () => {
+    const view = await renderComponent(
+      <MessageDetail
+        defaultFromMailboxId="mbx_1"
+        mailboxes={[]}
+        messages={[{ ...message, readAt: "2026-07-27T14:01:00.000Z" }]}
+        selectedId={message.id}
+        onAction={() => undefined}
+        onBack={() => undefined}
+        onRefresh={() => undefined}
+        onSent={() => undefined}
+      />
+    );
+    const more = view.container.querySelector<HTMLButtonElement>(
+      '[aria-label="More conversation actions"]'
+    );
+    await flushHookEffects(() => {
+      more?.dispatchEvent(
+        new PointerEvent("pointerdown", { bubbles: true, button: 0, pointerType: "mouse" })
+      );
+      more?.click();
+    });
+    const menu = document.body.querySelector<HTMLElement>("[data-mobile-thread-actions]");
+    expect(menu?.textContent).toContain("Mark Unread");
+    expect(menu?.textContent).not.toContain("Mark conversation unread");
     await view.unmount();
   });
 

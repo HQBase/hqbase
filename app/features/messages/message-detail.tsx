@@ -6,6 +6,7 @@ import {
   PiDotsThree,
   PiEnvelopeOpen,
   PiStar,
+  PiTag,
   PiTrash
 } from "react-icons/pi";
 import { toast } from "sonner";
@@ -20,7 +21,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { PullToRefresh } from "@/components/ui/pull-to-refresh";
 import { ComposerInlineTarget, useComposer } from "@/features/compose/composer-host";
-import { LabelBadges, LabelMenu } from "@/features/labels/label-controls";
+import { LabelMenu, LabelStack } from "@/features/labels/label-controls";
 import type { MailLabel } from "@/features/labels/types";
 import type { Mailbox } from "@/features/mailboxes/types";
 import { cn } from "@/lib/cn";
@@ -129,16 +130,6 @@ export function MessageDetail({
             {selected.subject}
           </h1>
           <div className="absolute inset-y-0 right-0 z-10 flex shrink-0 items-center gap-0.5 bg-toolbar shadow-[-10px_0_8px_2px_hsl(var(--surface-toolbar))] sm:static sm:flex-wrap sm:bg-transparent sm:shadow-none">
-            {labels.length > 0 && onToggleLabel ? (
-              <LabelMenu
-                assigned={assignedLabels}
-                canOrganizeLabels={canOrganizeLabels}
-                className="hidden sm:inline-flex"
-                labels={labels}
-                onToggle={onToggleLabel}
-                showTagIcon
-              />
-            ) : null}
             <IconButton
               className="hidden sm:inline-flex"
               label={isUnread ? "Mark conversation read" : "Mark conversation unread"}
@@ -229,7 +220,7 @@ export function MessageDetail({
                     }}
                   >
                     <PiEnvelopeOpen aria-hidden="true" className="size-4" />
-                    {isUnread ? "Mark conversation read" : "Mark conversation unread"}
+                    {isUnread ? "Mark conversation read" : "Mark Unread"}
                   </DropdownMenuItem>
                   {isTrash ? (
                     <DropdownMenuItem
@@ -277,26 +268,25 @@ export function MessageDetail({
       </div>
       <PullToRefresh className="min-h-0 flex-1" onRefresh={onRefresh}>
         {labels.length > 0 && onToggleLabel && canOrganizeLabels ? (
-          <div className="px-4 pt-4 sm:hidden" data-mobile-reader-labels>
+          <div className="px-4 pt-4 sm:px-6" data-reader-labels>
             <LabelMenu
               align="start"
               assigned={assignedLabels}
               canOrganizeLabels={canOrganizeLabels}
-              className="max-w-full overflow-hidden"
+              className="max-w-full overflow-hidden bg-muted/40 [@media(hover:hover)]:hover:bg-muted/60"
+              compactAssignedLabels={false}
               labels={labels}
               onToggle={onToggleLabel}
               showAssignedLabels
               showTagIcon
             />
           </div>
-        ) : assignedLabels.length > 0 ? (
-          <div className="px-4 pt-4 sm:hidden" data-mobile-reader-labels>
-            <LabelBadges labels={assignedLabels} />
-          </div>
-        ) : null}
-        {assignedLabels.length > 0 ? (
-          <div className="hidden px-4 pt-4 sm:block sm:px-6">
-            <LabelBadges labels={assignedLabels} />
+        ) : labels.length > 0 || assignedLabels.length > 0 ? (
+          <div className="px-4 pt-4 sm:px-6" data-reader-labels>
+            <span className="inline-flex h-auto min-h-0 w-fit max-w-full items-center gap-0.5 overflow-hidden rounded-full bg-muted/40 p-0.5 text-muted-foreground [&_svg]:size-3.5 [&_svg]:shrink-0">
+              <LabelStack labels={assignedLabels} />
+              <PiTag aria-hidden="true" className="pointer-events-none" />
+            </span>
           </div>
         ) : null}
         <ConversationMessages

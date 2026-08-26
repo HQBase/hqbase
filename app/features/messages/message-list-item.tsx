@@ -76,12 +76,12 @@ export function MessageListItem({
       >
         <AvatarFallback className="font-medium uppercase">{avatarInitial}</AvatarFallback>
       </Avatar>
-      <span className="col-start-3 row-start-2 flex shrink-0 self-center justify-self-end sm:col-start-1 sm:row-start-1 sm:justify-self-auto">
+      <span className="col-start-3 row-start-2 flex shrink-0 self-end justify-self-end sm:col-start-1 sm:row-start-1 sm:self-center sm:justify-self-auto">
         <button
           aria-label={conversation.isStarred ? "Unstar conversation" : "Star conversation"}
           aria-pressed={conversation.isStarred}
           className={cn(
-            "flex size-10 min-h-10 min-w-10 shrink-0 items-center justify-center rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:size-8 sm:min-h-8 sm:min-w-8",
+            "flex size-10 min-h-10 min-w-10 shrink-0 items-end justify-center rounded-md pb-px transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:size-8 sm:min-h-8 sm:min-w-8 sm:items-center sm:pb-0",
             conversation.isStarred
               ? "text-star"
               : "text-muted-foreground/45 [@media(hover:hover)]:hover:bg-accent [@media(hover:hover)]:hover:text-muted-foreground group-hover:text-muted-foreground"
@@ -97,13 +97,13 @@ export function MessageListItem({
           <PiStar
             aria-hidden="true"
             className={cn(
-              "pointer-events-none size-[18px] translate-y-px sm:size-4 sm:translate-y-0",
+              "pointer-events-none size-[18px] sm:size-4",
               conversation.isStarred && "fill-star"
             )}
           />
         </button>
       </span>
-      <span className="col-start-2 row-start-1 flex min-w-0 items-center gap-2 sm:col-start-2 sm:row-start-1">
+      <span className="col-start-2 row-start-1 flex min-w-0 items-center gap-1 sm:col-start-2 sm:row-start-1">
         <span
           className={cn(
             "min-w-0 truncate",
@@ -114,6 +114,14 @@ export function MessageListItem({
         >
           {correspondent}
         </span>
+        {conversation.messageCount > 1 ? (
+          <span
+            className="shrink-0 text-[11px] font-normal tabular-nums text-tertiary sm:hidden"
+            title={`${conversation.messageCount} messages`}
+          >
+            ({conversation.messageCount})
+          </span>
+        ) : null}
       </span>
       <span className="hidden items-center justify-center sm:col-start-3 sm:row-start-1 sm:flex">
         {conversation.hasAttachments ? (
@@ -140,14 +148,6 @@ export function MessageListItem({
             )}
           >
             {conversation.subject || "No subject"}
-            {conversation.messageCount > 1 ? (
-              <span
-                className="ml-1 text-[11px] font-normal tabular-nums text-tertiary sm:hidden"
-                title={`${conversation.messageCount} messages`}
-              >
-                ({conversation.messageCount})
-              </span>
-            ) : null}
           </span>
           <span
             className={cn(
