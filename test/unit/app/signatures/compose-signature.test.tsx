@@ -27,6 +27,15 @@ const automatic: SignatureSnapshot = {
   html: candidate.html,
   text: candidate.text
 };
+const alternate: Signature = {
+  ...candidate,
+  id: "sig_personal",
+  name: "Personal",
+  scope: "user",
+  scopeId: "usr_support",
+  scopeLabel: "Personal",
+  isDefault: false
+};
 
 afterEach(() => {
   document.body.replaceChildren();
@@ -111,10 +120,10 @@ describe("compose signature", () => {
     await view.unmount();
   });
 
-  it("keeps No signature when no default is available", async () => {
+  it("keeps No signature when the automatic choice is ambiguous", async () => {
     vi.mocked(listUsableSignatures).mockResolvedValue({
       automaticSignatureId: null,
-      signatures: [candidate]
+      signatures: [candidate, alternate]
     });
     const onSelectionChange = vi.fn().mockResolvedValue(undefined);
     const view = await renderComponent(

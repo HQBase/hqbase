@@ -39,7 +39,7 @@ export const DropdownMenuContent = React.forwardRef<
   <DropdownMenuPrimitive.Portal>
     <DropdownMenuPrimitive.Content
       className={cn(
-        "relative z-[60] min-w-44 rounded-md border bg-popover p-1 text-popover-foreground shadow-md",
+        "relative z-[2147483647] min-w-44 rounded-md border bg-popover p-1 text-popover-foreground shadow-md",
         className
       )}
       ref={ref}
