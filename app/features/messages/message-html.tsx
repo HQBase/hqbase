@@ -8,7 +8,7 @@ import { useTheme } from "@/features/theme/theme-provider";
 import { getMessageHtml, trustRemoteMediaSender } from "./api";
 import { buildEmailHtmlDocument } from "./html-document";
 import { hasMessageHtmlContent, splitQuotedText } from "./message-html-content";
-import type { MessageDetail } from "./types";
+import type { MessageDetail, MessageHtml as MessageHtmlResponse } from "./types";
 
 export { splitQuotedText } from "./message-html-content";
 
@@ -82,6 +82,10 @@ export function MessageHtml({ message }: MessageHtmlProps): React.ReactElement {
     [html, loadRemoteImages, theme]
   );
   const bodyHasContent = React.useMemo(() => hasMessageHtmlContent(html?.html ?? ""), [html?.html]);
+  const quoteVisible = quoteExpanded || !bodyHasContent;
+  const showRemoteImagesAlert = Boolean(
+    html && !loadRemoteImages && hasVisibleRemoteImages(html, quoteVisible)
+  );
 
   async function loadImages(): Promise<void> {
     setLoadingImages(true);
@@ -122,7 +126,7 @@ export function MessageHtml({ message }: MessageHtmlProps): React.ReactElement {
 
   return (
     <div className="flex flex-col gap-4">
-      {html?.hasRemoteImages && !loadRemoteImages && (
+      {showRemoteImagesAlert && (
         <RemoteImagesAlert
           direction={message.direction}
           fromAddress={message.fromAddress}
@@ -143,6 +147,20 @@ export function MessageHtml({ message }: MessageHtmlProps): React.ReactElement {
         subject={message.subject}
       />
     </div>
+  );
+}
+
+export function hasVisibleRemoteImages(
+  html: Pick<
+    MessageHtmlResponse,
+    "afterQuotedHtmlHasRemoteImages" | "htmlHasRemoteImages" | "quotedHtmlHasRemoteImages"
+  >,
+  quoteVisible: boolean
+): boolean {
+  return (
+    html.htmlHasRemoteImages ||
+    html.afterQuotedHtmlHasRemoteImages ||
+    (quoteVisible && html.quotedHtmlHasRemoteImages)
   );
 }
 
@@ -297,28 +315,34 @@ export function RemoteImagesAlert({
   savingTrust: boolean;
 }): React.ReactElement {
   return (
-    <Alert>
+    <Alert className="rounded-md px-3 py-2.5 text-xs [&>svg]:left-3 [&>svg]:top-3 [&>svg]:size-3.5 [&>svg~*]:pl-5">
       <PiImageBroken />
-      <AlertTitle>Remote images are hidden</AlertTitle>
-      <AlertDescription className="flex flex-col items-start gap-3">
-        <p>Loading them may tell the sender that you opened this message.</p>
-        <div className="flex flex-wrap gap-2">
-          <Button disabled={loadingImages} onClick={onLoad} size="sm" type="button">
-            Load images
+      <AlertTitle className="mb-1.5 line-clamp-2 text-xs font-semibold leading-4 tracking-normal">
+        Remote images are hidden. Loading them may reveal that you opened this email.
+      </AlertTitle>
+      <AlertDescription className="flex flex-wrap gap-1.5">
+        <Button
+          className="h-7 min-h-7 px-2.5 text-[11px]"
+          disabled={loadingImages}
+          onClick={onLoad}
+          size="sm"
+          type="button"
+        >
+          Load images
+        </Button>
+        {direction === "inbound" && (
+          <Button
+            className="h-7 min-h-7 px-2.5 text-[11px]"
+            disabled={savingTrust}
+            onClick={onAlwaysLoad}
+            size="sm"
+            title={`Always load remote images from ${fromAddress}`}
+            type="button"
+            variant="outline"
+          >
+            Always load
           </Button>
-          {direction === "inbound" && (
-            <Button
-              disabled={savingTrust}
-              onClick={onAlwaysLoad}
-              size="sm"
-              title={`Always load remote images from ${fromAddress}`}
-              type="button"
-              variant="outline"
-            >
-              Always load from sender
-            </Button>
-          )}
-        </div>
+        )}
       </AlertDescription>
     </Alert>
   );

@@ -125,6 +125,21 @@ describe("email HTML sanitizer", () => {
     expect(result.quotedHtml).not.toContain("gmail_quote");
   });
 
+  it("reports remote images separately for collapsed quoted history", () => {
+    const result = sanitizeMessageHtml({
+      allowRemoteImages: false,
+      attachments: [],
+      origin: "https://mail.example.com",
+      html: '<p>New reply</p><div class="gmail_quote"><img src="https://images.example.com/old.gif"></div>',
+      messageId: "msg-1"
+    });
+
+    expect(result.hasRemoteImages).toBe(true);
+    expect(result.htmlHasRemoteImages).toBe(false);
+    expect(result.quotedHtmlHasRemoteImages).toBe(true);
+    expect(result.afterQuotedHtmlHasRemoteImages).toBe(false);
+  });
+
   it("collapses the complete Gmail reply container including its attribution", () => {
     const result = sanitizeMessageHtml({
       allowRemoteImages: false,
@@ -398,6 +413,7 @@ describe("email HTML sanitizer", () => {
     });
 
     expect(result.hasRemoteImages).toBe(true);
+    expect(result.afterQuotedHtmlHasRemoteImages).toBe(true);
     expect(result.afterQuotedHtml).toContain("Remote image hidden");
     expect(result.afterQuotedHtml).not.toContain("images.example.com");
   });

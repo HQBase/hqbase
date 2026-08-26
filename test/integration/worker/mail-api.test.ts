@@ -255,7 +255,7 @@ describe("HQBase Mail API", () => {
     });
     await env.MAIL_OBJECTS.put(
       "mail/api/body.html",
-      '<p>Visible before</p><div class="gmail_quote"><p>Earlier reply</p></div><p>Visible after</p>',
+      '<p>Visible before</p><div class="gmail_quote"><p>Earlier reply</p><img src="https://images.example.net/old.gif"></div><p>Visible after</p>',
       { httpMetadata: { contentType: "text/html; charset=utf-8" } }
     );
   });
@@ -664,8 +664,11 @@ describe("HQBase Mail API", () => {
     expect(response.status, await response.clone().text()).toBe(200);
     const payload = (await response.json()) as {
       afterQuotedHtml: string | null;
+      afterQuotedHtmlHasRemoteImages: boolean;
       html: string;
+      htmlHasRemoteImages: boolean;
       quotedHtml: string | null;
+      quotedHtmlHasRemoteImages: boolean;
       remoteMediaTrusted: boolean;
     };
 
@@ -673,6 +676,9 @@ describe("HQBase Mail API", () => {
     expect(payload.html).not.toContain("Earlier reply");
     expect(payload.quotedHtml).toContain("Earlier reply");
     expect(payload.afterQuotedHtml).toContain("Visible after");
+    expect(payload.htmlHasRemoteImages).toBe(false);
+    expect(payload.quotedHtmlHasRemoteImages).toBe(true);
+    expect(payload.afterQuotedHtmlHasRemoteImages).toBe(false);
     expect(payload.remoteMediaTrusted).toBe(false);
   });
 

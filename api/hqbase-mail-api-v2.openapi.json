@@ -3695,9 +3695,12 @@
         "type": "object",
         "required": [
           "afterQuotedHtml",
+          "afterQuotedHtmlHasRemoteImages",
           "hasRemoteImages",
           "html",
+          "htmlHasRemoteImages",
           "quotedHtml",
+          "quotedHtmlHasRemoteImages",
           "remoteMediaTrusted"
         ],
         "properties": {
@@ -3712,11 +3715,20 @@
               }
             ]
           },
+          "afterQuotedHtmlHasRemoteImages": {
+            "description": "Whether authored content after quoted reply history contains remote images.",
+            "type": "boolean"
+          },
           "hasRemoteImages": {
+            "description": "Whether any returned HTML fragment contains remote images.",
             "type": "boolean"
           },
           "html": {
             "type": "string"
+          },
+          "htmlHasRemoteImages": {
+            "description": "Whether the main HTML fragment contains remote images.",
+            "type": "boolean"
           },
           "quotedHtml": {
             "anyOf": [
@@ -3727,6 +3739,10 @@
                 "type": "null"
               }
             ]
+          },
+          "quotedHtmlHasRemoteImages": {
+            "description": "Whether the quoted reply history contains remote images.",
+            "type": "boolean"
           },
           "remoteMediaTrusted": {
             "type": "boolean"

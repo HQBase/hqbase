@@ -64,8 +64,11 @@ export type MessageDetail = MessageSummary & {
 
 export type MessageHtml = {
   afterQuotedHtml: string | null;
+  afterQuotedHtmlHasRemoteImages: boolean;
   hasRemoteImages: boolean;
   html: string;
+  htmlHasRemoteImages: boolean;
   quotedHtml: string | null;
+  quotedHtmlHasRemoteImages: boolean;
   remoteMediaTrusted: boolean;
 };
