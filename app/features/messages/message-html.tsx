@@ -315,14 +315,14 @@ export function RemoteImagesAlert({
   savingTrust: boolean;
 }): React.ReactElement {
   return (
-    <Alert className="rounded-md px-3 py-2.5 text-xs [&>svg]:left-3 [&>svg]:top-3 [&>svg]:size-3.5 [&>svg~*]:pl-5">
+    <Alert className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-2 gap-y-1 rounded-md border-border/60 bg-muted/50 px-2.5 py-1.5 text-xs sm:grid-cols-[auto_minmax(0,1fr)_auto] [&>svg]:static [&>svg]:size-3.5 [&>svg]:text-muted-foreground [&>svg~*]:pl-0">
       <PiImageBroken />
-      <AlertTitle className="mb-1.5 line-clamp-2 text-xs font-semibold leading-4 tracking-normal">
+      <AlertTitle className="mb-0 min-w-0 line-clamp-2 text-[11px] font-semibold leading-[14px] tracking-normal">
         Remote images are hidden. Loading them may reveal that you opened this email.
       </AlertTitle>
-      <AlertDescription className="flex flex-wrap gap-1.5">
+      <AlertDescription className="col-start-2 row-start-2 flex flex-wrap gap-1 pt-0.5 sm:col-start-3 sm:row-start-1 sm:flex-nowrap sm:pt-0">
         <Button
-          className="h-7 min-h-7 px-2.5 text-[11px]"
+          className="h-6 min-h-6 px-2 text-[10px]"
           disabled={loadingImages}
           onClick={onLoad}
           size="sm"
@@ -332,7 +332,7 @@ export function RemoteImagesAlert({
         </Button>
         {direction === "inbound" && (
           <Button
-            className="h-7 min-h-7 px-2.5 text-[11px]"
+            className="h-6 min-h-6 px-2 text-[10px]"
             disabled={savingTrust}
             onClick={onAlwaysLoad}
             size="sm"

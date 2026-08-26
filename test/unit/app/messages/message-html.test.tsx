@@ -93,7 +93,9 @@ describe("message HTML view", () => {
     expect(html).toContain("Load images");
     expect(html).toContain("Always load");
     expect(html).toContain("line-clamp-2");
-    expect(html.match(/h-7 min-h-7/g)).toHaveLength(2);
+    expect(html).toContain("bg-muted/50");
+    expect(html).toContain("sm:grid-cols-[auto_minmax(0,1fr)_auto]");
+    expect(html.match(/h-6 min-h-6/g)).toHaveLength(2);
   });
 
   it("warns only when a blocked remote image is in visible content", () => {
