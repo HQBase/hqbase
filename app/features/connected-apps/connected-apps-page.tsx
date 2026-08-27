@@ -53,7 +53,7 @@ export function ConnectedAppsPage({ user }: { user: CurrentUser }): React.ReactE
       .then((next) => {
         if (!active) return;
         setConnections(next);
-        setActiveTab((current) => current ?? (next.length > 0 ? "connections" : "mcp"));
+        setActiveTab((current) => current ?? "mcp");
       })
       .catch((error: unknown) => {
         if (!active) return;

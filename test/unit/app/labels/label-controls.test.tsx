@@ -251,10 +251,11 @@ describe("label controls", () => {
     expect(html).toContain("Add label");
     expect(html).toContain('aria-label="Edit Customer"');
     expect(html).toContain('aria-label="Delete Customer"');
-    expect(html).toContain('class="flex flex-col gap-0.5"');
-    expect(html).toContain("rounded-xl px-3 py-3");
-    expect(html).toContain("hover:bg-hover");
-    expect(html).not.toContain("divide-y overflow-hidden rounded-xl border");
+    expect(html).toContain('data-slot="table"');
+    expect(html).toContain("rounded-lg border");
+    expect(html).toContain(">Label</th>");
+    expect(html).toContain(">Color</th>");
+    expect(html).toContain(">Actions</th>");
     expect(html).not.toContain("h-11");
   });
 });

@@ -44,18 +44,18 @@ export function McpConnectionDetails({
         </section>
       ) : null}
 
-      <Tabs defaultValue="read-only">
+      <Tabs defaultValue="mail-actions">
         <div className="flex flex-col gap-1.5">
           <p className="text-xs font-medium text-muted-foreground">Server profile</p>
           <TabsList
             aria-label="Server profile"
             className="inline-flex h-8 w-fit gap-1 rounded-full p-1"
           >
-            <TabsTrigger className="h-6 min-h-0 rounded-full px-3 text-xs" value="read-only">
-              Read only
-            </TabsTrigger>
             <TabsTrigger className="h-6 min-h-0 rounded-full px-3 text-xs" value="mail-actions">
               Mail actions
+            </TabsTrigger>
+            <TabsTrigger className="h-6 min-h-0 rounded-full px-3 text-xs" value="read-only">
+              Read only
             </TabsTrigger>
           </TabsList>
         </div>

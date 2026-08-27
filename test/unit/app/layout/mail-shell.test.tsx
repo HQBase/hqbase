@@ -461,7 +461,7 @@ describe("mail shell", () => {
     expect(html).not.toContain("Navigation");
   });
 
-  it("defaults to the read-only MCP profile and exposes the server switcher", () => {
+  it("defaults to the Mail actions MCP profile and exposes the server switcher", () => {
     const html = renderToStaticMarkup(
       <McpConnectionDetails
         fullEndpoint="https://mail.example.com/mcp/full"
@@ -472,14 +472,15 @@ describe("mail shell", () => {
       />
     );
 
-    expect(html).toContain("https://mail.example.com/mcp");
-    expect(html).not.toContain("https://mail.example.com/mcp/full");
+    expect(html).toContain("https://mail.example.com/mcp/full");
     expect(html).toContain("Read only");
     expect(html).toContain("Mail actions");
+    expect(html.indexOf("Mail actions")).toBeLessThan(html.indexOf("Read only"));
     expect(html).toContain('role="tablist"');
     expect(html).toContain('data-state="active"');
     expect(html).toContain('data-state="inactive"');
-    expect(html).toContain("Copy Read only endpoint");
+    expect(html).toContain("Copy Read, manage &amp; send endpoint");
+    expect(html).not.toContain("Copy Read only endpoint");
     expect(html).toContain("OAuth 2.1");
     expect(html).toContain("registers dynamically with PKCE");
     expect(html).toContain("Connecting as");

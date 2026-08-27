@@ -14,6 +14,14 @@ import { DropdownSelect } from "@/components/ui/dropdown-select";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Spinner } from "@/components/ui/spinner";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow
+} from "@/components/ui/table";
 import { SettingsSection } from "@/features/settings/settings-section";
 import { createLabel, deleteLabel, updateLabel } from "./api";
 import { LabelColorDot } from "./label-colors";
@@ -61,47 +69,64 @@ export function LabelSettings({
         description="Shared organization for people and mail agents"
         title="Labels"
       >
-        {labels.length === 0 ? (
-          <div className="rounded-xl border border-dashed p-6 text-sm text-muted-foreground">
-            No labels yet.
-          </div>
-        ) : (
-          <div className="flex flex-col gap-0.5">
+        <Table containerClassName="rounded-lg border">
+          <TableHeader className="bg-muted/40">
+            <TableRow className="[@media(hover:hover)]:hover:bg-transparent">
+              <TableHead>Label</TableHead>
+              <TableHead className="w-40">Color</TableHead>
+              {canManage ? <TableHead className="w-24 text-right">Actions</TableHead> : null}
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {labels.length === 0 ? (
+              <TableRow>
+                <TableCell
+                  className="h-24 text-center text-muted-foreground"
+                  colSpan={canManage ? 3 : 2}
+                >
+                  No labels yet.
+                </TableCell>
+              </TableRow>
+            ) : null}
             {labels.map((label) => (
-              <div
-                className="flex min-h-16 items-center gap-3 rounded-xl px-3 py-3 transition-colors [@media(hover:hover)]:hover:bg-hover sm:py-2"
-                key={label.id}
-              >
-                <LabelColorDot className="size-3" color={label.color} />
-                <span className="min-w-0 flex-1 truncate text-sm font-medium">{label.name}</span>
+              <TableRow key={label.id}>
+                <TableCell className="max-w-64 truncate font-medium">{label.name}</TableCell>
+                <TableCell>
+                  <span className="flex items-center gap-2 capitalize">
+                    <LabelColorDot className="size-3" color={label.color} />
+                    {label.color}
+                  </span>
+                </TableCell>
                 {canManage ? (
-                  <div className="flex shrink-0 items-center gap-1">
-                    <Button
-                      aria-label={`Edit ${label.name}`}
-                      className="size-9"
-                      size="icon"
-                      type="button"
-                      variant="ghost"
-                      onClick={() => setEditing(label)}
-                    >
-                      <PiPencilSimple aria-hidden="true" />
-                    </Button>
-                    <Button
-                      aria-label={`Delete ${label.name}`}
-                      className="size-9 text-destructive"
-                      size="icon"
-                      type="button"
-                      variant="ghost"
-                      onClick={() => setRemoving(label)}
-                    >
-                      <PiTrash aria-hidden="true" />
-                    </Button>
-                  </div>
+                  <TableCell className="text-right">
+                    <span className="inline-flex items-center gap-1">
+                      <Button
+                        aria-label={`Edit ${label.name}`}
+                        className="size-9"
+                        size="icon"
+                        type="button"
+                        variant="ghost"
+                        onClick={() => setEditing(label)}
+                      >
+                        <PiPencilSimple aria-hidden="true" />
+                      </Button>
+                      <Button
+                        aria-label={`Delete ${label.name}`}
+                        className="size-9 text-destructive"
+                        size="icon"
+                        type="button"
+                        variant="ghost"
+                        onClick={() => setRemoving(label)}
+                      >
+                        <PiTrash aria-hidden="true" />
+                      </Button>
+                    </span>
+                  </TableCell>
                 ) : null}
-              </div>
+              </TableRow>
             ))}
-          </div>
-        )}
+          </TableBody>
+        </Table>
         {!canManage ? (
           <p className="text-xs text-muted-foreground">
             Only an owner or admin can create, rename, recolor, or delete shared labels.

@@ -42,17 +42,17 @@ describe("connected apps", () => {
     document.body.appendChild(view.container);
     await flushHookEffects();
 
+    expect(findTab(view.container, "MCP")?.getAttribute("aria-selected")).toBe("true");
+    expect(view.container.textContent).toContain("Server profile");
+    expect(view.container.textContent).not.toContain("Your connections");
+
+    await flushHookEffects(() => selectTab(view.container, "Connections"));
     expect(findTab(view.container, "Connections")?.getAttribute("aria-selected")).toBe("true");
     expect(view.container.textContent).toContain("Your connections");
     expect(view.container.textContent).toContain("Mail helper");
     expect(view.container.textContent).toContain("Handle mail");
     expect(view.container.textContent).toContain("Mail API");
     expect(view.container.querySelector('[aria-label="Revoke Mail helper"]')).not.toBeNull();
-
-    await flushHookEffects(() => selectTab(view.container, "MCP"));
-    expect(findTab(view.container, "MCP")?.getAttribute("aria-selected")).toBe("true");
-    expect(view.container.textContent).toContain("Server profile");
-    expect(view.container.textContent).not.toContain("Your connections");
 
     await flushHookEffects(() => selectTab(view.container, "Skill + API"));
     expect(findTab(view.container, "Skill + API")?.getAttribute("aria-selected")).toBe("true");
@@ -89,6 +89,7 @@ describe("connected apps", () => {
     document.body.appendChild(view.container);
     await flushHookEffects();
 
+    await flushHookEffects(() => selectTab(view.container, "Connections"));
     await flushHookEffects(() =>
       view.container.querySelector<HTMLButtonElement>('[aria-label="Revoke Mail helper"]')?.click()
     );

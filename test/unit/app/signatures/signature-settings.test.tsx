@@ -110,13 +110,17 @@ describe("signature settings", () => {
     vi.mocked(updateSignature).mockResolvedValue({ ...signature, name: "Main" });
     vi.mocked(deleteSignature).mockResolvedValue(undefined);
     const view = await renderSettings();
-    const row = view.container.querySelector<HTMLButtonElement>('[aria-label="Edit Personal"]')
-      ?.parentElement?.parentElement;
-    expect(row?.parentElement?.className).toContain("gap-0.5");
-    expect(row?.parentElement?.className).not.toContain("divide-y");
-    expect(row?.className).toContain("rounded-xl");
-    expect(row?.className).toContain("hover:bg-hover");
-    expect(row?.className).toContain("sm:py-2");
+    expect(
+      Array.from(view.container.querySelectorAll("th")).map((header) => header.textContent)
+    ).toEqual(["Name", "Scope", "Default", "Actions"]);
+    expect(
+      view.container.querySelector<HTMLElement>('[data-slot="table-container"]')?.className
+    ).toContain("rounded-lg border");
+    const row = view.container
+      .querySelector<HTMLButtonElement>('[aria-label="Edit Personal"]')
+      ?.closest("tr");
+    expect(row?.textContent).toContain("Personal");
+    expect(row?.textContent).toContain("Default");
 
     await flushHookEffects(() =>
       view.container.querySelector<HTMLButtonElement>('[aria-label="Edit Personal"]')?.click()

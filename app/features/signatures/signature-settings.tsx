@@ -17,6 +17,14 @@ import { DropdownSelect, type DropdownSelectOption } from "@/components/ui/dropd
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Spinner } from "@/components/ui/spinner";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow
+} from "@/components/ui/table";
 import type { CurrentUser } from "@/features/auth/types";
 import { signatureImagesFromFiles } from "@/features/compose/email-images";
 import { RichEmailEditor } from "@/features/compose/rich-email-editor";
@@ -92,57 +100,72 @@ export function SignatureSettings({
         description="Create personal signatures and shared signatures that you manage."
         title="Signatures"
       >
-        {loading ? (
-          <div className="grid min-h-24 place-items-center text-sm text-muted-foreground">
-            Loading signatures…
-          </div>
-        ) : signatures.length === 0 ? (
-          <div className="rounded-xl border border-dashed p-6 text-sm text-muted-foreground">
-            No signatures yet.
-          </div>
-        ) : (
-          <div className="flex flex-col gap-0.5">
-            {signatures.map((signature) => (
-              <div
-                className="flex min-h-16 items-center gap-3 rounded-xl px-3 py-3 transition-colors [@media(hover:hover)]:hover:bg-hover sm:py-2"
-                key={signature.id}
-              >
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="truncate text-sm font-medium">{signature.name}</span>
-                    <Badge variant="outline">{signature.scopeLabel}</Badge>
-                    {signature.isDefault ? <Badge variant="secondary">Default</Badge> : null}
-                  </div>
-                  <p className="mt-1 line-clamp-2 whitespace-pre-line text-xs text-muted-foreground">
-                    {signature.text}
-                  </p>
-                </div>
-                <div className="flex shrink-0 items-center gap-1">
-                  <Button
-                    aria-label={`Edit ${signature.name}`}
-                    className="size-9"
-                    size="icon"
-                    type="button"
-                    variant="ghost"
-                    onClick={() => setEditing(signature)}
-                  >
-                    <PiPencilSimple aria-hidden="true" />
-                  </Button>
-                  <Button
-                    aria-label={`Delete ${signature.name}`}
-                    className="size-9 text-destructive"
-                    size="icon"
-                    type="button"
-                    variant="ghost"
-                    onClick={() => setRemoving(signature)}
-                  >
-                    <PiTrash aria-hidden="true" />
-                  </Button>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
+        <Table containerClassName="rounded-lg border">
+          <TableHeader className="bg-muted/40">
+            <TableRow className="[@media(hover:hover)]:hover:bg-transparent">
+              <TableHead>Name</TableHead>
+              <TableHead className="w-44">Scope</TableHead>
+              <TableHead className="w-24">Default</TableHead>
+              <TableHead className="w-24 text-right">Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {loading ? (
+              <TableRow>
+                <TableCell className="h-24 text-center text-muted-foreground" colSpan={4}>
+                  Loading signatures…
+                </TableCell>
+              </TableRow>
+            ) : null}
+            {!loading && signatures.length === 0 ? (
+              <TableRow>
+                <TableCell className="h-24 text-center text-muted-foreground" colSpan={4}>
+                  No signatures yet.
+                </TableCell>
+              </TableRow>
+            ) : null}
+            {!loading
+              ? signatures.map((signature) => (
+                  <TableRow key={signature.id}>
+                    <TableCell className="min-w-56">
+                      <span className="block truncate font-medium">{signature.name}</span>
+                      <span className="mt-0.5 block max-w-md truncate whitespace-pre-line text-xs text-muted-foreground">
+                        {signature.text}
+                      </span>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="outline">{signature.scopeLabel}</Badge>
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {signature.isDefault ? <Badge variant="secondary">Default</Badge> : "—"}
+                    </TableCell>
+                    <TableCell className="space-x-1 text-right">
+                      <Button
+                        aria-label={`Edit ${signature.name}`}
+                        className="size-9"
+                        size="icon"
+                        type="button"
+                        variant="ghost"
+                        onClick={() => setEditing(signature)}
+                      >
+                        <PiPencilSimple aria-hidden="true" />
+                      </Button>
+                      <Button
+                        aria-label={`Delete ${signature.name}`}
+                        className="size-9 text-destructive"
+                        size="icon"
+                        type="button"
+                        variant="ghost"
+                        onClick={() => setRemoving(signature)}
+                      >
+                        <PiTrash aria-hidden="true" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))
+              : null}
+          </TableBody>
+        </Table>
       </SettingsSection>
 
       <SignatureEditorDialog
