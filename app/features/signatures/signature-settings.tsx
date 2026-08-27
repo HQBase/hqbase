@@ -101,9 +101,12 @@ export function SignatureSettings({
             No signatures yet.
           </div>
         ) : (
-          <div className="divide-y overflow-hidden rounded-xl border bg-background">
+          <div className="flex flex-col gap-0.5">
             {signatures.map((signature) => (
-              <div className="flex min-h-16 items-center gap-3 px-4 py-3" key={signature.id}>
+              <div
+                className="flex min-h-16 items-center gap-3 rounded-xl px-3 py-3 transition-colors [@media(hover:hover)]:hover:bg-hover sm:py-2"
+                key={signature.id}
+              >
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="truncate text-sm font-medium">{signature.name}</span>

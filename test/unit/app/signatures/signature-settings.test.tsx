@@ -110,6 +110,13 @@ describe("signature settings", () => {
     vi.mocked(updateSignature).mockResolvedValue({ ...signature, name: "Main" });
     vi.mocked(deleteSignature).mockResolvedValue(undefined);
     const view = await renderSettings();
+    const row = view.container.querySelector<HTMLButtonElement>('[aria-label="Edit Personal"]')
+      ?.parentElement?.parentElement;
+    expect(row?.parentElement?.className).toContain("gap-0.5");
+    expect(row?.parentElement?.className).not.toContain("divide-y");
+    expect(row?.className).toContain("rounded-xl");
+    expect(row?.className).toContain("hover:bg-hover");
+    expect(row?.className).toContain("sm:py-2");
 
     await flushHookEffects(() =>
       view.container.querySelector<HTMLButtonElement>('[aria-label="Edit Personal"]')?.click()
