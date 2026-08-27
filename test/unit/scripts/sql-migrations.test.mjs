@@ -37,7 +37,9 @@ const expectedMigrationNames = [
   "0021_email_signatures.sql",
   "0022_login_email_domain_exact_match.sql",
   "0023_message_sender_names.sql",
-  "0024_draft_inline_images.sql"
+  "0024_draft_inline_images.sql",
+  "0025_activate_catch_all_policy.sql",
+  "0026_domain_disconnect.sql"
 ];
 const expectedAfterDeployMigrationNames = [
   "0001_remove_mailbox_alias_storage.sql",
@@ -249,6 +251,66 @@ describe("SQL migration contract", () => {
       .map((entry) => entry.name)
       .sort();
     expect(afterDeployNames).toEqual(expectedAfterDeployMigrationNames);
+  });
+
+  it("preserves existing unmatched mail behavior before activating domain policies", async () => {
+    const migrations = await readD1Migrations(migrationsDirectory);
+    const database = createDatabase();
+    applyBefore(database, migrations, "0025_activate_catch_all_policy.sql");
+    const timestamp = "2026-08-26T12:00:00.000Z";
+    database.exec(`
+      INSERT INTO mail_domains
+        (id, name, receiving_status, sending_status, dns_status, catch_all_policy,
+         is_enabled, created_at, updated_at)
+      VALUES
+        ('dom_reject', 'reject.example', 'ready', 'ready', 'ready', 'reject', 1,
+         '${timestamp}', '${timestamp}'),
+        ('dom_mailbox', 'mailbox.example', 'ready', 'ready', 'ready', 'reject', 1,
+         '${timestamp}', '${timestamp}');
+      INSERT INTO mailboxes
+        (id, address, mail_domain_id, display_name, is_active, created_at, updated_at)
+      VALUES
+        ('mbx_catchall', 'hello@mailbox.example', 'dom_mailbox', 'Hello', 1,
+         '${timestamp}', '${timestamp}');
+      UPDATE mail_domains
+      SET catch_all_policy = 'mailbox', catch_all_mailbox_id = 'mbx_catchall'
+      WHERE id = 'dom_mailbox';
+    `);
+
+    expect(
+      applyMigration(database, migrationNamed(migrations, "0025_activate_catch_all_policy.sql"))
+    ).toBe(true);
+    expect(
+      database
+        .prepare("SELECT id, catch_all_policy, catch_all_mailbox_id FROM mail_domains ORDER BY id")
+        .all()
+    ).toEqual([
+      { id: "dom_mailbox", catch_all_policy: "unassigned", catch_all_mailbox_id: null },
+      { id: "dom_reject", catch_all_policy: "unassigned", catch_all_mailbox_id: null }
+    ]);
+  });
+
+  it("keeps existing domains connected when adding disconnect state", async () => {
+    const migrations = await readD1Migrations(migrationsDirectory);
+    const database = createDatabase();
+    applyBefore(database, migrations, "0026_domain_disconnect.sql");
+    const timestamp = "2026-08-27T12:00:00.000Z";
+    database
+      .prepare(
+        `INSERT INTO mail_domains
+           (id, name, receiving_status, sending_status, dns_status, catch_all_policy,
+            is_enabled, created_at, updated_at)
+         VALUES ('dom_connected', 'connected.example', 'ready', 'ready', 'ready',
+                 'unassigned', 1, ?, ?)`
+      )
+      .run(timestamp, timestamp);
+
+    expect(applyMigration(database, migrationNamed(migrations, "0026_domain_disconnect.sql"))).toBe(
+      true
+    );
+    expect(
+      database.prepare("SELECT disconnected_at FROM mail_domains WHERE id = 'dom_connected'").get()
+    ).toEqual({ disconnected_at: null });
   });
 
   it("keeps deferred foreign keys active until the migration transaction commits", () => {
@@ -481,6 +543,9 @@ describe("SQL migration contract", () => {
     ).toBe(true);
     expect(
       applyMigration(database, migrationNamed(migrations, "0024_draft_inline_images.sql"))
+    ).toBe(true);
+    expect(
+      applyMigration(database, migrationNamed(migrations, "0025_activate_catch_all_policy.sql"))
     ).toBe(true);
     database
       .prepare("UPDATE draft_attachments SET content_id = ? WHERE id = 'att_upgrade'")
@@ -715,7 +780,7 @@ describe("SQL migration contract", () => {
       )
     ).toBe(false);
     expect(database.prepare("SELECT count(*) AS count FROM d1_migrations").get()).toEqual({
-      count: 24
+      count: 25
     });
     expect(
       database.prepare("SELECT count(*) AS count FROM d1_migrations_after_deploy").get()

@@ -14,8 +14,8 @@ import type {
   ConversationSummary,
   MessageDetail as MessageDetailType
 } from "@/features/messages/types";
-import type { MailFolderId } from "@/lib/routes";
-import { mailFolders } from "@/lib/routes";
+import { type MailFolderId, mailFolders } from "@/lib/routes";
+import { CatchAllPolicyNotice } from "./catch-all-policy-notice";
 
 type InboxPageProps = {
   activeFolder: MailFolderId;
@@ -181,7 +181,6 @@ export function InboxPage({
     }
     await loadThread(selectedId);
   }
-
   if (selectedId) {
     return (
       <div className="flex h-full flex-col bg-reader">
@@ -274,6 +273,7 @@ export function InboxPage({
           ) : null}
         </div>
       </div>
+      {activeFolder === "catchall" ? <CatchAllPolicyNotice /> : null}
       <div className="min-h-0 flex-1 overflow-hidden">
         <MessageList
           activeFolder={activeFolder}

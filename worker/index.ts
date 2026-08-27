@@ -53,6 +53,7 @@ export default {
     ctx: ExecutionContext
   ): Promise<void> {
     const stored = await handleInboundEmail(message, env);
+    if (!stored) return;
     if (stored.inserted) {
       ctx.waitUntil(
         notifyInboundMessage(env, stored.message, stored.isUnassigned).catch(() => {

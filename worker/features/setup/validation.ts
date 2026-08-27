@@ -27,7 +27,9 @@ export const bootstrapSetupSchema = z
         z.object({
           name: domainSchema,
           zoneId: z.string().trim().min(1).max(64).nullable().optional(),
-          accountId: z.string().trim().min(1).max(64).nullable().optional()
+          accountId: z.string().trim().min(1).max(64).nullable().optional(),
+          catchAllPolicy: z.enum(["reject", "unassigned", "mailbox"]).default("unassigned"),
+          catchAllMailboxAddress: emailAddressSchema.nullable().optional()
         })
       )
       .min(1)
@@ -81,6 +83,19 @@ export const bootstrapSetupSchema = z
         message: "Choose one of the setup mailboxes as the default From mailbox.",
         path: ["defaultFromMailboxAddress"]
       });
+    }
+    for (const [index, domain] of (input.emailDomains ?? []).entries()) {
+      if (domain.catchAllPolicy !== "mailbox") continue;
+      const mailbox = input.mailboxes.find(
+        (candidate) => candidate.address === domain.catchAllMailboxAddress
+      );
+      if (!mailbox || mailbox.address.split("@")[1] !== domain.name) {
+        context.addIssue({
+          code: "custom",
+          message: "Choose a mailbox on this domain for unknown addresses.",
+          path: ["emailDomains", index, "catchAllMailboxAddress"]
+        });
+      }
     }
   });
 

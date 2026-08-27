@@ -66,6 +66,7 @@ export function SettingsPage({
             canManage={canManage}
             defaultFromMailboxId={defaultFromMailboxId}
             deletedMailboxes={deletedMailboxes}
+            domains={setup.domains}
             mailboxes={mailboxes}
             users={users}
             onDefaultFromMailboxChange={onDefaultFromMailboxChange}
@@ -84,7 +85,11 @@ export function SettingsPage({
           )
         ) : null}
         {activeTab === "domains" && canManage ? (
-          <DomainSettings portalHostname={setup.portalHostname} onChanged={onRefresh} />
+          <DomainSettings
+            mailboxes={mailboxes}
+            portalHostname={setup.portalHostname}
+            onChanged={onRefresh}
+          />
         ) : null}
         {activeTab === "notifications" ? (
           <NotificationSettings notifications={notifications} />

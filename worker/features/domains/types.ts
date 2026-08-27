@@ -13,6 +13,7 @@ export type MailDomain = {
   catchAllMailboxId: string | null;
   isEnabled: boolean;
   lastErrorCode: string | null;
+  disconnectedAt: string | null;
   verifiedAt: string | null;
   createdAt: string;
   updatedAt: string;
@@ -30,6 +31,7 @@ export type MailDomainRow = {
   catch_all_mailbox_id: string | null;
   is_enabled: number;
   last_error_code: string | null;
+  disconnected_at: string | null;
   verified_at: string | null;
   created_at: string;
   updated_at: string;

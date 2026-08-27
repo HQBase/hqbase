@@ -88,6 +88,40 @@ export async function findMailboxForReceiving(
   return row ? mapMailbox(row) : null;
 }
 
+export async function findMailboxForCatchAllReceiving(
+  db: D1Database,
+  id: string,
+  mailDomainId: string
+): Promise<Mailbox | null> {
+  const row = await getRow<MailboxRow>(
+    db,
+    sql`SELECT m.* FROM mailboxes m
+        JOIN mail_domains d ON d.id = m.mail_domain_id
+        WHERE m.id = ${id}
+          AND m.mail_domain_id = ${mailDomainId}
+          AND m.kind = 'human'
+          AND m.deleted_at IS NULL
+          AND m.is_active = 1
+          AND d.is_enabled = 1
+          AND d.receiving_status = 'ready'
+        LIMIT 1`
+  );
+  return row ? mapMailbox(row) : null;
+}
+
+export async function findCatchAllDomainForMailbox(
+  db: D1Database,
+  mailboxId: string
+): Promise<string | null> {
+  const row = await getRow<{ name: string }>(
+    db,
+    sql`SELECT name FROM mail_domains
+        WHERE catch_all_policy = 'mailbox' AND catch_all_mailbox_id = ${mailboxId}
+        LIMIT 1`
+  );
+  return row?.name ?? null;
+}
+
 export async function findMailboxForSending(
   db: D1Database,
   address: string

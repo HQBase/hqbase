@@ -23,6 +23,7 @@ export function ConnectDomainDialog({
   authorized,
   domains,
   open,
+  preferredDomainName,
   onAuthorize,
   onConnected,
   onOpenChange
@@ -30,6 +31,7 @@ export function ConnectDomainDialog({
   authorized: boolean;
   domains: MailDomain[];
   open: boolean;
+  preferredDomainName?: string | null;
   onAuthorize: () => void;
   onConnected: () => void;
   onOpenChange: (open: boolean) => void;
@@ -46,7 +48,10 @@ export function ConnectDomainDialog({
       );
       setZones(next);
       const migrated = domains.find((domain) => !domain.zoneId);
-      const selected = next.find((zone) => zone.name === migrated?.name) ?? next[0];
+      const selected =
+        next.find((zone) => zone.name === preferredDomainName) ??
+        next.find((zone) => zone.name === migrated?.name) ??
+        next[0];
       if (selected) {
         setZoneId(selected.id);
         setName(selected.name);
@@ -59,7 +64,7 @@ export function ConnectDomainDialog({
         error instanceof Error ? error.message : "Cloudflare domains could not be loaded."
       );
     }
-  }, [domains]);
+  }, [domains, preferredDomainName]);
 
   React.useEffect(() => {
     if (open && authorized && zones.length === 0) void loadZones();

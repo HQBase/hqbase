@@ -8,6 +8,7 @@ import type { Agent } from "../agents/types";
 import { type AuditInput, auditStatement } from "../audit/service";
 
 import { findMailboxById } from "./queries";
+import { assertMailboxNotCatchAllDestination } from "./service";
 import type { Mailbox } from "./types";
 
 export async function softDeleteMailbox(
@@ -17,6 +18,7 @@ export async function softDeleteMailbox(
 ): Promise<Mailbox> {
   const mailbox = await findMailboxById(db, mailboxId);
   if (!mailbox) throw new AppError("MAILBOX_NOT_FOUND", "Mailbox not found.", 404);
+  await assertMailboxNotCatchAllDestination(db, mailboxId);
 
   const occurredAt = nowIso();
   const timestamp = mailbox.deletedAt ?? occurredAt;

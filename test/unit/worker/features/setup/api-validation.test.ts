@@ -93,6 +93,55 @@ describe("setup API validation", () => {
     ).toThrow("Choose one of the setup mailboxes as the default From mailbox.");
   });
 
+  it("accepts one same-domain mailbox as the catch-all destination", () => {
+    expect(
+      bootstrapSetupSchema.parse({
+        ownerName: "Owner",
+        ownerEmail: "owner@gmail.com",
+        ownerPassword: "password123",
+        emailDomains: [
+          {
+            name: "example.com",
+            catchAllPolicy: "mailbox",
+            catchAllMailboxAddress: "hello@example.com"
+          }
+        ],
+        checklistAcknowledged: true,
+        defaultFromMailboxAddress: "hello@example.com",
+        mailboxes: [{ address: "hello@example.com", displayName: "Hello" }]
+      })
+    ).toMatchObject({
+      emailDomains: [
+        {
+          name: "example.com",
+          catchAllPolicy: "mailbox",
+          catchAllMailboxAddress: "hello@example.com"
+        }
+      ]
+    });
+  });
+
+  it("rejects a catch-all destination from another domain", () => {
+    expect(() =>
+      bootstrapSetupSchema.parse({
+        ownerName: "Owner",
+        ownerEmail: "owner@gmail.com",
+        ownerPassword: "password123",
+        emailDomains: [
+          {
+            name: "example.com",
+            catchAllPolicy: "mailbox",
+            catchAllMailboxAddress: "hello@example.net"
+          },
+          { name: "example.net" }
+        ],
+        checklistAcknowledged: true,
+        defaultFromMailboxAddress: "hello@example.net",
+        mailboxes: [{ address: "hello@example.net", displayName: "Hello" }]
+      })
+    ).toThrow("Choose a mailbox on this domain for unknown addresses.");
+  });
+
   it("rejects credentials in Cloudflare zone listing input", () => {
     expect(() => listCloudflareZonesSchema.parse({ apiToken: "a".repeat(40) })).toThrow();
     expect(listCloudflareZonesSchema.parse({})).toEqual({});

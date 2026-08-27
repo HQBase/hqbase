@@ -21,8 +21,10 @@ import {
   TableRow
 } from "@/components/ui/table";
 import { LOGIN_EMAIL_HINT } from "@/lib/login-email";
+import { SetupCatchAllSettings } from "./setup-catch-all-settings";
 import type { MailboxDraft, MailboxErrors, OwnerErrors } from "./setup-validation";
 import { WizardActions, WizardPanel } from "./setup-wizard-parts";
+import type { SetupCatchAllSelection } from "./types";
 
 export type { MailboxDraft } from "./setup-validation";
 
@@ -131,7 +133,9 @@ export function OwnerStep({
 }
 
 export function MailboxStep({
+  catchAllByDomain,
   defaultFromMailboxAddress,
+  domains,
   errors,
   isPending,
   mailboxes,
@@ -140,10 +144,14 @@ export function MailboxStep({
   onComplete,
   onRemove,
   onSetDefaultFromMailboxAddress,
+  onSetCatchAllMailbox,
+  onSetCatchAllPolicy,
   onUpdate,
   submitError
 }: {
+  catchAllByDomain: Record<string, SetupCatchAllSelection>;
   defaultFromMailboxAddress: string;
+  domains: string[];
   errors: MailboxErrors;
   isPending: boolean;
   mailboxes: MailboxDraft[];
@@ -152,6 +160,8 @@ export function MailboxStep({
   onComplete: () => void;
   onRemove: (index: number) => void;
   onSetDefaultFromMailboxAddress: (address: string) => void;
+  onSetCatchAllMailbox: (domain: string, address: string) => void;
+  onSetCatchAllPolicy: (domain: string, policy: SetupCatchAllSelection["policy"]) => void;
   onUpdate: (index: number, patch: Partial<MailboxDraft>) => void;
   submitError: string | null;
 }): React.ReactElement {
@@ -240,6 +250,14 @@ export function MailboxStep({
         <PiPlus data-icon="inline-start" />
         Add mailbox
       </Button>
+
+      <SetupCatchAllSettings
+        catchAllByDomain={catchAllByDomain}
+        domains={domains}
+        mailboxes={mailboxes}
+        onSetCatchAllMailbox={onSetCatchAllMailbox}
+        onSetCatchAllPolicy={onSetCatchAllPolicy}
+      />
 
       <Field className="max-w-md">
         <FieldLabel htmlFor="setup-default-from-mailbox">Default From mailbox</FieldLabel>

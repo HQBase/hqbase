@@ -53,6 +53,17 @@ const workerDomainSchema = z.object({
   zone_name: z.string()
 });
 const workerDomainsSchema = z.array(workerDomainSchema);
+const catchAllRuleSchema = z.object({
+  actions: z
+    .array(
+      z.object({
+        type: z.string(),
+        value: z.array(z.string()).optional()
+      })
+    )
+    .default([]),
+  enabled: z.boolean().default(false)
+});
 
 type CloudflareStep = CloudflareConfigureResult["steps"][number];
 
@@ -242,6 +253,59 @@ export async function configureCloudflareDomain(
     }),
     steps
   };
+}
+
+export async function disconnectCloudflareDomain(
+  input: CloudflareZoneInput & { domainName: string }
+): Promise<{ catchAllChanged: boolean }> {
+  const workerName = normalizeWorkerName(input.workerName);
+  const zone = mapZone(
+    await cloudflareRequestResult(input.apiToken, `/zones/${input.zoneId}`, cloudflareZoneSchema)
+  );
+  if (zone.name !== input.domainName.toLowerCase()) {
+    throw new AppError(
+      "DOMAIN_ZONE_MISMATCH",
+      "Cloudflare returned a different domain for the stored zone.",
+      409
+    );
+  }
+
+  const rule = await cloudflareRequestResult(
+    input.apiToken,
+    `/zones/${zone.id}/email/routing/rules/catch_all`,
+    catchAllRuleSchema
+  );
+  const action = rule.actions[0];
+  const ownedByThisWorker =
+    rule.enabled &&
+    rule.actions.length === 1 &&
+    action?.type === "worker" &&
+    action.value?.length === 1 &&
+    action.value[0] === workerName;
+  if (!ownedByThisWorker) return { catchAllChanged: false };
+
+  const updated = await cloudflareRequestResult(
+    input.apiToken,
+    `/zones/${zone.id}/email/routing/rules/catch_all`,
+    catchAllRuleSchema,
+    {
+      body: JSON.stringify({
+        actions: [{ type: "drop" }],
+        enabled: false,
+        matchers: [{ type: "all" }],
+        name: "HQBase catch-all"
+      }),
+      method: "PUT"
+    }
+  );
+  if (updated.enabled) {
+    throw new AppError(
+      "CLOUDFLARE_DISCONNECT_INCOMPLETE",
+      "Cloudflare did not disable the HQBase catch-all route.",
+      502
+    );
+  }
+  return { catchAllChanged: true };
 }
 
 export async function attachWorkerCustomDomain(input: {

@@ -160,7 +160,14 @@ export function renderPreviewFixture(input: FixtureInput): React.ReactNode {
   }
   return (
     <MailboxStep
+      catchAllByDomain={{
+        "northstar.example": {
+          mailboxAddress: "support@northstar.example",
+          policy: "mailbox"
+        }
+      }}
       defaultFromMailboxAddress={input.mailboxes[0]?.address ?? ""}
+      domains={["northstar.example"]}
       errors={{ rows: input.mailboxes.map(() => ({})) }}
       isPending={input.state === "submitting"}
       mailboxes={input.mailboxes}
@@ -171,6 +178,8 @@ export function renderPreviewFixture(input: FixtureInput): React.ReactNode {
         input.setMailboxes((current) => current.filter((_, itemIndex) => itemIndex !== index))
       }
       onSetDefaultFromMailboxAddress={() => undefined}
+      onSetCatchAllMailbox={() => undefined}
+      onSetCatchAllPolicy={() => undefined}
       onUpdate={(index, patch) =>
         input.setMailboxes((current) =>
           current.map((mailbox, itemIndex) =>

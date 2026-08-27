@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   defaultMailboxesForDomains,
+  syncCatchAllSelections,
   syncMailboxesForDomains
 } from "@/features/setup/setup-helpers";
 import {
@@ -49,6 +50,30 @@ describe("setup form validation", () => {
       { address: "support@new.example", displayName: "Support" },
       { address: "privacy@new.example", displayName: "Privacy" }
     ]);
+  });
+
+  it("defaults each domain catch-all to its first mailbox and preserves explicit choices", () => {
+    const mailboxes = [
+      { address: "support@example.com", displayName: "Support" },
+      { address: "privacy@example.com", displayName: "Privacy" },
+      { address: "hello@example.net", displayName: "Hello" }
+    ];
+
+    expect(syncCatchAllSelections({}, ["example.com", "example.net"], mailboxes)).toEqual({
+      "example.com": { mailboxAddress: "support@example.com", policy: "mailbox" },
+      "example.net": { mailboxAddress: "hello@example.net", policy: "mailbox" }
+    });
+    expect(
+      syncCatchAllSelections(
+        {
+          "example.com": { mailboxAddress: "privacy@example.com", policy: "reject" }
+        },
+        ["example.com"],
+        mailboxes
+      )
+    ).toEqual({
+      "example.com": { mailboxAddress: "privacy@example.com", policy: "reject" }
+    });
   });
 
   it("blocks invalid owner details before the mailbox step", () => {

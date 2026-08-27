@@ -15,6 +15,7 @@ import {
 import { DropdownSelect } from "@/components/ui/dropdown-select";
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import type { MailDomain } from "@/features/domains/types";
 import { BulkMailboxAccessDialog } from "@/features/mailbox-access/bulk-mailbox-access-dialog";
 import { useMailboxAccessPolicies } from "@/features/mailbox-access/mailbox-access-policies";
 import { MailboxAccessPolicyDialog } from "@/features/mailbox-access/mailbox-access-policy";
@@ -31,6 +32,7 @@ type MailboxSettingsProps = {
   canManage: boolean;
   defaultFromMailboxId: string | null;
   deletedMailboxes: Mailbox[];
+  domains?: MailDomain[];
   mailboxes: Mailbox[];
   users: WorkspaceUser[];
   onDefaultFromMailboxChange: (mailboxId: string) => void;
@@ -41,6 +43,7 @@ export function MailboxSettings({
   canManage,
   defaultFromMailboxId,
   deletedMailboxes,
+  domains = [],
   mailboxes,
   users,
   onDefaultFromMailboxChange,
@@ -58,8 +61,8 @@ export function MailboxSettings({
   const [createPending, setCreatePending] = React.useState(false);
   const [pendingMailboxId, setPendingMailboxId] = React.useState<string | null>(null);
   const accessPolicies = useMailboxAccessPolicies(canManage);
-  const domains = mailboxDomains(mailboxes);
-  const activeDomain = domains.includes(domainFilter) ? domainFilter : "all";
+  const mailboxDomainNames = mailboxDomains(mailboxes);
+  const activeDomain = mailboxDomainNames.includes(domainFilter) ? domainFilter : "all";
   const visibleMailboxes =
     activeDomain === "all"
       ? mailboxes
@@ -68,6 +71,11 @@ export function MailboxSettings({
   const selectedMailboxes = mailboxes.filter((mailbox) => selectedMailboxIdSet.has(mailbox.id));
   const detailsMailbox = mailboxes.find((mailbox) => mailbox.id === detailsMailboxId) ?? null;
   const accessMailbox = mailboxes.find((mailbox) => mailbox.id === accessMailboxId) ?? null;
+  const catchAllDomainByMailbox = Object.fromEntries(
+    domains
+      .filter((domain) => domain.catchAllPolicy === "mailbox" && domain.catchAllMailboxId)
+      .map((domain) => [domain.catchAllMailboxId as string, domain.name])
+  );
 
   async function handleCreate(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -191,14 +199,14 @@ export function MailboxSettings({
         onChanged={onDefaultFromMailboxChange}
       />
 
-      {canManage && mailboxes.length > 0 && domains.length > 1 ? (
+      {canManage && mailboxes.length > 0 && mailboxDomainNames.length > 1 ? (
         <div>
           <DropdownSelect
             ariaLabel="Filter mailboxes by domain"
             className="w-56 shadow-none"
             options={[
               { label: "All domains", value: "all" },
-              ...domains.map((domain) => ({ label: domain, value: domain }))
+              ...mailboxDomainNames.map((domain) => ({ label: domain, value: domain }))
             ]}
             value={activeDomain}
             onValueChange={(value) => {
@@ -216,6 +224,7 @@ export function MailboxSettings({
 
       <MailboxTable
         canManage={canManage}
+        catchAllDomainByMailbox={catchAllDomainByMailbox}
         mailboxes={visibleMailboxes}
         pendingMailboxId={pendingMailboxId}
         policies={accessPolicies}

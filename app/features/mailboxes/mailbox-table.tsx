@@ -37,6 +37,7 @@ export function MailboxSelectionBar({
 
 export function MailboxTable({
   canManage,
+  catchAllDomainByMailbox = {},
   mailboxes,
   pendingMailboxId,
   policies,
@@ -47,6 +48,7 @@ export function MailboxTable({
   onToggle
 }: {
   canManage: boolean;
+  catchAllDomainByMailbox?: Record<string, string>;
   mailboxes: Mailbox[];
   pendingMailboxId: string | null;
   policies: MailboxAccessPolicies;
@@ -137,6 +139,11 @@ export function MailboxTable({
                 <span className="mt-0.5 block truncate text-xs text-muted-foreground sm:hidden">
                   {mailbox.displayName}
                 </span>
+                {catchAllDomainByMailbox[mailbox.id] ? (
+                  <Badge className="mt-1" variant="outline">
+                    Catch-all for {catchAllDomainByMailbox[mailbox.id]}
+                  </Badge>
+                ) : null}
               </TableCell>
               <TableCell className="hidden sm:table-cell">{mailbox.displayName}</TableCell>
               <TableCell onClick={canManage ? (event) => event.stopPropagation() : undefined}>

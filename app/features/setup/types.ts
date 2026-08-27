@@ -1,8 +1,10 @@
+import type { MailDomain } from "@/features/domains/types";
+
 export type SetupStatus = {
   isComplete: boolean;
   primaryDomain: string | null;
   portalHostname: string | null;
-  domains: Array<{ id: string; name: string; isEnabled: boolean }>;
+  domains: MailDomain[];
   userCount: number;
   mailboxCount: number;
   checklistAcknowledged: boolean;
@@ -14,13 +16,24 @@ export type BootstrapSetupInput = {
   ownerPassword: string;
   primaryDomain: string;
   portalHostname: string;
-  emailDomains: Array<{ name: string; zoneId: string; accountId: string | null }>;
+  emailDomains: Array<{
+    name: string;
+    zoneId: string;
+    accountId: string | null;
+    catchAllPolicy: "reject" | "unassigned" | "mailbox";
+    catchAllMailboxAddress: string | null;
+  }>;
   checklistAcknowledged: boolean;
   defaultFromMailboxAddress: string;
   mailboxes: Array<{
     address: string;
     displayName: string;
   }>;
+};
+
+export type SetupCatchAllSelection = {
+  policy: "reject" | "unassigned" | "mailbox";
+  mailboxAddress: string;
 };
 
 export type CloudflareZone = {

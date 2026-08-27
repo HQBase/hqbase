@@ -1,7 +1,12 @@
 import { AppError } from "../../lib/errors";
 import { findMailDomainByName } from "../domains/queries";
 
-import { findMailboxById, insertMailbox, updateMailbox } from "./queries";
+import {
+  findCatchAllDomainForMailbox,
+  findMailboxById,
+  insertMailbox,
+  updateMailbox
+} from "./queries";
 import type { CreateMailboxInput, Mailbox, UpdateMailboxInput } from "./types";
 
 export async function createMailbox(db: D1Database, input: CreateMailboxInput): Promise<Mailbox> {
@@ -31,6 +36,9 @@ export async function updateExistingMailbox(
   if (existing.deletedAt) {
     throw new AppError("MAILBOX_DELETED", "Restore the mailbox before changing it.", 409);
   }
+  if (input.isActive === false && existing.isActive) {
+    await assertMailboxNotCatchAllDestination(db, id);
+  }
 
   const updated = await updateMailbox(db, id, input);
   if (!updated) {
@@ -38,4 +46,18 @@ export async function updateExistingMailbox(
   }
 
   return updated;
+}
+
+export async function assertMailboxNotCatchAllDestination(
+  db: D1Database,
+  mailboxId: string
+): Promise<void> {
+  const domain = await findCatchAllDomainForMailbox(db, mailboxId);
+  if (domain) {
+    throw new AppError(
+      "CATCH_ALL_MAILBOX_IN_USE",
+      `Choose another catch-all mailbox for ${domain} before disabling or deleting this mailbox.`,
+      409
+    );
+  }
 }

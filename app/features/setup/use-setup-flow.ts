@@ -3,11 +3,16 @@ import * as React from "react";
 import { toast } from "sonner";
 
 import { bootstrapSetup } from "./api";
-import { emptyMailboxErrors, syncMailboxesForDomains } from "./setup-helpers";
+import { readSetupDraft } from "./setup-draft";
+import {
+  emptyMailboxErrors,
+  syncCatchAllSelections,
+  syncMailboxesForDomains
+} from "./setup-helpers";
 import { ACCESS_STEP, DOMAIN_STEP, MAILBOX_STEP, OWNER_STEP } from "./setup-steps";
 import type { MailboxDraft } from "./setup-validation";
 import { hasErrors, hasMailboxErrors, validateMailboxes, validateOwner } from "./setup-validation";
-import type { BootstrapSetupInput } from "./types";
+import type { BootstrapSetupInput, SetupCatchAllSelection } from "./types";
 import { useSetupCloudflare } from "./use-setup-cloudflare";
 
 export function useSetupFlow(onComplete: () => void) {
@@ -17,6 +22,9 @@ export function useSetupFlow(onComplete: () => void) {
   const [ownerPassword, setOwnerPassword] = React.useState("");
   const [ownerAttempted, setOwnerAttempted] = React.useState(false);
   const [mailboxes, setMailboxes] = React.useState<MailboxDraft[]>([]);
+  const [catchAllDraft, setCatchAllDraft] = React.useState<Record<string, SetupCatchAllSelection>>(
+    {}
+  );
   const [selectedDefaultFromAddress, setSelectedDefaultFromAddress] = React.useState("");
   const [mailboxAttempted, setMailboxAttempted] = React.useState(false);
   const [submitError, setSubmitError] = React.useState<string | null>(null);
@@ -29,6 +37,7 @@ export function useSetupFlow(onComplete: () => void) {
     setOwnerName(saved.ownerName);
     setOwnerEmail(saved.ownerEmail);
     setMailboxes(saved.mailboxes);
+    setCatchAllDraft(saved.catchAllByDomain);
     setSelectedDefaultFromAddress(saved.defaultFromMailboxAddress);
   }, []);
 
@@ -51,13 +60,14 @@ export function useSetupFlow(onComplete: () => void) {
       "hqb_setup_draft_v1",
       JSON.stringify({
         activeStep,
+        catchAllByDomain: catchAllDraft,
         defaultFromMailboxAddress,
         mailboxes,
         ownerEmail,
         ownerName
       })
     );
-  }, [activeStep, defaultFromMailboxAddress, mailboxes, ownerEmail, ownerName]);
+  }, [activeStep, catchAllDraft, defaultFromMailboxAddress, mailboxes, ownerEmail, ownerName]);
 
   const cloudflare = useSetupCloudflare({
     onConnectionInvalidated: () => setActiveStep((current) => Math.min(current, DOMAIN_STEP)),
@@ -67,7 +77,14 @@ export function useSetupFlow(onComplete: () => void) {
     onTokenVerified: () => advanceTo(DOMAIN_STEP)
   });
   const ownerDraft = { email: ownerEmail, name: ownerName, password: ownerPassword };
-  const managedDomains = cloudflare.emailDomains.map((domain) => domain.name);
+  const managedDomains = React.useMemo(
+    () => cloudflare.emailDomains.map((domain) => domain.name),
+    [cloudflare.emailDomains]
+  );
+  const catchAllByDomain = React.useMemo(
+    () => syncCatchAllSelections(catchAllDraft, managedDomains, mailboxes),
+    [catchAllDraft, mailboxes, managedDomains]
+  );
   const currentOwnerErrors = validateOwner(ownerDraft, managedDomains);
   const currentMailboxErrors = validateMailboxes(mailboxes, managedDomains);
   const ownerErrors = ownerAttempted ? currentOwnerErrors : {};
@@ -132,7 +149,17 @@ export function useSetupFlow(onComplete: () => void) {
       ownerName,
       ownerPassword,
       primaryDomain: cloudflare.primaryDomain,
-      emailDomains: cloudflare.emailDomains,
+      emailDomains: cloudflare.emailDomains.map((domain) => {
+        const selection = catchAllByDomain[domain.name] ?? {
+          policy: "unassigned" as const,
+          mailboxAddress: ""
+        };
+        return {
+          ...domain,
+          catchAllPolicy: selection.policy,
+          catchAllMailboxAddress: selection.policy === "mailbox" ? selection.mailboxAddress : null
+        };
+      }),
       portalHostname: cloudflare.portalHostname
     };
     setIsPending(true);
@@ -183,6 +210,23 @@ export function useSetupFlow(onComplete: () => void) {
     setSubmitError(null);
   }
 
+  function updateCatchAllPolicy(domain: string, policy: SetupCatchAllSelection["policy"]): void {
+    const current = catchAllByDomain[domain];
+    if (!current || (policy === "mailbox" && !current.mailboxAddress)) return;
+    setCatchAllDraft({ ...catchAllByDomain, [domain]: { ...current, policy } });
+    setSubmitError(null);
+  }
+
+  function updateCatchAllMailbox(domain: string, mailboxAddress: string): void {
+    const current = catchAllByDomain[domain];
+    if (!current) return;
+    setCatchAllDraft({
+      ...catchAllByDomain,
+      [domain]: { policy: "mailbox", mailboxAddress }
+    });
+    setSubmitError(null);
+  }
+
   return {
     access: cloudflare.access,
     activeStep,
@@ -192,12 +236,16 @@ export function useSetupFlow(onComplete: () => void) {
       errors: mailboxErrors,
       isPending,
       mailboxes,
+      domains: managedDomains,
+      catchAllByDomain,
       submitError,
       onAdd: addMailbox,
       onBack: () => setActiveStep(OWNER_STEP),
       onComplete: () => void handleComplete(),
       onRemove: removeMailbox,
       onSetDefaultFromMailboxAddress: setSelectedDefaultFromAddress,
+      onSetCatchAllMailbox: updateCatchAllMailbox,
+      onSetCatchAllPolicy: updateCatchAllPolicy,
       onUpdate: updateMailbox
     },
     owner: {
@@ -213,36 +261,4 @@ export function useSetupFlow(onComplete: () => void) {
     },
     steps
   };
-}
-
-function readSetupDraft(): {
-  activeStep: number;
-  defaultFromMailboxAddress: string;
-  mailboxes: MailboxDraft[];
-  ownerEmail: string;
-  ownerName: string;
-} | null {
-  try {
-    const value = JSON.parse(localStorage.getItem("hqb_setup_draft_v1") ?? "null") as Record<
-      string,
-      unknown
-    > | null;
-    if (!value || !Array.isArray(value.mailboxes)) return null;
-    return {
-      activeStep: Math.min(MAILBOX_STEP, Math.max(ACCESS_STEP, Number(value.activeStep) || 0)),
-      defaultFromMailboxAddress:
-        typeof value.defaultFromMailboxAddress === "string"
-          ? value.defaultFromMailboxAddress.slice(0, 254)
-          : "",
-      mailboxes: value.mailboxes
-        .filter((item): item is MailboxDraft =>
-          Boolean(item && typeof item === "object" && "address" in item && "displayName" in item)
-        )
-        .slice(0, 20),
-      ownerEmail: typeof value.ownerEmail === "string" ? value.ownerEmail.slice(0, 320) : "",
-      ownerName: typeof value.ownerName === "string" ? value.ownerName.slice(0, 120) : ""
-    };
-  } catch {
-    return null;
-  }
 }

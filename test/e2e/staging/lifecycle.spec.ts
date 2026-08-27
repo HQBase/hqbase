@@ -57,6 +57,13 @@ test("HQBase web lifecycle remains healthy", async ({ page, request }) => {
       data: {
         checklistAcknowledged: true,
         defaultFromMailboxAddress: sender,
+        emailDomains: [
+          {
+            catchAllMailboxAddress: sender,
+            catchAllPolicy: "mailbox",
+            name: domain
+          }
+        ],
         mailboxes: [{ address: sender, displayName: "HQBase E2E" }],
         ownerEmail: email,
         ownerName: "HQBase E2E Owner",
@@ -330,6 +337,17 @@ test("candidate mail experience contracts work together", async ({ request }) =>
   }>;
   const primaryMailbox = mailboxes.find((item) => item.address === sender);
   if (!primaryMailbox) throw new Error(`Staging mailbox ${sender} was not found.`);
+  const domainsResponse = await request.get("/api/domains");
+  expect(domainsResponse.ok(), await domainsResponse.text()).toBeTruthy();
+  expect(await domainsResponse.json()).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({
+        catchAllMailboxId: primaryMailbox.id,
+        catchAllPolicy: "mailbox",
+        id: primaryMailbox.mailDomainId
+      })
+    ])
+  );
 
   const suffix = `${process.env.GITHUB_RUN_ID ?? "local"}-${Date.now()}`;
   const searchTerm = `experience${suffix.replaceAll(/[^a-zA-Z0-9]/g, "")}`;
@@ -344,7 +362,23 @@ test("candidate mail experience contracts work together", async ({ request }) =>
     }
   });
   expect(secondDomainResponse.status(), await secondDomainResponse.text()).toBe(201);
-  const secondDomain = (await secondDomainResponse.json()) as { id: string };
+  const secondDomain = (await secondDomainResponse.json()) as {
+    catchAllPolicy: string;
+    id: string;
+  };
+  expect(secondDomain.catchAllPolicy).toBe("unassigned");
+  const disconnectWithoutGrant = await request.post(`/api/domains/${secondDomain.id}/disconnect`);
+  expect(disconnectWithoutGrant.status()).toBe(401);
+  await expect(disconnectWithoutGrant.json()).resolves.toMatchObject({
+    error: { code: "CLOUDFLARE_ACCESS_REQUIRED" }
+  });
+  const forgetConnected = await request.delete(`/api/domains/${secondDomain.id}`, {
+    data: { confirmation: secondDomainName }
+  });
+  expect(forgetConnected.status()).toBe(409);
+  await expect(forgetConnected.json()).resolves.toMatchObject({
+    error: { code: "DOMAIN_DISCONNECT_REQUIRED" }
+  });
   const secondAddress = `second@${secondDomainName}`;
   const secondMailboxResponse = await request.post("/api/mailboxes", {
     data: { address: secondAddress, displayName: `Second ${suffix}` }

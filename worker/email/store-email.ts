@@ -2,7 +2,6 @@ import { sql } from "drizzle-orm";
 
 import { newId, nowIso } from "../db/client";
 import { getRow } from "../db/drizzle";
-import { findMailboxForReceiving } from "../features/mailboxes/queries";
 import { getMessageDetail, insertAttachment, insertMessage } from "../features/messages/queries";
 import { resolveInboundThread } from "../features/messages/threading";
 import type { MessageDetail, MessageSummary } from "../features/messages/types";
@@ -13,6 +12,7 @@ import type { ParsedEmail } from "./parse-email";
 
 export type StoreInboundInput = {
   envelopeRecipient: string;
+  mailboxId: string | null;
   raw: ArrayBuffer;
   parsed: ParsedEmail;
 };
@@ -27,12 +27,12 @@ export async function storeInboundEmail(
   input: StoreInboundInput
 ): Promise<StoreInboundResult> {
   const recipient = input.envelopeRecipient.toLowerCase();
-  const initialPlan = planInboundStorage({
+  const plan = planInboundStorage({
     envelopeRecipient: recipient,
-    mailboxId: null,
+    mailboxId: input.mailboxId,
     parsed: input.parsed
   });
-  const dedupeKey = initialPlan.dedupeKey;
+  const dedupeKey = plan.dedupeKey;
   const duplicate = dedupeKey ? await findDuplicate(db, dedupeKey) : null;
   if (duplicate) {
     return { inserted: false, message: duplicate };
@@ -52,12 +52,6 @@ export async function storeInboundEmail(
     });
   }
 
-  const mailbox = await findMailboxForReceiving(db, recipient);
-  const plan = planInboundStorage({
-    envelopeRecipient: recipient,
-    mailboxId: mailbox?.id ?? null,
-    parsed: input.parsed
-  });
   const threadId = await resolveInboundThread(db, {
     inReplyTo: input.parsed.inReplyTo,
     lastMessageAt: timestamp,

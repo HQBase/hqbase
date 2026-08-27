@@ -56,7 +56,8 @@ describe("staging workflow lifecycle record", () => {
     expect(workflow).toContain('"is_unassigned":1');
     expect(workflow).toContain('"delivered_to_address":"alias@sql-upgrade.example.test"');
     expect(workflow).toContain('"draft_content_id_column_count":1');
-    expect(workflow).toContain('"migration_count":24');
+    expect(workflow).toContain('"disconnected_at":null');
+    expect(workflow).toContain('"migration_count":26');
     expect(workflow).toContain('"from_name":null');
     expect(workflow).toContain('"post_migration_count":2');
     expect(workflow).toContain('migrations_table = "d1_migrations_after_deploy"');

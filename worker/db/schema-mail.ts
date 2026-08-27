@@ -121,6 +121,7 @@ export const mailDomains = sqliteTable(
     ),
     isEnabled: integer("is_enabled", { mode: "boolean" }).default(sql`1`).notNull(),
     lastErrorCode: text("last_error_code"),
+    disconnectedAt: text("disconnected_at"),
     verifiedAt: text("verified_at"),
     createdAt: text("created_at").notNull(),
     updatedAt: text("updated_at").notNull()
