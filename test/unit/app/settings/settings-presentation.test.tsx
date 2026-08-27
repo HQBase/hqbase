@@ -127,7 +127,12 @@ describe("settings presentation", () => {
 
   it("keeps the user creation form out of the tab content", () => {
     const html = renderToStaticMarkup(
-      <UserSettings managedDomains={["example.com"]} users={[]} onChanged={() => undefined} />
+      <UserSettings
+        currentUser={{ id: "owner-1", role: "owner" }}
+        managedDomains={["example.com"]}
+        users={[]}
+        onChanged={() => undefined}
+      />
     );
 
     expect(html).toContain("Add user");
@@ -141,6 +146,7 @@ describe("settings presentation", () => {
   it("shows pending onboarding state and the matching recovery action", () => {
     const html = renderToStaticMarkup(
       <UserSettings
+        currentUser={{ id: "owner-1", role: "owner" }}
         managedDomains={["example.com"]}
         users={[
           {
@@ -163,8 +169,24 @@ describe("settings presentation", () => {
 
     expect(html).toContain("Invite sent");
     expect(html).toContain("Password reset required");
-    expect(html).toContain("Resend");
-    expect(html).toContain("New password");
+    expect(html.match(/aria-label="Actions for Avery Stone"/gu)).toHaveLength(2);
+  });
+
+  it("shows removed users with a disabled role and a row actions menu", () => {
+    const html = renderToStaticMarkup(
+      <UserSettings
+        currentUser={{ id: "owner-1", role: "owner" }}
+        managedDomains={["example.com"]}
+        users={[{ ...member, banned: true }]}
+        onChanged={() => undefined}
+      />
+    );
+
+    expect(html).toContain("Actions");
+    expect(html).toContain("Removed");
+    expect(html).toContain('aria-label="Actions for Avery Stone"');
+    expect(html).toContain('aria-label="Role for Avery Stone"');
+    expect(html).toContain("disabled");
   });
 
   it("explains workspace roles and mailbox grants", () => {

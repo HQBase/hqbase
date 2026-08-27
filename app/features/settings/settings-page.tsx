@@ -76,6 +76,7 @@ export function SettingsPage({
         {activeTab === "users" ? (
           canManage ? (
             <UserSettings
+              currentUser={currentUser}
               managedDomains={setup.domains.map((domain) => domain.name)}
               users={users}
               onChanged={onRefresh}

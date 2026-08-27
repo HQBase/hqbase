@@ -470,13 +470,244 @@ describe("workspace user onboarding", () => {
       .first<{ count: number }>();
     expect(remainingTokens?.count).toBe(0);
   });
+
+  it("removes and restores a user without restoring access", async () => {
+    const created = await createUser({
+      email: "removed-user@gmail.com",
+      method: "temporary_password",
+      name: "Removed User",
+      role: "member"
+    });
+    expect(created.status, await created.clone().text()).toBe(201);
+    const result = (await created.json()) as {
+      temporaryPassword: string;
+      user: { id: string };
+    };
+    const userCookie = await signIn("removed-user@gmail.com", result.temporaryPassword);
+    const session = await env.DB.prepare("SELECT id FROM session WHERE userId = ?")
+      .bind(result.user.id)
+      .first<{ id: string }>();
+    const owner = await env.DB.prepare('SELECT id FROM "user" WHERE email = ?')
+      .bind("owner@login.example")
+      .first<{ id: string }>();
+    expect(session?.id).toBeTruthy();
+    expect(owner?.id).toBeTruthy();
+
+    const timestamp = new Date().toISOString();
+    const expiresAt = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+    await env.DB.batch([
+      env.DB.prepare(
+        `INSERT INTO mailbox_grants
+           (mailbox_id, principal_id, access_level, created_by_principal_id, created_at, updated_at)
+           VALUES ('mailbox_users', ?, 'read', ?, ?, ?)`
+      ).bind(result.user.id, owner?.id, timestamp, timestamp),
+      env.DB.prepare(
+        `INSERT INTO push_subscriptions
+           (id, user_id, endpoint, p256dh_key, auth_key, created_at, updated_at)
+           VALUES ('push_removed_user', ?, 'https://push.example/removed-user', 'key', 'auth', ?, ?)`
+      ).bind(result.user.id, timestamp, timestamp),
+      env.DB.prepare(
+        `INSERT INTO oauthClient (id, clientId, redirectUris, createdAt, updatedAt)
+           VALUES ('oauth_client_removed_user', 'client_removed_user', '["https://client.example/callback"]', ?, ?)`
+      ).bind(timestamp, timestamp),
+      env.DB.prepare(
+        `INSERT INTO oauthConsent
+           (id, clientId, userId, scopes, createdAt, updatedAt)
+           VALUES ('oauth_consent_removed_user', 'client_removed_user', ?, '["mail:read"]', ?, ?)`
+      ).bind(result.user.id, timestamp, timestamp),
+      env.DB.prepare(
+        `INSERT INTO oauthRefreshToken
+           (id, token, clientId, sessionId, userId, expiresAt, createdAt, scopes)
+           VALUES ('oauth_refresh_removed_user', 'refresh_removed_user', 'client_removed_user', ?, ?, ?, ?, '["mail:read"]')`
+      ).bind(session?.id, result.user.id, expiresAt, timestamp),
+      env.DB.prepare(
+        `INSERT INTO oauthAccessToken
+           (id, token, clientId, sessionId, userId, refreshId, expiresAt, createdAt, scopes)
+           VALUES ('oauth_access_removed_user', 'access_removed_user', 'client_removed_user', ?, ?,
+                   'oauth_refresh_removed_user', ?, ?, '["mail:read"]')`
+      ).bind(session?.id, result.user.id, expiresAt, timestamp),
+      env.DB.prepare(
+        `INSERT INTO deviceCode
+           (id, deviceCode, userCode, userId, expiresAt, status)
+           VALUES ('device_removed_user', 'device-code-removed-user', 'REMOVE-USER', ?, ?, 'approved')`
+      ).bind(result.user.id, expiresAt),
+      env.DB.prepare(
+        `INSERT INTO verification
+           (id, identifier, value, expiresAt, createdAt, updatedAt)
+           VALUES ('verification_removed_user', 'reset-password:removed-user', ?, ?, ?, ?)`
+      ).bind(result.user.id, expiresAt, timestamp, timestamp)
+    ]);
+
+    const removed = await SELF.fetch(`${origin}/api/users/${result.user.id}`, {
+      headers: { cookie: ownerCookie },
+      method: "DELETE"
+    });
+    expect(removed.status, await removed.clone().text()).toBe(204);
+
+    const removedState = await env.DB.prepare(
+      `SELECT user.banned, principal.status,
+              (SELECT COUNT(*) FROM session WHERE userId = user.id) AS sessions,
+              (SELECT COUNT(*) FROM mailbox_grants WHERE principal_id = user.id) AS grants,
+              (SELECT COUNT(*) FROM push_subscriptions WHERE user_id = user.id) AS subscriptions,
+              (SELECT COUNT(*) FROM oauthAccessToken WHERE userId = user.id) AS access_tokens,
+              (SELECT COUNT(*) FROM oauthRefreshToken WHERE userId = user.id) AS refresh_tokens,
+              (SELECT COUNT(*) FROM oauthConsent WHERE userId = user.id) AS consents,
+              (SELECT COUNT(*) FROM deviceCode WHERE userId = user.id) AS device_codes,
+              (SELECT COUNT(*) FROM verification
+               WHERE value = user.id AND identifier LIKE 'reset-password:%') AS verifications
+       FROM "user" user
+       JOIN principals principal ON principal.id = user.id
+       WHERE user.id = ?`
+    )
+      .bind(result.user.id)
+      .first<Record<string, number | string>>();
+    expect(removedState).toMatchObject({
+      banned: 1,
+      status: "disabled",
+      sessions: 0,
+      grants: 0,
+      subscriptions: 0,
+      access_tokens: 0,
+      refresh_tokens: 0,
+      consents: 0,
+      device_codes: 0,
+      verifications: 0
+    });
+    await expect(signIn("removed-user@gmail.com", result.temporaryPassword)).rejects.toThrow();
+    const revokedSession = await SELF.fetch(`${origin}/api/me`, {
+      headers: { cookie: userCookie }
+    });
+    expect(revokedSession.status).toBe(401);
+
+    const listed = await SELF.fetch(`${origin}/api/users`, {
+      headers: { cookie: ownerCookie }
+    });
+    const users = (await listed.json()) as Array<{ banned: boolean; id: string }>;
+    expect(users).toContainEqual(expect.objectContaining({ banned: true, id: result.user.id }));
+
+    const roleChange = await SELF.fetch(`${origin}/api/users/${result.user.id}`, {
+      body: JSON.stringify({ role: "admin" }),
+      headers: { "content-type": "application/json", cookie: ownerCookie },
+      method: "PATCH"
+    });
+    expect(roleChange.status).toBe(409);
+    await expect(roleChange.json()).resolves.toMatchObject({
+      error: { code: "USER_REMOVED" }
+    });
+
+    const restored = await SELF.fetch(`${origin}/api/users/${result.user.id}/restore`, {
+      headers: { cookie: ownerCookie },
+      method: "POST"
+    });
+    expect(restored.status, await restored.clone().text()).toBe(200);
+    const restoredState = await env.DB.prepare(
+      `SELECT user.banned, principal.status,
+              (SELECT COUNT(*) FROM mailbox_grants WHERE principal_id = user.id) AS grants
+       FROM "user" user
+       JOIN principals principal ON principal.id = user.id
+       WHERE user.id = ?`
+    )
+      .bind(result.user.id)
+      .first<{ banned: number; grants: number; status: string }>();
+    expect(restoredState).toEqual({ banned: 0, grants: 0, status: "active" });
+    await expect(signIn("removed-user@gmail.com", result.temporaryPassword)).resolves.toContain(
+      "better-auth.session_token"
+    );
+
+    const audits = await env.DB.prepare(
+      `SELECT action, outcome FROM audit_events
+       WHERE resource_type = 'user' AND resource_id = ?
+         AND action IN ('user.remove', 'user.restore')
+       ORDER BY occurred_at`
+    )
+      .bind(result.user.id)
+      .all<{ action: string; outcome: string }>();
+    expect(audits.results).toEqual([
+      { action: "user.remove", outcome: "success" },
+      { action: "user.restore", outcome: "success" }
+    ]);
+  });
+
+  it("does not let a user remove themselves", async () => {
+    const owner = await env.DB.prepare('SELECT id FROM "user" WHERE email = ?')
+      .bind("owner@login.example")
+      .first<{ id: string }>();
+    const response = await SELF.fetch(`${origin}/api/users/${owner?.id}`, {
+      headers: { cookie: ownerCookie },
+      method: "DELETE"
+    });
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toMatchObject({
+      error: { code: "SELF_REMOVAL" }
+    });
+  });
+
+  it("requires an owner to remove or restore another owner", async () => {
+    const adminCreated = await createUser({
+      email: "user-admin@gmail.com",
+      method: "temporary_password",
+      name: "User Admin",
+      role: "admin"
+    });
+    const adminResult = (await adminCreated.json()) as {
+      temporaryPassword: string;
+    };
+    const pendingAdminCookie = await signIn("user-admin@gmail.com", adminResult.temporaryPassword);
+    const activatedAdmin = await SELF.fetch(`${origin}/api/me/password`, {
+      body: JSON.stringify({
+        confirmPassword: "user-admin-password-456",
+        currentPassword: adminResult.temporaryPassword,
+        newPassword: "user-admin-password-456"
+      }),
+      headers: { "content-type": "application/json", cookie: pendingAdminCookie, origin },
+      method: "POST"
+    });
+    expect(activatedAdmin.status, await activatedAdmin.clone().text()).toBe(200);
+    const adminCookie = extractSessionCookie(activatedAdmin);
+
+    const ownerCreated = await createUser({
+      email: "second-owner@gmail.com",
+      method: "temporary_password",
+      name: "Second Owner",
+      role: "owner"
+    });
+    const ownerResult = (await ownerCreated.json()) as { user: { id: string } };
+    const deniedRemoval = await SELF.fetch(`${origin}/api/users/${ownerResult.user.id}`, {
+      headers: { cookie: adminCookie },
+      method: "DELETE"
+    });
+    expect(deniedRemoval.status).toBe(403);
+    await expect(deniedRemoval.json()).resolves.toMatchObject({
+      error: { code: "OWNER_REQUIRED" }
+    });
+
+    const removed = await SELF.fetch(`${origin}/api/users/${ownerResult.user.id}`, {
+      headers: { cookie: ownerCookie },
+      method: "DELETE"
+    });
+    expect(removed.status, await removed.clone().text()).toBe(204);
+    const deniedRestore = await SELF.fetch(`${origin}/api/users/${ownerResult.user.id}/restore`, {
+      headers: { cookie: adminCookie },
+      method: "POST"
+    });
+    expect(deniedRestore.status).toBe(403);
+    await expect(deniedRestore.json()).resolves.toMatchObject({
+      error: { code: "OWNER_REQUIRED" }
+    });
+
+    const restored = await SELF.fetch(`${origin}/api/users/${ownerResult.user.id}/restore`, {
+      headers: { cookie: ownerCookie },
+      method: "POST"
+    });
+    expect(restored.status, await restored.clone().text()).toBe(200);
+  });
 });
 
 function createUser(input: {
   email: string;
   method: "email_invite" | "temporary_password";
   name: string;
-  role: "member";
+  role: "owner" | "admin" | "member";
 }): Promise<Response> {
   return SELF.fetch(`${origin}/api/users`, {
     body: JSON.stringify(input),

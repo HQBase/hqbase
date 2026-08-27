@@ -1,10 +1,7 @@
 import * as React from "react";
-import { PiEnvelope, PiKey } from "react-icons/pi";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
-import { Spinner } from "@/components/ui/spinner";
 import {
   Table,
   TableBody,
@@ -17,10 +14,12 @@ import { SettingsSection } from "@/features/settings/settings-section";
 import { regenerateTemporaryPassword, resendInvitation, updateUserRole } from "./api";
 import { RoleGuidance } from "./role-guidance";
 import { RoleSelect } from "./role-select";
-import type { WorkspaceUser } from "./types";
+import type { WorkspaceRole, WorkspaceUser } from "./types";
+import { UserActions, type UserLifecycleAction, UserLifecycleDialog } from "./user-actions";
 import { TemporaryPasswordReveal, UserOnboardingDialog } from "./user-onboarding-dialog";
 
 type UserSettingsProps = {
+  currentUser: { id: string; role: WorkspaceRole };
   managedDomains: string[];
   users: WorkspaceUser[];
   onChanged: () => void;
@@ -32,12 +31,14 @@ type TemporaryCredential = {
 };
 
 export function UserSettings({
+  currentUser,
   managedDomains,
   users,
   onChanged
 }: UserSettingsProps): React.ReactElement {
   const [pendingAction, setPendingAction] = React.useState<string | null>(null);
   const [credential, setCredential] = React.useState<TemporaryCredential | null>(null);
+  const [lifecycleAction, setLifecycleAction] = React.useState<UserLifecycleAction | null>(null);
 
   async function handleRoleChange(userId: string, role: WorkspaceUser["role"]) {
     await updateUserRole(userId, role);
@@ -82,7 +83,7 @@ export function UserSettings({
                   <RoleGuidance />
                 </span>
               </TableHead>
-              <TableHead className="w-32 text-right">Action</TableHead>
+              <TableHead className="w-16 text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -103,29 +104,19 @@ export function UserSettings({
                 <TableCell>
                   <RoleSelect
                     ariaLabel={`Role for ${user.name}`}
+                    disabled={user.banned}
                     value={user.role}
                     onChange={(role) => void handleRoleChange(user.id, role)}
                   />
                 </TableCell>
                 <TableCell className="text-right">
-                  {user.passwordSetupRequired ? (
-                    <Button
-                      disabled={pendingAction === user.id}
-                      onClick={() => void handlePendingAction(user)}
-                      size="sm"
-                      type="button"
-                      variant="outline"
-                    >
-                      {pendingAction === user.id ? (
-                        <Spinner data-icon="inline-start" />
-                      ) : user.onboardingMethod === "email_invite" ? (
-                        <PiEnvelope data-icon="inline-start" />
-                      ) : (
-                        <PiKey data-icon="inline-start" />
-                      )}
-                      {user.onboardingMethod === "email_invite" ? "Resend" : "New password"}
-                    </Button>
-                  ) : null}
+                  <UserActions
+                    currentUser={currentUser}
+                    disabled={pendingAction === user.id}
+                    user={user}
+                    onLifecycleAction={(kind) => setLifecycleAction({ kind, user })}
+                    onPendingAction={() => void handlePendingAction(user)}
+                  />
                 </TableCell>
               </TableRow>
             ))}
@@ -139,14 +130,23 @@ export function UserSettings({
           ) : null}
         </DialogContent>
       </Dialog>
+      <UserLifecycleDialog
+        action={lifecycleAction}
+        key={lifecycleAction ? `${lifecycleAction.kind}:${lifecycleAction.user.id}` : "closed"}
+        pending={lifecycleAction !== null && pendingAction === lifecycleAction.user.id}
+        onChanged={onChanged}
+        onClose={() => setLifecycleAction(null)}
+        onPendingChange={(pending) =>
+          setPendingAction(pending && lifecycleAction ? lifecycleAction.user.id : null)
+        }
+      />
     </>
   );
 }
 
 function UserStatus({ user }: { user: WorkspaceUser }): React.ReactElement {
-  if (!user.passwordSetupRequired) {
-    return <Badge variant="secondary">Active</Badge>;
-  }
+  if (user.banned) return <Badge variant="outline">Removed</Badge>;
+  if (!user.passwordSetupRequired) return <Badge variant="secondary">Active</Badge>;
   if (user.onboardingMethod === "email_invite") {
     return (
       <Badge variant="outline">{user.invitationSentAt ? "Invite sent" : "Invite not sent"}</Badge>

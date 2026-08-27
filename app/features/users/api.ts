@@ -1,4 +1,4 @@
-import { apiGet, apiPatch, apiPost } from "@/lib/api-client";
+import { apiDelete, apiGet, apiPatch, apiPost } from "@/lib/api-client";
 import type {
   CreateWorkspaceUserInput,
   CreateWorkspaceUserResult,
@@ -26,4 +26,12 @@ export async function resendInvitation(id: string): Promise<WorkspaceUser> {
 
 export async function regenerateTemporaryPassword(id: string): Promise<CreateWorkspaceUserResult> {
   return apiPost<CreateWorkspaceUserResult>(`/api/users/${id}/temporary-password`);
+}
+
+export async function removeUser(id: string): Promise<void> {
+  await apiDelete(`/api/users/${id}`);
+}
+
+export async function restoreUser(id: string): Promise<void> {
+  await apiPost(`/api/users/${id}/restore`);
 }
