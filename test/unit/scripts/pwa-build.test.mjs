@@ -21,7 +21,8 @@ describe("PWA build contract", () => {
     const manifest = JSON.parse(await readFile("public/manifest.webmanifest", "utf8"));
     expect(() => validateManifest(manifest)).not.toThrow();
     expect(manifest.name).toBe("HQBase");
-    expect(manifest.theme_color).toBe("#080808");
+    expect(manifest.background_color).toBe("#0f0f10");
+    expect(manifest.theme_color).toBe("#0f0f10");
   });
 
   it("keeps lifecycle metadata revalidated and hashed assets immutable", async () => {
@@ -36,6 +37,7 @@ describe("PWA build contract", () => {
     expect(html).toContain('rel="icon" href="/favicon.svg" type="image/svg+xml"');
     expect(html).toContain('rel="apple-touch-icon"');
     expect(html).toContain("viewport-fit=cover");
+    expect(html).toContain('<meta name="theme-color" content="#0f0f10" />');
     expect(iconGenerator).toContain('readFile(path.join(root, "public/logo.svg"), "utf8")');
     expect(iconGenerator).toContain('file: "apple-touch-icon.png", markWidth: 108');
     expect(iconGenerator).toContain('file: "icon-512.png", markWidth: 308');

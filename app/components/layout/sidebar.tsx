@@ -72,7 +72,7 @@ export function Sidebar({
     <aside
       className={cn(
         "flex-col text-foreground",
-        isDrawer ? "flex h-full w-full bg-sidebar" : "hidden h-full w-full bg-rail lg:flex"
+        isDrawer ? "flex h-full w-full bg-transparent" : "hidden h-full w-full bg-rail lg:flex"
       )}
     >
       <div className="flex h-full min-h-0 flex-1">
@@ -81,7 +81,7 @@ export function Sidebar({
           className={cn(
             "flex w-12 shrink-0 flex-col items-center",
             isDrawer
-              ? "px-1 pb-[max(1.25rem,calc(env(safe-area-inset-bottom)+0.5rem))] pt-[max(1.25rem,calc(env(safe-area-inset-top)+0.5rem))]"
+              ? "bg-black px-1 pb-[max(1.25rem,calc(env(safe-area-inset-bottom)+0.5rem))] pt-[max(1.25rem,calc(env(safe-area-inset-top)+0.5rem))]"
               : "py-2 pr-2 pl-1"
           )}
         >
@@ -150,7 +150,7 @@ export function Sidebar({
           className={cn(
             "flex h-full min-w-0 flex-1 flex-col overflow-hidden bg-sidebar",
             isDrawer
-              ? "border-l border-divider px-2 pb-[max(1.25rem,calc(env(safe-area-inset-bottom)+0.5rem))] pt-[max(1.25rem,calc(env(safe-area-inset-top)+0.5rem))]"
+              ? "px-2 pb-[max(1.25rem,calc(env(safe-area-inset-bottom)+0.5rem))] pt-[max(1.25rem,calc(env(safe-area-inset-top)+0.5rem))]"
               : "ml-2 rounded-[24px] border border-divider p-2 shadow-sm"
           )}
         >

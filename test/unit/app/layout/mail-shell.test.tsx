@@ -116,6 +116,8 @@ describe("mail shell", () => {
     expect(collapsedHtml).toContain('aria-label="Show sidebar"');
     expect(visibleHtml).toContain("justify-between");
     expect(visibleHtml).toContain("rounded-[24px] border border-divider");
+    expect(visibleHtml).not.toContain("bg-black");
+    expect(visibleHtml).not.toContain("rounded-r-[24px]");
     const topBarHtml = renderToStaticMarkup(
       <TopBar
         activeFolder="inbox"
@@ -269,9 +271,12 @@ describe("mail shell", () => {
     expect(html).toContain('aria-label="Settings"');
     expect(html).not.toContain(">Contacts</span>");
     expect(html).not.toContain(">Settings</span>");
-    expect(html).toContain("border-l border-divider");
+    expect(html).toContain("bg-black");
+    expect(html).toContain("bg-transparent");
+    expect(html).not.toContain("border-l border-divider");
     expect(html).toContain("w-full items-center");
     expect(html).not.toContain("rounded-[24px]");
+    expect(html).not.toContain("rounded-r-[24px]");
   });
 
   it("shows settings tabs in the left navigation instead of a top tab bar", () => {

@@ -67,15 +67,29 @@ const threadComposeSurface = readFileSync(
 );
 const styles = readFileSync(new URL("../../../../app/styles.css", import.meta.url), "utf8");
 const indexHtml = readFileSync(new URL("../../../../index.html", import.meta.url), "utf8");
+const theme = readFileSync(
+  new URL("../../../../app/features/theme/theme.ts", import.meta.url),
+  "utf8"
+);
 
 describe("mobile application shell", () => {
-  it("uses dynamic viewport and sidebar-colored safe areas", () => {
+  it("uses dynamic viewport and app-canvas-colored safe areas", () => {
     expect(appShell).toContain("h-[100dvh]");
     expect(appShell).toContain("pt-[env(safe-area-inset-top)]");
     expect(mobileNavigation).toContain("safe-area-inset-top");
     expect(mobileNavigation).toContain("safe-area-inset-bottom");
+    expect(mobileNavigation).toContain("before:bg-background");
+    expect(mobileNavigation).toContain("after:bg-background");
+    expect(mobileNavigation).not.toContain("!bg-transparent");
+    expect(mobileNavigation).not.toContain("data-[state=closed]:!animate-none");
+    expect(mobileNavigation).not.toContain("data-[state=open]:!animate-none");
+    expect(mobileNavigation).not.toContain("clip-path");
     expect(sidebar).toContain("safe-area-inset-top");
     expect(sidebar).toContain("safe-area-inset-bottom");
+    expect(styles).toContain("background-color: hsl(var(--surface-list))");
+    expect(indexHtml).toContain('<meta name="theme-color" content="#0f0f10" />');
+    expect(theme).toContain('dark: "#0f0f10"');
+    expect(theme).toContain('light: "#fafafa"');
   });
 
   it("keeps compact right sheets and composer controls clear of device safe areas", () => {
