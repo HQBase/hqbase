@@ -6,12 +6,8 @@ import { AppError } from "../../lib/errors";
 import { parseWith } from "../../lib/validation";
 import { recordAudit } from "../audit/service";
 import { getAccessibleDraft, listAccessibleDrafts, requireDraftAccess } from "../drafts/access";
-import {
-  addDraftAttachment,
-  deleteDraft,
-  removeDraftAttachment,
-  saveDraft
-} from "../drafts/queries";
+import { storeDraftAttachment } from "../drafts/attachments";
+import { deleteDraft, removeDraftAttachment, saveDraft } from "../drafts/queries";
 import { draftSchema } from "../drafts/validation";
 import {
   type MailEventScheduler,
@@ -178,7 +174,8 @@ function registerDraftAttachmentTools(
   server.registerTool(
     "add_draft_attachment",
     {
-      description: "Stage a base64 attachment of at most 10 MiB on an accessible draft.",
+      description:
+        "Stage a base64 attachment or safe inline image of at most 10 MiB on an accessible draft.",
       inputSchema: {
         draftId: z.string().min(1).max(100),
         filename: z
@@ -197,7 +194,8 @@ function registerDraftAttachmentTools(
         contentBase64: z
           .string()
           .max(maxMcpAttachmentBase64Length)
-          .regex(/^[A-Za-z0-9+/]*={0,2}$/)
+          .regex(/^[A-Za-z0-9+/]*={0,2}$/),
+        inline: z.boolean().default(false)
       },
       annotations: { destructiveHint: false, idempotentHint: false, openWorldHint: false }
     },
@@ -205,13 +203,21 @@ function registerDraftAttachmentTools(
       toolResult(async () => {
         const draft = await getAccessibleDraft(env, principal, input.draftId);
         const file = base64File(input);
-        const added = await addDraftAttachment(env.DB, principal.userId, draft.id, file);
-        await env.MAIL_OBJECTS.put(added.r2Key, file.stream(), {
-          httpMetadata: { contentType: added.attachment.contentType }
-        });
-        await recordDraftMutation(env, principal, "mcp.draft.attachment.add", added.attachment.id);
+        const added = await storeDraftAttachment(
+          env,
+          principal.userId,
+          draft.id,
+          file,
+          input.inline
+        );
+        await recordDraftMutation(env, principal, "mcp.draft.attachment.add", added.id);
         notifyDraftChange(env, principal.userId, schedule);
-        return added.attachment;
+        return input.inline
+          ? {
+              ...added,
+              htmlSrc: `/api/v2/drafts/${encodeURIComponent(draft.id)}/attachments/${encodeURIComponent(added.id)}/inline`
+            }
+          : added;
       })
   );
 

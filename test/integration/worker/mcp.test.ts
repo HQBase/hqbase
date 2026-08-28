@@ -516,8 +516,8 @@ describe("HQBase MCP server", () => {
       },
       fullToken,
       "/mcp/full"
-    )) as { id: string; filename: string };
-    expect(attachment.filename).toBe("draft.txt");
+    )) as { id: string; filename: string; inline: boolean };
+    expect(attachment).toMatchObject({ filename: "draft.txt", inline: false });
 
     const updated = (await callTool(
       "update_draft",
@@ -568,6 +568,74 @@ describe("HQBase MCP server", () => {
     await env.DB.prepare(
       "UPDATE mail_domains SET sending_status = 'ready' WHERE id = 'dom_example'"
     ).run();
+  });
+
+  it("stages safe inline draft images with a private HTML source", async () => {
+    const created = (await callTool(
+      "create_draft",
+      {
+        mailboxId: "mbx_allowed",
+        from: "allowed@example.com",
+        to: ["recipient@example.com"],
+        subject: "Inline image from MCP",
+        text: "Flowers"
+      },
+      fullToken,
+      "/mcp/full"
+    )) as { id: string; version: number };
+
+    const attachment = (await callTool(
+      "add_draft_attachment",
+      {
+        draftId: created.id,
+        filename: "flowers.png",
+        contentType: "image/png",
+        contentBase64: "iVBORw0KGgo=",
+        inline: true
+      },
+      fullToken,
+      "/mcp/full"
+    )) as { htmlSrc: string; id: string; inline: boolean };
+    expect(attachment).toMatchObject({
+      htmlSrc: `/api/v2/drafts/${created.id}/attachments/${attachment.id}/inline`,
+      inline: true
+    });
+    await expect(
+      env.DB.prepare("SELECT content_id FROM draft_attachments WHERE id = ?")
+        .bind(attachment.id)
+        .first<{ content_id: string }>()
+    ).resolves.toEqual({ content_id: `${attachment.id}@hqbase.invalid` });
+
+    const updated = (await callTool(
+      "update_draft",
+      {
+        draftId: created.id,
+        version: created.version,
+        html: `<p>Flowers</p><img src="${attachment.htmlSrc}" alt="Flowers">`
+      },
+      fullToken,
+      "/mcp/full"
+    )) as { html: string };
+    expect(updated.html).toContain(attachment.htmlSrc);
+    await expect(
+      callTool(
+        "add_draft_attachment",
+        {
+          draftId: created.id,
+          filename: "spoofed.png",
+          contentType: "image/png",
+          contentBase64: "bm90IGFuIGltYWdl",
+          inline: true
+        },
+        fullToken,
+        "/mcp/full"
+      )
+    ).rejects.toThrow("File cannot be displayed inline.");
+    await expect(
+      env.DB.prepare("SELECT COUNT(*) AS count FROM draft_attachments WHERE draft_id = ?")
+        .bind(created.id)
+        .first<{ count: number }>()
+    ).resolves.toEqual({ count: 1 });
   });
 
   it("defaults MCP sends, replies, and forwards to the automatic signature", async () => {
