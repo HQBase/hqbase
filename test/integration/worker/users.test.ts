@@ -701,6 +701,53 @@ describe("workspace user onboarding", () => {
     });
     expect(restored.status, await restored.clone().text()).toBe(200);
   });
+
+  it("prevents an admin from viewing or revoking owner sessions", async () => {
+    const adminEmail = "session-admin@login.example";
+    const created = await createAuth(env, new Request(`${origin}/api/auth/sign-up/email`)).handler(
+      new Request(`${origin}/api/auth/sign-up/email`, {
+        body: JSON.stringify({
+          email: adminEmail,
+          name: "Session Admin",
+          password: "session-admin-password",
+          rememberMe: false
+        }),
+        headers: { "content-type": "application/json", origin },
+        method: "POST"
+      })
+    );
+    expect(created.status, await created.clone().text()).toBe(200);
+    const adminCookie = extractSessionCookie(created);
+    await env.DB.prepare(`UPDATE "user" SET role = 'admin' WHERE email = ?`).bind(adminEmail).run();
+
+    const owner = await env.DB.prepare(`SELECT id FROM "user" WHERE role = 'owner'`).first<{
+      id: string;
+    }>();
+    const ownerSession = await env.DB.prepare(
+      `SELECT id FROM "session" WHERE userId = ? ORDER BY createdAt DESC LIMIT 1`
+    )
+      .bind(owner?.id)
+      .first<{ id: string }>();
+    if (!owner || !ownerSession) throw new Error("Owner session was not created.");
+
+    const listed = await SELF.fetch(`${origin}/api/sessions?userId=${owner.id}`, {
+      headers: { cookie: adminCookie }
+    });
+    expect(listed.status).toBe(403);
+    await expect(listed.json()).resolves.toMatchObject({ error: { code: "OWNER_REQUIRED" } });
+
+    const revoked = await SELF.fetch(`${origin}/api/sessions/${ownerSession.id}`, {
+      headers: { cookie: adminCookie },
+      method: "DELETE"
+    });
+    expect(revoked.status).toBe(403);
+    await expect(revoked.json()).resolves.toMatchObject({ error: { code: "OWNER_REQUIRED" } });
+
+    const ownerStillSignedIn = await SELF.fetch(`${origin}/api/me`, {
+      headers: { cookie: ownerCookie }
+    });
+    expect(ownerStillSignedIn.status).toBe(200);
+  });
 });
 
 function createUser(input: {

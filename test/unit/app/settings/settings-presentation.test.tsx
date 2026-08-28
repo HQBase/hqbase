@@ -193,7 +193,8 @@ describe("settings presentation", () => {
     const html = renderToStaticMarkup(<RoleGuidanceCopy />);
 
     expect(html).toContain("controls owner membership");
-    expect(html).toContain("Mailbox access requires an explicit grant");
+    expect(html).toContain("give themselves access to any mailbox");
+    expect(html).toContain("cannot manage owners");
     expect(html).toContain("can access every mailbox");
     expect(html).not.toContain("Community");
     expect(html).not.toContain("Pro");
