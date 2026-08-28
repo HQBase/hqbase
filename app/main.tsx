@@ -7,6 +7,16 @@ import { initializeTheme } from "./features/theme/theme";
 import { ThemeProvider } from "./features/theme/theme-provider";
 import "./styles.css";
 
+if (import.meta.env.DEV && new URLSearchParams(window.location.search).has("tweakcn")) {
+  document.documentElement.dataset.tweakcnPreview = "";
+  document.body.classList.add("font-sans");
+
+  const script = document.createElement("script");
+  script.src = "https://tweakcn.com/live-preview.min.js";
+  script.referrerPolicy = "no-referrer";
+  document.head.appendChild(script);
+}
+
 async function loadRootComponent(): Promise<React.ComponentType> {
   if (import.meta.env.DEV && window.location.pathname === "/__ui/setup") {
     return (await import("./features/setup/setup-preview")).SetupPreview;
