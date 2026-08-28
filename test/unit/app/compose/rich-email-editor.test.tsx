@@ -8,11 +8,11 @@ const pngHeader = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a
 
 afterEach(() => {
   document.body.replaceChildren();
-  vi.clearAllMocks();
+  vi.restoreAllMocks();
 });
 
 describe("rich email editor images", () => {
-  it("uploads an image and shows its resize box only after selection", async () => {
+  it("uploads an image and shows one resize control only after selection", async () => {
     const onChange = vi.fn();
     const onImages = vi.fn(async (files: File[]) => [
       {
@@ -43,18 +43,56 @@ describe("rich email editor images", () => {
     const renderedImage = view.container.querySelector<HTMLImageElement>(".ProseMirror img");
     const resizeContainer = view.container.querySelector<HTMLElement>("[data-resize-container]");
     if (!editor || !renderedImage || !resizeContainer) throw new Error("Expected resizable image");
-    expect(view.container.querySelectorAll("[data-resize-handle]")).toHaveLength(8);
+    expect(view.container.querySelectorAll("[data-resize-handle]")).toHaveLength(1);
+    expect(
+      view.container.querySelector<HTMLElement>("[data-resize-handle]")?.dataset.resizeHandle
+    ).toBe("bottom-right");
     expect(resizeContainer.classList.contains("ProseMirror-selectednode")).toBe(false);
     expect(editor.className).toContain("[&_[data-resize-handle]]:hidden");
-    expect(editor.className).toContain("cursor-ns-resize");
-    expect(editor.className).toContain("cursor-ew-resize");
+    expect(editor.className).toContain("ring-2");
     expect(editor.className).toContain("cursor-nwse-resize");
-    expect(editor.className).toContain("cursor-nesw-resize");
+    expect(editor.className).toContain("after:content-['↘']");
+    expect(editor.className).not.toContain("cursor-ns-resize");
+    expect(editor.className).not.toContain("cursor-ew-resize");
+    expect(editor.className).not.toContain("cursor-nesw-resize");
+    expect(editor.className).not.toContain("rounded-full");
     expect(editor.className).toContain("@media(pointer:coarse)");
 
     renderedImage.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     await vi.waitFor(() =>
       expect(resizeContainer.classList.contains("ProseMirror-selectednode")).toBe(true)
+    );
+    await view.unmount();
+  });
+
+  it("keeps a cached inline image when its parent rerenders after a signature change", async () => {
+    vi.spyOn(HTMLImageElement.prototype, "complete", "get").mockReturnValue(true);
+    vi.spyOn(HTMLImageElement.prototype, "naturalWidth", "get").mockReturnValue(640);
+    const html =
+      '<p>Hello</p><img alt="Flowers" src="/api/v2/drafts/draft-1/attachments/image-1/inline">';
+    const onChange = vi.fn();
+    const onImages = vi.fn(async () => []);
+    const view = await renderComponent(
+      <RichEmailEditor html={html} onChange={onChange} onImages={onImages} />
+    );
+    document.body.appendChild(view.container);
+
+    const firstImage = view.container.querySelector<HTMLImageElement>(".ProseMirror img");
+    const firstEditor = view.container.querySelector<HTMLElement>(".ProseMirror");
+    if (!firstImage || !firstEditor) throw new Error("Expected existing inline image");
+    expect(firstImage.getAttribute("src")).toBe(
+      "/api/v2/drafts/draft-1/attachments/image-1/inline"
+    );
+    const firstContainer = firstImage.closest<HTMLElement>("[data-resize-container]");
+    expect(firstContainer?.style.visibility).toBe("");
+    expect(firstContainer?.style.pointerEvents).toBe("");
+
+    await view.rerender(<RichEmailEditor html={html} onChange={onChange} onImages={onImages} />);
+
+    const images = view.container.querySelectorAll<HTMLImageElement>(".ProseMirror img");
+    expect(images).toHaveLength(1);
+    expect(images[0]?.getAttribute("src")).toBe(
+      "/api/v2/drafts/draft-1/attachments/image-1/inline"
     );
     await view.unmount();
   });

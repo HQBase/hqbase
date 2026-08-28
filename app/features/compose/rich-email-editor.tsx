@@ -114,6 +114,20 @@ export function RichEmailEditor({
   const imageExtension = React.useMemo(
     () =>
       Image.extend({
+        addNodeView() {
+          const parent = this.parent?.();
+          if (!parent) return null;
+          return (props) => {
+            const nodeView = parent(props);
+            const container = nodeView?.dom;
+            const image = container instanceof HTMLElement ? container.querySelector("img") : null;
+            if (container instanceof HTMLElement && image?.complete && image.naturalWidth > 0) {
+              container.style.visibility = "";
+              container.style.pointerEvents = "";
+            }
+            return nodeView;
+          };
+        },
         addInputRules() {
           return [];
         },
@@ -132,16 +146,7 @@ export function RichEmailEditor({
       }).configure({
         allowBase64: allowDataImages,
         resize: {
-          directions: [
-            "top",
-            "right",
-            "bottom",
-            "left",
-            "top-left",
-            "top-right",
-            "bottom-left",
-            "bottom-right"
-          ],
+          directions: ["bottom-right"],
           enabled: true,
           minHeight: 24,
           minWidth: 24,
@@ -167,25 +172,25 @@ export function RichEmailEditor({
             "[&_img]:h-auto [&_img]:max-w-full [&_[data-resize-container]]:max-w-full",
             "[&_[data-resize-handle]]:hidden [&_[data-resize-handle]]:touch-none",
             "[&_[data-resize-container].ProseMirror-selectednode]:outline-none",
-            "[&_[data-resize-container].ProseMirror-selectednode_[data-resize-wrapper]]:ring-1",
+            "[&_[data-resize-container].ProseMirror-selectednode_[data-resize-wrapper]]:ring-2",
             "[&_[data-resize-container].ProseMirror-selectednode_[data-resize-wrapper]]:ring-primary",
             "[&_[data-resize-container].ProseMirror-selectednode_[data-resize-handle]]:block",
-            "[&_[data-resize-handle*='-']]:size-3 [&_[data-resize-handle*='-']]:rounded-full",
-            "[&_[data-resize-handle*='-']]:border-2 [&_[data-resize-handle*='-']]:border-primary",
-            "[&_[data-resize-handle*='-']]:bg-background",
-            "[&_[data-resize-handle='top']]:h-2 [&_[data-resize-handle='top']]:cursor-ns-resize",
-            "[&_[data-resize-handle='bottom']]:h-2 [&_[data-resize-handle='bottom']]:cursor-ns-resize",
-            "[&_[data-resize-handle='left']]:w-2 [&_[data-resize-handle='left']]:cursor-ew-resize",
-            "[&_[data-resize-handle='right']]:w-2 [&_[data-resize-handle='right']]:cursor-ew-resize",
-            "[&_[data-resize-handle='top-left']]:cursor-nwse-resize",
+            "[&_[data-resize-container].ProseMirror-selectednode_[data-resize-handle='bottom-right']]:!flex",
+            "[&_[data-resize-handle='bottom-right']]:!size-5",
+            "[&_[data-resize-handle='bottom-right']]:items-center",
+            "[&_[data-resize-handle='bottom-right']]:justify-center",
+            "[&_[data-resize-handle='bottom-right']]:rounded-sm",
+            "[&_[data-resize-handle='bottom-right']]:border",
+            "[&_[data-resize-handle='bottom-right']]:border-primary",
+            "[&_[data-resize-handle='bottom-right']]:bg-background",
+            "[&_[data-resize-handle='bottom-right']]:text-primary",
+            "[&_[data-resize-handle='bottom-right']]:shadow-sm",
             "[&_[data-resize-handle='bottom-right']]:cursor-nwse-resize",
-            "[&_[data-resize-handle='top-right']]:cursor-nesw-resize",
-            "[&_[data-resize-handle='bottom-left']]:cursor-nesw-resize",
-            "[@media(pointer:coarse)]:[&_[data-resize-handle*='-']]:size-6",
-            "[@media(pointer:coarse)]:[&_[data-resize-handle='top']]:h-6",
-            "[@media(pointer:coarse)]:[&_[data-resize-handle='bottom']]:h-6",
-            "[@media(pointer:coarse)]:[&_[data-resize-handle='left']]:w-6",
-            "[@media(pointer:coarse)]:[&_[data-resize-handle='right']]:w-6"
+            "[&_[data-resize-handle='bottom-right']]:after:text-xs",
+            "[&_[data-resize-handle='bottom-right']]:after:font-semibold",
+            "[&_[data-resize-handle='bottom-right']]:after:leading-none",
+            "[&_[data-resize-handle='bottom-right']]:after:content-['↘']",
+            "[@media(pointer:coarse)]:[&_[data-resize-handle='bottom-right']]:!size-7"
           ),
           "data-compose-autofocus": ""
         },
