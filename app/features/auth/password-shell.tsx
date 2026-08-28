@@ -29,8 +29,24 @@ export function PasswordShell({
             </footer>
           ) : null}
         </section>
-        <p className="mt-4 text-center text-[11px] text-tertiary">Self-hosted on Cloudflare</p>
+        <ProductAttribution />
       </div>
     </main>
+  );
+}
+
+export function ProductAttribution(): React.ReactElement {
+  return (
+    <p className="mt-4 text-center text-[11px] text-tertiary">
+      Self-hosted on Cloudflare <span aria-hidden="true">·</span>{" "}
+      <a
+        className="underline-offset-4 transition-colors hover:text-foreground hover:underline"
+        href="https://hqbase.io/"
+        rel="noopener"
+        target="_blank"
+      >
+        Powered by HQBase
+      </a>
+    </p>
   );
 }

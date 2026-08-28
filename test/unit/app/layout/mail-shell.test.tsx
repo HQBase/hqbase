@@ -212,6 +212,9 @@ describe("mail shell", () => {
     const html = renderToStaticMarkup(<LoginPage onLogin={() => undefined} />);
 
     expect(html).toContain('src="/logo.svg"');
+    expect(html).toContain(
+      '<a class="underline-offset-4 transition-colors hover:text-foreground hover:underline" href="https://hqbase.io/" rel="noopener" target="_blank">Powered by HQBase</a>'
+    );
     expect(html).not.toContain(">HQ</span>");
   });
 

@@ -346,7 +346,6 @@ function safeLinkAttributes(attributes: sanitizeHtml.Attributes): sanitizeHtml.A
   if (!href || (!href.startsWith("#") && !isSafeLink(href))) {
     return { title: attributes.title ?? "" };
   }
-  if (href.startsWith("#")) return { href, title: attributes.title ?? "" };
   return {
     href,
     rel: "noopener noreferrer",

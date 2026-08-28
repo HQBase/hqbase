@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { signIn } from "./api";
 import { authenticationPath, safeAuthenticationReturnPath } from "./password-recovery";
+import { ProductAttribution } from "./password-shell";
 
 type LoginPageProps = {
   onLogin: () => void;
@@ -101,7 +102,7 @@ export function LoginPage({ onLogin }: LoginPageProps): React.ReactElement {
             </Button>
           </form>
         </section>
-        <p className="mt-4 text-center text-[11px] text-tertiary">Self-hosted on Cloudflare</p>
+        <ProductAttribution />
       </div>
     </main>
   );
