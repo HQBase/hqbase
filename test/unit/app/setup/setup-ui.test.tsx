@@ -117,7 +117,18 @@ describe("setup UI", () => {
     ];
     const html = renderToStaticMarkup(
       <MailboxStep
+        catchAllByDomain={{
+          "northstar.example": {
+            mailboxAddress: "support@northstar.example",
+            policy: "mailbox"
+          },
+          "fieldnotes.example": {
+            mailboxAddress: "support@fieldnotes.example",
+            policy: "mailbox"
+          }
+        }}
         defaultFromMailboxAddress="privacy@northstar.example"
+        domains={["northstar.example", "fieldnotes.example"]}
         errors={{ rows: mailboxes.map(() => ({})) }}
         isPending={false}
         mailboxes={mailboxes}
@@ -126,6 +137,8 @@ describe("setup UI", () => {
         onComplete={() => undefined}
         onRemove={() => undefined}
         onSetDefaultFromMailboxAddress={() => undefined}
+        onSetCatchAllMailbox={() => undefined}
+        onSetCatchAllPolicy={() => undefined}
         onUpdate={() => undefined}
         submitError={null}
       />
@@ -137,6 +150,9 @@ describe("setup UI", () => {
     expect(html).toContain("privacy@fieldnotes.example");
     expect(html).toContain("Add mailbox");
     expect(html).toContain("Default From mailbox");
+    expect(html).toContain("Mail to unknown addresses");
+    expect(html).toContain("Deliver to a mailbox");
+    expect(html).toContain('aria-label="Catch-all mailbox"');
     expect(html).toContain("Replies use the mailbox that received");
     expect(html).not.toContain("Add shared addresses");
     expect(html).not.toContain(">Review<");

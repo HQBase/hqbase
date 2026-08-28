@@ -3,8 +3,8 @@ import { PiArrowLeft } from "react-icons/pi";
 
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
-import { ComposeDialog } from "@/features/compose/compose-dialog";
 import type { ComposeMode } from "@/features/compose/compose-state";
+import { ComposerInlineTarget, useComposer } from "@/features/compose/composer-host";
 import type { Mailbox } from "@/features/mailboxes/types";
 import { getMessageThread } from "@/features/messages/api";
 import { ConversationMessages } from "@/features/messages/conversation-messages";
@@ -23,11 +23,10 @@ type DraftComposeDialogProps = {
 
 export function DraftComposeDialog({
   draft,
-  mailboxes,
   onDraftsChange,
-  onOpenChange,
-  onSent
-}: DraftComposeDialogProps): React.ReactElement {
+  onOpenChange
+}: DraftComposeDialogProps): React.ReactElement | null {
+  const { openDraft } = useComposer();
   const mode: ComposeMode = draft.replyToMessageId
     ? "reply"
     : draft.forwardOfMessageId
@@ -37,6 +36,7 @@ export function DraftComposeDialog({
   const [messages, setMessages] = React.useState<MessageDetail[]>([]);
   const [error, setError] = React.useState<string | null>(null);
   const [isDiscarding, setIsDiscarding] = React.useState(false);
+  const [sessionId, setSessionId] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     if (!contextMessageId) {
@@ -65,21 +65,27 @@ export function DraftComposeDialog({
     };
   }, [contextMessageId]);
 
-  if (!contextMessageId) {
-    return (
-      <ComposeDialog
-        draftId={draft.id}
-        mailboxes={mailboxes}
-        mode="new"
-        open
-        onDraftsChange={onDraftsChange}
-        onOpenChange={onOpenChange}
-        onSent={onSent}
-      />
-    );
-  }
-
   const message = messages.find((candidate) => candidate.id === contextMessageId) ?? null;
+
+  React.useEffect(() => {
+    if (contextMessageId && !message) return;
+    const route = { kind: "drafts", draftId: draft.id } as const;
+    setSessionId(
+      openDraft({
+        draftId: draft.id,
+        message,
+        messages,
+        mode,
+        origin: message
+          ? { folder: message.folder, messageId: message.id, threadId: message.threadId }
+          : null,
+        route
+      })
+    );
+  }, [contextMessageId, draft.id, message, messages, mode, openDraft]);
+
+  if (!contextMessageId) return null;
+
   if (!message) {
     return (
       <DraftContextStatus
@@ -109,19 +115,7 @@ export function DraftComposeDialog({
       <div className="min-h-0 flex-1 overflow-auto overscroll-contain">
         <ConversationMessages messages={messages} />
         <div className="px-4 pb-8 pt-2 sm:px-6">
-          <ComposeDialog
-            draftId={draft.id}
-            key={`${mode}:${message.id}:${draft.id}`}
-            mailboxes={mailboxes}
-            message={message}
-            mode={mode}
-            open
-            presentation="thread"
-            threadContext={<ConversationMessages compact messages={messages} />}
-            onDraftsChange={onDraftsChange}
-            onOpenChange={onOpenChange}
-            onSent={onSent}
-          />
+          {sessionId ? <ComposerInlineTarget sessionId={sessionId} /> : null}
         </div>
       </div>
     </article>

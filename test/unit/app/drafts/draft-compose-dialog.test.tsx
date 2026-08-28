@@ -1,12 +1,12 @@
 // @vitest-environment happy-dom
-import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { Draft } from "@/features/drafts/types";
 import type { MessageDetail } from "@/features/messages/types";
 
 const mocks = vi.hoisted(() => ({
-  getMessageThread: vi.fn()
+  getMessageThread: vi.fn(),
+  openDraft: vi.fn()
 }));
 
 vi.mock("@/features/messages/api", async (importOriginal) => ({
@@ -14,21 +14,11 @@ vi.mock("@/features/messages/api", async (importOriginal) => ({
   getMessageThread: mocks.getMessageThread
 }));
 
-vi.mock("@/features/compose/compose-dialog", () => ({
-  ComposeDialog: (props: {
-    draftId: string;
-    message: MessageDetail;
-    presentation?: string;
-    threadContext?: ReactNode;
-  }) => (
-    <div
-      data-compose-draft-id={props.draftId}
-      data-compose-message-id={props.message.id}
-      data-compose-presentation={props.presentation}
-    >
-      {props.threadContext}
-    </div>
-  )
+vi.mock("@/features/compose/composer-host", () => ({
+  ComposerInlineTarget: ({ sessionId }: { sessionId: string }) => (
+    <div data-composer-inline-target={sessionId} />
+  ),
+  useComposer: () => ({ openDraft: mocks.openDraft })
 }));
 
 vi.mock("@/features/messages/conversation-messages", () => ({
@@ -105,6 +95,7 @@ const draft: Draft = {
   subject: "Re: Account access",
   text: "Draft response",
   html: "<p>Draft response</p>",
+  signature: { mode: "automatic", id: null, name: "", html: "", text: "" },
   version: 2,
   updatedAt: "2026-08-18T14:03:00.000Z",
   attachments: []
@@ -112,6 +103,7 @@ const draft: Draft = {
 
 beforeEach(() => {
   mocks.getMessageThread.mockReset();
+  mocks.openDraft.mockReset().mockReturnValue("composer-draft-reply");
 });
 
 describe("reopening a contextual draft", () => {
@@ -130,13 +122,26 @@ describe("reopening a contextual draft", () => {
     await flushHookEffects();
 
     expect(mocks.getMessageThread).toHaveBeenCalledWith(targetMessage.id);
-    const composer = view.container.querySelector("[data-compose-draft-id]");
-    expect(composer?.getAttribute("data-compose-draft-id")).toBe(draft.id);
-    expect(composer?.getAttribute("data-compose-message-id")).toBe(targetMessage.id);
-    expect(composer?.getAttribute("data-compose-presentation")).toBe("thread");
+    expect(mocks.openDraft).toHaveBeenCalledWith({
+      draftId: draft.id,
+      message: targetMessage,
+      messages: [targetMessage, newerMessage],
+      mode: "reply",
+      origin: {
+        folder: targetMessage.folder,
+        messageId: targetMessage.id,
+        threadId: targetMessage.threadId
+      },
+      route: { kind: "drafts", draftId: draft.id }
+    });
+    expect(
+      view.container
+        .querySelector("[data-composer-inline-target]")
+        ?.getAttribute("data-composer-inline-target")
+    ).toBe("composer-draft-reply");
 
     const conversations = view.container.querySelectorAll("[data-conversation-message-ids]");
-    expect(conversations).toHaveLength(2);
+    expect(conversations).toHaveLength(1);
     for (const conversation of conversations) {
       expect(conversation.getAttribute("data-conversation-message-ids")).toBe(
         "msg_target,msg_newer"
@@ -162,7 +167,8 @@ describe("reopening a contextual draft", () => {
 
     expect(view.container.textContent).toContain("Draft context is unavailable");
     expect(view.container.textContent).toContain("The message this draft targets is unavailable.");
-    expect(view.container.querySelector("[data-compose-draft-id]")).toBeNull();
+    expect(mocks.openDraft).not.toHaveBeenCalled();
+    expect(view.container.querySelector("[data-composer-inline-target]")).toBeNull();
 
     await view.unmount();
   });

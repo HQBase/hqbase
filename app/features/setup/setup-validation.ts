@@ -116,7 +116,7 @@ export function validateMailboxes(
     }
 
     if (!displayName) {
-      rows[index] = { ...rows[index], displayName: "Enter a display name." };
+      rows[index] = { ...rows[index], displayName: "Enter a sender name." };
     } else if (displayName.length > 80) {
       rows[index] = { ...rows[index], displayName: "Use 80 characters or fewer." };
     }

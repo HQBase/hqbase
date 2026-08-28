@@ -1,5 +1,5 @@
 import type { MailboxDraft, MailboxErrors } from "./setup-validation";
-import type { CloudflareConfigureResult } from "./types";
+import type { CloudflareConfigureResult, SetupCatchAllSelection } from "./types";
 
 export function buildAppHostname(subdomain: string, domain: string): string {
   const normalized = subdomain
@@ -60,6 +60,31 @@ export function syncMailboxesForDomains(
 
 export function emptyMailboxErrors(count: number): MailboxErrors {
   return { rows: Array.from({ length: count }, () => ({})) };
+}
+
+export function syncCatchAllSelections(
+  current: Record<string, SetupCatchAllSelection>,
+  domains: string[],
+  mailboxes: MailboxDraft[]
+): Record<string, SetupCatchAllSelection> {
+  return Object.fromEntries(
+    normalizedDomains(domains).map((domain) => {
+      const mailboxAddresses = mailboxes
+        .map((mailbox) => mailbox.address.trim().toLowerCase())
+        .filter((address) => address.endsWith(`@${domain}`));
+      const previous = current[domain];
+      const mailboxAddress = mailboxAddresses.includes(previous?.mailboxAddress ?? "")
+        ? (previous?.mailboxAddress ?? "")
+        : (mailboxAddresses[0] ?? "");
+      const policy =
+        previous?.policy === "reject" || previous?.policy === "unassigned"
+          ? previous.policy
+          : mailboxAddress
+            ? "mailbox"
+            : "unassigned";
+      return [domain, { policy, mailboxAddress }];
+    })
+  );
 }
 
 function normalizedDomains(domains: string[]): string[] {

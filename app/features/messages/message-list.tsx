@@ -3,6 +3,7 @@ import { PiCircleNotch } from "react-icons/pi";
 
 import { Button } from "@/components/ui/button";
 import { PullToRefresh } from "@/components/ui/pull-to-refresh";
+import type { MailLabel } from "@/features/labels/types";
 import { appRoutePath, type MailFolderId } from "@/lib/routes";
 import { groupConversations } from "./conversation-display";
 import { EmptyMessageList, MessageListItem } from "./message-list-item";
@@ -19,6 +20,13 @@ type MessageListProps = {
   onRefresh: () => Promise<void> | void;
   onSelect: (conversation: ConversationSummary) => void;
   onToggleStar: (conversation: ConversationSummary) => void;
+  labels?: MailLabel[];
+  canOrganizeConversation?: (mailboxId: string | null) => boolean;
+  onToggleLabel?: (
+    conversation: ConversationSummary,
+    label: MailLabel,
+    assigned: boolean
+  ) => Promise<void> | void;
 };
 
 export function MessageList({
@@ -31,7 +39,10 @@ export function MessageList({
   onLoadMore,
   onRefresh,
   onSelect,
-  onToggleStar
+  onToggleStar,
+  labels = [],
+  canOrganizeConversation = () => false,
+  onToggleLabel = () => undefined
 }: MessageListProps): React.ReactElement {
   const scrollContainerRef = React.useRef<HTMLDivElement>(null);
   const pagingTriggerRef = React.useRef<HTMLDivElement>(null);
@@ -60,7 +71,7 @@ export function MessageList({
           <EmptyMessageList />
         </div>
       ) : (
-        <div className="mx-auto w-full max-w-[960px] px-4 pb-5 sm:px-6 lg:px-8">
+        <div className="mx-auto w-full max-w-[960px] px-1 pb-5 sm:px-6 lg:px-8">
           {groups.map((group) => (
             <section
               aria-labelledby={`conversation-group-${group.key}`}
@@ -68,7 +79,7 @@ export function MessageList({
               key={group.key}
             >
               <h2
-                className="pb-1.5 pt-6 text-[13px] font-medium text-foreground"
+                className="px-3 pb-1.5 pt-6 text-[13px] font-medium text-foreground sm:px-0"
                 id={`conversation-group-${group.key}`}
               >
                 {group.label}
@@ -76,7 +87,6 @@ export function MessageList({
               <div className="flex flex-col gap-0.5">
                 {group.conversations.map((conversation) => (
                   <MessageListItem
-                    activeFolder={activeFolder}
                     conversation={conversation}
                     href={appRoutePath({
                       kind: "mail",
@@ -85,7 +95,12 @@ export function MessageList({
                     })}
                     isActive={conversation.threadId === selectedThreadId}
                     key={conversation.threadId}
+                    labels={labels}
+                    canOrganizeLabels={canOrganizeConversation(conversation.mailboxId)}
                     onSelect={onSelect}
+                    onToggleLabel={(label, assigned) =>
+                      onToggleLabel(conversation, label, assigned)
+                    }
                     onToggleStar={onToggleStar}
                   />
                 ))}

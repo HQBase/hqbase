@@ -13,6 +13,14 @@ const settingsPage = readFileSync(
   new URL("../../../../app/features/settings/settings-page.tsx", import.meta.url),
   "utf8"
 );
+const contactsPage = readFileSync(
+  new URL("../../../../app/features/contacts/contacts-page.tsx", import.meta.url),
+  "utf8"
+);
+const contactViews = readFileSync(
+  new URL("../../../../app/features/contacts/contact-views.tsx", import.meta.url),
+  "utf8"
+);
 const topBar = readFileSync(
   new URL("../../../../app/components/layout/top-bar.tsx", import.meta.url),
   "utf8"
@@ -45,8 +53,12 @@ const mcpConnectionDetails = readFileSync(
   new URL("../../../../app/features/mcp/connection-dialog.tsx", import.meta.url),
   "utf8"
 );
-const mcpSettings = readFileSync(
-  new URL("../../../../app/features/mcp/mcp-settings.tsx", import.meta.url),
+const connectedAppsPage = readFileSync(
+  new URL("../../../../app/features/connected-apps/connected-apps-page.tsx", import.meta.url),
+  "utf8"
+);
+const agentsPage = readFileSync(
+  new URL("../../../../app/features/agents/agents-page.tsx", import.meta.url),
   "utf8"
 );
 const threadComposeSurface = readFileSync(
@@ -55,15 +67,29 @@ const threadComposeSurface = readFileSync(
 );
 const styles = readFileSync(new URL("../../../../app/styles.css", import.meta.url), "utf8");
 const indexHtml = readFileSync(new URL("../../../../index.html", import.meta.url), "utf8");
+const theme = readFileSync(
+  new URL("../../../../app/features/theme/theme.ts", import.meta.url),
+  "utf8"
+);
 
 describe("mobile application shell", () => {
-  it("uses dynamic viewport and sidebar-colored safe areas", () => {
+  it("uses dynamic viewport and app-canvas-colored safe areas", () => {
     expect(appShell).toContain("h-[100dvh]");
     expect(appShell).toContain("pt-[env(safe-area-inset-top)]");
     expect(mobileNavigation).toContain("safe-area-inset-top");
     expect(mobileNavigation).toContain("safe-area-inset-bottom");
+    expect(mobileNavigation).toContain("before:bg-background");
+    expect(mobileNavigation).toContain("after:bg-background");
+    expect(mobileNavigation).not.toContain("!bg-transparent");
+    expect(mobileNavigation).not.toContain("data-[state=closed]:!animate-none");
+    expect(mobileNavigation).not.toContain("data-[state=open]:!animate-none");
+    expect(mobileNavigation).not.toContain("clip-path");
     expect(sidebar).toContain("safe-area-inset-top");
     expect(sidebar).toContain("safe-area-inset-bottom");
+    expect(styles).toContain("background-color: hsl(var(--surface-list))");
+    expect(indexHtml).toContain('<meta name="theme-color" content="#0f0f10" />');
+    expect(theme).toContain('dark: "#0f0f10"');
+    expect(theme).toContain('light: "#fafafa"');
   });
 
   it("keeps compact right sheets and composer controls clear of device safe areas", () => {
@@ -75,24 +101,41 @@ describe("mobile application shell", () => {
     expect(composeForm).toContain("pb-[max(1rem,env(safe-area-inset-bottom))]");
   });
 
-  it("keeps MCP and Agent Skill connection details in Settings", () => {
-    expect(agentConnectionDetails.match(/h-7 min-h-0 rounded-full/g)).toHaveLength(2);
+  it("keeps delegated connections separate from machine identities", () => {
+    expect(agentConnectionDetails).toContain("export function AgentSkillDetails");
+    expect(agentConnectionDetails).not.toContain('aria-label="Connection method"');
     expect(mcpConnectionDetails).toContain("text-base sm:text-xs");
     expect(mcpConnectionDetails).toContain('value="read-only"');
     expect(mcpConnectionDetails).toContain('value="mail-actions"');
-    expect(mcpSettings).toContain("/mcp/full");
-    expect(mcpSettings).toContain("/skills/hqbase-mail/SKILL.md");
+    expect(connectedAppsPage).toContain('value="mcp"');
+    expect(connectedAppsPage).toContain('value="skill"');
+    expect(connectedAppsPage).toContain('value="connections"');
+    expect(connectedAppsPage).toContain("/mcp/full");
+    expect(connectedAppsPage).toContain("/skills/hqbase-mail/SKILL.md");
+    expect(connectedAppsPage).toContain("Your connections");
+    expect(agentsPage).toContain('profile="mailbox"');
+    expect(agentsPage).toContain('profile="provisioner"');
   });
 
-  it("keeps agent connection in MCP settings instead of standalone navigation", () => {
-    expect(settingsPage).toContain("McpSettings");
-    expect(settingsPage).toContain('"mcp"');
-    expect(appShell).not.toContain("Connect MCP");
-    expect(appShell).not.toContain("Connect AI agent");
-    expect(mobileNavigation).not.toContain("Connect MCP");
-    expect(mobileNavigation).not.toContain("Connect AI agent");
-    expect(topBar).not.toContain("Connect MCP");
-    expect(topBar).not.toContain("Connect AI agent");
+  it("removes agent connections from Settings", () => {
+    expect(settingsPage).not.toContain("McpSettings");
+    expect(settingsPage).not.toContain("AgentSettings");
+    expect(appShell).toContain("activeAgentTab");
+    expect(mobileNavigation).toContain("onAgentTabChange");
+  });
+
+  it("uses a compact desktop mailbox dropdown with agent mailboxes last", () => {
+    expect(topBar).toContain("DropdownMenuTrigger");
+    expect(topBar).toContain('side="bottom"');
+    expect(topBar).not.toContain("SelectTrigger");
+    expect(topBar).not.toContain("mailboxUnreadLabel");
+    expect(topBar).toContain('className="hidden h-8 min-h-0');
+    expect(topBar).toContain('mailbox.kind === "human"');
+    expect(topBar).toContain('mailbox.kind === "agent"');
+    expect(topBar.indexOf("humanMailboxes.map")).toBeLessThan(topBar.indexOf("Agent mailboxes"));
+    expect(topBar.indexOf("Agent mailboxes")).toBeLessThan(topBar.indexOf("agentMailboxes.map"));
+    expect(topBar).toContain("PiRobot");
+    expect(topBar).toContain('className="py-1 text-xs"');
   });
 
   it("keeps editable field text large enough to avoid iOS focus zoom", () => {
@@ -104,9 +147,22 @@ describe("mobile application shell", () => {
   it("keeps persistent mail chrome fixed and ignores pans that begin in the header", () => {
     expect(appShell).not.toContain("immersiveOnCompact");
     expect(appShell).toContain("touch-manipulation");
+    expect(appShell).toContain('dataset.hqbaseShell = "fixed"');
     expect(appShell).toContain("h-[env(safe-area-inset-top)] touch-none");
     expect(topBar).toContain("shrink-0 touch-none");
     expect(styles).toContain("overscroll-behavior: none");
+    expect(styles).toContain('html[data-hqbase-shell="fixed"] #root');
+    expect(styles).toContain("overflow: hidden");
+  });
+
+  it("uses the inbox content width for Contacts, Agents, and Settings", () => {
+    expect(settingsPage).toContain("max-w-[960px]");
+    expect(settingsPage).not.toContain("max-w-6xl");
+    expect(contactsPage).toContain("max-w-[960px]");
+    expect(contactsPage).not.toContain("max-w-[1200px]");
+    expect(agentsPage).toContain("max-w-[960px]");
+    expect(contactViews).toContain("max-w-[960px]");
+    expect(contactViews).not.toContain("max-w-3xl");
   });
 
   it("refreshes inside mail scroll surfaces without disabling deliberate pinch zoom", () => {

@@ -121,7 +121,7 @@ describe("useMailSync", () => {
     await hook.unmount();
   });
 
-  it("loads older cursor pages and keeps them through a newest-page refresh", async () => {
+  it("keeps older pages on normal refresh and removes them on hard refresh", async () => {
     Object.defineProperty(document, "visibilityState", {
       configurable: true,
       value: "visible"
@@ -129,6 +129,19 @@ describe("useMailSync", () => {
     const first = conversation("message-1", "2026-07-30T12:00:00.000Z");
     const second = conversation("message-2", "2026-07-30T11:00:00.000Z");
     const newest = conversation("message-0", "2026-07-30T13:00:00.000Z");
+    const replacement = conversation("message-new", "2026-07-30T14:00:00.000Z");
+    let resolveReplacement = (_page: {
+      conversations: ConversationSummary[];
+      nextCursor: string | null;
+      totalCount: number | null;
+    }): void => undefined;
+    const replacementRequest = new Promise<{
+      conversations: ConversationSummary[];
+      nextCursor: string | null;
+      totalCount: number | null;
+    }>((resolve) => {
+      resolveReplacement = resolve;
+    });
     mocks.listConversations
       .mockResolvedValueOnce({
         conversations: [first],
@@ -144,10 +157,12 @@ describe("useMailSync", () => {
         conversations: [newest, first],
         nextCursor: "cursor-2",
         totalCount: 3
-      });
+      })
+      .mockReturnValueOnce(replacementRequest);
     mocks.refreshNotifications
       .mockResolvedValueOnce(status("message-1"))
-      .mockResolvedValueOnce(status("message-1"));
+      .mockResolvedValueOnce(status("message-1"))
+      .mockResolvedValueOnce(status("message-new"));
 
     const hook = await renderHook(useMailSync, {
       activeFolder: "inbox",
@@ -176,6 +191,27 @@ describe("useMailSync", () => {
     ]);
     expect(hook.result.hasMore).toBe(false);
     expect(hook.result.totalCount).toBe(3);
+
+    let hardRefresh: Promise<void> | null = null;
+    await flushHookEffects(() => {
+      hardRefresh = hook.result.hardRefresh();
+    });
+    expect(mocks.listConversations).toHaveBeenNthCalledWith(
+      4,
+      expect.not.objectContaining({ cursor: expect.anything() })
+    );
+    expect(hook.result.conversations.map((item) => item.id)).toEqual([
+      "message-0",
+      "message-1",
+      "message-2"
+    ]);
+    expect(hook.result.totalCount).toBe(3);
+
+    resolveReplacement({ conversations: [replacement], nextCursor: null, totalCount: 1 });
+    await flushHookEffects(() => hardRefresh);
+    expect(hook.result.conversations.map((item) => item.id)).toEqual(["message-new"]);
+    expect(hook.result.hasMore).toBe(false);
+    expect(hook.result.totalCount).toBe(1);
     await hook.unmount();
   });
 
@@ -261,6 +297,53 @@ describe("useMailSync", () => {
       false
     );
     expect(hook.result.totalCount).toBe(4);
+    await hook.unmount();
+  });
+
+  it("removes a conversation immediately when its active label is removed", async () => {
+    const labeled = {
+      ...conversation("message-labeled", "2026-07-30T12:00:00.000Z"),
+      labels: [
+        {
+          color: "blue" as const,
+          createdAt: "2026-07-30T12:00:00.000Z",
+          id: "label-customer",
+          name: "Customer",
+          updatedAt: "2026-07-30T12:00:00.000Z"
+        },
+        {
+          color: "red" as const,
+          createdAt: "2026-07-30T12:00:00.000Z",
+          id: "label-priority",
+          name: "Priority",
+          updatedAt: "2026-07-30T12:00:00.000Z"
+        }
+      ]
+    };
+    mocks.listConversations.mockResolvedValueOnce({
+      conversations: [labeled],
+      nextCursor: null,
+      totalCount: 1
+    });
+    mocks.refreshNotifications.mockResolvedValueOnce(status("message-labeled"));
+    const hook = await renderHook(useMailSync, {
+      activeFolder: "inbox",
+      labelIds: ["label-customer", "label-priority"],
+      mailboxId: "all",
+      search: "",
+      userId: "user-1"
+    });
+    await flushHookEffects();
+
+    await flushHookEffects(() => {
+      hook.result.applyConversationLabels(labeled.threadId, labeled.labels?.slice(0, 1) ?? []);
+    });
+
+    expect(hook.result.conversations).toEqual([]);
+    expect(hook.result.totalCount).toBe(0);
+    expect(mocks.listConversations).toHaveBeenCalledWith(
+      expect.objectContaining({ labelIds: ["label-customer", "label-priority"] })
+    );
     await hook.unmount();
   });
 });

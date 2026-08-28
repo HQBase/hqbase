@@ -3,6 +3,7 @@ import { eq, sql } from "drizzle-orm";
 import { newId, nowIso } from "../../db/client";
 import { createDatabase, getRow, getRows } from "../../db/drizzle";
 import { mailDomains } from "../../db/schema";
+import { AppError } from "../../lib/errors";
 import { assertDomainUnusedByLoginEmails } from "../../security/login-email";
 import type { CatchAllPolicy, DomainStatus, MailDomain, MailDomainRow } from "./types";
 
@@ -19,6 +20,7 @@ function mapMailDomain(row: MailDomainRow): MailDomain {
     catchAllMailboxId: row.catch_all_mailbox_id,
     isEnabled: row.is_enabled === 1,
     lastErrorCode: row.last_error_code,
+    disconnectedAt: row.disconnected_at,
     verifiedAt: row.verified_at,
     createdAt: row.created_at,
     updatedAt: row.updated_at
@@ -28,7 +30,8 @@ function mapMailDomain(row: MailDomainRow): MailDomain {
 export async function listMailDomains(db: D1Database): Promise<MailDomain[]> {
   const rows = await getRows<MailDomainRow>(
     db,
-    sql`SELECT * FROM mail_domains ORDER BY is_enabled DESC, name`
+    sql`SELECT * FROM mail_domains
+        ORDER BY disconnected_at IS NOT NULL, is_enabled DESC, name`
   );
   return rows.map(mapMailDomain);
 }
@@ -44,7 +47,7 @@ export async function findMailDomainByName(
   return row ? mapMailDomain(row) : null;
 }
 
-async function findMailDomainById(db: D1Database, id: string): Promise<MailDomain | null> {
+export async function findMailDomainById(db: D1Database, id: string): Promise<MailDomain | null> {
   const row = await getRow<MailDomainRow>(db, sql`SELECT * FROM mail_domains WHERE id = ${id}`);
   return row ? mapMailDomain(row) : null;
 }
@@ -81,8 +84,9 @@ export async function upsertMailDomain(
       receivingStatus,
       sendingStatus,
       dnsStatus,
-      catchAllPolicy: "reject",
+      catchAllPolicy: "unassigned",
       isEnabled: true,
+      disconnectedAt: null,
       verifiedAt: timestamp,
       createdAt: existing?.createdAt ?? timestamp,
       updatedAt: timestamp
@@ -96,6 +100,7 @@ export async function upsertMailDomain(
         sendingStatus,
         dnsStatus,
         isEnabled: true,
+        disconnectedAt: null,
         verifiedAt: timestamp,
         updatedAt: timestamp
       }
@@ -117,9 +122,34 @@ export async function updateMailDomainSettings(
 ): Promise<MailDomain | null> {
   const current = await findMailDomainById(db, id);
   if (!current) return null;
+  if (current.disconnectedAt) {
+    throw new AppError(
+      "DOMAIN_DISCONNECTED",
+      "Reconnect this domain before changing its HQBase settings.",
+      409
+    );
+  }
   const catchAllPolicy = input.catchAllPolicy ?? current.catchAllPolicy;
   const catchAllMailboxId =
     catchAllPolicy === "mailbox" ? (input.catchAllMailboxId ?? current.catchAllMailboxId) : null;
+  if (catchAllPolicy === "mailbox") {
+    const mailbox = await getRow<{ id: string }>(
+      db,
+      sql`SELECT id FROM mailboxes
+          WHERE id = ${catchAllMailboxId}
+            AND mail_domain_id = ${current.id}
+            AND kind = 'human'
+            AND is_active = 1
+            AND deleted_at IS NULL`
+    );
+    if (!mailbox) {
+      throw new AppError(
+        "CATCH_ALL_MAILBOX_INVALID",
+        "Choose an active human mailbox on this domain.",
+        400
+      );
+    }
+  }
   await createDatabase(db)
     .update(mailDomains)
     .set({
@@ -127,6 +157,34 @@ export async function updateMailDomainSettings(
       catchAllMailboxId,
       isEnabled: input.isEnabled ?? current.isEnabled,
       updatedAt: nowIso()
+    })
+    .where(eq(mailDomains.id, id))
+    .run();
+  return findMailDomainById(db, id);
+}
+
+export async function updateMailDomainReadiness(
+  db: D1Database,
+  id: string,
+  input: {
+    accountId: string | null;
+    dnsStatus: Exclude<DomainStatus, "disabled">;
+    receivingStatus: DomainStatus;
+    sendingStatus: DomainStatus;
+    zoneId: string;
+  }
+): Promise<MailDomain | null> {
+  const timestamp = nowIso();
+  await createDatabase(db)
+    .update(mailDomains)
+    .set({
+      accountId: input.accountId,
+      dnsStatus: input.dnsStatus,
+      receivingStatus: input.receivingStatus,
+      sendingStatus: input.sendingStatus,
+      updatedAt: timestamp,
+      verifiedAt: timestamp,
+      zoneId: input.zoneId
     })
     .where(eq(mailDomains.id, id))
     .run();

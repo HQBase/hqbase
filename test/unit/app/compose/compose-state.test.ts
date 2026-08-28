@@ -2,8 +2,12 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   composeContextLabel,
   defaultSendingIdentity,
+  draftEditorHtml,
+  draftRecoveryKey,
   findDraftForComposer,
   forwardedMessage,
+  hasInvalidRecipients,
+  invalidRecipients,
   normalizeDraftHtml,
   readDraftRecovery,
   replyRecipients,
@@ -24,67 +28,42 @@ describe("composer state", () => {
       "two@example.com",
       "three@example.com"
     ]);
+    expect(invalidRecipients("one@example.com, unfinished")).toEqual(["unfinished"]);
+    expect(hasInvalidRecipients("one@example.com", "", "two@example.com")).toBe(false);
+    expect(hasInvalidRecipients("one@example.com", "unfinished", "")).toBe(true);
   });
 
-  it("exposes every send-enabled identity on an authorized mailbox", () => {
+  it("exposes one identity for every authorized active mailbox", () => {
     expect(
       sendingIdentities([
         {
           id: "mbx_1",
           address: "support@example.com",
+          mailDomainId: "dom_1",
           displayName: "Support",
+          kind: "human",
           isActive: true,
+          deletedAt: null,
           accessLevel: "agent",
           createdAt: "now",
-          updatedAt: "now",
-          addresses: [
-            {
-              id: "addr_1",
-              mailboxId: "mbx_1",
-              mailDomainId: "dom_1",
-              address: "support@example.com",
-              displayName: "Support",
-              receiveEnabled: true,
-              sendEnabled: true,
-              isPrimary: true
-            },
-            {
-              id: "addr_2",
-              mailboxId: "mbx_1",
-              mailDomainId: "dom_2",
-              address: "help@example.net",
-              displayName: "Support",
-              receiveEnabled: true,
-              sendEnabled: false,
-              isPrimary: false
-            }
-          ]
+          updatedAt: "now"
         },
         {
           id: "mbx_2",
           address: "sales@example.net",
+          mailDomainId: "dom_2",
           displayName: "Sales",
+          kind: "human",
           isActive: true,
+          deletedAt: null,
           accessLevel: "manager",
           createdAt: "now",
-          updatedAt: "now",
-          addresses: [
-            {
-              id: "addr_3",
-              mailboxId: "mbx_2",
-              mailDomainId: "dom_2",
-              address: "sales@example.net",
-              displayName: "Sales",
-              receiveEnabled: true,
-              sendEnabled: true,
-              isPrimary: true
-            }
-          ]
+          updatedAt: "now"
         }
       ])
     ).toEqual([
-      { mailboxId: "mbx_1", address: "support@example.com" },
-      { mailboxId: "mbx_2", address: "sales@example.net" }
+      { mailboxId: "mbx_1", address: "support@example.com", displayName: "Support" },
+      { mailboxId: "mbx_2", address: "sales@example.net", displayName: "Sales" }
     ]);
   });
 
@@ -121,6 +100,7 @@ describe("composer state", () => {
       subject: id,
       text: "",
       html: "",
+      signature: { mode: "automatic", id: null, name: "", html: "", text: "" },
       version: 1,
       updatedAt: "2026-07-29T14:00:00.000Z",
       attachments: []
@@ -129,9 +109,11 @@ describe("composer state", () => {
 
     expect(findDraftForComposer(drafts, "draft-two", null, null)?.id).toBe("draft-two");
     expect(findDraftForComposer(drafts, "missing", null, null)).toBeNull();
+    expect(findDraftForComposer(drafts, null, null, null)).toBeNull();
+    expect(draftRecoveryKey(drafts[0]?.id ?? "")).not.toBe(draftRecoveryKey(drafts[1]?.id ?? ""));
   });
 
-  it("uses the exact address that received the message as the reply identity", () => {
+  it("uses the mailbox that received the message as the reply identity", () => {
     const inboundMessage: MessageDetail = {
       id: "msg_1",
       threadId: "thr_1",
@@ -139,10 +121,11 @@ describe("composer state", () => {
       direction: "inbound",
       folder: "inbox",
       fromAddress: "sender@example.com",
-      to: ["alias@example.com"],
+      fromName: "Sender Example",
+      to: ["support@example.com"],
       cc: [],
       bcc: [],
-      deliveredToAddress: "alias@example.com",
+      deliveredToAddress: "support@example.com",
       subject: "Account access",
       snippet: "Please help",
       textBody: "Please help",
@@ -161,19 +144,23 @@ describe("composer state", () => {
     const identity = replySendingIdentity(
       inboundMessage,
       [
-        { mailboxId: "mbx_1", address: "support@example.com" },
-        { mailboxId: "mbx_1", address: "alias@example.com" }
+        { mailboxId: "mbx_1", address: "support@example.com", displayName: "Support" },
+        { mailboxId: "mbx_2", address: "privacy@example.com", displayName: "Privacy" }
       ],
-      { mailboxId: "mbx_2", address: "privacy@example.com" }
+      { mailboxId: "mbx_2", address: "privacy@example.com", displayName: "Privacy" }
     );
 
-    expect(identity).toEqual({ mailboxId: "mbx_1", address: "alias@example.com" });
+    expect(identity).toEqual({
+      mailboxId: "mbx_1",
+      address: "support@example.com",
+      displayName: "Support"
+    });
     expect(replyRecipients(inboundMessage)).toEqual(["sender@example.com"]);
     expect(composeContextLabel("reply", inboundMessage)).toContain(
-      "Replying to sender@example.com ·"
+      "Replying to Sender Example <sender@example.com> ·"
     );
     expect(composeContextLabel("forward", inboundMessage)).toContain(
-      "Forwarding message from sender@example.com ·"
+      "Forwarding message from Sender Example <sender@example.com> ·"
     );
     expect(composeContextLabel("new", inboundMessage)).toBeNull();
     expect(
@@ -200,56 +187,39 @@ describe("composer state", () => {
     ).toEqual([]);
   });
 
-  it("uses the preferred mailbox primary address for new messages", () => {
+  it("uses the preferred mailbox for new messages", () => {
     const mailboxes = [
       {
         id: "mbx_1",
         address: "support@example.com",
+        mailDomainId: "dom_1",
         displayName: "Support",
+        kind: "human" as const,
         isActive: true,
+        deletedAt: null,
         accessLevel: "manager" as const,
         createdAt: "now",
-        updatedAt: "now",
-        addresses: [
-          {
-            id: "addr_1",
-            mailboxId: "mbx_1",
-            mailDomainId: "dom_1",
-            address: "support@example.com",
-            displayName: "Support",
-            receiveEnabled: true,
-            sendEnabled: true,
-            isPrimary: true
-          }
-        ]
+        updatedAt: "now"
       },
       {
         id: "mbx_2",
         address: "privacy@example.com",
+        mailDomainId: "dom_1",
         displayName: "Privacy",
+        kind: "human" as const,
         isActive: true,
+        deletedAt: null,
         accessLevel: "agent" as const,
         createdAt: "now",
-        updatedAt: "now",
-        addresses: [
-          {
-            id: "addr_2",
-            mailboxId: "mbx_2",
-            mailDomainId: "dom_1",
-            address: "privacy@example.com",
-            displayName: "Privacy",
-            receiveEnabled: true,
-            sendEnabled: true,
-            isPrimary: true
-          }
-        ]
+        updatedAt: "now"
       }
     ];
     const identities = sendingIdentities(mailboxes);
 
-    expect(defaultSendingIdentity("mbx_2", mailboxes, identities)).toEqual({
+    expect(defaultSendingIdentity("mbx_2", identities)).toEqual({
       mailboxId: "mbx_2",
-      address: "privacy@example.com"
+      address: "privacy@example.com",
+      displayName: "Privacy"
     });
   });
 
@@ -257,6 +227,16 @@ describe("composer state", () => {
     expect(normalizeDraftHtml("", "<p></p>")).toBe("");
     expect(serializeDraft("from@example.com", "", "", "", "", "", "<p></p>")).toBe(
       serializeDraft("from@example.com", "", "", "", "", "", "")
+    );
+  });
+
+  it("safely opens plain-text drafts in the rich editor", () => {
+    expect(draftEditorHtml("First <line> & next\nSecond", "<p></p>")).toBe(
+      "<p>First &lt;line&gt; &amp; next<br>Second</p>"
+    );
+    expect(draftEditorHtml("Text fallback", "<p><br></p>")).toBe("<p>Text fallback</p>");
+    expect(draftEditorHtml("Text fallback", '<p><img src="cid:image"></p>')).toBe(
+      '<p><img src="cid:image"></p>'
     );
   });
 
@@ -268,6 +248,7 @@ describe("composer state", () => {
       direction: "inbound",
       folder: "inbox",
       fromAddress: "sender@example.com",
+      fromName: "Sender Example",
       to: ["support@example.com"],
       cc: [],
       bcc: [],
@@ -289,7 +270,7 @@ describe("composer state", () => {
     });
 
     expect(forwarded.text).toContain("---------- Forwarded message ---------");
-    expect(forwarded.text).toContain("From: sender@example.com");
+    expect(forwarded.text).toContain("From: Sender Example <sender@example.com>");
     expect(forwarded.html).toContain("&lt;script&gt;");
     expect(forwarded.html).not.toContain("<script>");
   });

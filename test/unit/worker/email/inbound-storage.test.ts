@@ -1,5 +1,6 @@
 import { planInboundStorage } from "@worker/email/inbound-plan";
 import type { ParsedEmail } from "@worker/email/parse-email";
+import { hasDownloadableAttachments } from "@worker/email/store-email";
 import { describe, expect, it } from "vitest";
 
 const parsed: ParsedEmail = {
@@ -8,6 +9,7 @@ const parsed: ParsedEmail = {
   cc: [],
   date: "2026-06-24T14:00:00.000Z",
   fromAddress: "alice@example.net",
+  fromName: "Alice Example",
   htmlBody: null,
   inReplyTo: null,
   messageId: "<message@example.net>",
@@ -42,5 +44,20 @@ describe("planInboundStorage", () => {
     expect(plan.folder).toBe("catchall");
     expect(plan.mailboxId).toBeNull();
     expect(plan.dedupeKey).toBeNull();
+  });
+
+  it("uses MIME disposition when an attachment also has a content ID", () => {
+    const attachment = {
+      filename: "logo.png",
+      contentType: "image/png",
+      contentId: "logo@example.com",
+      content: new Uint8Array([1, 2, 3]).buffer
+    };
+
+    expect(hasDownloadableAttachments([{ ...attachment, disposition: "inline" }])).toBe(false);
+    expect(hasDownloadableAttachments([{ ...attachment, disposition: "attachment" }])).toBe(true);
+    expect(
+      hasDownloadableAttachments([{ ...attachment, contentId: null, disposition: null }])
+    ).toBe(true);
   });
 });

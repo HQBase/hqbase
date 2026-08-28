@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { type AppRoute, appRoutePath, mailFolders, readAppRoute, settingsTabs } from "@/lib/routes";
+import {
+  type AppRoute,
+  agentTabs,
+  appRoutePath,
+  mailFolders,
+  readAppRoute,
+  settingsTabs
+} from "@/lib/routes";
 
 describe("application routing", () => {
   it("gives every mail folder a canonical route", () => {
@@ -33,6 +40,23 @@ describe("application routing", () => {
       expect(readAppRoute(path)).toEqual({ kind: "settings", tab });
       expect(appRoutePath(readAppRoute(path))).toBe(path);
     }
+  });
+
+  it("round-trips the contacts page and an exact correspondent", () => {
+    expect(readAppRoute("/contacts")).toEqual({ kind: "contacts", contactId: null });
+    const route: AppRoute = { kind: "contacts", contactId: "friend@example.com" };
+    expect(appRoutePath(route)).toBe("/contacts/friend%40example.com");
+    expect(readAppRoute(appRoutePath(route))).toEqual(route);
+  });
+
+  it("gives every Agents page a canonical route", () => {
+    for (const tab of agentTabs) {
+      const path = `/agents/${tab}`;
+      expect(readAppRoute(path)).toEqual({ kind: "agents", tab });
+      expect(appRoutePath(readAppRoute(path))).toBe(path);
+    }
+    expect(readAppRoute("/settings/mcp")).toEqual({ kind: "agents", tab: "connections" });
+    expect(readAppRoute("/settings/agents")).toEqual({ kind: "agents", tab: "mailboxes" });
   });
 
   it("keeps OAuth return aliases and the retired General tab compatible", () => {

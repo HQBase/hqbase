@@ -7,7 +7,22 @@ const setup: SetupStatus = {
   isComplete: true,
   primaryDomain: "example.com",
   portalHostname: "mail.example.com",
-  domains: [{ id: "domain-1", name: "example.com", isEnabled: true }],
+  domains: [
+    {
+      id: "domain-1",
+      name: "example.com",
+      zoneId: "zone-1",
+      accountId: "account-1",
+      receivingStatus: "ready",
+      sendingStatus: "ready",
+      dnsStatus: "ready",
+      catchAllPolicy: "unassigned",
+      catchAllMailboxId: null,
+      isEnabled: true,
+      disconnectedAt: null,
+      updatedAt: "2026-08-26T00:00:00.000Z"
+    }
+  ],
   userCount: 3,
   mailboxCount: 4,
   checklistAcknowledged: true

@@ -9,7 +9,10 @@ describe("compose fields", () => {
         bcc=""
         cc=""
         from="support@example.com"
-        identities={[{ mailboxId: "mbx_1", address: "support@example.com" }]}
+        fromDisabled={false}
+        identities={[
+          { mailboxId: "mbx_1", address: "support@example.com", displayName: "Support" }
+        ]}
         mode="reply"
         subject="Re: Account access"
         to="customer@example.com"
@@ -24,6 +27,7 @@ describe("compose fields", () => {
     expect(html).toContain('aria-label="To"');
     expect(html).toContain('aria-label="Cc"');
     expect(html).toContain('aria-label="Bcc"');
+    expect(html).toContain("Support — support@example.com");
     expect(html).not.toContain("Replying to");
   });
 });

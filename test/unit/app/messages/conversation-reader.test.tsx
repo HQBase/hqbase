@@ -17,6 +17,7 @@ const firstMessage: MessageDetailType = {
   direction: "inbound",
   folder: "inbox",
   fromAddress: "customer@example.com",
+  fromName: "Customer Example",
   to: ["support@example.com"],
   cc: [],
   bcc: [],
@@ -43,6 +44,7 @@ const secondMessage: MessageDetailType = {
   direction: "outbound",
   folder: "sent",
   fromAddress: "support@example.com",
+  fromName: "Support",
   to: ["customer@example.com"],
   textBody: "We can help.",
   snippet: "We can help",
@@ -86,6 +88,17 @@ describe("conversation reader", () => {
     expect(html).toContain('data-compose-message-id="msg_2"');
     expect(html).toContain('aria-label="Back to messages"');
     expect(html).toContain('aria-label="Archive conversation"');
+    expect(html).toContain("Customer Example");
+    expect(html).toContain("customer@example.com · to support@example.com");
+    const title = html.match(/<h1[^>]*>/u)?.[0];
+    expect(title).toContain("truncate whitespace-nowrap");
+    expect(title).not.toContain("break-words");
+    expect(title).not.toContain("text-balance");
+    const mobileActions = html.match(/<div class="absolute inset-y-0 right-0[^>]*>/u)?.[0];
+    expect(mobileActions).toContain("bg-toolbar");
+    expect(mobileActions).toContain("shadow-[-10px_0_8px_2px_hsl(var(--surface-toolbar))]");
+    expect(mobileActions).toContain("sm:static");
+    expect(mobileActions).toContain("sm:shadow-none");
   });
 
   it("offers restore instead of archive and trash in Trash", () => {
@@ -175,6 +188,13 @@ describe("conversation reader", () => {
   });
 
   it("shows the exact right-aligned conversation total and a manual paging fallback", () => {
+    const label = {
+      color: "blue" as const,
+      createdAt: "2026-07-27T14:00:00.000Z",
+      id: "label-1",
+      name: "Customer",
+      updatedAt: "2026-07-27T14:00:00.000Z"
+    };
     const html = renderToStaticMarkup(
       <InboxPage
         activeFolder="inbox"
@@ -182,6 +202,7 @@ describe("conversation reader", () => {
         defaultFromMailboxId="mbx_1"
         hasMore={true}
         isLoadingMore={false}
+        labels={[label]}
         loadMoreError={null}
         mailboxes={[]}
         selectedId={null}
@@ -197,12 +218,20 @@ describe("conversation reader", () => {
     expect(html).toContain("237 conversations");
     expect(html).not.toContain(">1+<");
     expect(html).toContain("Load more conversations");
+    expect(html.match(/max-w-\[960px\]/gu)).toHaveLength(2);
+    expect(html).not.toContain("max-w-[1200px]");
+    const header = html.match(/<div[^>]*data-inbox-header-layout[^>]*>/u)?.[0];
+    expect(header).toContain(
+      "sm:grid-cols-[2rem_minmax(7rem,18%)_1rem_minmax(0,1fr)_1.75rem_4rem]"
+    );
+    expect(html).toContain(
+      "col-start-2 flex min-w-0 items-center justify-end sm:col-start-4 sm:row-start-1"
+    );
   });
 
   it("labels the unread indicator and removes it once the message is read", () => {
     const unreadHtml = renderToStaticMarkup(
       <MessageListItem
-        activeFolder="inbox"
         conversation={conversation}
         href="/mail/inbox/msg_1"
         isActive={false}
@@ -212,7 +241,6 @@ describe("conversation reader", () => {
     );
     const readHtml = renderToStaticMarkup(
       <MessageListItem
-        activeFolder="inbox"
         conversation={{ ...conversation, unreadCount: 0 }}
         href="/mail/inbox/msg_1"
         isActive={false}
@@ -224,7 +252,192 @@ describe("conversation reader", () => {
     expect(unreadHtml).toContain('aria-label="Star conversation"');
     expect(unreadHtml).toContain('title="2 messages"');
     expect(unreadHtml).toContain(">2<");
+    expect(unreadHtml).toContain(">(2)</span>");
+    expect(unreadHtml).not.toContain("bg-muted px-1.5 py-0.5");
     expect(readHtml).toContain('aria-label="Star conversation"');
+  });
+
+  it("uses a Gmail-style information stack only below the small breakpoint", () => {
+    const hrLabel = {
+      color: "blue" as const,
+      createdAt: "2026-07-27T14:00:00.000Z",
+      id: "label-hr",
+      name: "HR",
+      updatedAt: "2026-07-27T14:00:00.000Z"
+    };
+    const importantLabel = {
+      ...hrLabel,
+      color: "red" as const,
+      id: "label-important",
+      name: "Important"
+    };
+    const html = renderToStaticMarkup(
+      <MessageListItem
+        conversation={{
+          ...conversation,
+          direction: "inbound",
+          fromAddress: "support@example.com",
+          fromName: "Support Team",
+          hasAttachments: true,
+          labels: [hrLabel, importantLabel]
+        }}
+        href="/mail/inbox/msg_1"
+        isActive={false}
+        canOrganizeLabels
+        labels={[hrLabel, importantLabel]}
+        onSelect={() => undefined}
+        onToggleLabel={() => undefined}
+        onToggleStar={() => undefined}
+      />
+    );
+
+    expect(html).toContain('data-message-avatar="mobile"');
+    expect(html).toContain("grid-cols-[2.5rem_minmax(0,1fr)_4rem]");
+    expect(html).not.toContain("grid-cols-[2.5rem_minmax(0,1fr)_5rem]");
+    expect(html).toContain("rounded-xl px-3");
+    expect(html).toContain("sm:grid-cols-[2rem_minmax(7rem,18%)_1rem_minmax(0,1fr)_1.75rem_4rem]");
+    expect(html).not.toContain("sm:grid-cols-[2rem_minmax(7rem,18%)_minmax(0,1fr)_auto_4rem]");
+    expect(html).toContain("sm:items-center");
+    expect(html).not.toContain("row-start-3");
+    expect(html).toContain(
+      "hidden items-center justify-center sm:col-start-3 sm:row-start-1 sm:flex"
+    );
+    expect(html).toContain('aria-label="Has attachments"');
+    expect(html).toContain("sm:col-start-4");
+    expect(html).toContain("sm:col-start-5");
+    expect(html).toContain("sm:col-start-6");
+    expect(html).toContain("sm:mr-2 sm:overflow-hidden");
+    expect(html).not.toContain("sm:pr-2");
+    expect(html).not.toContain("sm:row-start-2 sm:mt-1");
+    const time = html.match(/<time[^>]*>/u)?.[0];
+    expect(time).toContain("whitespace-nowrap");
+    expect(html).toContain("bg-blue-500/15");
+    expect(html).toContain("text-blue-700");
+    expect(html).toContain("text-[9px]");
+    expect(html).toContain('aria-label="Labels: HR, Important"');
+    expect(html).toContain("min-h-10");
+    expect(html).toContain("min-h-0");
+    expect(html).toContain("col-start-2 row-start-2");
+    expect(html).toContain("self-end justify-self-end");
+    expect(html).toContain("sm:col-start-4 sm:row-start-1 sm:inline-flex");
+    expect(html).toContain("sm:col-start-5 sm:row-start-1 sm:flex sm:w-7 sm:min-w-7");
+    expect(html).toContain("bg-muted px-0.5 py-0.5 text-[11px]");
+    expect(html).toContain(">(2)</span>");
+    expect(html).toContain('class="shrink-0 tabular-nums sm:hidden"');
+    expect(html).not.toContain(
+      'class="shrink-0 text-[11px] font-normal tabular-nums text-tertiary sm:hidden"'
+    );
+    expect(html).not.toContain("bg-muted px-1.5 py-0.5");
+    const starSlot = html.match(/<span class="col-start-3 row-start-2[^>]*>[\s\S]*?<\/span>/u)?.[0];
+    expect(starSlot).toContain("self-end");
+    expect(starSlot).toContain("sm:self-center");
+    expect(starSlot).toContain("items-end");
+    expect(starSlot).toContain("pb-px");
+    expect(starSlot).toContain("sm:items-center");
+    expect(starSlot).toContain("sm:pb-0");
+    expect(starSlot).toContain("size-[18px] -translate-y-px sm:size-4 sm:translate-y-0");
+    expect(starSlot).not.toContain("hover:bg-accent");
+    const row = html.match(/<a[^>]*>/u)?.[0];
+    expect(row).toContain("[--message-row-surface:var(--surface-list)]");
+    expect(row).toContain("hover:[--message-row-surface:var(--surface-hover)]");
+    const attachmentMarkers = [...html.matchAll(/aria-label="Has attachments"/gu)];
+    expect(attachmentMarkers).toHaveLength(2);
+    expect(attachmentMarkers[1]?.index).toBeLessThan(html.indexOf(">Account access"));
+    const compactLabelContainer = html.match(/<span[^>]*data-message-labels="compact"[^>]*>/u)?.[0];
+    expect(compactLabelContainer).toContain("w-max");
+    expect(compactLabelContainer).toContain("overflow-visible");
+    expect(compactLabelContainer).not.toContain("max-w-[75%]");
+    expect(compactLabelContainer).not.toContain("overflow-hidden");
+    expect(compactLabelContainer).toContain("rounded-full");
+    expect(compactLabelContainer).toContain("bg-[hsl(var(--message-row-surface))]");
+    expect(compactLabelContainer).toContain("p-0.5");
+    expect(compactLabelContainer).toContain(
+      "shadow-[-5px_0_5px_1px_hsl(var(--message-row-surface))]"
+    );
+    expect(compactLabelContainer).not.toContain("backdrop-blur");
+    expect(html).toContain("w-max shrink-0 leading-4");
+    const labelButton = html.match(
+      /<button[^>]*data-message-labels="desktop"[^>]*>[\s\S]*?<\/button>/u
+    )?.[0];
+    expect(labelButton).toContain("rounded-full");
+    expect(labelButton).toContain("bg-[hsl(var(--message-row-surface))]");
+    expect(labelButton).toContain("p-0.5");
+    expect(labelButton).toContain("shadow-[-5px_0_5px_1px_hsl(var(--message-row-surface))]");
+    expect(labelButton).toContain("sm:shadow-[-8px_0_8px_2px_hsl(var(--message-row-surface))]");
+    expect(labelButton).toContain("hover:bg-[hsl(var(--message-row-surface))]");
+    expect(labelButton).not.toContain("backdrop-blur");
+    expect(labelButton).toContain("sm:inline-flex");
+    expect(labelButton).toContain(">HR</span>");
+    expect(labelButton).toContain(">Important</span>");
+    expect(html.match(/>HR<\/span>/gu)).toHaveLength(2);
+    expect(html.match(/>Important<\/span>/gu)).toHaveLength(2);
+    expect(html).toContain("min-w-10");
+    expect(html).toContain("max-w-20");
+    expect(html).toContain('data-label-menu-icon="tag"');
+    expect(html.indexOf("Support Team")).toBeLessThan(html.indexOf(">(2)</span>"));
+    expect(html.indexOf(">(2)</span>")).toBeLessThan(html.indexOf("Account access"));
+    expect(html.indexOf("Account access")).toBeLessThan(html.indexOf("We can help"));
+    expect(html.indexOf("We can help")).toBeLessThan(html.indexOf("Important"));
+
+    const readOnlyHtml = renderToStaticMarkup(
+      <MessageListItem
+        conversation={{ ...conversation, labels: [hrLabel] }}
+        href="/mail/inbox/msg_1"
+        isActive={false}
+        labels={[hrLabel]}
+        onSelect={() => undefined}
+        onToggleLabel={() => undefined}
+        onToggleStar={() => undefined}
+      />
+    );
+    expect(readOnlyHtml).not.toContain('<button aria-label="Labels: HR"');
+    expect(readOnlyHtml).toContain('<span class="z-10 hidden');
+    expect(readOnlyHtml).toContain('data-message-labels="desktop"');
+
+    const activeHtml = renderToStaticMarkup(
+      <MessageListItem
+        conversation={conversation}
+        href="/mail/inbox/msg_1"
+        isActive
+        onSelect={() => undefined}
+        onToggleStar={() => undefined}
+      />
+    );
+    expect(activeHtml.match(/<a[^>]*>/u)?.[0]).toContain(
+      "[--message-row-surface:var(--surface-selected)]"
+    );
+  });
+
+  it("keeps every compact label visible in a right-aligned row", () => {
+    const names = ["Customer", "Priority", "Billing", "Follow up", "Partner", "HR", "Important"];
+    const labels = names.map((name, index) => ({
+      color: "blue" as const,
+      createdAt: "2026-08-25T12:00:00.000Z",
+      id: `label-${index + 1}`,
+      name,
+      updatedAt: "2026-08-25T12:00:00.000Z"
+    }));
+    const html = renderToStaticMarkup(
+      <MessageListItem
+        conversation={{ ...conversation, labels }}
+        href="/mail/inbox/msg_1"
+        isActive={false}
+        onSelect={() => undefined}
+        onToggleStar={() => undefined}
+      />
+    );
+    const compactLabels = html.match(
+      /<span[^>]*data-message-labels="compact"[^>]*>[\s\S]*?(?=<span class="z-10 hidden)/u
+    )?.[0];
+
+    expect(compactLabels).toContain("w-max");
+    expect(compactLabels).toContain("shrink-0");
+    expect(compactLabels).toContain("justify-self-end");
+    expect(compactLabels).toContain("overflow-visible");
+    expect(compactLabels).not.toContain("max-w-[75%]");
+    expect(compactLabels).not.toContain("overflow-hidden");
+    expect(compactLabels).not.toContain("data-label-stack-color");
+    for (const name of names) expect(compactLabels).toContain(`>${name}</span>`);
   });
 
   it("collapses messages between the first and final message behind a counted divider", () => {
@@ -247,5 +460,43 @@ describe("conversation reader", () => {
     expect(html).toContain('data-thread-disclosure-state="collapsed"');
     expect(html).toContain('data-thread-arrow="top-outward"');
     expect(html).toContain('data-thread-arrow="bottom-outward"');
+    expect(html).toContain("grid size-8");
+    expect(html).toContain("rounded-full bg-muted");
+    expect(html).toContain("size-2.5");
+    expect(html).not.toContain('<div class="divide-y divide-border"><article');
+    expect(html.match(/data-orientation="horizontal"/gu)).toHaveLength(2);
+  });
+
+  it("keeps inline images out of the downloadable attachment list", () => {
+    const html = renderToStaticMarkup(
+      <ConversationMessages
+        messages={[
+          {
+            ...firstMessage,
+            attachments: [
+              {
+                id: "inline-logo",
+                filename: "logo.png",
+                contentType: "image/png",
+                sizeBytes: 4,
+                contentId: "logo@example.com",
+                disposition: "inline"
+              },
+              {
+                id: "report",
+                filename: "report.pdf",
+                contentType: "application/pdf",
+                sizeBytes: 8,
+                contentId: "gmail-report@example.com",
+                disposition: "attachment"
+              }
+            ]
+          }
+        ]}
+      />
+    );
+
+    expect(html).not.toContain("logo.png");
+    expect(html).toContain("report.pdf");
   });
 });

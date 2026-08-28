@@ -19,6 +19,7 @@ const manifestSchema = z.object({
   schemaVersion: z.number().int().positive(),
   minVersion: z.string(),
   publishedAt: z.string().datetime(),
+  notes: z.array(z.string().min(1).max(2_000)).max(100).optional().default([]),
   notesUrl: z.string().url(),
   artifact: z.object({
     url: z.string().url(),
@@ -51,7 +52,7 @@ export async function getUpdateStatus(
   return {
     product: "hqbase",
     installedVersion,
-    installedSchemaVersion: 2,
+    installedSchemaVersion: 3,
     channel: "stable",
     checkedAt: new Date().toISOString(),
     available: compareVersions(release.version, installedVersion) > 0,

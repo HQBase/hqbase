@@ -7,7 +7,7 @@ import { applyCurrentMigrations } from "./current-migrations";
 import { tokenRow } from "./mail-api-token-fixture";
 
 const origin = "https://hqbase.test";
-const apiResource = `${origin}/api/v1`;
+const apiResource = `${origin}/api/v2`;
 const readToken = "hqb_access_changes-read-token";
 const writeToken = "hqb_access_changes-write-token";
 let userId = "";
@@ -67,6 +67,11 @@ describe("HQBase Mail API message changes", () => {
       )
     ]);
     await env.DB.batch([
+      env.DB.prepare(
+        `INSERT INTO mail_domains
+         (id, name, receiving_status, sending_status, dns_status, is_enabled, created_at, updated_at)
+         VALUES ('dom_changes', 'example.com', 'ready', 'ready', 'ready', 1, ?, ?)`
+      ).bind(stamp, stamp),
       mailboxRow("mbx_changes", "changes@example.com", stamp),
       mailboxRow("mbx_changes_bulk", "bulk-changes@example.com", stamp),
       mailboxRow("mbx_changes_secret", "secret-changes@example.com", stamp),
@@ -97,12 +102,12 @@ describe("HQBase Mail API message changes", () => {
   });
 
   it("starts with a checkpoint and does not replay historical journal rows", async () => {
-    const first = await apiFetch("/api/v1/changes", readToken);
+    const first = await apiFetch("/api/v2/changes", readToken);
     expect(first.status, await first.clone().text()).toBe(200);
     const checkpoint = await changePage(first);
     expect(checkpoint).toMatchObject({ changes: [], hasMore: false });
 
-    const next = await apiFetch(`/api/v1/changes?cursor=${checkpoint.nextCursor}`, readToken);
+    const next = await apiFetch(`/api/v2/changes?cursor=${checkpoint.nextCursor}`, readToken);
     await expect(next.json()).resolves.toMatchObject({ changes: [], hasMore: false });
   });
 
@@ -123,7 +128,7 @@ describe("HQBase Mail API message changes", () => {
       .bind(stamp, stamp)
       .run();
 
-    const response = await apiFetch(`/api/v1/changes?cursor=${cursor}`, readToken);
+    const response = await apiFetch(`/api/v2/changes?cursor=${cursor}`, readToken);
     const page = await changePage(response);
     expect(page.hasMore).toBe(false);
     expect(page.changes).toHaveLength(3);
@@ -134,6 +139,7 @@ describe("HQBase Mail API message changes", () => {
           id: "msg_changes_rapid",
           mailboxId: "mbx_changes",
           folder: "archived",
+          fromName: "Sender Example",
           readAt: stamp,
           starredAt: stamp
         }
@@ -164,7 +170,7 @@ describe("HQBase Mail API message changes", () => {
       .run();
 
     const first = await changePage(
-      await apiFetch(`/api/v1/changes?cursor=${cursor}&limit=100`, readToken)
+      await apiFetch(`/api/v2/changes?cursor=${cursor}&limit=100`, readToken)
     );
     expect(first.changes).toHaveLength(100);
     expect(first.hasMore).toBe(true);
@@ -178,7 +184,7 @@ describe("HQBase Mail API message changes", () => {
       .run();
 
     const second = await changePage(
-      await apiFetch(`/api/v1/changes?cursor=${first.nextCursor}&limit=100`, readToken)
+      await apiFetch(`/api/v2/changes?cursor=${first.nextCursor}&limit=100`, readToken)
     );
     expect(second.changes).toHaveLength(5);
     expect(second.hasMore).toBe(false);
@@ -186,7 +192,7 @@ describe("HQBase Mail API message changes", () => {
     expect(new Set(cycleIds).size).toBe(105);
 
     const nextCycle = await changePage(
-      await apiFetch(`/api/v1/changes?cursor=${second.nextCursor}`, readToken)
+      await apiFetch(`/api/v2/changes?cursor=${second.nextCursor}`, readToken)
     );
     expect(nextCycle.changes.map(upsertId)).toEqual(["msg_changes_bulk_000"]);
   });
@@ -198,7 +204,7 @@ describe("HQBase Mail API message changes", () => {
     await env.DB.prepare("DELETE FROM messages WHERE id = 'msg_changes_delete'").run();
 
     const page = await changePage(
-      await apiFetch(`/api/v1/changes?cursor=${cursor}&limit=2`, readToken)
+      await apiFetch(`/api/v2/changes?cursor=${cursor}&limit=2`, readToken)
     );
     expect(page).toMatchObject({ hasMore: false });
     expect(page.changes).toEqual([
@@ -214,22 +220,22 @@ describe("HQBase Mail API message changes", () => {
       messageRow("msg_changes_hidden", "thr_changes_secret", "mbx_changes_secret", stamp)
     ]);
     await env.DB.prepare(
-      "DELETE FROM mailbox_grants WHERE mailbox_id = 'mbx_changes' AND user_id = ?"
+      "DELETE FROM mailbox_grants WHERE mailbox_id = 'mbx_changes' AND principal_id = ?"
     )
       .bind(userId)
       .run();
 
-    const hidden = await changePage(await apiFetch(`/api/v1/changes?cursor=${cursor}`, readToken));
+    const hidden = await changePage(await apiFetch(`/api/v2/changes?cursor=${cursor}`, readToken));
     expect(hidden.changes).toEqual([]);
     await grantRow("mbx_changes", stamp).run();
 
     const afterGrant = await changePage(
-      await apiFetch(`/api/v1/changes?cursor=${hidden.nextCursor}`, readToken)
+      await apiFetch(`/api/v2/changes?cursor=${hidden.nextCursor}`, readToken)
     );
     expect(afterGrant.changes).toEqual([]);
     await messageRow("msg_changes_after_grant", "thr_changes", "mbx_changes", stamp).run();
     const newChange = await changePage(
-      await apiFetch(`/api/v1/changes?cursor=${afterGrant.nextCursor}`, readToken)
+      await apiFetch(`/api/v2/changes?cursor=${afterGrant.nextCursor}`, readToken)
     );
     expect(newChange.changes.map(upsertId)).toEqual(["msg_changes_after_grant"]);
   });
@@ -250,7 +256,7 @@ describe("HQBase Mail API message changes", () => {
           )
         ]);
         const page = await changePage(
-          await apiFetch(`/api/v1/changes?cursor=${cursor}`, readToken)
+          await apiFetch(`/api/v2/changes?cursor=${cursor}`, readToken)
         );
         expect(page.changes).toEqual([]);
       }
@@ -262,13 +268,13 @@ describe("HQBase Mail API message changes", () => {
         unassignedMessageRow("msg_changes_unassigned_owner", "thr_changes_unassigned_owner", stamp)
       ]);
       const upsertPage = await changePage(
-        await apiFetch(`/api/v1/changes?cursor=${cursor}`, readToken)
+        await apiFetch(`/api/v2/changes?cursor=${cursor}`, readToken)
       );
       expect(upsertPage.changes.map(upsertId)).toEqual(["msg_changes_unassigned_owner"]);
 
       await env.DB.prepare("DELETE FROM messages WHERE id = 'msg_changes_unassigned_owner'").run();
       const deletePage = await changePage(
-        await apiFetch(`/api/v1/changes?cursor=${upsertPage.nextCursor}`, readToken)
+        await apiFetch(`/api/v2/changes?cursor=${upsertPage.nextCursor}`, readToken)
       );
       expect(deletePage.changes).toEqual([
         { type: "delete", messageId: "msg_changes_unassigned_owner", mailboxId: null }
@@ -279,30 +285,35 @@ describe("HQBase Mail API message changes", () => {
   });
 
   it("validates scope, filters, limits, and opaque cursor bounds", async () => {
-    const noRead = await apiFetch("/api/v1/changes", writeToken);
+    const noRead = await apiFetch("/api/v2/changes", writeToken);
     expect(noRead.status).toBe(403);
     expect(noRead.headers.get("www-authenticate")).toContain('scope="mail:read"');
 
     for (const path of [
-      "/api/v1/changes?limit=0",
-      "/api/v1/changes?limit=101",
-      "/api/v1/changes?limit=1.5"
+      "/api/v2/changes?limit=0",
+      "/api/v2/changes?limit=101",
+      "/api/v2/changes?limit=1.5"
     ]) {
       const response = await apiFetch(path, readToken);
       expect(response.status, path).toBe(400);
       await expect(response.json()).resolves.toMatchObject({ error: { code: "INVALID_LIMIT" } });
     }
 
-    const filtered = await apiFetch("/api/v1/changes?folder=inbox", readToken);
-    expect(filtered.status).toBe(400);
-    await expect(filtered.json()).resolves.toMatchObject({
-      error: { code: "INVALID_CHANGE_FILTER" }
-    });
+    for (const path of [
+      "/api/v2/changes?folder=inbox",
+      "/api/v2/changes?labelIds=lbl_one&labelIds=lbl_two"
+    ]) {
+      const filtered = await apiFetch(path, readToken);
+      expect(filtered.status, path).toBe(400);
+      await expect(filtered.json()).resolves.toMatchObject({
+        error: { code: "INVALID_CHANGE_FILTER" }
+      });
+    }
 
     const future = encodeChangeCursor({ after: "9223372036854775807", highWater: null });
     for (const value of ["not-a-cursor", future]) {
       const response = await apiFetch(
-        `/api/v1/changes?cursor=${encodeURIComponent(value)}`,
+        `/api/v2/changes?cursor=${encodeURIComponent(value)}`,
         readToken
       );
       expect(response.status, value).toBe(400);
@@ -325,7 +336,7 @@ type ChangePage = {
 };
 
 async function checkpoint(): Promise<string> {
-  return (await changePage(await apiFetch("/api/v1/changes", readToken))).nextCursor;
+  return (await changePage(await apiFetch("/api/v2/changes", readToken))).nextCursor;
 }
 
 async function changePage(response: Response): Promise<ChangePage> {
@@ -340,14 +351,15 @@ function upsertId(change: ChangePage["changes"][number]): string {
 
 function mailboxRow(id: string, address: string, stamp: string): D1PreparedStatement {
   return env.DB.prepare(
-    `INSERT INTO mailboxes (id, address, display_name, is_active, created_at, updated_at)
-     VALUES (?, ?, ?, 1, ?, ?)`
+    `INSERT INTO mailboxes
+     (id, address, mail_domain_id, display_name, is_active, created_at, updated_at)
+     VALUES (?, ?, 'dom_changes', ?, 1, ?, ?)`
   ).bind(id, address, id, stamp, stamp);
 }
 
 function grantRow(mailboxId: string, stamp: string): D1PreparedStatement {
   return env.DB.prepare(
-    `INSERT INTO mailbox_grants (mailbox_id, user_id, access_level, created_by, created_at, updated_at)
+    `INSERT INTO mailbox_grants (mailbox_id, principal_id, access_level, created_by_principal_id, created_at, updated_at)
      VALUES (?, ?, 'agent', ?, ?, ?)`
   ).bind(mailboxId, userId, userId, stamp, stamp);
 }
@@ -367,10 +379,10 @@ function messageRow(
 ): D1PreparedStatement {
   return env.DB.prepare(
     `INSERT INTO messages
-     (id, thread_id, mailbox_id, direction, folder, from_address, to_json, cc_json, bcc_json,
+     (id, thread_id, mailbox_id, direction, folder, from_address, from_name, to_json, cc_json, bcc_json,
       subject, snippet, text_body, message_id, dedupe_key, in_reply_to, references_json,
       received_at, sent_at, read_at, has_attachments, created_at, updated_at)
-     VALUES (?, ?, ?, 'inbound', 'inbox', 'sender@example.net', '[]', '[]', '[]', ?, '', '',
+     VALUES (?, ?, ?, 'inbound', 'inbox', 'sender@example.net', 'Sender Example', '[]', '[]', '[]', ?, '', '',
              NULL, ?, NULL, '[]', ?, NULL, NULL, 0, ?, ?)`
   ).bind(id, threadId, mailboxId, id, `dedupe-${id}`, stamp, stamp, stamp);
 }

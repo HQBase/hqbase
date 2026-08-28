@@ -1,4 +1,5 @@
 import {
+  PiAddressBook,
   PiArchive,
   PiArrowsClockwise,
   PiBell,
@@ -6,17 +7,21 @@ import {
   PiEnvelopeSimple,
   PiGear,
   PiGlobe,
+  PiKey,
   PiNotePencil,
   PiPalette,
   PiPaperPlaneTilt,
   PiPlug,
+  PiRobot,
+  PiSignature,
   PiStar,
+  PiTag,
   PiTrash,
   PiTray,
   PiUsers,
   PiWarning
 } from "react-icons/pi";
-import type { mailFolders, SettingsTabId } from "@/lib/routes";
+import type { AgentTabId, SettingsTabId } from "@/lib/routes";
 
 export const icons = {
   inbox: PiTray,
@@ -28,15 +33,14 @@ export const icons = {
   catchall: PiWarning
 } as const;
 
-export const quickAccess: Array<
-  | {
-      folder: (typeof mailFolders)[number]["id"];
-      icon: React.ComponentType<{ className?: string }>;
-      label: string;
-    }
-  | { folder: "settings"; icon: React.ComponentType<{ className?: string }>; label: string }
-> = [
-  { folder: "inbox", icon: PiTray, label: "Inbox" },
+export const quickAccess: Array<{
+  folder: "inbox" | "contacts" | "agents" | "settings";
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+}> = [
+  { folder: "inbox", icon: PiTray, label: "Mail" },
+  { folder: "contacts", icon: PiAddressBook, label: "Contacts" },
+  { folder: "agents", icon: PiRobot, label: "Agents" },
   { folder: "settings", icon: PiGear, label: "Settings" }
 ];
 
@@ -49,7 +53,8 @@ export const settingsTabIcons: Record<
   domains: PiGlobe,
   notifications: PiBell,
   interface: PiPalette,
-  mcp: PiPlug,
+  labels: PiTag,
+  signatures: PiSignature,
   updates: PiArrowsClockwise,
   debug: PiBug
 };
@@ -60,9 +65,22 @@ export const settingsTabLabels: Record<SettingsTabId, string> = {
   domains: "Domains",
   notifications: "Notifications",
   interface: "Interface",
-  mcp: "MCP",
+  labels: "Labels",
+  signatures: "Signatures",
   updates: "Updates",
   debug: "Debug"
 };
 
-export { PiNotePencil };
+export const agentTabIcons: Record<AgentTabId, React.ComponentType<{ className?: string }>> = {
+  connections: PiPlug,
+  mailboxes: PiRobot,
+  provisioning: PiKey
+};
+
+export const agentTabLabels: Record<AgentTabId, string> = {
+  connections: "Connected apps",
+  mailboxes: "Mailbox agents",
+  provisioning: "Provisioning keys"
+};
+
+export { PiAddressBook, PiNotePencil };

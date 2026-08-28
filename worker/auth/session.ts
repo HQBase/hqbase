@@ -90,13 +90,13 @@ export function requireRole(
   }
 }
 
-export function requireRecentSession(authContext: AuthContext, maxAgeMs = 10 * 60 * 1000): void {
+export function requireRecentSession(
+  authContext: AuthContext,
+  maxAgeMs = 10 * 60 * 1000,
+  message = "Sign in again before changing workspace infrastructure."
+): void {
   if (!isRecentSession(authContext, maxAgeMs)) {
-    throw new AppError(
-      "RECENT_AUTH_REQUIRED",
-      "Sign in again before changing workspace infrastructure.",
-      403
-    );
+    throw new AppError("RECENT_AUTH_REQUIRED", message, 403);
   }
 }
 

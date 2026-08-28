@@ -9,7 +9,7 @@ import { AppError } from "../../lib/errors";
 import type { MessageAction } from "./actions";
 import { buildMessageActionPatch } from "./actions";
 import { decodeKeysetCursor, encodeKeysetCursor, type KeysetCursor } from "./keyset-cursor";
-import { literalSearchPattern } from "./search";
+import { literalContains } from "./search";
 import type {
   AttachmentRow,
   InsertAttachmentInput,
@@ -20,10 +20,7 @@ import type {
   StoredAttachment
 } from "./types";
 
-const messageSelect = sql`SELECT messages.*,
-  (SELECT address FROM mailbox_addresses
-   WHERE id = messages.delivered_to_address_id) AS delivered_to_address
-  FROM messages`;
+const messageSelect = sql`SELECT messages.* FROM messages`;
 
 /** Message cursors are versioned separately from conversation cursors. */
 const messageCursorVersion = "m1";
@@ -33,6 +30,8 @@ export const maxMessageLimit = 100;
 export type ListMessageFilters = {
   cursor?: string | undefined;
   folder?: string | undefined;
+  labelId?: string | undefined;
+  labelIds?: readonly string[] | undefined;
   limit?: number | undefined;
   mailboxId?: string | undefined;
   search?: string | undefined;
@@ -69,6 +68,7 @@ export async function insertMessage(
       direction: input.direction,
       folder: input.folder,
       fromAddress: input.fromAddress,
+      fromName: input.fromName,
       to: input.to,
       cc: input.cc,
       bcc: input.bcc,
@@ -87,8 +87,7 @@ export async function insertMessage(
       hasAttachments: input.hasAttachments,
       createdAt: timestamp,
       updatedAt: timestamp,
-      deliveredToAddressId: input.deliveredToAddressId ?? null,
-      sentFromAddressId: input.sentFromAddressId ?? null
+      deliveredToAddress: input.deliveredToAddress ?? null
     })
     .run();
 
@@ -114,6 +113,7 @@ export async function insertAttachment(
       contentType: input.contentType,
       sizeBytes: input.sizeBytes,
       contentId: input.contentId,
+      disposition: input.disposition,
       r2Key: input.r2Key,
       createdAt: timestamp
     })
@@ -126,6 +126,7 @@ export async function insertAttachment(
     contentType: input.contentType,
     sizeBytes: input.sizeBytes,
     contentId: input.contentId,
+    disposition: input.disposition,
     r2Key: input.r2Key,
     createdAt: timestamp
   };
@@ -156,12 +157,21 @@ export async function listMessagePage(
     where.push(sql`mailbox_id = ${filters.mailboxId}`);
   }
   if (filters.search) {
-    const like = literalSearchPattern(filters.search);
     where.push(
-      sql`(subject LIKE ${like} ESCAPE '\\' OR from_address LIKE ${like} ESCAPE '\\'
-           OR to_json LIKE ${like} ESCAPE '\\' OR snippet LIKE ${like} ESCAPE '\\'
-           OR text_body LIKE ${like} ESCAPE '\\')`
+      sql`(${literalContains(sql`subject`, filters.search)}
+           OR ${literalContains(sql`from_address`, filters.search)}
+           OR ${literalContains(sql`from_name`, filters.search)}
+           OR ${literalContains(sql`to_json`, filters.search)}
+           OR ${literalContains(sql`snippet`, filters.search)}
+           OR ${literalContains(sql`text_body`, filters.search)})`
     );
+  }
+  const labelIds = filters.labelIds ?? (filters.labelId ? [filters.labelId] : []);
+  for (const labelId of labelIds) {
+    where.push(sql`EXISTS (
+      SELECT 1 FROM message_labels assignment
+      WHERE assignment.message_id = messages.id AND assignment.label_id = ${labelId}
+    )`);
   }
 
   const cursor = filters.cursor ? decodeMessageCursor(filters.cursor) : null;
@@ -329,6 +339,7 @@ export function mapMessageSummary(row: MessageRow): MessageSummary {
     direction: row.direction,
     folder: row.folder,
     fromAddress: row.from_address,
+    fromName: row.from_name,
     to: parseJsonList(row.to_json),
     subject: row.subject,
     snippet: row.snippet,
@@ -349,6 +360,7 @@ function mapAttachment(row: AttachmentRow): StoredAttachment {
     contentType: row.content_type,
     sizeBytes: row.size_bytes,
     contentId: row.content_id,
+    disposition: row.disposition,
     r2Key: row.r2_key,
     createdAt: row.created_at
   };

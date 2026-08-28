@@ -4,6 +4,12 @@ export function inboxUnreadForMailbox(unread: UnreadCounts, mailboxId: string): 
   return mailboxId === "all" ? unread.inbox : (unread.inboxByMailbox[mailboxId] ?? 0);
 }
 
-export function mailboxUnreadLabel(label: string, mailboxId: string, unread: UnreadCounts): string {
-  return `${label} (${inboxUnreadForMailbox(unread, mailboxId).toLocaleString()})`;
+export function mailDocumentTitle(
+  unread: UnreadCounts,
+  mailboxId: string,
+  mailboxAddress?: string
+): string {
+  const count = inboxUnreadForMailbox(unread, mailboxId);
+  const label = mailboxId === "all" ? "Inbox" : (mailboxAddress ?? "Inbox");
+  return `${label}${count > 0 ? ` (${count})` : ""} - Mail`;
 }

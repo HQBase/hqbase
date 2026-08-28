@@ -152,5 +152,6 @@ export function getMailboxAccessEntries(
 }
 
 export function formatAccessLevel(accessLevel: MailboxAccessLevel): string {
+  if (accessLevel === "agent") return "Handle mail";
   return `${accessLevel.slice(0, 1).toUpperCase()}${accessLevel.slice(1)}`;
 }

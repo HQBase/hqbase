@@ -1,8 +1,9 @@
 import { sql } from "drizzle-orm";
-import { check, index, integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import { check, index, integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 
-import { users } from "./schema-auth";
-import { mailboxAddresses, mailboxes } from "./schema-mail";
+import { principals } from "./schema-core";
+import { mailboxes } from "./schema-mail";
+import { emailSignatures } from "./schema-signatures";
 
 export const threads = sqliteTable(
   "threads",
@@ -29,6 +30,7 @@ export const messages = sqliteTable(
       enum: ["inbox", "sent", "drafts", "archived", "trash", "catchall"]
     }).notNull(),
     fromAddress: text("from_address").notNull(),
+    fromName: text("from_name"),
     to: text("to_json", { mode: "json" }).$type<string[]>().notNull(),
     cc: text("cc_json", { mode: "json" }).$type<string[]>().notNull(),
     bcc: text("bcc_json", { mode: "json" }).$type<string[]>().notNull(),
@@ -50,12 +52,7 @@ export const messages = sqliteTable(
     hasAttachments: integer("has_attachments", { mode: "boolean" }).default(sql`0`).notNull(),
     createdAt: text("created_at").notNull(),
     updatedAt: text("updated_at").notNull(),
-    deliveredToAddressId: text("delivered_to_address_id").references(() => mailboxAddresses.id, {
-      onDelete: "set null"
-    }),
-    sentFromAddressId: text("sent_from_address_id").references(() => mailboxAddresses.id, {
-      onDelete: "set null"
-    }),
+    deliveredToAddress: text("delivered_to_address"),
     isUnassigned: integer("is_unassigned", { mode: "boolean" }).default(sql`0`).notNull()
   },
   (table) => [
@@ -87,10 +84,19 @@ export const messageAttachments = sqliteTable(
     contentType: text("content_type").notNull(),
     sizeBytes: integer("size_bytes").notNull(),
     contentId: text("content_id"),
+    disposition: text("disposition", { enum: ["attachment", "inline"] })
+      .default("attachment")
+      .notNull(),
     r2Key: text("r2_key").notNull(),
     createdAt: text("created_at").notNull()
   },
-  (table) => [index("message_attachments_message_idx").on(table.messageId)]
+  (table) => [
+    check(
+      "message_attachments_disposition_check",
+      sql`${table.disposition} IN ('attachment', 'inline')`
+    ),
+    index("message_attachments_message_idx").on(table.messageId)
+  ]
 );
 
 export const messageChanges = sqliteTable(
@@ -113,9 +119,9 @@ export const drafts = sqliteTable(
   "drafts",
   {
     id: text("id").primaryKey().notNull(),
-    userId: text("user_id")
+    principalId: text("principal_id")
       .notNull()
-      .references(() => users.id, { onDelete: "cascade" }),
+      .references(() => principals.id, { onDelete: "cascade" }),
     mailboxId: text("mailbox_id").references(() => mailboxes.id, { onDelete: "set null" }),
     replyToMessageId: text("reply_to_message_id").references(() => messages.id, {
       onDelete: "set null"
@@ -127,6 +133,15 @@ export const drafts = sqliteTable(
     subject: text("subject").default("").notNull(),
     textBody: text("text_body").default("").notNull(),
     htmlBody: text("html_body").default("").notNull(),
+    signatureMode: text("signature_mode", { enum: ["automatic", "selected", "none"] })
+      .default("none")
+      .notNull(),
+    signatureId: text("signature_id").references(() => emailSignatures.id, {
+      onDelete: "set null"
+    }),
+    signatureNameSnapshot: text("signature_name_snapshot").default("").notNull(),
+    signatureHtmlSnapshot: text("signature_html_snapshot").default("").notNull(),
+    signatureTextSnapshot: text("signature_text_snapshot").default("").notNull(),
     version: integer("version").default(1).notNull(),
     createdAt: text("created_at").notNull(),
     updatedAt: text("updated_at").notNull(),
@@ -135,8 +150,12 @@ export const drafts = sqliteTable(
     })
   },
   (table) => [
-    index("drafts_user_updated_id_idx").on(
-      table.userId,
+    check(
+      "drafts_signature_mode_check",
+      sql`${table.signatureMode} IN ('automatic', 'selected', 'none')`
+    ),
+    index("drafts_principal_updated_id_idx").on(
+      table.principalId,
       sql`${table.updatedAt} DESC`,
       sql`${table.id} DESC`
     ),
@@ -154,10 +173,16 @@ export const draftAttachments = sqliteTable(
     filename: text("filename").notNull(),
     contentType: text("content_type").notNull(),
     sizeBytes: integer("size_bytes").notNull(),
+    contentId: text("content_id"),
     r2Key: text("r2_key").notNull().unique(),
     createdAt: text("created_at").notNull()
   },
-  (table) => [index("draft_attachments_draft_idx").on(table.draftId, table.createdAt)]
+  (table) => [
+    index("draft_attachments_draft_idx").on(table.draftId, table.createdAt),
+    uniqueIndex("draft_attachments_content_id_uidx")
+      .on(table.contentId)
+      .where(sql`${table.contentId} IS NOT NULL`)
+  ]
 );
 
 export const draftChanges = sqliteTable(
@@ -165,12 +190,12 @@ export const draftChanges = sqliteTable(
   {
     sequence: integer("sequence").primaryKey({ autoIncrement: true }),
     draftId: text("draft_id").notNull(),
-    userId: text("user_id").notNull(),
+    principalId: text("principal_id").notNull(),
     kind: text("kind", { enum: ["upsert", "delete"] }).notNull(),
     changedAt: text("changed_at").notNull()
   },
   (table) => [
     check("draft_changes_kind_check", sql`${table.kind} IN ('upsert', 'delete')`),
-    index("draft_changes_user_sequence_idx").on(table.userId, table.sequence)
+    index("draft_changes_principal_sequence_idx").on(table.principalId, table.sequence)
   ]
 );

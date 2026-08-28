@@ -13,6 +13,7 @@ const fullToken = "hqb_access_mcp-hqbase-full-token";
 const fullScopes = ["mail:read", "mail:write", "mail:send"];
 const readToolNames = [
   "list_mailboxes",
+  "list_labels",
   "search_messages",
   "list_conversations",
   "get_message",
@@ -52,32 +53,37 @@ describe("HQBase MCP server", () => {
         userId
       ),
       env.DB.prepare(
-        `INSERT INTO mailboxes (id, address, display_name, is_active, created_at, updated_at)
-         VALUES ('mbx_allowed', 'allowed@example.com', 'Allowed', 1, ?, ?)`
-      ).bind(now.toISOString(), now.toISOString()),
-      env.DB.prepare(
-        `INSERT INTO mailboxes (id, address, display_name, is_active, created_at, updated_at)
-         VALUES ('mbx_hidden', 'hidden@example.com', 'Hidden', 1, ?, ?)`
-      ).bind(now.toISOString(), now.toISOString()),
-      env.DB.prepare(
         `INSERT INTO mail_domains (
           id, name, receiving_status, sending_status, dns_status, is_enabled, created_at, updated_at
         ) VALUES ('dom_example', 'example.com', 'ready', 'ready', 'ready', 1, ?, ?)`
       ).bind(now.toISOString(), now.toISOString()),
       env.DB.prepare(
-        `INSERT INTO mailbox_addresses (
-          id, mailbox_id, mail_domain_id, local_part, address, display_name,
-          receive_enabled, send_enabled, is_primary, created_at, updated_at
-        ) VALUES (
-          'addr_allowed', 'mbx_allowed', 'dom_example', 'allowed', 'allowed@example.com', 'Allowed',
-          1, 1, 1, ?, ?
-        )`
+        `INSERT INTO mailboxes
+         (id, address, mail_domain_id, display_name, is_active, created_at, updated_at)
+         VALUES ('mbx_allowed', 'allowed@example.com', 'dom_example', 'Allowed', 1, ?, ?)`
+      ).bind(now.toISOString(), now.toISOString()),
+      env.DB.prepare(
+        `INSERT INTO mailboxes
+         (id, address, mail_domain_id, display_name, is_active, created_at, updated_at)
+         VALUES ('mbx_hidden', 'hidden@example.com', 'dom_example', 'Hidden', 1, ?, ?)`
       ).bind(now.toISOString(), now.toISOString()),
       env.DB.prepare(
         `INSERT INTO mailbox_grants
-         (mailbox_id, user_id, access_level, created_by, created_at, updated_at)
+         (mailbox_id, principal_id, access_level, created_by_principal_id, created_at, updated_at)
          VALUES ('mbx_allowed', ?, 'agent', ?, ?, ?)`
       ).bind(userId, userId, now.toISOString(), now.toISOString()),
+      env.DB.prepare(
+        `INSERT INTO labels
+         (id, name, color, created_by_user_id, created_at, updated_at)
+         VALUES ('lbl_mcp_customer', 'Customer', 'blue', ?, ?, ?)`
+      ).bind(userId, now.toISOString(), now.toISOString()),
+      env.DB.prepare(
+        `INSERT INTO email_signatures
+         (id, name, html_body, text_body, user_id, is_default, created_by, updated_by,
+          created_at, updated_at)
+         VALUES ('sig_mcp_default', 'MCP default', '<p>MCP signature</p>', 'MCP signature', ?, 1,
+                 ?, ?, ?, ?)`
+      ).bind(userId, userId, userId, now.toISOString(), now.toISOString()),
       env.DB.prepare(
         `INSERT INTO oauthClient
          (id, clientId, disabled, redirectUris, public, requirePKCE, createdAt, updatedAt)
@@ -161,8 +167,12 @@ describe("HQBase MCP server", () => {
         `INSERT INTO threads (id, subject_normalized, last_message_at, created_at, updated_at)
          VALUES
            ('thr_mcp_allowed', 'mcp allowed', ?, ?, ?),
-           ('thr_mcp_unassigned', 'mcp unassigned', ?, ?, ?)`
+           ('thr_mcp_unassigned', 'mcp unassigned', ?, ?, ?),
+           ('thr_mcp_signature', 'mcp signature source', ?, ?, ?)`
       ).bind(
+        now.toISOString(),
+        now.toISOString(),
+        now.toISOString(),
         now.toISOString(),
         now.toISOString(),
         now.toISOString(),
@@ -180,6 +190,23 @@ describe("HQBase MCP server", () => {
           'sender@example.com', ?, '[]', '[]', 'MCP allowed', 'Attachment body',
           'Attachment body', '<mcp-allowed@example.com>', 'mcp-allowed:allowed@example.com',
           NULL, '[]', ?, NULL, NULL, 1, ?, ?
+        )`
+      ).bind(
+        JSON.stringify(["allowed@example.com"]),
+        now.toISOString(),
+        now.toISOString(),
+        now.toISOString()
+      ),
+      env.DB.prepare(
+        `INSERT INTO messages (
+          id, thread_id, mailbox_id, direction, folder, from_address, to_json, cc_json, bcc_json,
+          subject, snippet, text_body, message_id, dedupe_key, in_reply_to, references_json,
+          received_at, sent_at, read_at, has_attachments, created_at, updated_at
+        ) VALUES (
+          'msg_mcp_signature', 'thr_mcp_signature', 'mbx_allowed', 'inbound', 'inbox',
+          'signature-sender@example.com', ?, '[]', '[]', 'MCP signature source', 'Earlier signature body',
+          'Earlier signature body', '<mcp-signature@example.com>', 'mcp-signature:allowed@example.com',
+          NULL, '[]', ?, NULL, NULL, 0, ?, ?
         )`
       ).bind(
         JSON.stringify(["allowed@example.com"]),
@@ -314,11 +341,14 @@ describe("HQBase MCP server", () => {
     expect(await listToolNames(readProfileFullToken)).toEqual(readToolNames);
     expect(await listToolNames(fullToken, "/mcp/full")).toEqual([
       "list_mailboxes",
+      "list_labels",
       "search_messages",
       "list_conversations",
       "get_message",
       "get_thread",
       "get_attachment",
+      "add_label",
+      "remove_label",
       "update_message",
       "update_conversation",
       "list_drafts",
@@ -359,8 +389,48 @@ describe("HQBase MCP server", () => {
   });
 
   it("filters mailbox results through live mailbox grants", async () => {
-    const mailboxes = (await callTool("list_mailboxes", {}, readToken)) as Array<{ id: string }>;
-    expect(mailboxes.map((mailbox) => mailbox.id)).toEqual(["mbx_allowed"]);
+    const mailboxes = (await callTool("list_mailboxes", {}, readToken)) as Array<{
+      address: string;
+      addresses?: unknown;
+      id: string;
+      mailDomainId: string;
+    }>;
+    expect(mailboxes).toEqual([
+      expect.objectContaining({
+        address: "allowed@example.com",
+        id: "mbx_allowed",
+        mailDomainId: "dom_example"
+      })
+    ]);
+    expect(mailboxes[0]).not.toHaveProperty("addresses");
+  });
+
+  it("lists, adds, filters, and removes shared labels", async () => {
+    await expect(callTool("list_labels", {}, readToken)).resolves.toEqual([
+      expect.objectContaining({ color: "blue", id: "lbl_mcp_customer", name: "Customer" })
+    ]);
+
+    await expect(
+      callTool(
+        "add_label",
+        { labelId: "lbl_mcp_customer", messageId: "msg_mcp_allowed", target: "message" },
+        fullToken,
+        "/mcp/full"
+      )
+    ).resolves.toMatchObject({ affected: 1, assigned: true, labelId: "lbl_mcp_customer" });
+    await expect(
+      callTool("search_messages", { labelId: "lbl_mcp_customer" }, readToken)
+    ).resolves.toMatchObject([
+      { id: "msg_mcp_allowed", labels: [expect.objectContaining({ id: "lbl_mcp_customer" })] }
+    ]);
+    await expect(
+      callTool(
+        "remove_label",
+        { labelId: "lbl_mcp_customer", messageId: "msg_mcp_allowed", target: "message" },
+        fullToken,
+        "/mcp/full"
+      )
+    ).resolves.toMatchObject({ affected: 1, assigned: false, labelId: "lbl_mcp_customer" });
   });
 
   it("reads permitted threads and returns bounded embedded attachments", async () => {
@@ -430,8 +500,11 @@ describe("HQBase MCP server", () => {
       },
       fullToken,
       "/mcp/full"
-    )) as { id: string; version: number };
-    expect(created).toMatchObject({ version: 1 });
+    )) as { id: string; signature: { id: string | null; mode: string }; version: number };
+    expect(created).toMatchObject({
+      signature: { id: "sig_mcp_default", mode: "automatic" },
+      version: 1
+    });
 
     const attachment = (await callTool(
       "add_draft_attachment",
@@ -443,8 +516,8 @@ describe("HQBase MCP server", () => {
       },
       fullToken,
       "/mcp/full"
-    )) as { id: string; filename: string };
-    expect(attachment.filename).toBe("draft.txt");
+    )) as { id: string; filename: string; inline: boolean };
+    expect(attachment).toMatchObject({ filename: "draft.txt", inline: false });
 
     const updated = (await callTool(
       "update_draft",
@@ -455,19 +528,222 @@ describe("HQBase MCP server", () => {
       },
       fullToken,
       "/mcp/full"
-    )) as { attachments: Array<{ id: string }>; text: string; version: number };
-    expect(updated).toMatchObject({ text: "Updated review", version: 2 });
+    )) as {
+      attachments: Array<{ id: string }>;
+      signature: { id: string | null; mode: string };
+      text: string;
+      version: number;
+    };
+    expect(updated).toMatchObject({
+      signature: { id: "sig_mcp_default", mode: "automatic" },
+      text: "Updated review",
+      version: 2
+    });
     expect(updated.attachments.map((item) => item.id)).toEqual([attachment.id]);
+
+    const withoutSignature = (await callTool(
+      "update_draft",
+      {
+        draftId: created.id,
+        version: updated.version,
+        signature: { mode: "none" }
+      },
+      fullToken,
+      "/mcp/full"
+    )) as { signature: { id: string | null; mode: string }; version: number };
+    expect(withoutSignature).toMatchObject({
+      signature: { id: null, mode: "none" },
+      version: 3
+    });
 
     await env.DB.prepare(
       "UPDATE mail_domains SET sending_status = 'disabled' WHERE id = 'dom_example'"
     ).run();
     await expect(
       callTool("get_draft", { draftId: created.id }, fullToken, "/mcp/full")
-    ).resolves.toMatchObject({ id: created.id });
+    ).resolves.toMatchObject({
+      id: created.id,
+      signature: { id: null, mode: "none" }
+    });
     await env.DB.prepare(
       "UPDATE mail_domains SET sending_status = 'ready' WHERE id = 'dom_example'"
     ).run();
+  });
+
+  it("stages safe inline draft images with a private HTML source", async () => {
+    const created = (await callTool(
+      "create_draft",
+      {
+        mailboxId: "mbx_allowed",
+        from: "allowed@example.com",
+        to: ["recipient@example.com"],
+        subject: "Inline image from MCP",
+        text: "Flowers"
+      },
+      fullToken,
+      "/mcp/full"
+    )) as { id: string; version: number };
+
+    const attachment = (await callTool(
+      "add_draft_attachment",
+      {
+        draftId: created.id,
+        filename: "flowers.png",
+        contentType: "image/png",
+        contentBase64: "iVBORw0KGgo=",
+        inline: true
+      },
+      fullToken,
+      "/mcp/full"
+    )) as { htmlSrc: string; id: string; inline: boolean };
+    expect(attachment).toMatchObject({
+      htmlSrc: `/api/v2/drafts/${created.id}/attachments/${attachment.id}/inline`,
+      inline: true
+    });
+    await expect(
+      env.DB.prepare("SELECT content_id FROM draft_attachments WHERE id = ?")
+        .bind(attachment.id)
+        .first<{ content_id: string }>()
+    ).resolves.toEqual({ content_id: `${attachment.id}@hqbase.invalid` });
+
+    const updated = (await callTool(
+      "update_draft",
+      {
+        draftId: created.id,
+        version: created.version,
+        html: `<p>Flowers</p><img src="${attachment.htmlSrc}" alt="Flowers">`
+      },
+      fullToken,
+      "/mcp/full"
+    )) as { html: string };
+    expect(updated.html).toContain(attachment.htmlSrc);
+    await expect(
+      callTool(
+        "add_draft_attachment",
+        {
+          draftId: created.id,
+          filename: "spoofed.png",
+          contentType: "image/png",
+          contentBase64: "bm90IGFuIGltYWdl",
+          inline: true
+        },
+        fullToken,
+        "/mcp/full"
+      )
+    ).rejects.toThrow("File cannot be displayed inline.");
+    await expect(
+      env.DB.prepare("SELECT COUNT(*) AS count FROM draft_attachments WHERE draft_id = ?")
+        .bind(created.id)
+        .first<{ count: number }>()
+    ).resolves.toEqual({ count: 1 });
+  });
+
+  it("defaults MCP sends, replies, and forwards to the automatic signature", async () => {
+    const sent = (await callTool(
+      "send_email",
+      {
+        from: "allowed@example.com",
+        to: ["reader@example.net"],
+        subject: "MCP signature send",
+        text: "Send authored"
+      },
+      fullToken,
+      "/mcp/full"
+    )) as { id: string };
+    expect(await storedText(sent.id)).toBe("Send authored\n\nMCP signature");
+
+    const replied = (await callTool(
+      "reply_to_message",
+      {
+        from: "allowed@example.com",
+        messageId: "msg_mcp_signature",
+        text: "Reply authored"
+      },
+      fullToken,
+      "/mcp/full"
+    )) as { id: string };
+    const replyText = await storedText(replied.id);
+    expect(replyText.indexOf("Reply authored")).toBeLessThan(replyText.indexOf("MCP signature"));
+    expect(replyText.indexOf("MCP signature")).toBeLessThan(
+      replyText.indexOf("Earlier signature body")
+    );
+
+    const forwarded = (await callTool(
+      "forward_message",
+      {
+        from: "allowed@example.com",
+        includeOriginalAttachments: false,
+        messageId: "msg_mcp_signature",
+        text: "Forward authored",
+        to: ["reader@example.net"]
+      },
+      fullToken,
+      "/mcp/full"
+    )) as { id: string };
+    const forwardText = await storedText(forwarded.id);
+    expect(forwardText.indexOf("Forward authored")).toBeLessThan(
+      forwardText.indexOf("MCP signature")
+    );
+    expect(forwardText.indexOf("MCP signature")).toBeLessThan(
+      forwardText.indexOf("Forwarded message")
+    );
+
+    const savedForwardDraft = (await callTool(
+      "create_draft",
+      {
+        mailboxId: "mbx_allowed",
+        forwardOfMessageId: "msg_mcp_allowed",
+        from: "allowed@example.com",
+        subject: "Fwd: MCP allowed",
+        text: "Saved forward authored",
+        to: ["reader@example.net"]
+      },
+      fullToken,
+      "/mcp/full"
+    )) as { id: string };
+    const savedForward = (await callTool(
+      "send_email",
+      {
+        attachmentIds: [],
+        draftId: savedForwardDraft.id,
+        from: "allowed@example.com",
+        subject: "Fwd: MCP allowed",
+        text: "Saved forward authored",
+        to: ["reader@example.net"]
+      },
+      fullToken,
+      "/mcp/full"
+    )) as { id: string };
+    const savedForwardText = await storedText(savedForward.id);
+    expect(savedForwardText.indexOf("Saved forward authored")).toBeLessThan(
+      savedForwardText.indexOf("MCP signature")
+    );
+    expect(savedForwardText.indexOf("MCP signature")).toBeLessThan(
+      savedForwardText.indexOf("Forwarded message")
+    );
+    const savedForwardAttachments = await env.DB.prepare(
+      "SELECT filename FROM message_attachments WHERE message_id = ? ORDER BY filename"
+    )
+      .bind(savedForward.id)
+      .all<{ filename: string }>();
+    expect(savedForwardAttachments.results).toEqual([{ filename: "hello.txt" }]);
+    expect(
+      await env.DB.prepare("SELECT id FROM drafts WHERE id = ?").bind(savedForwardDraft.id).first()
+    ).toBeNull();
+
+    const unsigned = (await callTool(
+      "send_email",
+      {
+        from: "allowed@example.com",
+        signature: { mode: "none" },
+        subject: "MCP unsigned send",
+        text: "Unsigned body",
+        to: ["reader@example.net"]
+      },
+      fullToken,
+      "/mcp/full"
+    )) as { id: string };
+    expect(await storedText(unsigned.id)).toBe("Unsigned body");
   });
 
   it("applies conversation actions through agent access", async () => {
@@ -545,6 +821,14 @@ async function callTool(
     throw new Error(payload.result.content?.[0]?.text ?? `${name} failed without an error body.`);
   }
   return JSON.parse(payload.result?.content?.[0]?.text ?? "null") as unknown;
+}
+
+async function storedText(messageId: string): Promise<string> {
+  const row = await env.DB.prepare("SELECT text_body FROM messages WHERE id = ?")
+    .bind(messageId)
+    .first<{ text_body: string }>();
+  if (!row) throw new Error("MCP sent message was not stored.");
+  return row.text_body;
 }
 
 function mcpRequest(body: unknown, accessToken?: string, endpoint = "/mcp"): Promise<Response> {

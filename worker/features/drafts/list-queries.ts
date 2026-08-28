@@ -3,6 +3,7 @@ import { type SQL, sql } from "drizzle-orm";
 import { getRows } from "../../db/drizzle";
 import { AppError } from "../../lib/errors";
 import { decodeKeysetCursor, encodeKeysetCursor } from "../messages/keyset-cursor";
+import { literalContains } from "../messages/search";
 import { attachmentsForDrafts, type DraftRow, mapAttachment, mapDraftRow } from "./queries";
 import type { Draft, DraftAttachment } from "./types";
 
@@ -23,10 +24,24 @@ function decodeDraftCursor(value: string) {
 
 export async function listDraftPage(
   db: D1Database,
-  userId: string,
-  input: { cursor?: string | undefined; limit?: number | undefined } = {}
+  principalId: string,
+  input: {
+    cursor?: string | undefined;
+    limit?: number | undefined;
+    search?: string | undefined;
+  } = {}
 ): Promise<DraftPage> {
-  const where: SQL[] = [sql`user_id = ${userId}`];
+  const where: SQL[] = [sql`principal_id = ${principalId}`];
+  if (input.search) {
+    where.push(sql`(
+      ${literalContains(sql`subject`, input.search)}
+      OR ${literalContains(sql`from_address`, input.search)}
+      OR ${literalContains(sql`to_json`, input.search)}
+      OR ${literalContains(sql`cc_json`, input.search)}
+      OR ${literalContains(sql`bcc_json`, input.search)}
+      OR ${literalContains(sql`text_body`, input.search)}
+    )`);
+  }
   const cursor = input.cursor ? decodeDraftCursor(input.cursor) : null;
   if (cursor) {
     where.push(
@@ -59,7 +74,7 @@ export async function listDraftPage(
 
 export async function getDraftsByIds(
   db: D1Database,
-  userId: string,
+  principalId: string,
   ids: string[]
 ): Promise<Draft[]> {
   if (ids.length === 0) return [];
@@ -70,7 +85,7 @@ export async function getDraftsByIds(
       ...(await getRows<DraftRow>(
         db,
         sql`SELECT * FROM drafts
-            WHERE user_id = ${userId}
+            WHERE principal_id = ${principalId}
               AND id IN (${sql.join(
                 batch.map((id) => sql`${id}`),
                 sql`, `

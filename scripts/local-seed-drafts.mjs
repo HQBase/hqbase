@@ -7,7 +7,7 @@ export function buildDraftSeedLines(timeline) {
       "drafts",
       [
         "id",
-        "user_id",
+        "principal_id",
         "mailbox_id",
         "reply_to_message_id",
         "from_address",
@@ -44,7 +44,7 @@ export function buildDraftSeedLines(timeline) {
       "drafts",
       [
         "id",
-        "user_id",
+        "principal_id",
         "mailbox_id",
         "reply_to_message_id",
         "from_address",
@@ -62,9 +62,9 @@ export function buildDraftSeedLines(timeline) {
       [
         "drf_local_hiring_reply",
         users[2].id,
-        mailboxes[3].id,
+        mailboxes[6].id,
         "msg_local_hiring_inbound",
-        mailboxes[3].address,
+        mailboxes[6].address,
         ["talent@agency.test"],
         [mailboxes[0].address],
         [],
@@ -81,7 +81,7 @@ export function buildDraftSeedLines(timeline) {
       "drafts",
       [
         "id",
-        "user_id",
+        "principal_id",
         "mailbox_id",
         "reply_to_message_id",
         "from_address",
@@ -118,7 +118,7 @@ export function buildDraftSeedLines(timeline) {
       "drafts",
       [
         "id",
-        "user_id",
+        "principal_id",
         "mailbox_id",
         "reply_to_message_id",
         "from_address",

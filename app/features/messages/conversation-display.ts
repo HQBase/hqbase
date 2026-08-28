@@ -12,7 +12,7 @@ export function conversationActivityTimestamp(conversation: ConversationSummary)
 
 export function correspondentLabel(conversation: ConversationSummary): string {
   if (conversation.direction === "inbound") {
-    return displayNameFromAddress(conversation.fromAddress) || "Unknown sender";
+    return conversation.fromName?.trim() || conversation.fromAddress.trim() || "Unknown sender";
   }
   return `To: ${displayNameFromAddress(conversation.to[0] ?? "") || "recipient"}`;
 }

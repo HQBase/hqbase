@@ -4,11 +4,16 @@ import { PiPaperclip, PiPaperPlaneTilt, PiTrash } from "react-icons/pi";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import type { DraftAttachment } from "@/features/drafts/types";
+import type { MessageDetail } from "@/features/messages/types";
+import { ComposeSignature } from "@/features/signatures/compose-signature";
+import type { SignatureSelection, SignatureSnapshot } from "@/features/signatures/types";
 import { cn } from "@/lib/cn";
 import { AttachmentList } from "./attachment-list";
 import { ComposeFields, type SendingIdentity } from "./compose-fields";
 import { submitComposeOnShortcut } from "./compose-shortcuts";
 import type { ComposeMode } from "./compose-state";
+import type { RichEmailImage } from "./email-images";
+import { ReplyQuotePreview } from "./reply-quote-preview";
 import { RichEmailEditor } from "./rich-email-editor";
 
 type ComposeFormProps = {
@@ -18,20 +23,27 @@ type ComposeFormProps = {
   contextLabel: string | null;
   formId: string;
   from: string;
+  fromDisabled: boolean;
   html: string;
   identities: SendingIdentity[];
   isPending: boolean;
   mode: ComposeMode;
   presentation: "window" | "thread";
   ready: boolean;
+  replyMessage: MessageDetail | null;
   sendDisabled: boolean;
+  signatureDisabled: boolean;
+  signature: SignatureSnapshot;
   subject: string;
   threadContext?: React.ReactNode;
   to: string;
   onDiscard: () => void;
   onEditorChange: (html: string, text: string) => void;
-  onFiles: (files: File[]) => void;
+  onFiles: (files: File[]) => Promise<void> | void;
+  onImages: (files: File[], currentHtml: string) => Promise<RichEmailImage[]>;
   onRemoveAttachment: (attachment: DraftAttachment) => void;
+  onManageSignatures: () => void;
+  onSetSignature: (selection: SignatureSelection) => Promise<void> | void;
   onSetBcc: (value: string) => void;
   onSetCc: (value: string) => void;
   onSetFrom: (value: string) => void;
@@ -66,6 +78,7 @@ export function ComposeForm(props: ComposeFormProps): React.ReactElement {
             identities={props.identities}
             mode={props.mode}
             from={props.from}
+            fromDisabled={props.fromDisabled}
             to={props.to}
             cc={props.cc}
             bcc={props.bcc}
@@ -80,14 +93,23 @@ export function ComposeForm(props: ComposeFormProps): React.ReactElement {
             contained={props.presentation === "window"}
             html={props.html}
             onFiles={props.onFiles}
+            onImages={props.onImages}
             onChange={props.onEditorChange}
           />
+          <ComposeSignature
+            disabled={props.isPending || props.signatureDisabled}
+            from={props.from}
+            signature={props.signature}
+            onManage={props.onManageSignatures}
+            onSelectionChange={props.onSetSignature}
+          />
+          {props.replyMessage ? <ReplyQuotePreview message={props.replyMessage} /> : null}
           <AttachmentList attachments={props.attachments} onRemove={props.onRemoveAttachment} />
           <footer
             className={cn(
               "flex items-center justify-between gap-2 border-t bg-background/50 px-5 py-3",
               props.presentation === "window" &&
-                "pb-[max(1rem,env(safe-area-inset-bottom))] md:pb-3"
+                "pb-[max(1rem,env(safe-area-inset-bottom))] lg:pb-3"
             )}
           >
             <div className="flex gap-2">
@@ -113,7 +135,7 @@ export function ComposeForm(props: ComposeFormProps): React.ReactElement {
                     multiple
                     type="file"
                     onChange={(event) => {
-                      props.onFiles(Array.from(event.target.files ?? []));
+                      void props.onFiles(Array.from(event.target.files ?? []));
                       event.currentTarget.value = "";
                     }}
                   />

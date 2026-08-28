@@ -11,6 +11,7 @@ import {
   publishMessageMailEvent,
   scheduleMailEvent
 } from "../events/service";
+import { requireLabel, withConversationLabels, withMessageLabels } from "../labels/queries";
 import { listMailboxesForUser } from "../mailboxes/queries";
 import { requireAttachmentAccess, requireMessageAccess } from "../messages/access";
 import { listConversations, updateConversationAction } from "../messages/conversation-queries";
@@ -23,7 +24,7 @@ import {
   updateMessageAction
 } from "../messages/queries";
 import { conversationFolders } from "../messages/types";
-
+import { registerLabelReadTool, registerLabelWriteTools } from "./mail-label-tools";
 import type { McpPrincipal } from "./route";
 import { attachmentResult, toolResult } from "./tool-result";
 
@@ -63,6 +64,8 @@ function registerReadTools(server: McpServer, env: WorkerEnv, principal: McpPrin
       })
   );
 
+  registerLabelReadTool(server, env);
+
   server.registerTool(
     "search_messages",
     {
@@ -70,6 +73,7 @@ function registerReadTools(server: McpServer, env: WorkerEnv, principal: McpPrin
         "Search recent individual messages across mailboxes where the user has read access.",
       inputSchema: {
         folder: z.enum(["inbox", "sent", "archived", "trash", "catchall"]).optional(),
+        labelId: z.string().min(1).max(100).optional(),
         mailboxId: z.string().min(1).max(100).optional(),
         query: z.string().trim().min(1).max(200).optional(),
         limit: z.number().int().min(1).max(100).default(25)
@@ -78,19 +82,22 @@ function registerReadTools(server: McpServer, env: WorkerEnv, principal: McpPrin
     },
     (input) =>
       toolResult(async () => {
+        if (input.labelId) await requireLabel(env.DB, input.labelId);
         const scope = await accessibleMessageScope(
           env.DB,
           principal.userId,
           principal.role,
           "read"
         );
-        return listMessages(env.DB, {
+        const messages = await listMessages(env.DB, {
           folder: input.folder,
+          labelId: input.labelId,
           mailboxId: input.mailboxId,
           scope,
           search: input.query,
           limit: input.limit
         });
+        return withMessageLabels(env.DB, messages);
       })
   );
 
@@ -101,6 +108,7 @@ function registerReadTools(server: McpServer, env: WorkerEnv, principal: McpPrin
         "List recent mailbox conversations with aggregate unread, star, attachment, and count state.",
       inputSchema: {
         folder: conversationFolderSchema.optional(),
+        labelId: z.string().min(1).max(100).optional(),
         mailboxId: z.string().min(1).max(100).optional(),
         query: z.string().trim().min(1).max(200).optional()
       },
@@ -108,18 +116,21 @@ function registerReadTools(server: McpServer, env: WorkerEnv, principal: McpPrin
     },
     (input) =>
       toolResult(async () => {
+        if (input.labelId) await requireLabel(env.DB, input.labelId);
         const scope = await accessibleMessageScope(
           env.DB,
           principal.userId,
           principal.role,
           "read"
         );
-        return listConversations(env.DB, {
+        const conversations = await listConversations(env.DB, {
           folder: input.folder,
+          labelId: input.labelId,
           mailboxId: input.mailboxId,
           scope,
           search: input.query
         });
+        return withConversationLabels(env.DB, conversations, scope);
       })
   );
 
@@ -149,7 +160,8 @@ function registerReadTools(server: McpServer, env: WorkerEnv, principal: McpPrin
           principal.role,
           "read"
         );
-        return Promise.all(
+        return withMessageLabels(
+          env.DB,
           (await listThreadMessages(env.DB, message.threadId, scope)).map(publicMessage)
         );
       })
@@ -190,6 +202,8 @@ function registerWriteTools(
   principal: McpPrincipal,
   schedule: MailEventScheduler
 ): void {
+  registerLabelWriteTools(server, env, principal, schedule);
+
   server.registerTool(
     "update_message",
     {
@@ -260,7 +274,9 @@ async function readMessage(env: WorkerEnv, principal: McpPrincipal, messageId: s
   await requireMessageAccess(env.DB, principal.userId, principal.role, messageId, "read");
   const message = await getMessageDetail(env.DB, messageId);
   if (!message) throw new AppError("MESSAGE_NOT_FOUND", "Message not found.", 404);
-  return publicMessage(message);
+  const [result] = await withMessageLabels(env.DB, [publicMessage(message)]);
+  if (!result) throw new AppError("MESSAGE_NOT_FOUND", "Message not found.", 404);
+  return result;
 }
 
 function recordMutation(

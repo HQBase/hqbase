@@ -2,6 +2,9 @@ import * as React from "react";
 import { PiArrowLeft } from "react-icons/pi";
 
 import { Button } from "@/components/ui/button";
+import { setConversationLabel } from "@/features/labels/api";
+import { LabelFilter } from "@/features/labels/label-controls";
+import type { MailLabel } from "@/features/labels/types";
 import type { Mailbox } from "@/features/mailboxes/types";
 import { getMessageThread, runConversationAction } from "@/features/messages/api";
 import { MessageDetail } from "@/features/messages/message-detail";
@@ -11,8 +14,8 @@ import type {
   ConversationSummary,
   MessageDetail as MessageDetailType
 } from "@/features/messages/types";
-import type { MailFolderId } from "@/lib/routes";
-import { mailFolders } from "@/lib/routes";
+import { type MailFolderId, mailFolders } from "@/lib/routes";
+import { CatchAllPolicyNotice } from "./catch-all-policy-notice";
 
 type InboxPageProps = {
   activeFolder: MailFolderId;
@@ -20,16 +23,21 @@ type InboxPageProps = {
   defaultFromMailboxId: string | null;
   hasMore: boolean;
   isLoadingMore: boolean;
+  labelIds?: readonly string[];
+  labels?: MailLabel[];
   loadMoreError: string | null;
   mailboxes: Mailbox[];
   selectedId: string | null;
   onDraftsChange?: () => void;
   onConversationAction: (threadId: string, action: ConversationAction, affected: number) => void;
+  onConversationLabelsChange?: (threadId: string, labels: MailLabel[]) => void;
   onLoadMore: () => void;
+  onLabelChange?: (labelIds: string[]) => void;
   onRefresh: () => Promise<void> | void;
   onMessageRouteChange: (folder: MailFolderId, messageId: string | null) => void;
   onSelect: (messageId: string) => void;
   totalCount: number | null;
+  canOrganizeConversation?: (mailboxId: string | null) => boolean;
 };
 
 export function InboxPage({
@@ -38,16 +46,21 @@ export function InboxPage({
   defaultFromMailboxId,
   hasMore,
   isLoadingMore,
+  labelIds = [],
+  labels = [],
   loadMoreError,
   mailboxes,
   selectedId,
   onDraftsChange,
   onConversationAction,
+  onConversationLabelsChange = () => undefined,
   onLoadMore,
+  onLabelChange = () => undefined,
   onRefresh,
   onMessageRouteChange,
   onSelect,
-  totalCount
+  totalCount,
+  canOrganizeConversation = () => false
 }: InboxPageProps): React.ReactElement {
   const activeLabel = mailFolders.find((folder) => folder.id === activeFolder)?.label ?? "Messages";
   const conversationCountLabel =
@@ -124,6 +137,7 @@ export function InboxPage({
     (conversation) => conversation.threadId === selectedThreadId
   );
   const readerSelectedId = selectedConversation?.id ?? selectedId;
+  const selectedMailboxId = selectedConversation?.mailboxId ?? thread.at(-1)?.mailboxId ?? null;
 
   React.useEffect(() => {
     if (
@@ -167,7 +181,6 @@ export function InboxPage({
     }
     await loadThread(selectedId);
   }
-
   if (selectedId) {
     return (
       <div className="flex h-full flex-col bg-reader">
@@ -206,8 +219,11 @@ export function InboxPage({
             error={detailError}
             isLoading={detailLoading}
             key={selectedId}
+            canOrganizeLabels={canOrganizeConversation(selectedMailboxId)}
+            labels={labels}
             mailboxes={mailboxes}
             messages={thread}
+            routeMessageId={selectedId}
             selectedId={readerSelectedId}
             showBack
             onAction={handleAction}
@@ -216,6 +232,16 @@ export function InboxPage({
             onRefresh={async () => {
               await onRefresh();
               if (selectedId) await loadThread(selectedId);
+            }}
+            onToggleLabel={async (label, assigned) => {
+              const result = await setConversationLabel(
+                readerSelectedId ?? selectedId,
+                label.id,
+                assigned
+              );
+              onConversationLabelsChange(result.threadId, result.labels);
+              await onRefresh();
+              await loadThread(selectedId);
             }}
             onSent={() => {
               void Promise.resolve(onRefresh()).catch(() => undefined);
@@ -230,13 +256,24 @@ export function InboxPage({
   return (
     <div className="flex h-full flex-col bg-list" data-mobile-view="message-list">
       <div className="flex h-11 shrink-0 items-center border-b border-divider bg-toolbar">
-        <div className="mx-auto flex w-full max-w-[960px] items-center justify-between gap-3 px-4 sm:px-6 lg:px-8">
-          <span className="text-sm font-medium text-foreground">{activeLabel}</span>
+        <div
+          className="mx-auto grid w-full max-w-[960px] grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-4 sm:grid-cols-[2rem_minmax(7rem,18%)_1rem_minmax(0,1fr)_1.75rem_4rem] sm:gap-x-1.5 sm:px-9 lg:px-11"
+          data-inbox-header-layout
+        >
+          <span className="min-w-0 truncate text-sm font-medium text-foreground sm:col-span-2 sm:col-start-1">
+            {activeLabel}
+          </span>
+          <div className="col-start-2 flex min-w-0 items-center justify-end sm:col-start-4 sm:row-start-1">
+            <LabelFilter labels={labels} values={labelIds} onChange={onLabelChange} />
+          </div>
           {conversationCountLabel ? (
-            <span className="text-[12px] tabular-nums text-tertiary">{conversationCountLabel}</span>
+            <span className="hidden shrink-0 justify-self-end whitespace-nowrap text-[12px] tabular-nums text-tertiary sm:col-span-2 sm:col-start-5 sm:row-start-1 sm:inline">
+              {conversationCountLabel}
+            </span>
           ) : null}
         </div>
       </div>
+      {activeFolder === "catchall" ? <CatchAllPolicyNotice /> : null}
       <div className="min-h-0 flex-1 overflow-hidden">
         <MessageList
           activeFolder={activeFolder}
@@ -249,6 +286,13 @@ export function InboxPage({
           onRefresh={onRefresh}
           onSelect={(conversation) => onSelect(conversation.id)}
           onToggleStar={handleStarToggle}
+          onToggleLabel={async (conversation, label, assigned) => {
+            const result = await setConversationLabel(conversation.id, label.id, assigned);
+            onConversationLabelsChange(result.threadId, result.labels);
+            await onRefresh();
+          }}
+          canOrganizeConversation={canOrganizeConversation}
+          labels={labels}
         />
       </div>
     </div>

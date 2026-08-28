@@ -2,7 +2,8 @@ import { signUpOwnerUser } from "../../auth/user-actions";
 import type { WorkerEnv } from "../../lib/env";
 import { AppError } from "../../lib/errors";
 import { assertLoginEmailOutsideDomains } from "../../security/login-email";
-import { upsertMailDomain } from "../domains/queries";
+import { updateMailDomainSettings, upsertMailDomain } from "../domains/queries";
+import type { CatchAllPolicy, MailDomain } from "../domains/types";
 import { createMailbox } from "../mailboxes/service";
 import type { Mailbox } from "../mailboxes/types";
 import { setDefaultFromMailboxId } from "../preferences/queries";
@@ -32,6 +33,8 @@ type BootstrapInput = {
         name: string;
         zoneId?: string | null | undefined;
         accountId?: string | null | undefined;
+        catchAllPolicy?: CatchAllPolicy | undefined;
+        catchAllMailboxAddress?: string | null | undefined;
       }>
     | undefined;
   checklistAcknowledged: boolean;
@@ -65,13 +68,15 @@ export async function bootstrapSetup(
       domains.map((domain) => domain.name)
     );
 
+    const createdDomains = new Map<string, MailDomain>();
     for (const domain of domains) {
-      await upsertMailDomain(env.DB, {
+      const createdDomain = await upsertMailDomain(env.DB, {
         ...domain,
         receivingStatus: "ready",
         sendingStatus: "ready",
         dnsStatus: "ready"
       });
+      createdDomains.set(createdDomain.name, createdDomain);
     }
 
     await heartbeat.renew();
@@ -99,6 +104,18 @@ export async function bootstrapSetup(
     const mailboxes: Mailbox[] = [];
     for (const mailbox of input.mailboxes) {
       mailboxes.push(await createMailbox(env.DB, mailbox));
+    }
+    for (const domainInput of domains) {
+      const domain = createdDomains.get(domainInput.name);
+      if (!domain) throw new Error("Setup domain did not persist.");
+      const catchAllPolicy = domainInput.catchAllPolicy ?? "unassigned";
+      const catchAllMailbox = mailboxes.find(
+        (mailbox) => mailbox.address === domainInput.catchAllMailboxAddress
+      );
+      await updateMailDomainSettings(env.DB, domain.id, {
+        catchAllPolicy,
+        catchAllMailboxId: catchAllPolicy === "mailbox" ? (catchAllMailbox?.id ?? null) : null
+      });
     }
     const defaultFromMailbox = mailboxes.find(
       (mailbox) => mailbox.address === input.defaultFromMailboxAddress

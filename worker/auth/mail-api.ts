@@ -1,20 +1,34 @@
 import type { WorkerEnv } from "../lib/env";
 import { AppError } from "../lib/errors";
 
-import { authOrigin, mailApiResource } from "./auth";
+import {
+  AgentBearerError,
+  agentCredentialPrefix,
+  authenticateAgentBearer
+} from "./agent-credential";
+import { authOrigin, mailApiResource, mailApiV1Resource } from "./auth";
 import { authenticateOAuthBearer, OAuthBearerError } from "./oauth-principal";
+import { type AgentPrincipal, type HumanPrincipal, humanPrincipal } from "./principal";
 import { type AuthContext, requireAuthContext } from "./session";
 
 const mailApiScopes = ["mail:read", "mail:write", "mail:send"] as const;
 export type MailApiScope = (typeof mailApiScopes)[number];
-const mailApiMetadataPath = "/.well-known/oauth-protected-resource/api/v1";
+const mailApiMetadataPrefix = "/.well-known/oauth-protected-resource";
 const agentSkillPath = "/skills/hqbase-mail/SKILL.md";
 
-export type MailApiPrincipal = {
-  auth: AuthContext;
-  authentication: "bearer" | "session";
-  scopes: ReadonlySet<MailApiScope>;
-};
+export type MailApiPrincipal =
+  | {
+      principal: HumanPrincipal;
+      auth: AuthContext;
+      authentication: "bearer" | "session";
+      scopes: ReadonlySet<MailApiScope>;
+    }
+  | {
+      principal: AgentPrincipal;
+      auth: null;
+      authentication: "agent";
+      scopes: ReadonlySet<MailApiScope>;
+    };
 
 export class MailApiAuthError extends AppError {
   readonly authError: "invalid_token" | "insufficient_scope" | null;
@@ -39,7 +53,15 @@ export async function requireMailApiContext(
   request: Request,
   requiredScope: MailApiScope
 ): Promise<AuthContext> {
-  return (await requireMailApiPrincipal(env, request, requiredScope)).auth;
+  const result = await requireMailApiPrincipal(env, request, requiredScope);
+  if (result.auth) return result.auth;
+  throw new MailApiAuthError(
+    "AGENT_PRINCIPAL_NOT_SUPPORTED",
+    "This endpoint does not accept a machine agent credential.",
+    403,
+    requiredScope,
+    null
+  );
 }
 
 export async function requireMailApiPrincipal(
@@ -48,8 +70,10 @@ export async function requireMailApiPrincipal(
   requiredScope: MailApiScope
 ): Promise<MailApiPrincipal> {
   if (!isVersionedMailApiRequest(request)) {
+    const auth = await requireAuthContext(env, request);
     return {
-      auth: await requireAuthContext(env, request),
+      principal: humanPrincipal(auth),
+      auth,
       authentication: "session",
       scopes: new Set(mailApiScopes)
     };
@@ -57,8 +81,10 @@ export async function requireMailApiPrincipal(
 
   if (!request.headers.has("authorization")) {
     try {
+      const auth = await requireAuthContext(env, request);
       return {
-        auth: await requireAuthContext(env, request),
+        principal: humanPrincipal(auth),
+        auth,
         authentication: "session",
         scopes: new Set(mailApiScopes)
       };
@@ -76,10 +102,46 @@ export async function requireMailApiPrincipal(
     }
   }
 
+  if (mailApiBasePath(request) === "/api/v2" && isAgentBearer(request)) {
+    try {
+      const result = await authenticateAgentBearer(request, env, {
+        allowedScopes: mailApiScopes,
+        resource: "mail"
+      });
+      if (!result.scopes.has(requiredScope)) {
+        throw new MailApiAuthError(
+          "INSUFFICIENT_SCOPE",
+          `The ${requiredScope} permission is required.`,
+          403,
+          requiredScope,
+          "insufficient_scope"
+        );
+      }
+      return {
+        principal: result.principal,
+        auth: null,
+        authentication: "agent",
+        scopes: mailScopes(result.scopes)
+      };
+    } catch (error) {
+      if (error instanceof MailApiAuthError) throw error;
+      if (error instanceof AgentBearerError) {
+        throw new MailApiAuthError(
+          "INVALID_AGENT_CREDENTIAL",
+          "Agent bearer credential is invalid or inactive.",
+          401,
+          requiredScope,
+          "invalid_token"
+        );
+      }
+      throw error;
+    }
+  }
+
   try {
     const principal = await authenticateOAuthBearer(request, env, {
       allowedScopes: mailApiScopes,
-      resource: mailApiResource(env, request)
+      resource: mailApiResourceForRequest(env, request)
     });
     if (!principal.scopes.has(requiredScope)) {
       throw new MailApiAuthError(
@@ -90,14 +152,12 @@ export async function requireMailApiPrincipal(
         "insufficient_scope"
       );
     }
+    const auth = { session: principal.session, user: principal.user };
     return {
-      auth: { session: principal.session, user: principal.user },
+      principal: humanPrincipal(auth),
+      auth,
       authentication: "bearer",
-      scopes: new Set(
-        [...principal.scopes].filter((scope): scope is MailApiScope =>
-          mailApiScopes.includes(scope as MailApiScope)
-        )
-      )
+      scopes: mailScopes(principal.scopes)
     };
   } catch (error) {
     if (error instanceof MailApiAuthError) throw error;
@@ -114,9 +174,33 @@ export async function requireMailApiPrincipal(
   }
 }
 
+function isAgentBearer(request: Request): boolean {
+  const authorization = request.headers.get("authorization") ?? "";
+  return (
+    authorization
+      .match(/^Bearer\s+(.+)$/iu)?.[1]
+      ?.trim()
+      .startsWith(agentCredentialPrefix) ?? false
+  );
+}
+
+function mailScopes(scopes: ReadonlySet<string>): ReadonlySet<MailApiScope> {
+  return new Set(
+    [...scopes].filter((scope): scope is MailApiScope =>
+      mailApiScopes.includes(scope as MailApiScope)
+    )
+  );
+}
+
 export function isVersionedMailApiRequest(request: Request): boolean {
+  return mailApiBasePath(request) !== null;
+}
+
+export function mailApiBasePath(request: Request): "/api/v1" | "/api/v2" | null {
   const pathname = new URL(request.url).pathname;
-  return pathname === "/api/v1" || pathname.startsWith("/api/v1/");
+  if (pathname === "/api/v1" || pathname.startsWith("/api/v1/")) return "/api/v1";
+  if (pathname === "/api/v2" || pathname.startsWith("/api/v2/")) return "/api/v2";
+  return null;
 }
 
 export function mailApiChallenge(
@@ -124,8 +208,9 @@ export function mailApiChallenge(
   request: Request,
   error: MailApiAuthError
 ): string {
+  const basePath = mailApiBasePath(request) ?? "/api/v2";
   const parameters = [
-    `resource_metadata="${authOrigin(env, request)}${mailApiMetadataPath}"`,
+    `resource_metadata="${authOrigin(env, request)}${mailApiMetadataPrefix}${basePath}"`,
     `scope="${error.requiredScope}"`
   ];
   if (error.authError) parameters.push(`error="${error.authError}"`);
@@ -133,11 +218,14 @@ export function mailApiChallenge(
 }
 
 export function handleMailApiMetadata(request: Request, env: WorkerEnv): Response | null {
-  if (new URL(request.url).pathname !== mailApiMetadataPath) return null;
+  const pathname = new URL(request.url).pathname;
+  const basePath = pathname.slice(mailApiMetadataPrefix.length);
+  if (basePath !== "/api/v1" && basePath !== "/api/v2") return null;
   const origin = authOrigin(env, request);
   return Response.json(
     {
-      resource: mailApiResource(env, request),
+      resource:
+        basePath === "/api/v1" ? mailApiV1Resource(env, request) : mailApiResource(env, request),
       authorization_servers: [`${origin}/api/auth`],
       scopes_supported: mailApiScopes,
       bearer_methods_supported: ["header"],
@@ -152,4 +240,10 @@ export function handleMailApiMetadata(request: Request, env: WorkerEnv): Respons
       }
     }
   );
+}
+
+function mailApiResourceForRequest(env: WorkerEnv, request: Request): string {
+  return mailApiBasePath(request) === "/api/v1"
+    ? mailApiV1Resource(env, request)
+    : mailApiResource(env, request);
 }

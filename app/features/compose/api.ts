@@ -12,7 +12,7 @@ export async function sendMessage(input: {
   attachmentIds?: string[];
   draftId?: string;
 }): Promise<MessageSummary> {
-  return apiPost<MessageSummary>("/api/v1/send", input);
+  return apiPost<MessageSummary>("/api/v2/send", input);
 }
 
 export async function replyToMessage(input: {
@@ -26,5 +26,5 @@ export async function replyToMessage(input: {
   attachmentIds?: string[];
   draftId?: string;
 }): Promise<MessageSummary> {
-  return apiPost<MessageSummary>("/api/v1/reply", input);
+  return apiPost<MessageSummary>("/api/v2/reply", input);
 }

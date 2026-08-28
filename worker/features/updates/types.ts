@@ -6,6 +6,7 @@ export type ReleaseManifest = {
   schemaVersion: number;
   minVersion: string;
   publishedAt: string;
+  notes: string[];
   notesUrl: string;
   artifact: { url: string; sha256: string; size: number };
   keyId: string;

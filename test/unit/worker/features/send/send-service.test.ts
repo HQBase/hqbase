@@ -4,12 +4,16 @@ vi.mock("@worker/db/client", () => ({
   newId: vi.fn(() => "html-1"),
   nowIso: vi.fn(() => "2026-07-10T00:00:00.000Z")
 }));
+vi.mock("@worker/db/drizzle", () => ({
+  createDatabase: vi.fn(),
+  getRows: vi.fn()
+}));
 
+vi.mock("@worker/features/drafts/attachment-lookups", () => ({
+  draftAttachmentObjects: vi.fn()
+}));
 vi.mock("@worker/features/mailboxes/queries", () => ({
   findMailboxForSending: vi.fn()
-}));
-vi.mock("@worker/features/mailboxes/address-queries", () => ({
-  findAddressIdentity: vi.fn().mockResolvedValue(null)
 }));
 vi.mock("@worker/features/messages/queries", () => ({
   getMessageDetail: vi.fn(),
@@ -22,6 +26,8 @@ vi.mock("@worker/features/messages/threading", () => ({
   touchThread: vi.fn()
 }));
 
+import { createDatabase, getRows } from "@worker/db/drizzle";
+import { draftAttachmentObjects } from "@worker/features/drafts/attachment-lookups";
 import { findMailboxForSending } from "@worker/features/mailboxes/queries";
 import {
   getMessageDetail,
@@ -34,12 +40,14 @@ import { replyToMessage, sendNewMessage } from "@worker/features/send/service";
 import type { WorkerEnv } from "@worker/lib/env";
 
 const mailbox = {
-  addresses: [],
   address: "support@example.com",
   createdAt: "2026-07-10T00:00:00.000Z",
+  deletedAt: null,
   displayName: "Support",
   id: "mailbox-1",
+  kind: "human" as const,
   isActive: true,
+  mailDomainId: "domain-1",
   updatedAt: "2026-07-10T00:00:00.000Z"
 };
 
@@ -48,6 +56,7 @@ const sentSummary = {
   direction: "outbound" as const,
   folder: "sent" as const,
   fromAddress: mailbox.address,
+  fromName: mailbox.displayName,
   hasAttachments: false,
   id: "message-1",
   mailboxId: mailbox.id,
@@ -63,6 +72,8 @@ const sentSummary = {
 
 describe("send service", () => {
   const send = vi.fn();
+  const deleteObject = vi.fn();
+  const deleteDraftRun = vi.fn();
   const get = vi.fn();
   const put = vi.fn();
   const env = {
@@ -76,7 +87,7 @@ describe("send service", () => {
       "https://github.com/HQBase/hqbase/releases/latest/download/stable.json",
     HQBASE_WORKER_NAME: "hqbase",
     MAIL_EVENTS: {} as WorkerEnv["MAIL_EVENTS"],
-    MAIL_OBJECTS: { get, put } as unknown as R2Bucket,
+    MAIL_OBJECTS: { delete: deleteObject, get, put } as unknown as R2Bucket,
     MAIL_SENDER: { send } as unknown as SendEmail,
     HQBASE_JOBS: {} as Queue
   } satisfies WorkerEnv;
@@ -87,6 +98,13 @@ describe("send service", () => {
     vi.mocked(createThread).mockResolvedValue("thread-1");
     vi.mocked(touchThread).mockResolvedValue();
     vi.mocked(insertMessage).mockResolvedValue(sentSummary);
+    vi.mocked(draftAttachmentObjects).mockResolvedValue([]);
+    vi.mocked(getRows).mockResolvedValue([]);
+    deleteObject.mockResolvedValue(undefined);
+    deleteDraftRun.mockResolvedValue({ meta: { changes: 1 } });
+    vi.mocked(createDatabase).mockReturnValue({
+      delete: () => ({ where: () => ({ run: deleteDraftRun }) })
+    } as never);
   });
 
   it("uses Cloudflare's generated Message-ID for new messages", async () => {
@@ -103,16 +121,400 @@ describe("send service", () => {
     });
 
     expect(send).toHaveBeenCalledWith({
-      from: mailbox.address,
+      from: { name: mailbox.displayName, email: mailbox.address },
       subject: "Hello",
       text: "Hello",
       to: ["owner@example.com"]
     });
     expect(insertMessage).toHaveBeenCalledWith(
       env.DB,
-      expect.objectContaining({ messageId: "<cloudflare-new@example.com>" })
+      expect.objectContaining({
+        fromName: mailbox.displayName,
+        messageId: "<cloudflare-new@example.com>"
+      })
     );
+    expect(findMailboxForSending).toHaveBeenCalledOnce();
     expect(createThread).toHaveBeenCalledWith(env.DB, "Hello", "2026-07-10T00:00:00.000Z");
+  });
+
+  it("sends and stores one resolved signature after the authored content", async () => {
+    send.mockResolvedValue({ messageId: "<cloudflare-signature@example.com>" });
+
+    await sendNewMessage(
+      env,
+      {
+        attachmentIds: [],
+        bcc: [],
+        cc: [],
+        from: mailbox.address,
+        subject: "Signed",
+        text: "Hello",
+        to: ["owner@example.com"]
+      },
+      "user-1",
+      {
+        mode: "selected",
+        id: "sig_support",
+        name: "Support",
+        text: "Jane\nSupport",
+        html: "<p>Jane<br>Support</p>"
+      }
+    );
+
+    expect(send).toHaveBeenCalledWith(
+      expect.objectContaining({
+        text: "Hello\n\nJane\nSupport",
+        html: "<p>Hello</p><br><br><p>Jane<br>Support</p>"
+      })
+    );
+    expect(insertMessage).toHaveBeenCalledWith(
+      env.DB,
+      expect.objectContaining({ textBody: "Hello\n\nJane\nSupport" })
+    );
+  });
+
+  it("converts signature data images to private CID attachments", async () => {
+    send.mockResolvedValue({ messageId: "<cloudflare-signature-image@example.com>" });
+    const image = "data:image/png;base64,iVBORw0KGgo=";
+
+    await sendNewMessage(
+      env,
+      {
+        attachmentIds: [],
+        bcc: [],
+        cc: [],
+        from: mailbox.address,
+        subject: "Signed image",
+        text: "Hello",
+        to: ["owner@example.com"]
+      },
+      "user-1",
+      {
+        mode: "selected",
+        id: "sig_support",
+        name: "Support",
+        text: "Support logo",
+        html: `<p>Support</p><img src="${image}" alt="Support logo" width="64" height="64">`
+      }
+    );
+
+    const payload = send.mock.calls[0]?.[0] as Parameters<SendEmail["send"]>[0];
+    expect(payload.html).toContain('src="cid:html-1-1@hqbase.invalid"');
+    expect(payload.html).not.toContain("data:image");
+    expect(payload.attachments).toEqual([
+      expect.objectContaining({
+        contentId: "html-1-1@hqbase.invalid",
+        disposition: "inline",
+        filename: "signature-image-1.png",
+        type: "image/png"
+      })
+    ]);
+    expect(put).toHaveBeenCalledWith("sent/2026-07-10/html-1-1.png", expect.any(ArrayBuffer), {
+      httpMetadata: { contentType: "image/png" }
+    });
+    expect(insertMessage).toHaveBeenCalledWith(
+      env.DB,
+      expect.objectContaining({ hasAttachments: false })
+    );
+    expect(insertAttachment).toHaveBeenCalledWith(
+      env.DB,
+      expect.objectContaining({
+        contentId: "html-1-1@hqbase.invalid",
+        r2Key: "sent/2026-07-10/html-1-1.png"
+      })
+    );
+  });
+
+  it("uses only referenced private draft images and removes unused draft objects", async () => {
+    send.mockResolvedValue({ messageId: "<cloudflare-inline@example.com>" });
+    vi.mocked(draftAttachmentObjects).mockResolvedValue([
+      {
+        id: "attachment-inline",
+        draftId: "draft-1",
+        filename: "chart.png",
+        contentType: "image/png",
+        sizeBytes: 3,
+        contentId: "attachment-inline@hqbase.invalid",
+        r2Key: "drafts/user-1/draft-1/attachment-inline",
+        content: new Uint8Array([1, 2, 3]).buffer
+      }
+    ]);
+    vi.mocked(getRows).mockResolvedValue([
+      { r2_key: "drafts/user-1/draft-1/attachment-inline" },
+      { r2_key: "drafts/user-1/draft-1/unused" }
+    ]);
+
+    await sendNewMessage(
+      env,
+      {
+        attachmentIds: ["attachment-inline"],
+        bcc: [],
+        cc: [],
+        draftId: "draft-1",
+        from: mailbox.address,
+        html: '<p>Hello<img src="/api/v2/drafts/draft-1/attachments/attachment-inline/inline" width="320"></p>',
+        subject: "Inline",
+        text: "Hello",
+        to: ["owner@example.com"]
+      },
+      "user-1"
+    );
+
+    const payload = send.mock.calls[0]?.[0] as Parameters<SendEmail["send"]>[0];
+    expect(payload.html).toContain('src="cid:attachment-inline@hqbase.invalid"');
+    expect(payload.html).not.toContain("/api/v2/drafts/");
+    expect(payload.attachments).toEqual([
+      expect.objectContaining({
+        contentId: "attachment-inline@hqbase.invalid",
+        disposition: "inline",
+        filename: "chart.png"
+      })
+    ]);
+    expect(insertAttachment).toHaveBeenCalledWith(
+      env.DB,
+      expect.objectContaining({ r2Key: "sent/2026-07-10/html-1-1" })
+    );
+    expect(deleteObject).toHaveBeenCalledWith([
+      "drafts/user-1/draft-1/attachment-inline",
+      "drafts/user-1/draft-1/unused"
+    ]);
+  });
+
+  it("uses the attachment's owning draft when an API client omits draftId", async () => {
+    send.mockResolvedValue({ messageId: "<cloudflare-derived-inline@example.com>" });
+    vi.mocked(draftAttachmentObjects).mockResolvedValue([
+      {
+        id: "attachment-inline",
+        draftId: "draft-1",
+        filename: "chart.png",
+        contentType: "image/png",
+        sizeBytes: 3,
+        contentId: "attachment-inline@hqbase.invalid",
+        r2Key: "drafts/user-1/draft-1/attachment-inline",
+        content: new Uint8Array([1, 2, 3]).buffer
+      }
+    ]);
+
+    await sendNewMessage(
+      env,
+      {
+        attachmentIds: ["attachment-inline"],
+        bcc: [],
+        cc: [],
+        from: mailbox.address,
+        html: '<p>Hello<img src="/api/v1/drafts/draft-1/attachments/attachment-inline/inline"></p>',
+        subject: "Inline",
+        text: "Hello",
+        to: ["owner@example.com"]
+      },
+      "user-1"
+    );
+
+    const payload = send.mock.calls[0]?.[0] as Parameters<SendEmail["send"]>[0];
+    expect(payload.html).toContain('src="cid:attachment-inline@hqbase.invalid"');
+    expect(insertAttachment).toHaveBeenCalledWith(
+      env.DB,
+      expect.objectContaining({ r2Key: "sent/2026-07-10/html-1-1" })
+    );
+    expect(deleteDraftRun).not.toHaveBeenCalled();
+  });
+
+  it("copies attachments from multiple owned drafts when draftId is omitted", async () => {
+    send.mockResolvedValue({ messageId: "<cloudflare-forward-attachments@example.com>" });
+    vi.mocked(draftAttachmentObjects).mockResolvedValue([
+      {
+        id: "attachment-inline",
+        draftId: "draft-1",
+        filename: "chart.png",
+        contentType: "image/png",
+        sizeBytes: 3,
+        contentId: "attachment-inline@hqbase.invalid",
+        r2Key: "drafts/user-1/draft-1/attachment-inline",
+        content: new Uint8Array([1, 2, 3]).buffer
+      },
+      {
+        id: "attachment-file",
+        draftId: "draft-2",
+        filename: "report.pdf",
+        contentType: "application/pdf",
+        sizeBytes: 3,
+        contentId: null,
+        r2Key: "drafts/user-1/draft-2/attachment-file",
+        content: new Uint8Array([4, 5, 6]).buffer
+      }
+    ]);
+
+    await sendNewMessage(
+      env,
+      {
+        attachmentIds: ["attachment-inline", "attachment-file"],
+        bcc: [],
+        cc: [],
+        from: mailbox.address,
+        html: '<p>Hello<img src="/api/v2/drafts/draft-1/attachments/attachment-inline/inline"></p>',
+        subject: "Forward attachments",
+        text: "Hello",
+        to: ["owner@example.com"]
+      },
+      "user-1"
+    );
+
+    const payload = send.mock.calls[0]?.[0] as Parameters<SendEmail["send"]>[0];
+    expect(payload.attachments).toEqual([
+      expect.objectContaining({
+        contentId: "attachment-inline@hqbase.invalid",
+        disposition: "inline"
+      }),
+      expect.objectContaining({ disposition: "attachment", filename: "report.pdf" })
+    ]);
+    expect(put).toHaveBeenCalledWith("sent/2026-07-10/html-1-1", expect.any(ArrayBuffer), {
+      httpMetadata: { contentType: "image/png" }
+    });
+    expect(put).toHaveBeenCalledWith("sent/2026-07-10/html-1-2", expect.any(ArrayBuffer), {
+      httpMetadata: { contentType: "application/pdf" }
+    });
+  });
+
+  it("rejects attachments from a different explicit draft", async () => {
+    vi.mocked(draftAttachmentObjects).mockResolvedValue([
+      {
+        id: "attachment-other",
+        draftId: "draft-2",
+        filename: "report.pdf",
+        contentType: "application/pdf",
+        sizeBytes: 3,
+        contentId: null,
+        r2Key: "drafts/user-1/draft-2/attachment-other",
+        content: new Uint8Array([1, 2, 3]).buffer
+      }
+    ]);
+
+    await expect(
+      sendNewMessage(
+        env,
+        {
+          attachmentIds: ["attachment-other"],
+          bcc: [],
+          cc: [],
+          draftId: "draft-1",
+          from: mailbox.address,
+          subject: "Wrong draft",
+          text: "Hello",
+          to: ["owner@example.com"]
+        },
+        "user-1"
+      )
+    ).rejects.toMatchObject({ code: "ATTACHMENT_DRAFT_MISMATCH", status: 400 });
+    expect(send).not.toHaveBeenCalled();
+  });
+
+  it("chunks cleanup for drafts with more than 1,000 staged objects", async () => {
+    send.mockResolvedValue({ messageId: "<cloudflare-cleanup@example.com>" });
+    vi.mocked(getRows).mockResolvedValue(
+      Array.from({ length: 1_001 }, (_value, index) => ({ r2_key: `drafts/object-${index}` }))
+    );
+
+    await sendNewMessage(
+      env,
+      {
+        attachmentIds: [],
+        bcc: [],
+        cc: [],
+        draftId: "draft-1",
+        from: mailbox.address,
+        subject: "Cleanup",
+        text: "Hello",
+        to: ["owner@example.com"]
+      },
+      "user-1"
+    );
+
+    expect(deleteObject).toHaveBeenCalledTimes(2);
+    expect(deleteObject.mock.calls[0]?.[0]).toHaveLength(1_000);
+    expect(deleteObject.mock.calls[1]?.[0]).toEqual(["drafts/object-1000"]);
+  });
+
+  it("removes staged signature objects when delivery fails", async () => {
+    send.mockRejectedValue(new Error("delivery failed"));
+
+    await expect(
+      sendNewMessage(
+        env,
+        {
+          attachmentIds: [],
+          bcc: [],
+          cc: [],
+          from: mailbox.address,
+          subject: "Signed image",
+          text: "Hello",
+          to: ["owner@example.com"]
+        },
+        "user-1",
+        {
+          mode: "selected",
+          id: "sig_support",
+          name: "Support",
+          text: "Support logo",
+          html: '<img src="data:image/png;base64,iVBORw0KGgo=" alt="Support logo">'
+        }
+      )
+    ).rejects.toThrow("delivery failed");
+
+    expect(deleteObject).toHaveBeenCalledWith(["sent/2026-07-10/html-1-1.png"]);
+  });
+
+  it("removes unrecorded signature objects when post-send persistence fails", async () => {
+    send.mockResolvedValue({ messageId: "<cloudflare-signature-image@example.com>" });
+    vi.mocked(createThread).mockRejectedValue(new Error("D1 unavailable"));
+
+    await expect(
+      sendNewMessage(
+        env,
+        {
+          attachmentIds: [],
+          bcc: [],
+          cc: [],
+          from: mailbox.address,
+          subject: "Signed image",
+          text: "Hello",
+          to: ["owner@example.com"]
+        },
+        "user-1",
+        {
+          mode: "selected",
+          id: "sig_support",
+          name: "Support",
+          text: "Support logo",
+          html: '<img src="data:image/png;base64,iVBORw0KGgo=" alt="Support logo">'
+        }
+      )
+    ).rejects.toThrow("D1 unavailable");
+
+    expect(send).toHaveBeenCalledOnce();
+    expect(deleteObject).toHaveBeenCalledWith(["sent/2026-07-10/html-1-1.png"]);
+  });
+
+  it("removes an unrecorded HTML body when persistence fails after upload", async () => {
+    send.mockResolvedValue({ messageId: "<cloudflare-html@example.com>" });
+    vi.mocked(touchThread).mockRejectedValue(new Error("D1 unavailable"));
+
+    await expect(
+      sendNewMessage(env, {
+        attachmentIds: [],
+        bcc: [],
+        cc: [],
+        from: mailbox.address,
+        html: "<p>Hello</p>",
+        subject: "HTML cleanup",
+        text: "Hello",
+        to: ["owner@example.com"]
+      })
+    ).rejects.toThrow("D1 unavailable");
+
+    expect(put).toHaveBeenCalledWith("sent/2026-07-10/html-1.html", "<p>Hello</p>", {
+      httpMetadata: { contentType: "text/html; charset=utf-8" }
+    });
+    expect(deleteObject).toHaveBeenCalledWith(["sent/2026-07-10/html-1.html"]);
   });
 
   it("keeps only allowlisted threading headers on replies", async () => {
@@ -125,6 +527,7 @@ describe("send service", () => {
       direction: "inbound",
       folder: "inbox",
       fromAddress: "owner@example.com",
+      fromName: "Owner Example",
       htmlAvailable: false,
       inReplyTo: null,
       messageId: "<original@example.com>",
@@ -144,11 +547,12 @@ describe("send service", () => {
       to: ["alternate@example.com"]
     });
 
-    const quotedText = "Reply\n\nOn 2026-07-10 at 00:00 UTC, owner@example.com wrote:\n> Original";
+    const quotedText =
+      "Reply\n\nOn 2026-07-10 at 00:00 UTC, Owner Example <owner@example.com> wrote:\n> Original";
     const quotedHtml =
-      '<p>Reply</p><div class="gmail_quote gmail_quote_container"><div dir="ltr" class="gmail_attr"><br>On 2026-07-10 at 00:00 UTC, owner@example.com wrote:<br></div><blockquote class="gmail_quote" style="margin:0 0 0 .8ex;border-left:1px #ccc solid;padding-left:1ex">Original</blockquote></div>';
+      '<p>Reply</p><br><br><div class="gmail_quote gmail_quote_container"><div dir="ltr" class="gmail_attr"><br>On 2026-07-10 at 00:00 UTC, Owner Example &lt;owner@example.com&gt; wrote:<br></div><blockquote class="gmail_quote" style="margin:0 0 0 .8ex;border-left:1px #ccc solid;padding-left:1ex">Original</blockquote></div>';
     expect(send).toHaveBeenCalledWith({
-      from: mailbox.address,
+      from: { name: mailbox.displayName, email: mailbox.address },
       bcc: ["audit@example.com"],
       cc: ["manager@example.com"],
       headers: {
@@ -165,6 +569,7 @@ describe("send service", () => {
       expect.objectContaining({
         bcc: ["audit@example.com"],
         cc: ["manager@example.com"],
+        fromName: mailbox.displayName,
         htmlR2Key: "sent/2026-07-10/html-1.html",
         messageId: "<cloudflare-reply@example.com>",
         textBody: quotedText,
@@ -186,6 +591,7 @@ describe("send service", () => {
       contentType: "image/png",
       sizeBytes: 3,
       contentId: "<logo@example.com>",
+      disposition: "inline" as const,
       r2Key: "mail/logo.png",
       createdAt: "2026-07-10T00:00:00.000Z"
     };
@@ -248,8 +654,11 @@ describe("send service", () => {
       expect.objectContaining({
         contentId: "logo@example.com",
         messageId: "message-1",
-        r2Key: "mail/logo.png"
+        r2Key: "sent/2026-07-10/html-1-1"
       })
     );
+    expect(put).toHaveBeenCalledWith("sent/2026-07-10/html-1-1", expect.any(ArrayBuffer), {
+      httpMetadata: { contentType: "image/png" }
+    });
   });
 });

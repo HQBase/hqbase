@@ -5,13 +5,16 @@ import { mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:f
 import { resolve } from "node:path";
 import { gzipSync } from "node:zlib";
 
+import { extractReleaseNotes, releaseNoteItems } from "./notes.mjs";
+
 const root = resolve(import.meta.dirname, "../..");
 const product = "hqbase";
-const schemaVersion = 2;
+const schemaVersion = 3;
 const packageJson = JSON.parse(readFileSync(resolve(root, "package.json"), "utf8"));
 const version = process.env.HQBASE_RELEASE_VERSION ?? packageJson.version;
 const minVersion = process.env.HQBASE_MIN_VERSION || packageJson.hqbaseRelease?.minimumVersion;
 const changelog = readFileSync(resolve(root, "CHANGELOG.md"), "utf8");
+const notes = releaseNoteItems(extractReleaseNotes(changelog, version));
 const privateKeyValue = process.env.HQBASE_RELEASE_PRIVATE_KEY_FILE
   ? readFileSync(process.env.HQBASE_RELEASE_PRIVATE_KEY_FILE, "utf8")
   : process.env.HQBASE_RELEASE_PRIVATE_KEY;
@@ -21,9 +24,6 @@ if (!/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(version))
   throw new Error("Release version must be semantic.");
 if (!/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(minVersion ?? ""))
   throw new Error("Minimum release version must be semantic.");
-if (!changelog.includes(`## ${version}\n`))
-  throw new Error(`CHANGELOG.md is missing release notes for ${version}.`);
-
 const output = resolve(root, "release");
 mkdirSync(output, { recursive: true });
 const tarFile = resolve(output, `${product}-${version}.tar`);
@@ -41,6 +41,7 @@ const manifest = {
   schemaVersion,
   minVersion,
   publishedAt: new Date().toISOString(),
+  notes,
   notesUrl: `https://github.com/HQBase/hqbase/releases/tag/v${version}`,
   artifact: {
     url: `https://github.com/HQBase/hqbase/releases/download/v${version}/hqbase-${version}.tar.gz`,

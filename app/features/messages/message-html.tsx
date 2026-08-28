@@ -3,13 +3,12 @@ import { PiImageBroken } from "react-icons/pi";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
 import { useTheme } from "@/features/theme/theme-provider";
 
 import { getMessageHtml, trustRemoteMediaSender } from "./api";
 import { buildEmailHtmlDocument } from "./html-document";
 import { hasMessageHtmlContent, splitQuotedText } from "./message-html-content";
-import type { MessageDetail } from "./types";
+import type { MessageDetail, MessageHtml as MessageHtmlResponse } from "./types";
 
 export { splitQuotedText } from "./message-html-content";
 
@@ -83,6 +82,10 @@ export function MessageHtml({ message }: MessageHtmlProps): React.ReactElement {
     [html, loadRemoteImages, theme]
   );
   const bodyHasContent = React.useMemo(() => hasMessageHtmlContent(html?.html ?? ""), [html?.html]);
+  const quoteVisible = quoteExpanded || !bodyHasContent;
+  const showRemoteImagesAlert = Boolean(
+    html && !loadRemoteImages && hasVisibleRemoteImages(html, quoteVisible)
+  );
 
   async function loadImages(): Promise<void> {
     setLoadingImages(true);
@@ -123,7 +126,7 @@ export function MessageHtml({ message }: MessageHtmlProps): React.ReactElement {
 
   return (
     <div className="flex flex-col gap-4">
-      {html?.hasRemoteImages && !loadRemoteImages && (
+      {showRemoteImagesAlert && (
         <RemoteImagesAlert
           direction={message.direction}
           fromAddress={message.fromAddress}
@@ -144,6 +147,20 @@ export function MessageHtml({ message }: MessageHtmlProps): React.ReactElement {
         subject={message.subject}
       />
     </div>
+  );
+}
+
+export function hasVisibleRemoteImages(
+  html: Pick<
+    MessageHtmlResponse,
+    "afterQuotedHtmlHasRemoteImages" | "htmlHasRemoteImages" | "quotedHtmlHasRemoteImages"
+  >,
+  quoteVisible: boolean
+): boolean {
+  return (
+    html.htmlHasRemoteImages ||
+    html.afterQuotedHtmlHasRemoteImages ||
+    (quoteVisible && html.quotedHtmlHasRemoteImages)
   );
 }
 
@@ -264,24 +281,20 @@ export function QuotedContentDivider({
   onToggle: () => void;
 }): React.ReactElement {
   return (
-    <div className="flex items-center gap-2 print:hidden" data-quoted-content-control>
-      <Separator className="flex-1" />
-      <Button
+    <div className="flex justify-start print:hidden" data-quoted-content-control>
+      <button
         aria-expanded={expanded}
         aria-label={expanded ? "Hide quoted message history" : "Show quoted message history"}
-        className="rounded-full"
+        className="inline-flex h-5 w-8 cursor-pointer items-center justify-center rounded bg-muted text-muted-foreground transition-colors [@media(hover:hover)]:hover:bg-muted/80 [@media(hover:hover)]:hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         onClick={onToggle}
-        size="icon"
         type="button"
-        variant="outline"
       >
-        <span aria-hidden="true" className="inline-flex items-center gap-1">
+        <span aria-hidden="true" className="inline-flex items-center gap-0.5">
           <span className="size-[3px] rounded-full bg-current" data-quoted-content-dot />
           <span className="size-[3px] rounded-full bg-current" data-quoted-content-dot />
           <span className="size-[3px] rounded-full bg-current" data-quoted-content-dot />
         </span>
-      </Button>
-      <Separator className="flex-1" />
+      </button>
     </div>
   );
 }
@@ -302,28 +315,34 @@ export function RemoteImagesAlert({
   savingTrust: boolean;
 }): React.ReactElement {
   return (
-    <Alert>
+    <Alert className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-2 gap-y-1 rounded-md border-border/60 bg-muted/50 px-2.5 py-1.5 text-xs sm:grid-cols-[auto_minmax(0,1fr)_auto] [&>svg]:static [&>svg]:size-3.5 [&>svg]:text-muted-foreground [&>svg~*]:pl-0">
       <PiImageBroken />
-      <AlertTitle>Remote images are hidden</AlertTitle>
-      <AlertDescription className="flex flex-col items-start gap-3">
-        <p>Loading them may tell the sender that you opened this message.</p>
-        <div className="flex flex-wrap gap-2">
-          <Button disabled={loadingImages} onClick={onLoad} size="sm" type="button">
-            Load images
+      <AlertTitle className="mb-0 min-w-0 line-clamp-2 text-[11px] font-semibold leading-[14px] tracking-normal">
+        Remote images are hidden. Loading them may reveal that you opened this email.
+      </AlertTitle>
+      <AlertDescription className="col-start-2 row-start-2 flex flex-wrap gap-1 pt-0.5 sm:col-start-3 sm:row-start-1 sm:flex-nowrap sm:pt-0">
+        <Button
+          className="h-6 min-h-6 px-2 text-[10px]"
+          disabled={loadingImages}
+          onClick={onLoad}
+          size="sm"
+          type="button"
+        >
+          Load images
+        </Button>
+        {direction === "inbound" && (
+          <Button
+            className="h-6 min-h-6 px-2 text-[10px]"
+            disabled={savingTrust}
+            onClick={onAlwaysLoad}
+            size="sm"
+            title={`Always load remote images from ${fromAddress}`}
+            type="button"
+            variant="outline"
+          >
+            Always load from this sender
           </Button>
-          {direction === "inbound" && (
-            <Button
-              disabled={savingTrust}
-              onClick={onAlwaysLoad}
-              size="sm"
-              title={`Always load remote images from ${fromAddress}`}
-              type="button"
-              variant="outline"
-            >
-              Always load from sender
-            </Button>
-          )}
-        </div>
+        )}
       </AlertDescription>
     </Alert>
   );

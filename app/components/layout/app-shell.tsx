@@ -3,9 +3,9 @@ import type { CurrentUser } from "@/features/auth/types";
 import type { MailConnectionStatus } from "@/features/events/types";
 import type { Mailbox } from "@/features/mailboxes/types";
 import type { UnreadCounts } from "@/features/notifications/types";
+import type { GlobalSearchResult } from "@/features/search/types";
 import type { UpdateStatus } from "@/features/updates/types";
 import { UpdateBanner } from "@/features/updates/update-banner";
-import { useDesktopShell } from "@/hooks/use-desktop-shell";
 import { scrollActiveMobileMailSurfaceToTop } from "@/lib/mobile-scroll";
 import type { FolderId } from "@/lib/routes";
 import { readStoredBoolean, sidebarCollapsedStorageKey, storeLayoutValue } from "./desktop-layout";
@@ -14,6 +14,7 @@ import { TopBar } from "./top-bar";
 
 type AppShellProps = {
   activeFolder: FolderId;
+  activeAgentTab?: import("@/lib/routes").AgentTabId | undefined;
   activeSettingsTab?: import("@/lib/routes").SettingsTabId | undefined;
   canManage?: boolean | undefined;
   connectionStatus: MailConnectionStatus;
@@ -28,19 +29,28 @@ type AppShellProps = {
   unread: UnreadCounts;
   draftCount: number;
   onCompose: () => void;
+  onAgentTabChange?: ((tab: import("@/lib/routes").AgentTabId) => void) | undefined;
   onFolderChange: (folder: FolderId) => void;
   onSettingsTabChange?: ((tab: import("@/lib/routes").SettingsTabId) => void) | undefined;
   onMailboxChange: (mailboxId: string) => void;
   onSearchChange: (search: string) => void;
+  onSearchSelect?: (result: GlobalSearchResult) => void;
+  onSearchSubmit?: (query: string) => void;
   onSignedOut: () => void;
   onOpenUpdates: () => void;
 };
 
 export function AppShell(props: AppShellProps): React.ReactElement {
-  const desktopShell = useDesktopShell();
   const [sidebarCollapsed, setSidebarCollapsed] = React.useState(() =>
     readStoredBoolean(sidebarCollapsedStorageKey, false)
   );
+
+  React.useEffect(() => {
+    document.documentElement.dataset.hqbaseShell = "fixed";
+    return () => {
+      delete document.documentElement.dataset.hqbaseShell;
+    };
+  }, []);
 
   const toggleSidebar = React.useCallback((): void => {
     const next = !sidebarCollapsed;
@@ -50,65 +60,40 @@ export function AppShell(props: AppShellProps): React.ReactElement {
 
   return (
     <div className="relative flex h-screen h-[100dvh] touch-manipulation overflow-hidden bg-rail pt-[env(safe-area-inset-top)] text-foreground lg:p-2">
-      {desktopShell ? (
-        <div className="flex h-full w-full gap-2" id="hqbase-desktop-shell">
-          <div className={sidebarCollapsed ? "hidden" : "w-[20rem] shrink-0"} id="desktop-sidebar">
-            <Sidebar
-              activeFolder={props.activeFolder}
-              activeSettingsTab={props.activeSettingsTab}
-              canManage={props.canManage}
-              connectionStatus={props.connectionStatus}
-              draftCount={props.draftCount}
-              mailboxId={props.mailboxId}
-              sidebarCollapsed={sidebarCollapsed}
-              unread={props.unread}
-              user={props.user}
-              onCompose={props.onCompose}
-              onFolderChange={props.onFolderChange}
-              onSettingsTabChange={props.onSettingsTabChange}
-              onSignedOut={props.onSignedOut}
-              onToggleSidebar={toggleSidebar}
-            />
-          </div>
-          <div className="relative min-w-0 flex-1" id="desktop-content">
-            <div className="h-full w-full overflow-hidden rounded-[24px] border border-divider bg-reader shadow-sm">
-              <ShellContent
-                {...props}
-                desktopShell={desktopShell}
-                sidebarCollapsed={sidebarCollapsed}
-                onToggleSidebar={toggleSidebar}
-              />
-            </div>
-          </div>
-        </div>
-      ) : (
-        <>
+      <div className="flex h-full w-full gap-2" id="hqbase-desktop-shell">
+        <div
+          className={sidebarCollapsed ? "hidden" : "hidden w-[20rem] shrink-0 lg:block"}
+          id="desktop-sidebar"
+        >
           <Sidebar
             activeFolder={props.activeFolder}
+            activeAgentTab={props.activeAgentTab}
             activeSettingsTab={props.activeSettingsTab}
             canManage={props.canManage}
             connectionStatus={props.connectionStatus}
             draftCount={props.draftCount}
             mailboxId={props.mailboxId}
+            sidebarCollapsed={sidebarCollapsed}
             unread={props.unread}
             user={props.user}
             onCompose={props.onCompose}
+            onAgentTabChange={props.onAgentTabChange}
             onFolderChange={props.onFolderChange}
             onSettingsTabChange={props.onSettingsTabChange}
             onSignedOut={props.onSignedOut}
+            onToggleSidebar={toggleSidebar}
           />
-          <div className="relative min-w-0 flex-1">
-            <div className="h-full w-full overflow-hidden rounded-[24px] border border-divider bg-reader shadow-sm">
-              <ShellContent
-                {...props}
-                desktopShell={false}
-                sidebarCollapsed={false}
-                onToggleSidebar={toggleSidebar}
-              />
-            </div>
+        </div>
+        <div className="relative min-w-0 flex-1" id="desktop-content">
+          <div className="h-full w-full overflow-hidden rounded-[24px] border border-divider bg-reader shadow-sm">
+            <ShellContent
+              {...props}
+              sidebarCollapsed={sidebarCollapsed}
+              onToggleSidebar={toggleSidebar}
+            />
           </div>
-        </>
-      )}
+        </div>
+      </div>
       <button
         aria-label="Scroll current view to top"
         className="absolute inset-x-0 top-0 z-40 h-[env(safe-area-inset-top)] touch-none cursor-default appearance-none border-0 bg-transparent p-0"
@@ -122,6 +107,7 @@ export function AppShell(props: AppShellProps): React.ReactElement {
 
 function ShellContent({
   activeFolder,
+  activeAgentTab,
   activeSettingsTab,
   canManage,
   children,
@@ -136,16 +122,18 @@ function ShellContent({
   updateStatus,
   user,
   onCompose,
+  onAgentTabChange,
   onFolderChange,
   onMailboxChange,
   onOpenUpdates,
   onSearchChange,
+  onSearchSelect = () => undefined,
+  onSearchSubmit = () => undefined,
   onSettingsTabChange,
   onSignedOut,
   sidebarCollapsed,
   onToggleSidebar
 }: AppShellProps & {
-  desktopShell: boolean;
   sidebarCollapsed: boolean;
   onToggleSidebar: () => void;
 }): React.ReactElement {
@@ -153,6 +141,7 @@ function ShellContent({
     <div className="flex h-full min-w-0 flex-1 flex-col">
       <TopBar
         activeFolder={activeFolder}
+        activeAgentTab={activeAgentTab}
         activeSettingsTab={activeSettingsTab}
         canManage={canManage}
         connectionStatus={connectionStatus}
@@ -164,9 +153,12 @@ function ShellContent({
         user={user}
         sidebarCollapsed={sidebarCollapsed}
         onCompose={onCompose}
+        onAgentTabChange={onAgentTabChange}
         onFolderChange={onFolderChange}
         onMailboxChange={onMailboxChange}
         onSearchChange={onSearchChange}
+        onSearchSelect={onSearchSelect}
+        onSearchSubmit={onSearchSubmit}
         onSettingsTabChange={onSettingsTabChange}
         onSignedOut={onSignedOut}
         onToggleSidebar={onToggleSidebar}

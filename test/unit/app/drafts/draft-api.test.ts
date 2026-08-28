@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { listDrafts } from "../../../../app/features/drafts/api";
+import { listDrafts, uploadDraftAttachment } from "../../../../app/features/drafts/api";
 
 describe("draft API", () => {
   afterEach(() => vi.unstubAllGlobals());
@@ -11,7 +11,7 @@ describe("draft API", () => {
       .mockResolvedValueOnce(
         Response.json([{ id: "drf_newer" }], {
           headers: {
-            link: '<https://hqbase.test/api/v1/drafts?cursor=previous>; rel=prev; title="Older, drafts", <https://hqbase.test/api/v1/drafts?limit=100&cursor=next>; type="application/json"; rel="alternate next"'
+            link: '<https://hqbase.test/api/v2/drafts?cursor=previous>; rel=prev; title="Older, drafts", <https://hqbase.test/api/v2/drafts?limit=100&cursor=next>; type="application/json"; rel="alternate next"'
           }
         })
       )
@@ -19,13 +19,13 @@ describe("draft API", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     await expect(listDrafts()).resolves.toEqual([{ id: "drf_newer" }, { id: "drf_older" }]);
-    expect(fetchMock).toHaveBeenNthCalledWith(1, "/api/v1/drafts?limit=100", {
+    expect(fetchMock).toHaveBeenNthCalledWith(1, "/api/v2/drafts?limit=100", {
       credentials: "include",
       method: "GET"
     });
     expect(fetchMock).toHaveBeenNthCalledWith(
       2,
-      "https://hqbase.test/api/v1/drafts?limit=100&cursor=next",
+      "https://hqbase.test/api/v2/drafts?limit=100&cursor=next",
       { credentials: "include", method: "GET" }
     );
   });
@@ -33,7 +33,7 @@ describe("draft API", () => {
   it("stops when a valid Link header has no next relation", async () => {
     const fetchMock = vi.fn<typeof fetch>().mockResolvedValueOnce(
       Response.json([{ id: "drf_only" }], {
-        headers: { link: "<https://hqbase.test/api/v1/drafts?cursor=previous>; rel=prev" }
+        headers: { link: "<https://hqbase.test/api/v2/drafts?cursor=previous>; rel=prev" }
       })
     );
     vi.stubGlobal("fetch", fetchMock);
@@ -53,5 +53,31 @@ describe("draft API", () => {
     );
 
     await expect(listDrafts()).rejects.toThrow("Malformed Link header.");
+  });
+
+  it("marks an editor image as an inline draft attachment", async () => {
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValueOnce(
+      Response.json(
+        {
+          id: "attachment-1",
+          filename: "logo.png",
+          contentType: "image/png",
+          sizeBytes: 8,
+          inline: true
+        },
+        { status: 201 }
+      )
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const file = new File(["image"], "logo.png", { type: "image/png" });
+
+    await uploadDraftAttachment("draft-1", file, true);
+
+    const [url, init] = fetchMock.mock.calls[0] ?? [];
+    expect(url).toBe("/api/v2/drafts/draft-1/attachments");
+    expect(init).toMatchObject({ method: "POST", credentials: "include" });
+    const form = init?.body as FormData;
+    expect(form.get("file")).toBe(file);
+    expect(form.get("inline")).toBe("true");
   });
 });

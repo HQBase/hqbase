@@ -1,20 +1,15 @@
 import type * as React from "react";
+import { DropdownSelect } from "@/components/ui/dropdown-select";
 import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectTrigger,
-  SelectValue
-} from "@/components/ui/select";
 import type { ComposeMode } from "./compose-state";
+import { RecipientField } from "./recipient-field";
 
-export type SendingIdentity = { mailboxId: string; address: string };
+export type SendingIdentity = { mailboxId: string; address: string; displayName: string };
 export function ComposeFields(props: {
   identities: SendingIdentity[];
   mode: ComposeMode;
   from: string;
+  fromDisabled: boolean;
   to: string;
   cc: string;
   bcc: string;
@@ -28,49 +23,36 @@ export function ComposeFields(props: {
   return (
     <div className="flex flex-col px-5">
       <Row label="From">
-        <Select required value={props.from} onValueChange={props.setFrom}>
-          <SelectTrigger
-            aria-label="From"
-            className="h-10 rounded-none border-0 bg-transparent px-0 shadow-none focus:ring-0"
-          >
-            <SelectValue placeholder="Choose address" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectGroup>
-              {props.identities.map((identity) => (
-                <SelectItem key={identity.address} value={identity.address}>
-                  {identity.address}
-                </SelectItem>
-              ))}
-            </SelectGroup>
-          </SelectContent>
-        </Select>
+        <DropdownSelect
+          ariaLabel="From"
+          className="rounded-none border-0 bg-transparent px-0 shadow-none focus-visible:ring-0"
+          disabled={props.fromDisabled}
+          options={props.identities.map((identity) => ({
+            label: `${identity.displayName} — ${identity.address}`,
+            value: identity.address
+          }))}
+          placeholder="Choose address"
+          required
+          value={props.from}
+          onValueChange={props.setFrom}
+        />
       </Row>
       <Row label="To">
-        <Input
-          aria-label="To"
+        <RecipientField
           autoFocus={props.mode !== "reply"}
-          data-compose-autofocus={props.mode !== "reply" ? "" : undefined}
+          label="To"
           required
           value={props.to}
-          onChange={(event) => props.setTo(event.target.value)}
+          onChange={props.setTo}
         />
       </Row>
       <div className="grid grid-cols-1 border-b sm:grid-cols-2 sm:divide-x">
         <Row label="Cc" border={false}>
-          <Input
-            aria-label="Cc"
-            value={props.cc}
-            onChange={(event) => props.setCc(event.target.value)}
-          />
+          <RecipientField label="Cc" value={props.cc} onChange={props.setCc} />
         </Row>
         <div className="sm:pl-4">
           <Row label="Bcc" border={false}>
-            <Input
-              aria-label="Bcc"
-              value={props.bcc}
-              onChange={(event) => props.setBcc(event.target.value)}
-            />
+            <RecipientField label="Bcc" value={props.bcc} onChange={props.setBcc} />
           </Row>
         </div>
       </div>

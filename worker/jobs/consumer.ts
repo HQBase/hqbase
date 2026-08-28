@@ -13,6 +13,10 @@ import { operationalLog } from "../observability/log";
 import { isJob, type Job } from "./types";
 
 const batchSize = 100;
+const orphanGraceMs = 24 * 60 * 60 * 1_000;
+// ponytail: Persist a cursor if a workspace needs complete sweeps beyond this daily bound.
+const r2ObjectScanLimit = 10_000;
+const r2PageSize = 1_000;
 
 async function deleteExpiredRows(env: WorkerEnv): Promise<Record<string, number>> {
   const nowSeconds = Math.floor(Date.now() / 1000);
@@ -77,20 +81,47 @@ async function integrityCounters(env: WorkerEnv): Promise<Record<string, number>
   let orphaned = 0;
   let cursor: string | undefined;
   do {
-    const page = await env.MAIL_OBJECTS.list(cursor ? { cursor, limit: 1000 } : { limit: 1000 });
+    const limit = Math.min(r2PageSize, r2ObjectScanLimit - listed);
+    const page = await env.MAIL_OBJECTS.list(cursor ? { cursor, limit } : { limit });
     listed += page.objects.length;
     for (const object of page.objects) {
       const referenced = await hasObjectReference(env.DB, object.key);
       if (!referenced) orphaned += 1;
     }
     cursor = page.truncated ? page.cursor : undefined;
-  } while (cursor && listed < 10_000);
+  } while (cursor && listed < r2ObjectScanLimit);
   return {
     rawReferences: database?.raw_refs ?? 0,
     attachmentReferences: database?.attachment_refs ?? 0,
     r2ObjectsScanned: listed,
     orphanedR2Objects: orphaned
   };
+}
+
+export async function removeExpiredOrphanedObjects(
+  env: WorkerEnv,
+  now = Date.now()
+): Promise<number> {
+  const cutoff = now - orphanGraceMs;
+  const orphaned: string[] = [];
+  let listed = 0;
+  let cursor: string | undefined;
+  do {
+    const limit = Math.min(r2PageSize, r2ObjectScanLimit - listed);
+    const page = await env.MAIL_OBJECTS.list(cursor ? { cursor, limit } : { limit });
+    listed += page.objects.length;
+    for (const object of page.objects) {
+      if (object.uploaded.getTime() >= cutoff) continue;
+      const referenced = await hasObjectReference(env.DB, object.key);
+      if (!referenced) orphaned.push(object.key);
+    }
+    cursor = page.truncated ? page.cursor : undefined;
+  } while (cursor && listed < r2ObjectScanLimit);
+
+  for (let start = 0; start < orphaned.length; start += r2PageSize) {
+    await env.MAIL_OBJECTS.delete(orphaned.slice(start, start + r2PageSize));
+  }
+  return orphaned.length;
 }
 
 async function processJob(env: WorkerEnv, job: Job): Promise<void> {
@@ -105,7 +136,11 @@ async function processJob(env: WorkerEnv, job: Job): Promise<void> {
   try {
     const counters =
       job.kind === "maintenance"
-        ? { ...(await deleteExpiredRows(env)), retainedMessages: await applyRetention(env) }
+        ? {
+            ...(await deleteExpiredRows(env)),
+            retainedMessages: await applyRetention(env),
+            removedR2Orphans: await removeExpiredOrphanedObjects(env)
+          }
         : await integrityCounters(env);
     await database
       .update(operationRuns)
@@ -128,7 +163,8 @@ function hasObjectReference(db: D1Database, key: string): Promise<unknown | null
   return getRow(
     db,
     sql`SELECT 1 FROM messages WHERE raw_r2_key = ${key} OR html_r2_key = ${key}
-        UNION ALL SELECT 1 FROM message_attachments WHERE r2_key = ${key} LIMIT 1`
+        UNION ALL SELECT 1 FROM message_attachments WHERE r2_key = ${key}
+        UNION ALL SELECT 1 FROM draft_attachments WHERE r2_key = ${key} LIMIT 1`
   );
 }
 

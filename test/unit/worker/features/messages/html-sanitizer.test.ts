@@ -12,6 +12,7 @@ const attachment = {
   contentType: "image/png",
   sizeBytes: 120,
   contentId: "<signature-logo@example.com>",
+  disposition: "inline" as const,
   r2Key: "messages/logo.png",
   createdAt: "2026-07-13T00:00:00.000Z"
 };
@@ -43,11 +44,11 @@ describe("email HTML sanitizer", () => {
       attachments: [attachment],
       origin: "https://mail.example.com",
       html: '<img src="cid:signature-logo@example.com">',
-      inlineBasePath: "/api/v1/messages",
+      inlineBasePath: "/api/v2/messages",
       messageId: "msg-1"
     });
 
-    expect(result.html).toContain("https://mail.example.com/api/v1/messages/msg-1/inline/att-logo");
+    expect(result.html).toContain("https://mail.example.com/api/v2/messages/msg-1/inline/att-logo");
   });
 
   it("removes active content, unsafe links, redirects, and CSS resource loads", () => {
@@ -123,6 +124,21 @@ describe("email HTML sanitizer", () => {
     expect(result.html).toBe("<p>New reply</p>");
     expect(result.quotedHtml).toContain("<strong>Earlier reply</strong>");
     expect(result.quotedHtml).not.toContain("gmail_quote");
+  });
+
+  it("reports remote images separately for collapsed quoted history", () => {
+    const result = sanitizeMessageHtml({
+      allowRemoteImages: false,
+      attachments: [],
+      origin: "https://mail.example.com",
+      html: '<p>New reply</p><div class="gmail_quote"><img src="https://images.example.com/old.gif"></div>',
+      messageId: "msg-1"
+    });
+
+    expect(result.hasRemoteImages).toBe(true);
+    expect(result.htmlHasRemoteImages).toBe(false);
+    expect(result.quotedHtmlHasRemoteImages).toBe(true);
+    expect(result.afterQuotedHtmlHasRemoteImages).toBe(false);
   });
 
   it("collapses the complete Gmail reply container including its attribution", () => {
@@ -398,6 +414,7 @@ describe("email HTML sanitizer", () => {
     });
 
     expect(result.hasRemoteImages).toBe(true);
+    expect(result.afterQuotedHtmlHasRemoteImages).toBe(true);
     expect(result.afterQuotedHtml).toContain("Remote image hidden");
     expect(result.afterQuotedHtml).not.toContain("images.example.com");
   });

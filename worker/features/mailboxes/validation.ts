@@ -15,10 +15,3 @@ export const updateMailboxSchema = z
   .refine((value) => value.displayName !== undefined || value.isActive !== undefined, {
     message: "At least one mailbox field must be provided."
   });
-
-export const createMailboxAddressSchema = z.object({
-  address: emailAddressSchema,
-  displayName: z.string().trim().min(1).max(80),
-  receiveEnabled: z.boolean().optional(),
-  sendEnabled: z.boolean().optional()
-});

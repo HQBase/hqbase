@@ -1,13 +1,16 @@
 import type { AppTheme } from "@/features/theme/theme";
 
 export function buildEmailHtmlDocument(input: {
+  allowDataImages?: boolean;
   allowRemoteImages: boolean;
   html: string;
   origin: string;
   theme: AppTheme;
 }): string {
   const origin = new URL(input.origin).origin;
-  const imageSources = input.allowRemoteImages ? `${origin} https: http:` : origin;
+  const imageSources = `${input.allowRemoteImages ? `${origin} https: http:` : origin}${
+    input.allowDataImages ? " data:" : ""
+  }`;
   const policy = `default-src 'none'; img-src ${imageSources}; font-src ${origin}; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'`;
   return `<!doctype html><html data-theme="${input.theme}"><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="${escapeAttribute(policy)}"><meta name="referrer" content="no-referrer"><meta name="color-scheme" content="${input.theme}"><style>${baseStyles(input.theme)}</style></head><body>${input.html}</body></html>`;
 }

@@ -12,15 +12,8 @@ import {
   DialogTitle,
   DialogTrigger
 } from "@/components/ui/dialog";
+import { DropdownSelect } from "@/components/ui/dropdown-select";
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectTrigger,
-  SelectValue
-} from "@/components/ui/select";
 import { CloudflareAuthorizationFlow } from "@/features/settings/cloudflare-authorization-dialog";
 import type { CloudflareZone } from "@/features/setup/types";
 import { listAvailableCloudflareZones, provisionDomain } from "./api";
@@ -30,6 +23,7 @@ export function ConnectDomainDialog({
   authorized,
   domains,
   open,
+  preferredDomainName,
   onAuthorize,
   onConnected,
   onOpenChange
@@ -37,6 +31,7 @@ export function ConnectDomainDialog({
   authorized: boolean;
   domains: MailDomain[];
   open: boolean;
+  preferredDomainName?: string | null;
   onAuthorize: () => void;
   onConnected: () => void;
   onOpenChange: (open: boolean) => void;
@@ -53,7 +48,10 @@ export function ConnectDomainDialog({
       );
       setZones(next);
       const migrated = domains.find((domain) => !domain.zoneId);
-      const selected = next.find((zone) => zone.name === migrated?.name) ?? next[0];
+      const selected =
+        next.find((zone) => zone.name === preferredDomainName) ??
+        next.find((zone) => zone.name === migrated?.name) ??
+        next[0];
       if (selected) {
         setZoneId(selected.id);
         setName(selected.name);
@@ -66,7 +64,7 @@ export function ConnectDomainDialog({
         error instanceof Error ? error.message : "Cloudflare domains could not be loaded."
       );
     }
-  }, [domains]);
+  }, [domains, preferredDomainName]);
 
   React.useEffect(() => {
     if (open && authorized && zones.length === 0) void loadZones();
@@ -108,7 +106,7 @@ export function ConnectDomainDialog({
       }}
     >
       <DialogTrigger asChild>
-        <Button type="button">
+        <Button size="sm" type="button">
           <PiPlus data-icon="inline-start" />
           Connect domain
         </Button>
@@ -125,20 +123,14 @@ export function ConnectDomainDialog({
             <FieldGroup>
               <Field>
                 <FieldLabel>Cloudflare domain</FieldLabel>
-                <Select required value={zoneId} onValueChange={chooseZone}>
-                  <SelectTrigger aria-label="Cloudflare domain">
-                    <SelectValue placeholder="Choose an active domain" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectGroup>
-                      {zones.map((zone) => (
-                        <SelectItem key={zone.id} value={zone.id}>
-                          {zone.name}
-                        </SelectItem>
-                      ))}
-                    </SelectGroup>
-                  </SelectContent>
-                </Select>
+                <DropdownSelect
+                  ariaLabel="Cloudflare domain"
+                  options={zones.map((zone) => ({ label: zone.name, value: zone.id }))}
+                  placeholder="Choose an active domain"
+                  required
+                  value={zoneId}
+                  onValueChange={chooseZone}
+                />
               </Field>
             </FieldGroup>
             <DialogFooter>

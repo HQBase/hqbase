@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 const original = {
   createdAt: "2026-07-28T15:30:00.000Z",
   fromAddress: "owner@example.com",
+  fromName: null,
   receivedAt: "2026-07-28T15:29:00.000Z",
   sentAt: null,
   snippet: "Fallback",

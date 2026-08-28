@@ -1,8 +1,11 @@
+import type { SignatureSnapshot } from "../signatures/types";
+
 export type DraftAttachment = {
   id: string;
   filename: string;
   contentType: string;
   sizeBytes: number;
+  inline: boolean;
 };
 
 export type Draft = {
@@ -17,6 +20,7 @@ export type Draft = {
   subject: string;
   text: string;
   html: string;
+  signature: SignatureSnapshot;
   version: number;
   updatedAt: string;
   attachments: DraftAttachment[];

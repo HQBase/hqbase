@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { destroyPlan, destroyResources, destroyTargets } from "../../../scripts/hqbase/destroy.mjs";
 import { configPath, recordWorkerDeployedForConfig } from "../../../scripts/hqbase/manifest.mjs";
@@ -179,6 +179,35 @@ describe("operator destroy scopes", () => {
     expect(removeWorker).toBeGreaterThan(detach);
   });
 
+  it("empties created storage after stopping writers and before deleting the bucket", () => {
+    const events = [];
+
+    destroyResources("all", manifest(), {
+      checkpoint: () => {},
+      emptyBucket: (input) => events.push(`empty ${input.r2.bucket}`),
+      runCommand: (_command, args) => {
+        const operation = args.slice(2).join(" ");
+        if (operation === "delete hqbase-qa --force") events.push("delete worker");
+        if (operation === "r2 bucket delete hqbase-mail") events.push("delete bucket");
+        return "";
+      }
+    });
+
+    expect(events).toEqual(["delete worker", "empty hqbase-mail", "delete bucket"]);
+  });
+
+  it("does not empty reused storage", () => {
+    const emptyBucket = vi.fn();
+
+    destroyResources("storage", manifest({ ownership: "reused" }), {
+      checkpoint: () => {},
+      emptyBucket,
+      runCommand: () => ""
+    });
+
+    expect(emptyBucket).not.toHaveBeenCalled();
+  });
+
   it("records a direct signed deploy before deleting its bound queues", () => {
     const input = manifest();
     input.worker.deployed = false;
@@ -226,7 +255,7 @@ describe("operator destroy scopes", () => {
     expect(checkpoints).toEqual([]);
   });
 
-  it("keeps completed cleanup checkpoints when a later deletion fails", () => {
+  it("keeps completed cleanup checkpoints when emptying storage fails", () => {
     const input = manifest();
     input.worker.deployed = false;
     const checkpoints = [];
@@ -234,14 +263,12 @@ describe("operator destroy scopes", () => {
     expect(() =>
       destroyResources("state", input, {
         checkpoint: (next) => checkpoints.push(structuredClone(next)),
-        runCommand: (_command, args) => {
-          if (args.slice(2, 6).join(" ") === "r2 bucket delete hqbase-mail") {
-            throw new Error("bucket is not empty");
-          }
-          return "";
-        }
+        emptyBucket: () => {
+          throw new Error("could not empty bucket");
+        },
+        runCommand: () => ""
       })
-    ).toThrow(/bucket is not empty/);
+    ).toThrow(/could not empty bucket/);
 
     expect(checkpoints).toHaveLength(2);
     expect(input).toMatchObject({

@@ -7,6 +7,7 @@ import { applyCurrentMigrations } from "./current-migrations";
 
 const mailboxId = "mbx_search";
 const scope = { includeUnassigned: false, mailboxIds: [mailboxId] };
+const longSearch = "This search phrase stays exact after fifty bytes in remote D1";
 
 describe("message search", () => {
   beforeAll(async () => {
@@ -14,15 +15,23 @@ describe("message search", () => {
     const stamp = "2026-08-22T00:00:00.000Z";
     await env.DB.batch([
       env.DB.prepare(
-        `INSERT INTO mailboxes (id, address, display_name, is_active, created_at, updated_at)
-         VALUES (?, 'search@example.com', 'Search', 1, ?, ?)`
+        `INSERT INTO mail_domains
+         (id, name, receiving_status, sending_status, dns_status, is_enabled, created_at, updated_at)
+         VALUES ('dom_search', 'example.com', 'ready', 'ready', 'ready', 1, ?, ?)`
+      ).bind(stamp, stamp),
+      env.DB.prepare(
+        `INSERT INTO mailboxes
+         (id, address, mail_domain_id, display_name, is_active, created_at, updated_at)
+         VALUES (?, 'search@example.com', 'dom_search', 'Search', 1, ?, ?)`
       ).bind(mailboxId, stamp, stamp),
       ...searchMessageRows("percent", "Save 100% today", stamp),
       ...searchMessageRows("percent_noise", "Save 100 dollars today", stamp),
       ...searchMessageRows("underscore", "Project a_b", stamp),
       ...searchMessageRows("underscore_noise", "Project axb", stamp),
       ...searchMessageRows("backslash", String.raw`Path C:\mail`, stamp),
-      ...searchMessageRows("backslash_noise", "Path C:/mail", stamp)
+      ...searchMessageRows("backslash_noise", "Path C:/mail", stamp),
+      ...searchMessageRows("long", longSearch, stamp),
+      ...searchMessageRows("long_noise", `${longSearch.slice(0, -2)}xx`, stamp)
     ]);
   });
 
@@ -37,6 +46,17 @@ describe("message search", () => {
     expect(messagePage.messages.map((message) => message.id)).toEqual([expectedId]);
     expect(conversationPage.conversations.map((conversation) => conversation.id)).toEqual([
       expectedId
+    ]);
+  });
+
+  it("keeps searches longer than D1's LIKE pattern limit exact", async () => {
+    expect(new TextEncoder().encode(longSearch).byteLength).toBeGreaterThan(50);
+    const messagePage = await listMessagePage(env.DB, { scope, search: longSearch });
+    const conversationPage = await listConversationPage(env.DB, { scope, search: longSearch });
+
+    expect(messagePage.messages.map((message) => message.id)).toEqual(["msg_search_long"]);
+    expect(conversationPage.conversations.map((conversation) => conversation.id)).toEqual([
+      "msg_search_long"
     ]);
   });
 });

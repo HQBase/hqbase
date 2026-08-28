@@ -8,13 +8,13 @@ import type { MailConnectionStatus } from "@/features/events/types";
 import type { Mailbox } from "@/features/mailboxes/types";
 import type { UnreadCounts } from "@/features/notifications/types";
 import { cn } from "@/lib/cn";
-import type { FolderId, SettingsTabId } from "@/lib/routes";
+import type { AgentTabId, FolderId, SettingsTabId } from "@/lib/routes";
 import { appRoutePath } from "@/lib/routes";
 import { AccountMenu } from "./account-menu";
 import { quickAccess } from "./sidebar/constants";
 import { MailConnectionIndicator } from "./sidebar/mail-connection-indicator";
 import { isModifiedNavigation } from "./sidebar/sidebar-helpers";
-import { MailNav, SettingsNav } from "./sidebar/sidebar-nav";
+import { AgentsNav, ContactsNav, MailNav, SettingsNav } from "./sidebar/sidebar-nav";
 
 type SidebarProps = {
   activeFolder: FolderId;
@@ -22,19 +22,24 @@ type SidebarProps = {
   mailboxId: string;
   mailboxFilter?: {
     mailboxes: Mailbox[];
+    open?: boolean;
     value: string;
     onChange: (mailboxId: string) => void;
+    onOpenChange?: (open: boolean) => void;
   };
   user: CurrentUser;
   unread: UnreadCounts;
   onCompose?: () => void;
   onFolderChange: (folder: FolderId) => void;
+  onSectionChange?: ((folder: FolderId) => void) | undefined;
   onSignedOut: () => void;
   variant?: "desktop" | "drawer";
   sidebarCollapsed?: boolean;
+  activeAgentTab?: AgentTabId | undefined;
   activeSettingsTab?: SettingsTabId | undefined;
   canManage?: boolean | undefined;
   connectionStatus?: MailConnectionStatus | undefined;
+  onAgentTabChange?: ((tab: AgentTabId) => void) | undefined;
   onSettingsTabChange?: ((tab: SettingsTabId) => void) | undefined;
   onToggleSidebar?: () => void;
 };
@@ -48,98 +53,117 @@ export function Sidebar({
   user,
   onCompose,
   onFolderChange,
+  onSectionChange,
   onSignedOut,
   variant = "desktop",
   sidebarCollapsed = false,
+  activeAgentTab,
   activeSettingsTab,
   canManage = false,
   connectionStatus = "connecting",
+  onAgentTabChange,
   onSettingsTabChange,
   onToggleSidebar
 }: SidebarProps): React.ReactElement {
   const isDrawer = variant === "drawer";
+  const handleSectionChange = onSectionChange ?? onFolderChange;
 
   return (
     <aside
       className={cn(
         "flex-col text-foreground",
-        isDrawer
-          ? "flex h-full w-full bg-sidebar pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-[max(0.75rem,env(safe-area-inset-top))]"
-          : "hidden h-full w-full bg-rail lg:flex"
+        isDrawer ? "flex h-full w-full bg-transparent" : "hidden h-full w-full bg-rail lg:flex"
       )}
     >
       <div className="flex h-full min-h-0 flex-1">
-        {!isDrawer ? (
-          <nav
-            aria-label="Quick access"
-            className="flex w-12 shrink-0 flex-col items-center py-2 pr-2 pl-1"
+        <nav
+          aria-label="Quick access"
+          className={cn(
+            "flex w-12 shrink-0 flex-col items-center",
+            isDrawer
+              ? "bg-black px-1 pb-[max(1.25rem,calc(env(safe-area-inset-bottom)+0.5rem))] pt-[max(1.25rem,calc(env(safe-area-inset-top)+0.5rem))]"
+              : "py-2 pr-2 pl-1"
+          )}
+        >
+          <a
+            aria-label="Inbox"
+            className="rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            href={appRoutePath({ kind: "mail", folder: "inbox", messageId: null })}
+            onClick={(event) => {
+              if (isModifiedNavigation(event)) return;
+              event.preventDefault();
+              handleSectionChange("inbox");
+            }}
           >
-            <a
-              aria-label="Inbox"
-              className="rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              href={appRoutePath({ kind: "mail", folder: "inbox", messageId: null })}
-              onClick={(event) => {
-                if (isModifiedNavigation(event)) return;
-                event.preventDefault();
-                onFolderChange("inbox");
-              }}
-            >
-              <img alt="" className="size-7 rounded-md object-contain" src="/logo.svg" />
-            </a>
-            <div className="mt-5 flex flex-col gap-1">
-              {quickAccess.map(({ folder, icon: Icon, label }) => {
-                const isActive =
-                  folder === "settings" ? activeFolder === "settings" : activeFolder !== "settings";
-                return (
-                  <Button
-                    asChild
-                    className={cn(
-                      "size-9 text-tertiary [@media(hover:hover)]:hover:bg-muted/70 [@media(hover:hover)]:hover:text-foreground",
-                      isActive && "bg-selected text-foreground"
-                    )}
-                    key={folder}
-                    size="icon"
-                    title={label}
-                    type="button"
-                    variant="ghost"
+            <img alt="" className="size-7 rounded-md object-contain" src="/logo.svg" />
+          </a>
+          <div className={cn("mt-5 flex flex-col gap-1", isDrawer && "w-full items-center")}>
+            {quickAccess.map(({ folder, icon: Icon, label }) => {
+              const isActive =
+                folder === "inbox"
+                  ? !["settings", "contacts", "agents"].includes(activeFolder)
+                  : activeFolder === folder;
+              return (
+                <Button
+                  asChild
+                  className={cn(
+                    "text-tertiary [@media(hover:hover)]:hover:bg-muted/70 [@media(hover:hover)]:hover:text-foreground",
+                    isDrawer ? "size-10" : "size-9",
+                    isActive &&
+                      "bg-selected text-foreground [@media(hover:hover)]:hover:bg-selected"
+                  )}
+                  key={folder}
+                  size="icon"
+                  title={label}
+                  type="button"
+                  variant="ghost"
+                >
+                  <a
+                    aria-current={isActive ? "page" : undefined}
+                    aria-label={label}
+                    href={
+                      folder === "settings"
+                        ? appRoutePath({ kind: "settings", tab: "mailboxes" })
+                        : folder === "agents"
+                          ? appRoutePath({ kind: "agents", tab: "connections" })
+                          : folder === "contacts"
+                            ? appRoutePath({ kind: "contacts", contactId: null })
+                            : appRoutePath({ kind: "mail", folder, messageId: null })
+                    }
+                    onClick={(event) => {
+                      if (isModifiedNavigation(event)) return;
+                      event.preventDefault();
+                      handleSectionChange(folder);
+                    }}
                   >
-                    <a
-                      aria-current={isActive ? "page" : undefined}
-                      aria-label={label}
-                      href={
-                        folder === "settings"
-                          ? appRoutePath({ kind: "settings", tab: "mailboxes" })
-                          : appRoutePath({ kind: "mail", folder, messageId: null })
-                      }
-                      onClick={(event) => {
-                        if (isModifiedNavigation(event)) return;
-                        event.preventDefault();
-                        onFolderChange(folder);
-                      }}
-                    >
-                      <Icon />
-                    </a>
-                  </Button>
-                );
-              })}
-            </div>
-            <div className="mt-auto flex flex-col items-center gap-1">
-              <AccountMenu compact user={user} onSignedOut={onSignedOut} />
-            </div>
-          </nav>
-        ) : null}
+                    <Icon />
+                  </a>
+                </Button>
+              );
+            })}
+          </div>
+          <div className={cn("mt-auto flex flex-col items-center gap-1", isDrawer && "w-full")}>
+            <AccountMenu compact user={user} onSignedOut={onSignedOut} />
+          </div>
+        </nav>
         <div
           className={cn(
-            "flex min-w-0 flex-1 flex-col p-2",
-            !isDrawer &&
-              "ml-2 h-full overflow-hidden rounded-[24px] border border-divider bg-sidebar p-2 shadow-sm"
+            "flex h-full min-w-0 flex-1 flex-col overflow-hidden bg-sidebar",
+            isDrawer
+              ? "px-2 pb-[max(1.25rem,calc(env(safe-area-inset-bottom)+0.5rem))] pt-[max(1.25rem,calc(env(safe-area-inset-top)+0.5rem))]"
+              : "ml-2 rounded-[24px] border border-divider p-2 shadow-sm"
           )}
         >
           <div className="mb-5 flex h-9 items-center justify-between gap-3 px-3.5 pr-0">
             <div className="flex min-w-0 items-center gap-3">
-              {isDrawer ? <img alt="" className="h-7 w-auto shrink-0" src="/logo.svg" /> : null}
               <span className="truncate text-sm font-semibold leading-none tracking-tight">
-                Mail
+                {activeFolder === "settings"
+                  ? "Settings"
+                  : activeFolder === "agents"
+                    ? "Agents"
+                    : activeFolder === "contacts"
+                      ? "Contacts"
+                      : "Mail"}
               </span>
               <MailConnectionIndicator status={connectionStatus} />
             </div>
@@ -171,11 +195,22 @@ export function Sidebar({
               activeSettingsTab={activeSettingsTab}
               canManage={canManage}
               isDrawer={isDrawer}
-              user={user}
+              onCompose={onCompose}
+              onSettingsTabChange={onSettingsTabChange}
+            />
+          ) : activeFolder === "agents" ? (
+            <AgentsNav
+              activeAgentTab={activeAgentTab}
+              canManage={canManage}
+              isDrawer={isDrawer}
+              onAgentTabChange={onAgentTabChange}
+              onCompose={onCompose}
+            />
+          ) : activeFolder === "contacts" ? (
+            <ContactsNav
+              isDrawer={isDrawer}
               onCompose={onCompose}
               onFolderChange={onFolderChange}
-              onSettingsTabChange={onSettingsTabChange}
-              onSignedOut={onSignedOut}
             />
           ) : (
             <MailNav
@@ -185,10 +220,8 @@ export function Sidebar({
               mailboxFilter={mailboxFilter}
               unread={unread}
               isDrawer={isDrawer}
-              user={user}
               onCompose={onCompose}
               onFolderChange={onFolderChange}
-              onSignedOut={onSignedOut}
             />
           )}
         </div>

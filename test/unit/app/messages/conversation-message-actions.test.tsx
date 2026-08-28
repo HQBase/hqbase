@@ -63,6 +63,12 @@ describe("conversation message actions", () => {
     const lastForward = view.container.querySelector<HTMLButtonElement>(
       '[data-compose-action="forward"][data-compose-message-id="msg_2"]'
     );
+    expect(
+      view.container.querySelector<HTMLElement>('[data-thread-message-id="msg_1"]')?.className
+    ).toContain("pt-2");
+    expect(
+      view.container.querySelector<HTMLElement>('[data-thread-message-id="msg_2"]')?.className
+    ).toContain("pt-5");
     await flushHookEffects(() => reply?.click());
     await flushHookEffects(() => lastForward?.click());
 

@@ -73,13 +73,19 @@ export function verifyManifest(envelope, publicKeyBase64 = publicKey) {
     manifest.channel !== "stable" ||
     !/^\d+\.\d+\.\d+/.test(manifest.version) ||
     !/^\d+\.\d+\.\d+/.test(manifest.minVersion) ||
+    (manifest.notes !== undefined &&
+      (!Array.isArray(manifest.notes) ||
+        manifest.notes.length > 100 ||
+        manifest.notes.some(
+          (note) => typeof note !== "string" || note.length < 1 || note.length > 2_000
+        ))) ||
     !/^[a-f0-9]{64}$/.test(manifest.artifact?.sha256) ||
     !Number.isInteger(manifest.artifact?.size) ||
     manifest.artifact.size <= 0
   ) {
     throw new Error("Release manifest is incompatible.");
   }
-  return manifest;
+  return { ...manifest, notes: manifest.notes ?? [] };
 }
 
 export function compareVersions(left, right) {
@@ -119,10 +125,11 @@ export function normalizeConfig(config, version, artifactSha256) {
       ...(artifactSha256 ? { HQBASE_RELEASE_ARTIFACT_SHA256: artifactSha256 } : {}),
       HQBASE_WORKER_NAME: workerNameFromConfig(config)
     },
-    d1_databases: config.d1_databases?.map((binding) => ({
-      ...binding,
-      migrations_dir: "migrations"
-    }))
+    d1_databases: config.d1_databases?.map((binding) => {
+      const normalized = { ...binding, migrations_dir: "migrations" };
+      delete normalized.migrations_pattern;
+      return normalized;
+    })
   };
 }
 

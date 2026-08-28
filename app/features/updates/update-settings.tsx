@@ -163,6 +163,30 @@ export function UpdateSettings({
       </div>
       {status?.available && !progress ? (
         <div className="flex flex-col gap-4 pt-1">
+          <div className="rounded-xl border border-border/80 bg-muted/25 p-4">
+            <h3 className="text-sm font-medium">What’s changing</h3>
+            {status.release.notes.length > 0 ? (
+              <ul className="mt-2 space-y-2 pl-4 text-xs leading-5 text-muted-foreground">
+                {status.release.notes.map((note) => (
+                  <li className="list-disc pl-1" key={note}>
+                    {note}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="mt-2 text-xs leading-5 text-muted-foreground">
+                This older release record does not include an embedded changelog.
+              </p>
+            )}
+            <a
+              className="mt-3 inline-flex text-xs font-medium text-foreground underline-offset-4 hover:underline"
+              href={status.release.notesUrl}
+              rel="noreferrer"
+              target="_blank"
+            >
+              Read complete release notes
+            </a>
+          </div>
           <div>
             <h3 className="text-sm font-medium">Apply update</h3>
             <p className="mt-1 max-w-2xl text-xs leading-5 text-muted-foreground">

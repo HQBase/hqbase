@@ -1,4 +1,4 @@
-export const mailEventTopics = ["messages", "drafts", "mailboxes"] as const;
+export const mailEventTopics = ["messages", "drafts", "mailboxes", "labels"] as const;
 
 export type MailEventTopic = (typeof mailEventTopics)[number];
 

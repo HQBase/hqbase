@@ -10,7 +10,7 @@ import type { MessageEventTarget } from "../events/service";
 
 import type { MessageAction } from "./actions";
 import { decodeKeysetCursor, encodeKeysetCursor, type KeysetCursor } from "./keyset-cursor";
-import { literalSearchPattern } from "./search";
+import { literalContains } from "./search";
 import type {
   ConversationFolder,
   ConversationPage,
@@ -23,9 +23,12 @@ import type {
 const conversationCursorVersion = 1;
 
 export type ListConversationFilters = {
+  correspondentEmail?: string | undefined;
   cursor?: string | undefined;
   folder?: ConversationFolder | undefined;
   limit?: number | undefined;
+  labelId?: string | undefined;
+  labelIds?: readonly string[] | undefined;
   mailboxId?: string | undefined;
   scope: MessageScope;
   search?: string | undefined;
@@ -69,14 +72,40 @@ export async function listConversationPage(
     eligibilityWhere.push(sql`accessible.folder = ${filters.folder}`);
   }
   if (filters.search) {
-    const like = literalSearchPattern(filters.search);
     eligibilityWhere.push(
-      sql`(accessible.subject LIKE ${like} ESCAPE '\\'
-           OR accessible.from_address LIKE ${like} ESCAPE '\\'
-           OR accessible.to_json LIKE ${like} ESCAPE '\\'
-           OR accessible.snippet LIKE ${like} ESCAPE '\\'
-           OR accessible.text_body LIKE ${like} ESCAPE '\\')`
+      sql`(${literalContains(sql`accessible.subject`, filters.search)}
+           OR ${literalContains(sql`accessible.from_address`, filters.search)}
+           OR ${literalContains(sql`accessible.from_name`, filters.search)}
+           OR ${literalContains(sql`accessible.to_json`, filters.search)}
+           OR ${literalContains(sql`accessible.snippet`, filters.search)}
+           OR ${literalContains(sql`accessible.text_body`, filters.search)})`
     );
+  }
+  if (filters.correspondentEmail) {
+    eligibilityWhere.push(sql`(
+      lower(accessible.from_address) = ${filters.correspondentEmail}
+      OR EXISTS (
+        SELECT 1 FROM json_each(accessible.to_json) recipient
+        WHERE lower(trim(CAST(recipient.value AS TEXT))) = ${filters.correspondentEmail}
+      )
+      OR EXISTS (
+        SELECT 1 FROM json_each(accessible.cc_json) recipient
+        WHERE lower(trim(CAST(recipient.value AS TEXT))) = ${filters.correspondentEmail}
+      )
+      OR EXISTS (
+        SELECT 1 FROM json_each(accessible.bcc_json) recipient
+        WHERE lower(trim(CAST(recipient.value AS TEXT))) = ${filters.correspondentEmail}
+      )
+    )`);
+  }
+  const labelIds = filters.labelIds ?? (filters.labelId ? [filters.labelId] : []);
+  for (const labelId of labelIds) {
+    eligibilityWhere.push(sql`EXISTS (
+      SELECT 1
+      FROM accessible labeled
+      JOIN message_labels assignment ON assignment.message_id = labeled.id
+      WHERE labeled.thread_id = accessible.thread_id AND assignment.label_id = ${labelId}
+    )`);
   }
 
   const cursor = filters.cursor ? decodeConversationCursor(filters.cursor) : null;
@@ -256,6 +285,7 @@ function mapConversationSummary(row: ConversationRow): ConversationSummary {
     direction: row.direction,
     folder: row.folder,
     fromAddress: row.from_address,
+    fromName: row.from_name,
     to: parseJsonList(row.to_json),
     subject: row.subject,
     snippet: row.snippet,

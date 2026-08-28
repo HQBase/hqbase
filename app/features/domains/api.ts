@@ -1,5 +1,5 @@
 import type { CloudflareZone } from "@/features/setup/types";
-import { apiGet, apiPatch, apiPost, apiPut } from "@/lib/api-client";
+import { apiDelete, apiGet, apiPatch, apiPost, apiPut } from "@/lib/api-client";
 import type { MailDomain } from "./types";
 export const listDomains = () => apiGet<MailDomain[]>("/api/domains");
 export const listAvailableCloudflareZones = async () =>
@@ -12,6 +12,11 @@ export const provisionDomain = (input: {
   name: string;
   enableSending: boolean;
 }) => apiPost<{ domain: MailDomain }>("/api/domains/provision", input);
+export const recheckDomain = (id: string) => apiPost<MailDomain>(`/api/domains/${id}/recheck`, {});
+export const disconnectDomain = (id: string) =>
+  apiPost<MailDomain>(`/api/domains/${id}/disconnect`, {});
+export const forgetDomain = (id: string, confirmation: string) =>
+  apiDelete(`/api/domains/${id}`, { confirmation });
 export const updateDomain = (
   id: string,
   input: {

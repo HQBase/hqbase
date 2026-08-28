@@ -9,7 +9,13 @@ export const mailFolders = [
 
 export const draftFolder = { id: "drafts", label: "Drafts", path: "drafts" } as const;
 
-const folders = [...mailFolders, draftFolder, { id: "settings", label: "Settings" }] as const;
+const folders = [
+  ...mailFolders,
+  draftFolder,
+  { id: "contacts", label: "Contacts" },
+  { id: "agents", label: "Agents" },
+  { id: "settings", label: "Settings" }
+] as const;
 
 export const settingsTabs = [
   "mailboxes",
@@ -17,18 +23,24 @@ export const settingsTabs = [
   "domains",
   "notifications",
   "interface",
-  "mcp",
+  "labels",
+  "signatures",
   "updates",
   "debug"
 ] as const;
 
+export const agentTabs = ["connections", "mailboxes", "provisioning"] as const;
+
 export type MailFolderId = (typeof mailFolders)[number]["id"];
 export type FolderId = (typeof folders)[number]["id"];
 export type SettingsTabId = (typeof settingsTabs)[number];
+export type AgentTabId = (typeof agentTabs)[number];
 
 export type AppRoute =
   | { kind: "mail"; folder: MailFolderId; messageId: string | null }
   | { kind: "drafts"; draftId: string | null }
+  | { kind: "contacts"; contactId: string | null }
+  | { kind: "agents"; tab: AgentTabId }
   | { kind: "settings"; tab: SettingsTabId };
 
 const publicAuthenticationPaths = new Set(["/forgot-password", "/reset-password", "/set-password"]);
@@ -48,14 +60,29 @@ export function readAppRoute(input: string | URL): AppRoute {
   const url = input instanceof URL ? input : new URL(input, "https://hqbase.local");
   const legacySettings = url.searchParams.get("settings");
   if (legacySettings) {
+    if (legacySettings === "mcp") return { kind: "agents", tab: "connections" };
+    if (legacySettings === "agents") return { kind: "agents", tab: "mailboxes" };
     const tab = readSettingsTab(legacySettings) ?? legacySettingsTabs[legacySettings];
     if (tab) return { kind: "settings", tab };
   }
 
   const segments = url.pathname.split("/").filter(Boolean);
   if (segments[0] === "settings") {
+    if (segments[1] === "mcp") return { kind: "agents", tab: "connections" };
+    if (segments[1] === "agents") return { kind: "agents", tab: "mailboxes" };
     const tab = readSettingsTab(segments[1]) ?? legacySettingsTabs[segments[1] ?? ""];
     return { kind: "settings", tab: tab ?? "mailboxes" };
+  }
+
+  if (segments[0] === "agents") {
+    return { kind: "agents", tab: readAgentTab(segments[1]) ?? "connections" };
+  }
+
+  if (segments[0] === "contacts") {
+    return {
+      kind: "contacts",
+      contactId: segments[1] ? decodePathSegment(segments[1]) : null
+    };
   }
 
   // Drafts canonical: /mail/drafts[/draftId], legacy: /drafts[/draftId]
@@ -95,6 +122,10 @@ export function readAppRoute(input: string | URL): AppRoute {
 
 export function appRoutePath(route: AppRoute): string {
   if (route.kind === "settings") return `/settings/${route.tab}`;
+  if (route.kind === "agents") return `/agents/${route.tab}`;
+  if (route.kind === "contacts") {
+    return route.contactId ? `/contacts/${encodeURIComponent(route.contactId)}` : "/contacts";
+  }
   if (route.kind === "drafts") {
     const base = `/mail/${draftFolder.path}`;
     return route.draftId ? `${base}/${encodeURIComponent(route.draftId)}` : base;
@@ -108,6 +139,10 @@ function isSettingsTabId(value: string): value is SettingsTabId {
   return settingsTabs.includes(value as SettingsTabId);
 }
 
+function isAgentTabId(value: string): value is AgentTabId {
+  return agentTabs.includes(value as AgentTabId);
+}
+
 function readMailFolder(segment: string | undefined): MailFolderId | null {
   if (!segment) return null;
   if (segment === "catchall" || segment === "catch-all") return "catchall";
@@ -116,6 +151,10 @@ function readMailFolder(segment: string | undefined): MailFolderId | null {
 
 function readSettingsTab(segment: string | undefined): SettingsTabId | null {
   return segment && isSettingsTabId(segment) ? segment : null;
+}
+
+function readAgentTab(segment: string | undefined): AgentTabId | null {
+  return segment && isAgentTabId(segment) ? segment : null;
 }
 
 function decodePathSegment(segment: string): string | null {

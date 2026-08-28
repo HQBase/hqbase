@@ -135,10 +135,13 @@ describe("HQBase installation resources", () => {
 
     expect(config.assets.run_worker_first).toEqual([
       "/api/*",
+      "/management/*",
       "/mcp",
       "/mcp/*",
       "/.well-known/*",
       "/skills/hqbase-mail/SKILL.md",
+      "/skills/hqbase-mailbox/SKILL.md",
+      "/skills/hqbase-provisioner/SKILL.md",
       "/AGENTS.md",
       "/agents.md"
     ]);

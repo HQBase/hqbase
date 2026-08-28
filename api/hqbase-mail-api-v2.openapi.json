@@ -1,0 +1,4354 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "HQBase Mail API",
+    "version": "2.0.0",
+    "description": "Stable v2 mail API for HQBase clients, automations, and agents. Additive fields may be introduced within v2; clients must ignore unknown response fields. Administrative APIs are not part of this contract."
+  },
+  "servers": [
+    {
+      "url": "{origin}",
+      "variables": {
+        "origin": {
+          "default": "https://mail.example.com",
+          "description": "HQBase origin"
+        }
+      }
+    }
+  ],
+  "tags": [
+    {
+      "name": "Mailboxes"
+    },
+    {
+      "name": "Messages"
+    },
+    {
+      "name": "Changes"
+    },
+    {
+      "name": "Conversations"
+    },
+    {
+      "name": "Labels"
+    },
+    {
+      "name": "Drafts"
+    },
+    {
+      "name": "Sending"
+    },
+    {
+      "name": "Events"
+    },
+    {
+      "name": "Signatures"
+    }
+  ],
+  "paths": {
+    "/api/v2/mailboxes": {
+      "get": {
+        "summary": "List mailboxes",
+        "security": [
+          {
+            "oauth2": ["mail:read"]
+          },
+          {
+            "cookieSession": []
+          },
+          {
+            "agentBearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Mailboxes",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Mailbox"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid authentication",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient OAuth scope or mailbox access",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found or not visible",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "tags": ["Mailboxes"],
+        "operationId": "listMailboxes",
+        "x-hqbase-agent-capabilities": ["mail:read"]
+      }
+    },
+    "/api/v2/events": {
+      "get": {
+        "summary": "Open change event WebSocket",
+        "description": "Opens an authenticated wake-only WebSocket. The server sends `changed` frames for messages, mailboxes, shared labels, and permitted drafts. Frames contain no mail data or cursors. After a frame or reconnect, read the authoritative REST resources and change journals. OAuth tokens require `mail:read`; draft frames also require `mail:send`. The authorization decision at upgrade is an event-delivery lease for 10 minutes. Credential or session revocation does not close the current socket immediately. The server closes the socket when the lease ends, and reconnection must use current credentials and permissions.",
+        "security": [
+          {
+            "oauth2": ["mail:read"]
+          },
+          {
+            "cookieSession": []
+          },
+          {
+            "agentBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "Upgrade",
+            "in": "header",
+            "required": true,
+            "description": "WebSocket upgrade request.",
+            "schema": {
+              "type": "string",
+              "const": "websocket"
+            }
+          }
+        ],
+        "responses": {
+          "101": {
+            "description": "WebSocket established. Text frames use `{\"type\":\"changed\",\"topic\":\"messages|drafts|mailboxes|labels\"}`."
+          },
+          "401": {
+            "description": "Missing or invalid authentication",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient OAuth scope or invalid browser origin",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "Method not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "426": {
+            "description": "WebSocket upgrade required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Event connection unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "tags": ["Events"],
+        "operationId": "openMailEvents",
+        "x-hqbase-agent-capabilities": ["mail:read"]
+      }
+    },
+    "/api/v2/changes": {
+      "get": {
+        "summary": "Read message changes",
+        "description": "Returns a bounded page of message upserts and deletion tombstones in journal order. A request without a cursor returns an empty checkpoint at the current high-water sequence.",
+        "security": [
+          {
+            "oauth2": ["mail:read"]
+          },
+          {
+            "cookieSession": []
+          },
+          {
+            "agentBearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A bounded page of message changes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessageChangePage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request. `INVALID_LIMIT` when limit is not an integer from 1 to 100. `INVALID_CHANGE_CURSOR` when the cursor is malformed, foreign, or beyond the current journal. `INVALID_CHANGE_FILTER` when a mailbox, folder, or search filter is supplied.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid authentication",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient OAuth scope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "`CHANGE_CURSOR_EXPIRED` when future journal retention removes a required range. The client must start a new full bootstrap.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "tags": ["Changes"],
+        "operationId": "listMessageChanges",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 512
+            },
+            "description": "Opaque cursor from a checkpoint or previous changes page. Omit it only to create a new checkpoint."
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 100
+            },
+            "description": "Maximum number of journal entries read for this page."
+          }
+        ],
+        "x-hqbase-agent-capabilities": ["mail:read"]
+      }
+    },
+    "/api/v2/labels": {
+      "get": {
+        "summary": "List labels",
+        "description": "Lists shared workspace labels. Labels organize mail but never grant mailbox access or change folders.",
+        "security": [
+          {
+            "oauth2": ["mail:read"]
+          },
+          {
+            "cookieSession": []
+          },
+          {
+            "agentBearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Workspace labels",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Label"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid authentication",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The mail:read permission is required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "tags": ["Labels"],
+        "operationId": "listLabels",
+        "x-hqbase-agent-capabilities": ["mail:read"]
+      }
+    },
+    "/api/v2/messages": {
+      "get": {
+        "summary": "List or search messages",
+        "security": [
+          {
+            "oauth2": ["mail:read"]
+          },
+          {
+            "cookieSession": []
+          },
+          {
+            "agentBearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "One page of messages, newest activity first.",
+            "headers": {
+              "Link": {
+                "required": false,
+                "description": "RFC 8288 link to the next page, as `<url>; rel=\"next\"`. The header is absent on the last page.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MessageSummary"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request. `INVALID_LIMIT` when limit is not an integer from 1 to 100. `INVALID_CURSOR` when the cursor is malformed or is not a message cursor.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid authentication",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient OAuth scope or mailbox access",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found or not visible",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "tags": ["Messages"],
+        "operationId": "listMessages",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "folder",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": ["inbox", "sent", "drafts", "archived", "trash", "catchall"]
+            },
+            "description": "Message folder to list. Drafts are separate resources, not message rows. Use `/api/v2/drafts` to list drafts."
+          },
+          {
+            "in": "query",
+            "name": "mailboxId",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 100
+            },
+            "description": "Limit results to one accessible mailbox."
+          },
+          {
+            "in": "query",
+            "name": "labelId",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 100
+            },
+            "description": "Limit results to messages assigned this existing label."
+          },
+          {
+            "in": "query",
+            "name": "labelIds",
+            "required": false,
+            "style": "form",
+            "explode": true,
+            "schema": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "maxLength": 100
+              }
+            },
+            "description": "Repeat this parameter to require every listed label on each returned message."
+          },
+          {
+            "in": "query",
+            "name": "search",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            },
+            "description": "Search one literal substring in the subject, sender, To recipients, snippet, and plain-text body. The characters %, _, and \\ are ordinary text."
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 100
+            },
+            "description": "Maximum number of messages in the page."
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 512
+            },
+            "description": "Opaque cursor from the previous page. Read it from the Link header and send it unchanged."
+          }
+        ],
+        "x-hqbase-agent-capabilities": ["mail:read"]
+      }
+    },
+    "/api/v2/messages/{id}": {
+      "get": {
+        "summary": "Get a message",
+        "security": [
+          {
+            "oauth2": ["mail:read"]
+          },
+          {
+            "cookieSession": []
+          },
+          {
+            "agentBearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Message",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessageDetail"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid authentication",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient OAuth scope or mailbox access",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found or not visible",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "tags": ["Messages"],
+        "operationId": "getMessage",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100
+            }
+          }
+        ],
+        "x-hqbase-agent-capabilities": ["mail:read"]
+      }
+    },
+    "/api/v2/messages/{id}/thread": {
+      "get": {
+        "summary": "Get a message thread",
+        "security": [
+          {
+            "oauth2": ["mail:read"]
+          },
+          {
+            "cookieSession": []
+          },
+          {
+            "agentBearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Accessible thread messages",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MessageDetail"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid authentication",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient OAuth scope or mailbox access",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found or not visible",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "tags": ["Messages"],
+        "operationId": "getMessageThread",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100
+            }
+          }
+        ],
+        "x-hqbase-agent-capabilities": ["mail:read"]
+      }
+    },
+    "/api/v2/messages/{id}/html": {
+      "get": {
+        "summary": "Get sanitized message HTML",
+        "security": [
+          {
+            "oauth2": ["mail:read"]
+          },
+          {
+            "cookieSession": []
+          },
+          {
+            "agentBearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Sanitized HTML",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessageHtml"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid authentication",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient OAuth scope or mailbox access",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found or not visible",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "tags": ["Messages"],
+        "operationId": "getMessageHtml",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100
+            }
+          },
+          {
+            "in": "query",
+            "name": "loadRemoteImages",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "enum": [1]
+            },
+            "description": "Load remote images for this response only."
+          }
+        ],
+        "x-hqbase-agent-capabilities": ["mail:read"]
+      }
+    },
+    "/api/v2/messages/{id}/inline/{attachmentId}": {
+      "get": {
+        "summary": "Render a safe inline image",
+        "security": [
+          {
+            "oauth2": ["mail:read"]
+          },
+          {
+            "cookieSession": []
+          },
+          {
+            "agentBearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Inline image",
+            "content": {
+              "image/*": {
+                "schema": {
+                  "type": "string",
+                  "contentEncoding": "binary"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid authentication",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient OAuth scope or mailbox access",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found or not visible",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Unsupported inline media",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "tags": ["Messages"],
+        "operationId": "getInlineAttachment",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100
+            }
+          },
+          {
+            "in": "path",
+            "name": "attachmentId",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100
+            }
+          }
+        ],
+        "x-hqbase-agent-capabilities": ["mail:read"]
+      }
+    },
+    "/api/v2/attachments/{id}": {
+      "get": {
+        "summary": "Download an attachment",
+        "security": [
+          {
+            "oauth2": ["mail:read"]
+          },
+          {
+            "cookieSession": []
+          },
+          {
+            "agentBearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Attachment",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "contentEncoding": "binary"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid authentication",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient OAuth scope or mailbox access",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found or not visible",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "tags": ["Messages"],
+        "operationId": "getAttachment",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100
+            }
+          }
+        ],
+        "x-hqbase-agent-capabilities": ["mail:read"]
+      }
+    },
+    "/api/v2/messages/{id}/remote-media/trust": {
+      "post": {
+        "summary": "Trust remote media from this sender",
+        "security": [
+          {
+            "oauth2": ["mail:write"]
+          },
+          {
+            "cookieSession": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Trust preference",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RemoteMediaTrust"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid authentication",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient OAuth scope or mailbox access",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found or not visible",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "tags": ["Messages"],
+        "operationId": "trustRemoteMedia",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100
+            }
+          }
+        ]
+      }
+    },
+    "/api/v2/messages/{id}/{action}": {
+      "post": {
+        "summary": "Update message state",
+        "security": [
+          {
+            "oauth2": ["mail:write"]
+          },
+          {
+            "cookieSession": []
+          },
+          {
+            "agentBearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Updated message",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessageSummary"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid authentication",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient OAuth scope or mailbox access",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found or not visible",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "tags": ["Messages"],
+        "operationId": "updateMessage",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100
+            }
+          },
+          {
+            "in": "path",
+            "name": "action",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "read",
+                "unread",
+                "star",
+                "unstar",
+                "archive",
+                "unarchive",
+                "trash",
+                "restore"
+              ]
+            }
+          }
+        ],
+        "x-hqbase-agent-capabilities": ["mail:write"]
+      }
+    },
+    "/api/v2/messages/{id}/labels/{labelId}": {
+      "put": {
+        "summary": "Add a label to a message",
+        "description": "Adds one existing label without changing mailbox access or the message folder.",
+        "security": [
+          {
+            "oauth2": ["mail:write"]
+          },
+          {
+            "cookieSession": []
+          },
+          {
+            "agentBearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Label assignment state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LabelAssignmentResult"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The caller cannot organize this message",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The message or label was not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "tags": ["Labels"],
+        "operationId": "addMessageLabel",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 100
+            }
+          },
+          {
+            "in": "path",
+            "name": "labelId",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 100
+            }
+          }
+        ],
+        "x-hqbase-agent-capabilities": ["mail:write"]
+      },
+      "delete": {
+        "summary": "Remove a label from a message",
+        "description": "Removes one label without changing mailbox access or the message folder.",
+        "security": [
+          {
+            "oauth2": ["mail:write"]
+          },
+          {
+            "cookieSession": []
+          },
+          {
+            "agentBearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Label assignment state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LabelAssignmentResult"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The caller cannot organize this message",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The message or label was not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "tags": ["Labels"],
+        "operationId": "removeMessageLabel",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 100
+            }
+          },
+          {
+            "in": "path",
+            "name": "labelId",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 100
+            }
+          }
+        ],
+        "x-hqbase-agent-capabilities": ["mail:write"]
+      }
+    },
+    "/api/v2/conversations": {
+      "get": {
+        "summary": "List or search conversations",
+        "security": [
+          {
+            "oauth2": ["mail:read"]
+          },
+          {
+            "cookieSession": []
+          },
+          {
+            "agentBearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Conversation page",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConversationPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid authentication",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient OAuth scope or mailbox access",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found or not visible",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "tags": ["Conversations"],
+        "operationId": "listConversations",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "folder",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": ["inbox", "sent", "starred", "archived", "trash", "catchall"]
+            },
+            "description": "Folder to list."
+          },
+          {
+            "in": "query",
+            "name": "mailboxId",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 100
+            },
+            "description": "Limit results to one accessible mailbox."
+          },
+          {
+            "in": "query",
+            "name": "labelId",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 100
+            },
+            "description": "Limit results to conversations where an accessible message has this existing label."
+          },
+          {
+            "in": "query",
+            "name": "labelIds",
+            "required": false,
+            "style": "form",
+            "explode": true,
+            "schema": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "maxLength": 100
+              }
+            },
+            "description": "Repeat this parameter to require every listed label on accessible messages in each returned conversation."
+          },
+          {
+            "in": "query",
+            "name": "search",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            },
+            "description": "Search one literal substring in the subject, sender, To recipients, snippet, and plain-text body. The characters %, _, and \\ are ordinary text."
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 512
+            },
+            "description": "Opaque cursor from the previous page."
+          }
+        ],
+        "x-hqbase-agent-capabilities": ["mail:read"]
+      }
+    },
+    "/api/v2/conversations/{id}/{action}": {
+      "post": {
+        "summary": "Update conversation state",
+        "description": "Applies the action to the accessible part of the conversation identified by the message {id}.",
+        "security": [
+          {
+            "oauth2": ["mail:write"]
+          },
+          {
+            "cookieSession": []
+          },
+          {
+            "agentBearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Update result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConversationActionResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid authentication",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient OAuth scope or mailbox access",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found or not visible",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "tags": ["Conversations"],
+        "operationId": "updateConversation",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "description": "Use ConversationSummary.id, the ID of the latest accessible message in the conversation. Do not use threadId. A thread ID does not identify a message and returns 403 MAILBOX_FORBIDDEN.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100
+            }
+          },
+          {
+            "in": "path",
+            "name": "action",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "read",
+                "unread",
+                "star",
+                "unstar",
+                "archive",
+                "unarchive",
+                "trash",
+                "restore"
+              ]
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConversationActionInput"
+              },
+              "example": {
+                "folder": "inbox"
+              }
+            }
+          }
+        },
+        "x-hqbase-agent-capabilities": ["mail:write"]
+      }
+    },
+    "/api/v2/conversations/{id}/labels/{labelId}": {
+      "put": {
+        "summary": "Add a label to a conversation",
+        "description": "Adds one existing label to every accessible message that the caller can organize. Inaccessible copies remain unchanged.",
+        "security": [
+          {
+            "oauth2": ["mail:write"]
+          },
+          {
+            "cookieSession": []
+          },
+          {
+            "agentBearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Label assignment state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LabelAssignmentResult"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The caller cannot organize this conversation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The conversation or label was not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "tags": ["Labels"],
+        "operationId": "addConversationLabel",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "description": "One accessible message ID representing the conversation.",
+            "schema": {
+              "type": "string",
+              "maxLength": 100
+            }
+          },
+          {
+            "in": "path",
+            "name": "labelId",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 100
+            }
+          }
+        ],
+        "x-hqbase-agent-capabilities": ["mail:write"]
+      },
+      "delete": {
+        "summary": "Remove a label from a conversation",
+        "description": "Removes one label from every accessible message that the caller can organize. Inaccessible copies remain unchanged.",
+        "security": [
+          {
+            "oauth2": ["mail:write"]
+          },
+          {
+            "cookieSession": []
+          },
+          {
+            "agentBearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Label assignment state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LabelAssignmentResult"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The caller cannot organize this conversation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The conversation or label was not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "tags": ["Labels"],
+        "operationId": "removeConversationLabel",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "description": "One accessible message ID representing the conversation.",
+            "schema": {
+              "type": "string",
+              "maxLength": 100
+            }
+          },
+          {
+            "in": "path",
+            "name": "labelId",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 100
+            }
+          }
+        ],
+        "x-hqbase-agent-capabilities": ["mail:write"]
+      }
+    },
+    "/api/v2/drafts": {
+      "get": {
+        "summary": "List drafts",
+        "security": [
+          {
+            "oauth2": ["mail:send"]
+          },
+          {
+            "cookieSession": []
+          },
+          {
+            "agentBearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "One page of drafts, newest update first.",
+            "headers": {
+              "Link": {
+                "required": false,
+                "description": "RFC 8288 link to the next page, as `<url>; rel=\"next\"`. The header is absent on the last page.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Draft"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request. `INVALID_LIMIT` when limit is not an integer from 1 to 100. `INVALID_DRAFT_CURSOR` when the cursor is malformed or is not a draft-list cursor.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid authentication",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient OAuth scope or mailbox access",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found or not visible",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "tags": ["Drafts"],
+        "operationId": "listDrafts",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 100
+            },
+            "description": "Maximum number of draft rows read for this page. Live access filtering can make the returned array shorter."
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 512
+            },
+            "description": "Opaque cursor from the previous page. Read it from the Link header and send it unchanged."
+          }
+        ],
+        "x-hqbase-agent-capabilities": ["mail:send"]
+      },
+      "post": {
+        "summary": "Create a draft",
+        "security": [
+          {
+            "oauth2": ["mail:send"]
+          },
+          {
+            "cookieSession": []
+          },
+          {
+            "agentBearer": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Created draft",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Draft"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid authentication",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient OAuth scope or mailbox access",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found or not visible",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "tags": ["Drafts"],
+        "operationId": "createDraft",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DraftInput"
+              },
+              "example": {
+                "mailboxId": null,
+                "replyToMessageId": null,
+                "forwardOfMessageId": null,
+                "from": "",
+                "to": [],
+                "cc": [],
+                "bcc": [],
+                "subject": "",
+                "text": "",
+                "html": ""
+              }
+            }
+          }
+        },
+        "x-hqbase-agent-capabilities": ["mail:send"]
+      }
+    },
+    "/api/v2/drafts/changes": {
+      "get": {
+        "summary": "Read draft changes",
+        "description": "Returns a bounded page of private draft upserts and deletion tombstones in journal order. A request without a cursor returns an empty checkpoint at the current user-specific high-water sequence.",
+        "security": [
+          {
+            "oauth2": ["mail:send"]
+          },
+          {
+            "cookieSession": []
+          },
+          {
+            "agentBearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A bounded page of draft changes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DraftChangePage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request. `INVALID_LIMIT` when limit is not an integer from 1 to 100. `INVALID_DRAFT_CHANGE_CURSOR` when the cursor is malformed, foreign, or beyond the user's current journal. `INVALID_DRAFT_CHANGE_FILTER` when a mailbox, folder, search, or timestamp filter is supplied.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid authentication",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient OAuth scope or mailbox access",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "`DRAFT_CHANGE_CURSOR_EXPIRED` when future journal retention removes a required range. The client must start a new full draft bootstrap.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "tags": ["Drafts"],
+        "operationId": "listDraftChanges",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 512
+            },
+            "description": "Opaque cursor from a draft checkpoint or previous draft-changes page. Omit it only to create a new checkpoint."
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 100
+            },
+            "description": "Maximum number of draft journal entries read for this page."
+          }
+        ],
+        "x-hqbase-agent-capabilities": ["mail:send"]
+      }
+    },
+    "/api/v2/drafts/{id}": {
+      "get": {
+        "summary": "Get a draft",
+        "security": [
+          {
+            "oauth2": ["mail:send"]
+          },
+          {
+            "cookieSession": []
+          },
+          {
+            "agentBearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Draft",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Draft"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid authentication",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient OAuth scope or mailbox access",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found or not visible",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "tags": ["Drafts"],
+        "operationId": "getDraft",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100
+            }
+          }
+        ],
+        "x-hqbase-agent-capabilities": ["mail:send"]
+      },
+      "patch": {
+        "summary": "Update a draft",
+        "security": [
+          {
+            "oauth2": ["mail:send"]
+          },
+          {
+            "cookieSession": []
+          },
+          {
+            "agentBearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Updated draft",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Draft"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid authentication",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient OAuth scope or mailbox access",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found or not visible",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Draft version conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "tags": ["Drafts"],
+        "operationId": "updateDraft",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DraftInput"
+              },
+              "example": {
+                "mailboxId": null,
+                "replyToMessageId": null,
+                "forwardOfMessageId": null,
+                "from": "",
+                "to": [],
+                "cc": [],
+                "bcc": [],
+                "subject": "Updated draft",
+                "text": "",
+                "html": "",
+                "version": 1
+              }
+            }
+          }
+        },
+        "x-hqbase-agent-capabilities": ["mail:send"]
+      },
+      "delete": {
+        "summary": "Delete a draft",
+        "security": [
+          {
+            "oauth2": ["mail:send"]
+          },
+          {
+            "cookieSession": []
+          },
+          {
+            "agentBearer": []
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Draft deleted"
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid authentication",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient OAuth scope or mailbox access",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found or not visible",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "tags": ["Drafts"],
+        "operationId": "deleteDraft",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100
+            }
+          }
+        ],
+        "x-hqbase-agent-capabilities": ["mail:send"]
+      }
+    },
+    "/api/v2/drafts/{id}/attachments": {
+      "post": {
+        "summary": "Add a draft attachment",
+        "description": "Records the file part's Content-Type, or application/octet-stream when no type is present. Set the optional inline field to true for a safe raster image that can be placed in the draft body. One file and all files in one draft can each total at most 25 MiB; larger uploads return 413 ATTACHMENTS_TOO_LARGE.",
+        "security": [
+          {
+            "oauth2": ["mail:send"]
+          },
+          {
+            "cookieSession": []
+          },
+          {
+            "agentBearer": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Added attachment",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DraftAttachment"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid authentication",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient OAuth scope or mailbox access",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found or not visible",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "File or draft attachment total exceeds 25 MiB",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Unsupported inline media",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "tags": ["Drafts"],
+        "operationId": "addDraftAttachment",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": ["file"],
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary",
+                    "contentEncoding": "binary"
+                  },
+                  "inline": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Set to true to store a safe raster image for inline use."
+                  }
+                }
+              },
+              "encoding": {
+                "file": {
+                  "contentType": "*/*"
+                }
+              }
+            }
+          }
+        },
+        "x-hqbase-agent-capabilities": ["mail:send"]
+      }
+    },
+    "/api/v2/drafts/{draftId}/attachments/{id}/inline": {
+      "get": {
+        "summary": "Render a safe inline draft image",
+        "description": "Returns a private inline image owned by the authenticated draft author.",
+        "security": [
+          {
+            "oauth2": ["mail:send"]
+          },
+          {
+            "cookieSession": []
+          },
+          {
+            "agentBearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Inline draft image",
+            "content": {
+              "image/*": {
+                "schema": {
+                  "type": "string",
+                  "contentEncoding": "binary"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid authentication",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient OAuth scope or mailbox access",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Draft, attachment, or stored object not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Unsupported inline media",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "tags": ["Drafts"],
+        "operationId": "getDraftInlineAttachment",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "draftId",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100
+            }
+          },
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100
+            }
+          }
+        ],
+        "x-hqbase-agent-capabilities": ["mail:send"]
+      }
+    },
+    "/api/v2/drafts/{draftId}/attachments/{id}": {
+      "delete": {
+        "summary": "Remove a draft attachment",
+        "security": [
+          {
+            "oauth2": ["mail:send"]
+          },
+          {
+            "cookieSession": []
+          },
+          {
+            "agentBearer": []
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Attachment removed"
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid authentication",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient OAuth scope or mailbox access",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found or not visible",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "tags": ["Drafts"],
+        "operationId": "removeDraftAttachment",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "draftId",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100
+            }
+          },
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100
+            }
+          }
+        ],
+        "x-hqbase-agent-capabilities": ["mail:send"]
+      }
+    },
+    "/api/v2/send": {
+      "post": {
+        "summary": "Send a new message",
+        "security": [
+          {
+            "oauth2": ["mail:send"]
+          },
+          {
+            "cookieSession": []
+          },
+          {
+            "agentBearer": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Sent message",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessageSummary"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid authentication",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient OAuth scope or mailbox access",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found or not visible",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "tags": ["Sending"],
+        "operationId": "sendMessage",
+        "description": "Not idempotent. Do not retry blindly.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SendInput"
+              },
+              "example": {
+                "from": "support@example.com",
+                "to": ["person@example.net"],
+                "cc": [],
+                "bcc": [],
+                "subject": "Hello",
+                "text": "Hello from HQBase",
+                "attachmentIds": []
+              }
+            }
+          }
+        },
+        "x-hqbase-agent-capabilities": ["mail:send"]
+      }
+    },
+    "/api/v2/reply": {
+      "post": {
+        "summary": "Reply to a message",
+        "security": [
+          {
+            "oauth2": ["mail:send"]
+          },
+          {
+            "cookieSession": []
+          },
+          {
+            "agentBearer": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Sent reply",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessageSummary"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid authentication",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient OAuth scope or mailbox access",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found or not visible",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "tags": ["Sending"],
+        "operationId": "replyToMessage",
+        "description": "Not idempotent. Do not retry blindly.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReplyInput"
+              },
+              "example": {
+                "messageId": "msg_example",
+                "from": "support@example.com",
+                "cc": [],
+                "bcc": [],
+                "text": "Thanks for your message.",
+                "attachmentIds": []
+              }
+            }
+          }
+        },
+        "x-hqbase-agent-capabilities": ["mail:send"]
+      }
+    },
+    "/api/v2/forward": {
+      "post": {
+        "summary": "Forward a message",
+        "security": [
+          {
+            "oauth2": ["mail:send"]
+          },
+          {
+            "cookieSession": []
+          },
+          {
+            "agentBearer": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Sent forward",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessageSummary"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid authentication",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient OAuth scope or mailbox access",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found or not visible",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "tags": ["Sending"],
+        "operationId": "forwardMessage",
+        "description": "Not idempotent. Do not retry blindly. Set includeOriginalAttachments to false to omit the source message's attachments.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ForwardInput"
+              },
+              "example": {
+                "messageId": "msg_example",
+                "from": "support@example.com",
+                "to": ["person@example.net"],
+                "cc": [],
+                "bcc": [],
+                "text": "Please review this message.",
+                "attachmentIds": [],
+                "includeOriginalAttachments": true
+              }
+            }
+          }
+        },
+        "x-hqbase-agent-capabilities": ["mail:send"]
+      }
+    },
+    "/api/v2/signatures": {
+      "get": {
+        "summary": "List signatures for a From address",
+        "security": [
+          {
+            "oauth2": ["mail:send"]
+          },
+          {
+            "cookieSession": []
+          },
+          {
+            "agentBearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Applicable signatures and the automatic selection",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SignatureCandidates"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid From address",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid authentication",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient OAuth scope or mailbox access",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Sending mailbox not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "tags": ["Signatures"],
+        "operationId": "listSignatures",
+        "description": "Returns only personal, mailbox, and exact-domain signatures usable from the exact address.",
+        "parameters": [
+          {
+            "name": "from",
+            "in": "query",
+            "required": true,
+            "description": "Exact sending address.",
+            "schema": {
+              "type": "string",
+              "format": "email",
+              "maxLength": 254
+            }
+          }
+        ],
+        "x-hqbase-agent-capabilities": ["mail:send"]
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "oauth2": {
+        "type": "oauth2",
+        "description": "Audience-bound OAuth token. Request resource={origin}/api/v2.",
+        "flows": {
+          "authorizationCode": {
+            "authorizationUrl": "/api/auth/oauth2/authorize",
+            "tokenUrl": "/api/auth/oauth2/token",
+            "refreshUrl": "/api/auth/oauth2/token",
+            "scopes": {
+              "mail:read": "Read accessible mail",
+              "mail:write": "Organize accessible mail",
+              "mail:send": "Manage drafts and send mail",
+              "offline_access": "Request a refresh token"
+            }
+          }
+        }
+      },
+      "cookieSession": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "better-auth.session_token",
+        "description": "Same-origin HQBase web session. Secure deployments may prefix the cookie name."
+      },
+      "agentBearer": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "hqb_agent_<secret>",
+        "description": "Mailbox agent credential created in Settings > Agents. It works only for the assigned Mail API capabilities and mailbox grant. Each operation lists required capabilities in x-hqbase-agent-capabilities."
+      }
+    },
+    "schemas": {
+      "Error": {
+        "type": "object",
+        "required": ["error"],
+        "properties": {
+          "error": {
+            "type": "object",
+            "required": ["code", "message"],
+            "properties": {
+              "code": {
+                "type": "string"
+              },
+              "message": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      },
+      "Mailbox": {
+        "type": "object",
+        "required": [
+          "id",
+          "address",
+          "mailDomainId",
+          "displayName",
+          "kind",
+          "isActive",
+          "deletedAt",
+          "accessLevel",
+          "createdAt",
+          "updatedAt"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "address": {
+            "type": "string",
+            "format": "email"
+          },
+          "mailDomainId": {
+            "type": "string"
+          },
+          "displayName": {
+            "type": "string",
+            "description": "Shared sender name used with the mailbox address on future outbound messages."
+          },
+          "kind": {
+            "type": "string",
+            "enum": ["human", "agent"],
+            "description": "Whether this is an ordinary mailbox or a dedicated mailbox created with a mailbox agent."
+          },
+          "isActive": {
+            "type": "boolean"
+          },
+          "deletedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Deletion time. Normal Mail API lists return null because deleted mailboxes are hidden."
+          },
+          "accessLevel": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": ["read", "agent", "manager"]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "Label": {
+        "type": "object",
+        "required": ["id", "name", "color", "createdAt", "updatedAt"],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          },
+          "color": {
+            "type": "string",
+            "enum": [
+              "gray",
+              "red",
+              "orange",
+              "amber",
+              "green",
+              "teal",
+              "blue",
+              "indigo",
+              "purple",
+              "pink"
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "LabelAssignmentResult": {
+        "type": "object",
+        "required": ["affected", "assigned", "labelId", "labels"],
+        "properties": {
+          "affected": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "assigned": {
+            "type": "boolean"
+          },
+          "labelId": {
+            "type": "string"
+          },
+          "messageId": {
+            "type": "string"
+          },
+          "threadId": {
+            "type": "string"
+          },
+          "labels": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Label"
+            }
+          }
+        }
+      },
+      "MessageSummary": {
+        "type": "object",
+        "required": [
+          "id",
+          "threadId",
+          "mailboxId",
+          "direction",
+          "folder",
+          "fromAddress",
+          "fromName",
+          "to",
+          "subject",
+          "snippet",
+          "receivedAt",
+          "sentAt",
+          "readAt",
+          "starredAt",
+          "hasAttachments",
+          "createdAt",
+          "labels"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "threadId": {
+            "type": "string"
+          },
+          "mailboxId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "direction": {
+            "type": "string",
+            "enum": ["inbound", "outbound"]
+          },
+          "folder": {
+            "type": "string",
+            "enum": ["inbox", "sent", "drafts", "archived", "trash", "catchall"],
+            "description": "Stored message folder. Drafts use the separate Draft schema and endpoints; current write paths do not produce message summaries with `folder: drafts`."
+          },
+          "fromAddress": {
+            "type": "string",
+            "format": "email"
+          },
+          "fromName": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Decoded inbound display name or the mailbox sender name snapshot for outbound mail. Treat it as untrusted display text and use fromAddress for matching and replies."
+          },
+          "to": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "subject": {
+            "type": "string"
+          },
+          "snippet": {
+            "type": "string"
+          },
+          "receivedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "sentAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "readAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "starredAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "hasAttachments": {
+            "type": "boolean"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "labels": {
+            "type": "array",
+            "description": "Labels assigned to this message. Conversation summaries contain the union from accessible messages.",
+            "items": {
+              "$ref": "#/components/schemas/Label"
+            }
+          }
+        }
+      },
+      "MessageChangeUpsert": {
+        "type": "object",
+        "required": ["type", "message"],
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "upsert"
+          },
+          "message": {
+            "$ref": "#/components/schemas/MessageSummary"
+          }
+        }
+      },
+      "MessageChangeDelete": {
+        "type": "object",
+        "required": ["type", "messageId", "mailboxId"],
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "delete"
+          },
+          "messageId": {
+            "type": "string"
+          },
+          "mailboxId": {
+            "description": "The mailbox at deletion, or null for owner-only unassigned mail.",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "MessageChange": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/MessageChangeUpsert"
+          },
+          {
+            "$ref": "#/components/schemas/MessageChangeDelete"
+          }
+        ]
+      },
+      "MessageChangePage": {
+        "type": "object",
+        "required": ["changes", "nextCursor", "hasMore"],
+        "properties": {
+          "changes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MessageChange"
+            }
+          },
+          "nextCursor": {
+            "type": "string"
+          },
+          "hasMore": {
+            "type": "boolean"
+          }
+        }
+      },
+      "Attachment": {
+        "type": "object",
+        "required": [
+          "id",
+          "messageId",
+          "filename",
+          "contentType",
+          "sizeBytes",
+          "contentId",
+          "disposition",
+          "createdAt"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "messageId": {
+            "type": "string"
+          },
+          "filename": {
+            "type": "string"
+          },
+          "contentType": {
+            "type": "string"
+          },
+          "sizeBytes": {
+            "type": "integer"
+          },
+          "contentId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "disposition": {
+            "type": "string",
+            "enum": ["attachment", "inline"],
+            "description": "MIME presentation intent. A content ID does not make a part inline by itself."
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "MessageDetail": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/MessageSummary"
+          },
+          {
+            "type": "object",
+            "required": [
+              "cc",
+              "bcc",
+              "deliveredToAddress",
+              "textBody",
+              "htmlAvailable",
+              "messageId",
+              "inReplyTo",
+              "references",
+              "attachments"
+            ],
+            "properties": {
+              "cc": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "bcc": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "deliveredToAddress": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "textBody": {
+                "type": "string"
+              },
+              "htmlAvailable": {
+                "type": "boolean"
+              },
+              "messageId": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "inReplyTo": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "references": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "attachments": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/Attachment"
+                }
+              }
+            }
+          }
+        ]
+      },
+      "MessageHtml": {
+        "type": "object",
+        "required": [
+          "afterQuotedHtml",
+          "afterQuotedHtmlHasRemoteImages",
+          "hasRemoteImages",
+          "html",
+          "htmlHasRemoteImages",
+          "quotedHtml",
+          "quotedHtmlHasRemoteImages",
+          "remoteMediaTrusted"
+        ],
+        "properties": {
+          "afterQuotedHtml": {
+            "description": "Sanitized authored content that follows quoted reply history, or null when absent.",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "afterQuotedHtmlHasRemoteImages": {
+            "description": "Whether authored content after quoted reply history contains remote images.",
+            "type": "boolean"
+          },
+          "hasRemoteImages": {
+            "description": "Whether any returned HTML fragment contains remote images.",
+            "type": "boolean"
+          },
+          "html": {
+            "type": "string"
+          },
+          "htmlHasRemoteImages": {
+            "description": "Whether the main HTML fragment contains remote images.",
+            "type": "boolean"
+          },
+          "quotedHtml": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "quotedHtmlHasRemoteImages": {
+            "description": "Whether the quoted reply history contains remote images.",
+            "type": "boolean"
+          },
+          "remoteMediaTrusted": {
+            "type": "boolean"
+          }
+        }
+      },
+      "RemoteMediaTrust": {
+        "type": "object",
+        "required": ["remoteMediaTrusted"],
+        "properties": {
+          "remoteMediaTrusted": {
+            "type": "boolean",
+            "const": true
+          }
+        }
+      },
+      "ConversationSummary": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/MessageSummary"
+          },
+          {
+            "type": "object",
+            "required": ["isStarred", "messageCount", "unreadCount"],
+            "properties": {
+              "isStarred": {
+                "type": "boolean"
+              },
+              "messageCount": {
+                "type": "integer"
+              },
+              "unreadCount": {
+                "type": "integer"
+              }
+            }
+          }
+        ]
+      },
+      "ConversationPage": {
+        "type": "object",
+        "required": ["conversations", "nextCursor", "totalCount"],
+        "properties": {
+          "conversations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ConversationSummary"
+            }
+          },
+          "nextCursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "totalCount": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "ConversationActionInput": {
+        "type": "object",
+        "required": ["folder"],
+        "properties": {
+          "folder": {
+            "type": "string",
+            "enum": ["inbox", "sent", "starred", "archived", "trash", "catchall"]
+          }
+        }
+      },
+      "ConversationActionResult": {
+        "type": "object",
+        "required": ["affected", "threadId"],
+        "properties": {
+          "affected": {
+            "type": "integer"
+          },
+          "threadId": {
+            "type": "string"
+          }
+        }
+      },
+      "DraftAttachment": {
+        "type": "object",
+        "required": ["id", "filename", "contentType", "sizeBytes", "inline"],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "filename": {
+            "type": "string"
+          },
+          "contentType": {
+            "type": "string"
+          },
+          "sizeBytes": {
+            "type": "integer"
+          },
+          "inline": {
+            "type": "boolean"
+          }
+        }
+      },
+      "DraftInput": {
+        "type": "object",
+        "required": [
+          "mailboxId",
+          "replyToMessageId",
+          "forwardOfMessageId",
+          "from",
+          "to",
+          "cc",
+          "bcc",
+          "subject",
+          "text",
+          "html"
+        ],
+        "properties": {
+          "mailboxId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "replyToMessageId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "forwardOfMessageId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "from": {
+            "type": "string"
+          },
+          "to": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "cc": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "bcc": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "subject": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "text": {
+            "type": "string",
+            "maxLength": 100000
+          },
+          "html": {
+            "type": "string",
+            "maxLength": 200000
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "signature": {
+            "$ref": "#/components/schemas/SignatureSelection"
+          }
+        }
+      },
+      "Draft": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/DraftInput"
+          },
+          {
+            "type": "object",
+            "required": ["id", "version", "updatedAt", "attachments", "signature"],
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "version": {
+                "type": "integer"
+              },
+              "updatedAt": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "attachments": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/DraftAttachment"
+                }
+              },
+              "signature": {
+                "$ref": "#/components/schemas/SignatureSnapshot"
+              }
+            }
+          }
+        ]
+      },
+      "DraftChangeUpsert": {
+        "type": "object",
+        "required": ["type", "draft"],
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "upsert"
+          },
+          "draft": {
+            "$ref": "#/components/schemas/Draft"
+          }
+        }
+      },
+      "DraftChangeDelete": {
+        "type": "object",
+        "required": ["type", "draftId"],
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "delete"
+          },
+          "draftId": {
+            "type": "string"
+          }
+        }
+      },
+      "DraftChange": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/DraftChangeUpsert"
+          },
+          {
+            "$ref": "#/components/schemas/DraftChangeDelete"
+          }
+        ]
+      },
+      "DraftChangePage": {
+        "type": "object",
+        "required": ["changes", "nextCursor", "hasMore"],
+        "properties": {
+          "changes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DraftChange"
+            }
+          },
+          "nextCursor": {
+            "type": "string"
+          },
+          "hasMore": {
+            "type": "boolean"
+          }
+        }
+      },
+      "SendInput": {
+        "type": "object",
+        "required": ["from", "to", "subject", "text"],
+        "properties": {
+          "from": {
+            "type": "string",
+            "format": "email"
+          },
+          "to": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1,
+            "maxItems": 50
+          },
+          "cc": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 50
+          },
+          "bcc": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 50
+          },
+          "subject": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "text": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100000
+          },
+          "html": {
+            "type": "string",
+            "maxLength": 200000
+          },
+          "attachmentIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 20
+          },
+          "draftId": {
+            "type": "string"
+          },
+          "signature": {
+            "$ref": "#/components/schemas/SignatureSelection"
+          }
+        }
+      },
+      "ReplyInput": {
+        "type": "object",
+        "required": ["messageId", "from", "text"],
+        "properties": {
+          "messageId": {
+            "type": "string"
+          },
+          "from": {
+            "type": "string",
+            "format": "email"
+          },
+          "to": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 50
+          },
+          "cc": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 50
+          },
+          "bcc": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 50
+          },
+          "text": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100000
+          },
+          "html": {
+            "type": "string",
+            "maxLength": 200000
+          },
+          "attachmentIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 20
+          },
+          "draftId": {
+            "type": "string"
+          },
+          "signature": {
+            "$ref": "#/components/schemas/SignatureSelection"
+          }
+        }
+      },
+      "ForwardInput": {
+        "type": "object",
+        "required": ["messageId", "from", "to"],
+        "properties": {
+          "messageId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "from": {
+            "type": "string",
+            "format": "email"
+          },
+          "to": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "email"
+            },
+            "minItems": 1,
+            "maxItems": 50
+          },
+          "cc": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "email"
+            },
+            "maxItems": 50,
+            "default": []
+          },
+          "bcc": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "email"
+            },
+            "maxItems": 50,
+            "default": []
+          },
+          "subject": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "text": {
+            "type": "string",
+            "maxLength": 100000,
+            "default": ""
+          },
+          "html": {
+            "type": "string",
+            "maxLength": 200000
+          },
+          "attachmentIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100
+            },
+            "maxItems": 20,
+            "default": []
+          },
+          "includeOriginalAttachments": {
+            "type": "boolean",
+            "default": true
+          },
+          "signature": {
+            "$ref": "#/components/schemas/SignatureSelection"
+          }
+        }
+      },
+      "SignatureSelection": {
+        "oneOf": [
+          {
+            "type": "object",
+            "required": ["mode"],
+            "properties": {
+              "mode": {
+                "type": "string",
+                "const": "automatic"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": ["mode", "id"],
+            "properties": {
+              "mode": {
+                "type": "string",
+                "const": "selected"
+              },
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 100
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": ["mode"],
+            "properties": {
+              "mode": {
+                "type": "string",
+                "const": "none"
+              }
+            }
+          }
+        ]
+      },
+      "SignatureSnapshot": {
+        "type": "object",
+        "required": ["mode", "id", "name", "html", "text"],
+        "properties": {
+          "mode": {
+            "type": "string",
+            "enum": ["automatic", "selected", "none"]
+          },
+          "id": {
+            "type": ["string", "null"]
+          },
+          "name": {
+            "type": "string"
+          },
+          "html": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          }
+        }
+      },
+      "Signature": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "html",
+          "text",
+          "scope",
+          "scopeId",
+          "scopeLabel",
+          "isDefault",
+          "createdAt",
+          "updatedAt"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "html": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          },
+          "scope": {
+            "type": "string",
+            "enum": ["user", "mailbox", "domain"]
+          },
+          "scopeId": {
+            "type": "string"
+          },
+          "scopeLabel": {
+            "type": "string"
+          },
+          "isDefault": {
+            "type": "boolean"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "SignatureCandidates": {
+        "type": "object",
+        "required": ["automaticSignatureId", "signatures"],
+        "properties": {
+          "automaticSignatureId": {
+            "type": ["string", "null"]
+          },
+          "signatures": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Signature"
+            }
+          }
+        }
+      }
+    }
+  }
+}

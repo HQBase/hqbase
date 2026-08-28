@@ -102,10 +102,7 @@ async function currentMessages(
   if (ids.length === 0) return new Map();
   const messages = await getRows<MessageRow>(
     db,
-    sql`SELECT messages.*,
-          (SELECT address FROM mailbox_addresses
-           WHERE id = messages.delivered_to_address_id) AS delivered_to_address
-        FROM messages
+    sql`SELECT messages.* FROM messages
         WHERE messages.id IN (${sql.join(
           ids.map((id) => sql`${id}`),
           sql`, `

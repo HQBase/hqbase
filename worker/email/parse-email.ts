@@ -7,11 +7,13 @@ type ParsedAttachment = {
   filename: string;
   contentType: string;
   contentId: string | null;
+  disposition: Attachment["disposition"];
   content: ArrayBuffer | Uint8Array | string;
 };
 
 export type ParsedEmail = {
   fromAddress: string;
+  fromName: string | null;
   to: string[];
   cc: string[];
   bcc: string[];
@@ -33,9 +35,11 @@ export async function parseRawEmail(raw: ArrayBuffer): Promise<ParsedEmail> {
 
   const textBody = email.text ?? "";
   const htmlBody = email.html ?? null;
+  const from = firstMailbox(email.from);
 
   return {
-    fromAddress: firstAddress(email.from),
+    fromAddress: from.address,
+    fromName: normalizeSenderName(from.name),
     to: flattenAddresses(email.to),
     cc: flattenAddresses(email.cc),
     bcc: flattenAddresses(email.bcc),
@@ -51,14 +55,19 @@ export async function parseRawEmail(raw: ArrayBuffer): Promise<ParsedEmail> {
   };
 }
 
-function firstAddress(address: Email["from"]): string {
+function firstMailbox(address: Email["from"]): { address: string; name: string } {
   if (!address) {
-    return "unknown";
+    return { address: "unknown", name: "" };
   }
-  if ("group" in address && Array.isArray(address.group)) {
-    return address.group[0]?.address ?? "unknown";
+  if (typeof address.address === "string") {
+    return { address: address.address, name: address.name };
   }
-  return address.address ?? "unknown";
+  return address.group[0] ?? { address: "unknown", name: "" };
+}
+
+function normalizeSenderName(value: string): string | null {
+  const name = value.replace(/\s+/gu, " ").trim().slice(0, 200);
+  return name || null;
 }
 
 function flattenAddresses(addresses: Address[] | undefined): string[] {
@@ -100,6 +109,7 @@ function mapAttachment(attachment: Attachment): ParsedAttachment {
     filename: attachment.filename ?? "attachment",
     contentType: attachment.mimeType,
     contentId: attachment.contentId ?? null,
+    disposition: attachment.disposition,
     content: attachment.content
   };
 }

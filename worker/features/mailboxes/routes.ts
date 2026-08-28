@@ -1,6 +1,6 @@
 import { type Context, Hono } from "hono";
 
-import { requireMailApiContext } from "../../auth/mail-api";
+import { mailApiBasePath, requireMailApiPrincipal } from "../../auth/mail-api";
 import { requireAuthContext, requireRole } from "../../auth/session";
 import type { HonoApp } from "../../lib/env";
 import { readJson } from "../../lib/json";
@@ -8,25 +8,28 @@ import { parseWith } from "../../lib/validation";
 import { recordAudit } from "../audit/service";
 import { ignoreMailEventFailure, publishMailboxMailEvent } from "../events/service";
 
-import { listMailboxesForUser } from "./queries";
-import {
-  createMailbox,
-  createMailboxAddress,
-  removeMailboxAddress,
-  updateExistingMailbox
-} from "./service";
-import { createMailboxAddressSchema, createMailboxSchema, updateMailboxSchema } from "./validation";
+import { restoreMailbox, softDeleteMailbox } from "./lifecycle-service";
+import { listDeletedMailboxes, listMailboxesForUser } from "./queries";
+import { createMailbox, updateExistingMailbox } from "./service";
+import { createMailboxSchema, updateMailboxSchema } from "./validation";
 
 export const mailboxRoutes = new Hono<HonoApp>();
 export const mailboxReadRoutes = new Hono<HonoApp>();
 
 const listForUser = async (c: Context<HonoApp>) => {
-  const auth = await requireMailApiContext(c.env, c.req.raw, "mail:read");
-  return c.json(await listMailboxesForUser(c.env.DB, auth.user.id, auth.user.role));
+  const auth = await requireMailApiPrincipal(c.env, c.req.raw, "mail:read");
+  const mailboxes = await listMailboxesForUser(c.env.DB, auth.principal.id, auth.principal.role);
+  return c.json(mailApiBasePath(c.req.raw) === "/api/v1" ? mailboxes.map(toV1Mailbox) : mailboxes);
 };
 
 mailboxRoutes.get("/", listForUser);
 mailboxReadRoutes.get("/", listForUser);
+
+mailboxRoutes.get("/deleted", async (c) => {
+  const auth = await requireAuthContext(c.env, c.req.raw);
+  requireRole(auth, ["owner", "admin"]);
+  return c.json(await listDeletedMailboxes(c.env.DB));
+});
 
 mailboxRoutes.post("/", async (c) => {
   const authContext = await requireAuthContext(c.env, c.req.raw);
@@ -66,44 +69,64 @@ mailboxRoutes.patch("/:id", async (c) => {
   return c.json(updated);
 });
 
-mailboxRoutes.post("/:id/addresses", async (c) => {
+mailboxRoutes.delete("/:id", async (c) => {
   const auth = await requireAuthContext(c.env, c.req.raw);
   requireRole(auth, ["owner", "admin"]);
-  const address = await createMailboxAddress(
-    c.env.DB,
-    c.req.param("id"),
-    parseWith(createMailboxAddressSchema, await readJson(c.req.raw))
-  );
-  await recordAudit(c.env.DB, {
+  const mailbox = await softDeleteMailbox(c.env.DB, c.req.param("id"), {
     correlationId: c.get("correlationId"),
     actorType: "user",
     actorId: auth.user.id,
-    action: "mailbox_address.create",
+    action: "mailbox.delete",
     resourceType: "mailbox",
     resourceId: c.req.param("id"),
     outcome: "success"
   });
-  scheduleMailboxEvent(c, c.req.param("id"));
-  return c.json(address, 201);
+  scheduleMailboxEvent(c, mailbox.id);
+  return c.json(mailbox);
 });
 
-mailboxRoutes.delete("/:id/addresses/:addressId", async (c) => {
+mailboxRoutes.post("/:id/restore", async (c) => {
   const auth = await requireAuthContext(c.env, c.req.raw);
   requireRole(auth, ["owner", "admin"]);
-  await removeMailboxAddress(c.env.DB, c.req.param("id"), c.req.param("addressId"));
-  await recordAudit(c.env.DB, {
+  const mailbox = await restoreMailbox(c.env.DB, c.req.param("id"), {
     correlationId: c.get("correlationId"),
     actorType: "user",
     actorId: auth.user.id,
-    action: "mailbox_address.delete",
+    action: "mailbox.restore",
     resourceType: "mailbox",
     resourceId: c.req.param("id"),
     outcome: "success"
   });
-  scheduleMailboxEvent(c, c.req.param("id"));
-  return c.body(null, 204);
+  scheduleMailboxEvent(c, mailbox.id);
+  return c.json(mailbox);
 });
 
 function scheduleMailboxEvent(c: Context<HonoApp>, mailboxId: string): void {
   c.executionCtx.waitUntil(ignoreMailEventFailure(publishMailboxMailEvent(c.env, mailboxId)));
+}
+
+type MailboxWithAccess = Awaited<ReturnType<typeof listMailboxesForUser>>[number];
+
+function toV1Mailbox(mailbox: MailboxWithAccess) {
+  return {
+    id: mailbox.id,
+    address: mailbox.address,
+    addresses: [
+      {
+        id: mailbox.id,
+        mailboxId: mailbox.id,
+        mailDomainId: mailbox.mailDomainId,
+        address: mailbox.address,
+        displayName: mailbox.displayName,
+        receiveEnabled: mailbox.isActive,
+        sendEnabled: mailbox.isActive,
+        isPrimary: true
+      }
+    ],
+    displayName: mailbox.displayName,
+    isActive: mailbox.isActive,
+    accessLevel: mailbox.accessLevel,
+    createdAt: mailbox.createdAt,
+    updatedAt: mailbox.updatedAt
+  };
 }

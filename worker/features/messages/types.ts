@@ -20,6 +20,7 @@ export type StoredAttachment = {
   contentType: string;
   sizeBytes: number;
   contentId: string | null;
+  disposition: "attachment" | "inline";
   r2Key: string;
   createdAt: string;
 };
@@ -31,6 +32,7 @@ export type MessageSummary = {
   direction: MessageDirection;
   folder: MessageFolder;
   fromAddress: string;
+  fromName: string | null;
   to: string[];
   subject: string;
   snippet: string;
@@ -74,6 +76,7 @@ export type MessageRow = {
   direction: MessageDirection;
   folder: MessageFolder;
   from_address: string;
+  from_name: string | null;
   to_json: string;
   cc_json: string;
   bcc_json: string;
@@ -114,6 +117,7 @@ export type AttachmentRow = {
   content_type: string;
   size_bytes: number;
   content_id: string | null;
+  disposition: "attachment" | "inline";
   r2_key: string;
   created_at: string;
 };
@@ -125,6 +129,7 @@ export type InsertMessageInput = {
   direction: MessageDirection;
   folder: MessageFolder;
   fromAddress: string;
+  fromName: string | null;
   to: string[];
   cc: string[];
   bcc: string[];
@@ -141,8 +146,7 @@ export type InsertMessageInput = {
   sentAt: string | null;
   readAt: string | null;
   hasAttachments: boolean;
-  deliveredToAddressId?: string | null | undefined;
-  sentFromAddressId?: string | null | undefined;
+  deliveredToAddress?: string | null | undefined;
 };
 
 export type InsertAttachmentInput = {
@@ -151,5 +155,6 @@ export type InsertAttachmentInput = {
   contentType: string;
   sizeBytes: number;
   contentId: string | null;
+  disposition: "attachment" | "inline";
   r2Key: string;
 };

@@ -9,5 +9,6 @@ export type MailDomain = {
   catchAllPolicy: "reject" | "unassigned" | "mailbox";
   catchAllMailboxId: string | null;
   isEnabled: boolean;
+  disconnectedAt: string | null;
   updatedAt: string;
 };

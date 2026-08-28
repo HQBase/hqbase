@@ -7,7 +7,7 @@ const source = readFileSync(
 );
 
 describe("dropdown menu", () => {
-  it("layers its portaled content above fixed dialogs", () => {
-    expect(source).toContain("relative z-[60]");
+  it("layers its portaled content above floating composer windows", () => {
+    expect(source).toContain("relative z-[2147483647]");
   });
 });

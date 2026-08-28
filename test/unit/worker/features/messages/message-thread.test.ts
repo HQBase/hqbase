@@ -10,6 +10,7 @@ const row: MessageRow = {
   direction: "inbound",
   folder: "inbox",
   from_address: "customer@example.com",
+  from_name: "Customer",
   to_json: '["support@example.com"]',
   cc_json: "[]",
   bcc_json: "[]",
@@ -54,7 +55,7 @@ describe("message threads", () => {
       deliveredToAddress: "support@example.com"
     });
     expect(prepare.mock.calls[0]?.[0]).toContain("ORDER BY COALESCE");
-    expect(prepare.mock.calls[0]?.[0]).toContain("delivered_to_address_id");
+    expect(prepare.mock.calls[0]?.[0]).toContain("SELECT messages.* FROM messages");
     expect(threadBind).toHaveBeenCalledWith("thr_1", "mbx_allowed", "mbx_second");
     expect(prepare.mock.calls[0]?.[0]).not.toContain("IS NULL");
   });

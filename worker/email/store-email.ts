@@ -2,8 +2,6 @@ import { sql } from "drizzle-orm";
 
 import { newId, nowIso } from "../db/client";
 import { getRow } from "../db/drizzle";
-import { findAddressIdentity } from "../features/mailboxes/address-queries";
-import { findMailboxByAddress } from "../features/mailboxes/queries";
 import { getMessageDetail, insertAttachment, insertMessage } from "../features/messages/queries";
 import { resolveInboundThread } from "../features/messages/threading";
 import type { MessageDetail, MessageSummary } from "../features/messages/types";
@@ -14,6 +12,7 @@ import type { ParsedEmail } from "./parse-email";
 
 export type StoreInboundInput = {
   envelopeRecipient: string;
+  mailboxId: string | null;
   raw: ArrayBuffer;
   parsed: ParsedEmail;
 };
@@ -28,12 +27,12 @@ export async function storeInboundEmail(
   input: StoreInboundInput
 ): Promise<StoreInboundResult> {
   const recipient = input.envelopeRecipient.toLowerCase();
-  const initialPlan = planInboundStorage({
+  const plan = planInboundStorage({
     envelopeRecipient: recipient,
-    mailboxId: null,
+    mailboxId: input.mailboxId,
     parsed: input.parsed
   });
-  const dedupeKey = initialPlan.dedupeKey;
+  const dedupeKey = plan.dedupeKey;
   const duplicate = dedupeKey ? await findDuplicate(db, dedupeKey) : null;
   if (duplicate) {
     return { inserted: false, message: duplicate };
@@ -53,13 +52,6 @@ export async function storeInboundEmail(
     });
   }
 
-  const mailbox = await findMailboxByAddress(db, recipient);
-  const receivingIdentity = await findAddressIdentity(db, recipient, "receive");
-  const plan = planInboundStorage({
-    envelopeRecipient: recipient,
-    mailboxId: mailbox?.id ?? null,
-    parsed: input.parsed
-  });
   const threadId = await resolveInboundThread(db, {
     inReplyTo: input.parsed.inReplyTo,
     lastMessageAt: timestamp,
@@ -74,6 +66,7 @@ export async function storeInboundEmail(
     direction: "inbound",
     folder: plan.folder,
     fromAddress: input.parsed.fromAddress,
+    fromName: input.parsed.fromName,
     to: plan.to,
     cc: input.parsed.cc,
     bcc: input.parsed.bcc,
@@ -89,8 +82,8 @@ export async function storeInboundEmail(
     receivedAt: timestamp,
     sentAt: null,
     readAt: null,
-    hasAttachments: input.parsed.attachments.length > 0,
-    deliveredToAddressId: receivingIdentity?.address.id ?? null
+    hasAttachments: hasDownloadableAttachments(input.parsed.attachments),
+    deliveredToAddress: recipient
   });
 
   for (const attachment of input.parsed.attachments) {
@@ -104,6 +97,7 @@ export async function storeInboundEmail(
       contentType: attachment.contentType,
       sizeBytes: attachmentSize(attachment.content),
       contentId: attachment.contentId,
+      disposition: messageAttachmentDisposition(attachment),
       r2Key
     });
   }
@@ -113,6 +107,19 @@ export async function storeInboundEmail(
     isUnassigned: plan.isUnassigned,
     message: (await getMessageDetail(db, message.id)) ?? message
   };
+}
+
+export function hasDownloadableAttachments(attachments: ParsedEmail["attachments"]): boolean {
+  return attachments.some(
+    (attachment) => messageAttachmentDisposition(attachment) === "attachment"
+  );
+}
+
+function messageAttachmentDisposition(
+  attachment: ParsedEmail["attachments"][number]
+): "attachment" | "inline" {
+  if (attachment.disposition === "attachment") return "attachment";
+  return attachment.disposition === "inline" || attachment.contentId ? "inline" : "attachment";
 }
 
 async function findDuplicate(db: D1Database, dedupeKey: string): Promise<MessageSummary | null> {

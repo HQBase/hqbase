@@ -1,0 +1,948 @@
+{
+  "info": {
+    "_postman_id": "72c6dbf4-835d-4a3f-87df-77b7ddcf2db2",
+    "name": "HQBase Mail API v2",
+    "description": "Generated from api/hqbase-mail-api-v2.openapi.json. For a tool acting for a person, set base_url, run Register public client, and use Postman's OAuth 2.0 Authorization Code flow with PKCE (S256). Auth URL: {{base_url}}/api/auth/oauth2/authorize. Token URL: {{base_url}}/api/auth/oauth2/token. Client ID: {{client_id}}. Scope: mail:read mail:write mail:send offline_access. Add authorization request parameter resource={{api_resource}}, then store the resulting token only in your local environment as access_token. For a mailbox agent, skip OAuth and set access_token to its one-time hqb_agent_ credential. Postman v2.1 HTTP collections cannot contain WebSocket requests. To receive change wakes, create a separate WebSocket request to {{ws_base_url}}/api/v2/events and add Authorization: Bearer {{access_token}}. Sending, replying, and forwarding are not idempotent.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{access_token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "https://mail.example.com",
+      "type": "string"
+    },
+    {
+      "key": "ws_base_url",
+      "value": "wss://mail.example.com",
+      "type": "string"
+    },
+    {
+      "key": "api_resource",
+      "value": "{{base_url}}/api/v2",
+      "type": "string"
+    },
+    {
+      "key": "client_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "access_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "id",
+      "value": "msg_example",
+      "type": "string"
+    },
+    {
+      "key": "attachmentId",
+      "value": "att_example",
+      "type": "string"
+    },
+    {
+      "key": "draftId",
+      "value": "drf_example",
+      "type": "string"
+    },
+    {
+      "key": "labelId",
+      "value": "lbl_example",
+      "type": "string"
+    },
+    {
+      "key": "signatureId",
+      "value": "sig_example",
+      "type": "string"
+    },
+    {
+      "key": "action",
+      "value": "read",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "OAuth setup",
+      "item": [
+        {
+          "name": "Authorization server metadata",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/.well-known/oauth-authorization-server/api/auth"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Mail API protected-resource metadata",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/.well-known/oauth-protected-resource/api/v2"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Register public client",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const registration = pm.response.json();",
+                  "if (registration.client_id) pm.environment.set('client_id', registration.client_id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"client_name\": \"HQBase Postman\",\n  \"redirect_uris\": [\n    \"https://oauth.pstmn.io/v1/browser-callback\"\n  ],\n  \"token_endpoint_auth_method\": \"none\",\n  \"grant_types\": [\n    \"authorization_code\",\n    \"refresh_token\"\n  ],\n  \"response_types\": [\n    \"code\"\n  ],\n  \"scope\": \"mail:read mail:write mail:send offline_access\",\n  \"resources\": [\n    \"{{api_resource}}\"\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/auth/oauth2/register"
+            },
+            "description": "Creates a public PKCE client. The test script stores client_id in the active local environment."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Mailboxes",
+      "item": [
+        {
+          "name": "List mailboxes",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v2/mailboxes",
+              "variable": []
+            },
+            "description": "List mailboxes"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Changes",
+      "item": [
+        {
+          "name": "Read message changes",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v2/changes",
+              "variable": [],
+              "query": [
+                {
+                  "key": "cursor",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Opaque cursor from a checkpoint or previous changes page. Omit it only to create a new checkpoint."
+                },
+                {
+                  "key": "limit",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Maximum number of journal entries read for this page."
+                }
+              ]
+            },
+            "description": "Returns a bounded page of message upserts and deletion tombstones in journal order. A request without a cursor returns an empty checkpoint at the current high-water sequence."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Labels",
+      "item": [
+        {
+          "name": "List labels",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v2/labels",
+              "variable": []
+            },
+            "description": "Lists shared workspace labels. Labels organize mail but never grant mailbox access or change folders."
+          },
+          "response": []
+        },
+        {
+          "name": "Add a label to a message",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v2/messages/:id/labels/:labelId",
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{id}}"
+                },
+                {
+                  "key": "labelId",
+                  "value": "{{labelId}}"
+                }
+              ]
+            },
+            "description": "Adds one existing label without changing mailbox access or the message folder."
+          },
+          "response": []
+        },
+        {
+          "name": "Remove a label from a message",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v2/messages/:id/labels/:labelId",
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{id}}"
+                },
+                {
+                  "key": "labelId",
+                  "value": "{{labelId}}"
+                }
+              ]
+            },
+            "description": "Removes one label without changing mailbox access or the message folder."
+          },
+          "response": []
+        },
+        {
+          "name": "Add a label to a conversation",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v2/conversations/:id/labels/:labelId",
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{id}}"
+                },
+                {
+                  "key": "labelId",
+                  "value": "{{labelId}}"
+                }
+              ]
+            },
+            "description": "Adds one existing label to every accessible message that the caller can organize. Inaccessible copies remain unchanged."
+          },
+          "response": []
+        },
+        {
+          "name": "Remove a label from a conversation",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v2/conversations/:id/labels/:labelId",
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{id}}"
+                },
+                {
+                  "key": "labelId",
+                  "value": "{{labelId}}"
+                }
+              ]
+            },
+            "description": "Removes one label from every accessible message that the caller can organize. Inaccessible copies remain unchanged."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Messages",
+      "item": [
+        {
+          "name": "List or search messages",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v2/messages",
+              "variable": [],
+              "query": [
+                {
+                  "key": "folder",
+                  "value": "inbox",
+                  "disabled": false,
+                  "description": "Message folder to list. Drafts are separate resources, not message rows. Use `/api/v2/drafts` to list drafts."
+                },
+                {
+                  "key": "mailboxId",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Limit results to one accessible mailbox."
+                },
+                {
+                  "key": "labelId",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Limit results to messages assigned this existing label."
+                },
+                {
+                  "key": "labelIds",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Repeat this parameter to require every listed label on each returned message."
+                },
+                {
+                  "key": "search",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Search one literal substring in the subject, sender, To recipients, snippet, and plain-text body. The characters %, _, and \\ are ordinary text."
+                },
+                {
+                  "key": "limit",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Maximum number of messages in the page."
+                },
+                {
+                  "key": "cursor",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Opaque cursor from the previous page. Read it from the Link header and send it unchanged."
+                }
+              ]
+            },
+            "description": "List or search messages"
+          },
+          "response": []
+        },
+        {
+          "name": "Get a message",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v2/messages/:id",
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{id}}"
+                }
+              ]
+            },
+            "description": "Get a message"
+          },
+          "response": []
+        },
+        {
+          "name": "Get a message thread",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v2/messages/:id/thread",
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{id}}"
+                }
+              ]
+            },
+            "description": "Get a message thread"
+          },
+          "response": []
+        },
+        {
+          "name": "Get sanitized message HTML",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v2/messages/:id/html",
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{id}}"
+                }
+              ],
+              "query": [
+                {
+                  "key": "loadRemoteImages",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Load remote images for this response only."
+                }
+              ]
+            },
+            "description": "Get sanitized message HTML"
+          },
+          "response": []
+        },
+        {
+          "name": "Render a safe inline image",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v2/messages/:id/inline/:attachmentId",
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{id}}"
+                },
+                {
+                  "key": "attachmentId",
+                  "value": "{{attachmentId}}"
+                }
+              ]
+            },
+            "description": "Render a safe inline image"
+          },
+          "response": []
+        },
+        {
+          "name": "Download an attachment",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v2/attachments/:id",
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{id}}"
+                }
+              ]
+            },
+            "description": "Download an attachment"
+          },
+          "response": []
+        },
+        {
+          "name": "Trust remote media from this sender",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v2/messages/:id/remote-media/trust",
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{id}}"
+                }
+              ]
+            },
+            "description": "Trust remote media from this sender"
+          },
+          "response": []
+        },
+        {
+          "name": "Update message state",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v2/messages/:id/:action",
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{id}}"
+                },
+                {
+                  "key": "action",
+                  "value": "{{action}}"
+                }
+              ]
+            },
+            "description": "Update message state"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Conversations",
+      "item": [
+        {
+          "name": "List or search conversations",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v2/conversations",
+              "variable": [],
+              "query": [
+                {
+                  "key": "folder",
+                  "value": "inbox",
+                  "disabled": false,
+                  "description": "Folder to list."
+                },
+                {
+                  "key": "mailboxId",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Limit results to one accessible mailbox."
+                },
+                {
+                  "key": "labelId",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Limit results to conversations where an accessible message has this existing label."
+                },
+                {
+                  "key": "labelIds",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Repeat this parameter to require every listed label on accessible messages in each returned conversation."
+                },
+                {
+                  "key": "search",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Search one literal substring in the subject, sender, To recipients, snippet, and plain-text body. The characters %, _, and \\ are ordinary text."
+                },
+                {
+                  "key": "cursor",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Opaque cursor from the previous page."
+                }
+              ]
+            },
+            "description": "List or search conversations"
+          },
+          "response": []
+        },
+        {
+          "name": "Update conversation state",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v2/conversations/:id/:action",
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{id}}"
+                },
+                {
+                  "key": "action",
+                  "value": "{{action}}"
+                }
+              ]
+            },
+            "description": "Applies the action to the accessible part of the conversation identified by the message {id}.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"folder\": \"inbox\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Drafts",
+      "item": [
+        {
+          "name": "List drafts",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v2/drafts",
+              "variable": [],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Maximum number of draft rows read for this page. Live access filtering can make the returned array shorter."
+                },
+                {
+                  "key": "cursor",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Opaque cursor from the previous page. Read it from the Link header and send it unchanged."
+                }
+              ]
+            },
+            "description": "List drafts"
+          },
+          "response": []
+        },
+        {
+          "name": "Create a draft",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v2/drafts",
+              "variable": []
+            },
+            "description": "Create a draft",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"mailboxId\": null,\n  \"replyToMessageId\": null,\n  \"forwardOfMessageId\": null,\n  \"from\": \"\",\n  \"to\": [],\n  \"cc\": [],\n  \"bcc\": [],\n  \"subject\": \"\",\n  \"text\": \"\",\n  \"html\": \"\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Read draft changes",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v2/drafts/changes",
+              "variable": [],
+              "query": [
+                {
+                  "key": "cursor",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Opaque cursor from a draft checkpoint or previous draft-changes page. Omit it only to create a new checkpoint."
+                },
+                {
+                  "key": "limit",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Maximum number of draft journal entries read for this page."
+                }
+              ]
+            },
+            "description": "Returns a bounded page of private draft upserts and deletion tombstones in journal order. A request without a cursor returns an empty checkpoint at the current user-specific high-water sequence."
+          },
+          "response": []
+        },
+        {
+          "name": "Get a draft",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v2/drafts/:id",
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{id}}"
+                }
+              ]
+            },
+            "description": "Get a draft"
+          },
+          "response": []
+        },
+        {
+          "name": "Update a draft",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v2/drafts/:id",
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{id}}"
+                }
+              ]
+            },
+            "description": "Update a draft",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"mailboxId\": null,\n  \"replyToMessageId\": null,\n  \"forwardOfMessageId\": null,\n  \"from\": \"\",\n  \"to\": [],\n  \"cc\": [],\n  \"bcc\": [],\n  \"subject\": \"Updated draft\",\n  \"text\": \"\",\n  \"html\": \"\",\n  \"version\": 1\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete a draft",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v2/drafts/:id",
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{id}}"
+                }
+              ]
+            },
+            "description": "Delete a draft"
+          },
+          "response": []
+        },
+        {
+          "name": "Add a draft attachment",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v2/drafts/:id/attachments",
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{id}}"
+                }
+              ]
+            },
+            "description": "Records the file part's Content-Type, or application/octet-stream when no type is present. Set the optional inline field to true for a safe raster image that can be placed in the draft body. One file and all files in one draft can each total at most 25 MiB; larger uploads return 413 ATTACHMENTS_TOO_LARGE.",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": []
+                },
+                {
+                  "key": "inline",
+                  "type": "text",
+                  "value": "true",
+                  "disabled": true,
+                  "description": "Set to true to store a safe raster image for inline use."
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Render a safe inline draft image",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v2/drafts/:draftId/attachments/:id/inline",
+              "variable": [
+                {
+                  "key": "draftId",
+                  "value": "{{draftId}}"
+                },
+                {
+                  "key": "id",
+                  "value": "{{id}}"
+                }
+              ]
+            },
+            "description": "Returns a private inline image owned by the authenticated draft author."
+          },
+          "response": []
+        },
+        {
+          "name": "Remove a draft attachment",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v2/drafts/:draftId/attachments/:id",
+              "variable": [
+                {
+                  "key": "draftId",
+                  "value": "{{draftId}}"
+                },
+                {
+                  "key": "id",
+                  "value": "{{id}}"
+                }
+              ]
+            },
+            "description": "Remove a draft attachment"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Sending",
+      "item": [
+        {
+          "name": "Send a new message",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v2/send",
+              "variable": []
+            },
+            "description": "Not idempotent. Do not retry blindly.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"from\": \"support@example.com\",\n  \"to\": [\n    \"person@example.net\"\n  ],\n  \"cc\": [],\n  \"bcc\": [],\n  \"subject\": \"Hello\",\n  \"text\": \"Hello from HQBase\",\n  \"attachmentIds\": []\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Reply to a message",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v2/reply",
+              "variable": []
+            },
+            "description": "Not idempotent. Do not retry blindly.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"messageId\": \"msg_example\",\n  \"from\": \"support@example.com\",\n  \"cc\": [],\n  \"bcc\": [],\n  \"text\": \"Thanks for your message.\",\n  \"attachmentIds\": []\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Forward a message",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v2/forward",
+              "variable": []
+            },
+            "description": "Not idempotent. Do not retry blindly. Set includeOriginalAttachments to false to omit the source message's attachments.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"messageId\": \"msg_example\",\n  \"from\": \"support@example.com\",\n  \"to\": [\n    \"person@example.net\"\n  ],\n  \"cc\": [],\n  \"bcc\": [],\n  \"text\": \"Please review this message.\",\n  \"attachmentIds\": [],\n  \"includeOriginalAttachments\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Signatures",
+      "item": [
+        {
+          "name": "List signatures for a From address",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v2/signatures",
+              "variable": [],
+              "query": [
+                {
+                  "key": "from",
+                  "value": "support@example.com",
+                  "disabled": false,
+                  "description": "Exact sending address."
+                }
+              ]
+            },
+            "description": "Returns only personal, mailbox, and exact-domain signatures usable from the exact address."
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}

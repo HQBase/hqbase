@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import { buildEmailHtmlDocument } from "@/features/messages/html-document";
 import {
   EmailFrame,
+  hasVisibleRemoteImages,
   MessageHtmlFrames,
   QuotedContentDivider,
   RemoteImagesAlert,
@@ -24,6 +25,13 @@ describe("message HTML view", () => {
       origin: "https://mail.example.com",
       theme: "dark"
     });
+    const signature = buildEmailHtmlDocument({
+      allowDataImages: true,
+      allowRemoteImages: false,
+      html: '<img src="data:image/png;base64,iVBORw==">',
+      origin: "https://mail.example.com",
+      theme: "dark"
+    });
 
     expect(blocked).toContain("img-src https://mail.example.com;");
     expect(blocked).toContain("font-src https://mail.example.com;");
@@ -40,6 +48,7 @@ describe("message HTML view", () => {
     expect(blocked).not.toContain("max-width: 100%");
     expect(blocked).not.toContain("https: http:");
     expect(loaded).toContain("img-src https://mail.example.com https: http:");
+    expect(signature).toContain("img-src https://mail.example.com data:");
   });
 
   it("uses transparent light defaults without rewriting sender HTML", () => {
@@ -78,10 +87,30 @@ describe("message HTML view", () => {
       />
     );
 
-    expect(html).toContain("Remote images are hidden");
-    expect(html).toContain("Loading them may tell the sender that you opened this message.");
+    expect(html).toContain(
+      "Remote images are hidden. Loading them may reveal that you opened this email."
+    );
     expect(html).toContain("Load images");
-    expect(html).toContain("Always load from sender");
+    expect(html).toContain("Always load from this sender");
+    expect(html).toContain("line-clamp-2");
+    expect(html).toContain("bg-muted/50");
+    expect(html).toContain("sm:grid-cols-[auto_minmax(0,1fr)_auto]");
+    expect(html.match(/h-6 min-h-6/g)).toHaveLength(2);
+  });
+
+  it("warns only when a blocked remote image is in visible content", () => {
+    const quoteOnly = {
+      afterQuotedHtmlHasRemoteImages: false,
+      htmlHasRemoteImages: false,
+      quotedHtmlHasRemoteImages: true
+    };
+
+    expect(hasVisibleRemoteImages(quoteOnly, false)).toBe(false);
+    expect(hasVisibleRemoteImages(quoteOnly, true)).toBe(true);
+    expect(hasVisibleRemoteImages({ ...quoteOnly, htmlHasRemoteImages: true }, false)).toBe(true);
+    expect(
+      hasVisibleRemoteImages({ ...quoteOnly, afterQuotedHtmlHasRemoteImages: true }, false)
+    ).toBe(true);
   });
 
   it("renders an accessible ellipsis disclosure for quoted history", () => {
@@ -93,6 +122,10 @@ describe("message HTML view", () => {
     expect(html).toContain('aria-expanded="false"');
     expect(html.match(/data-quoted-content-dot/g)).toHaveLength(3);
     expect(html).toContain("print:hidden");
+    expect(html).toContain("justify-start");
+    expect(html).toContain("h-5 w-8");
+    expect(html).toContain("bg-muted");
+    expect(html).not.toContain("data-orientation");
   });
 
   it("keeps content after a collapsed quote in order and includes the quote when printing", () => {

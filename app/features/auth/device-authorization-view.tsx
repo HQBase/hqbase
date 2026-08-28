@@ -7,9 +7,9 @@ import { Input } from "@/components/ui/input";
 const scopeDescriptions: Record<string, string> = {
   "mail:read":
     "Read allowed mailboxes, conversations, message text, threads, and bounded attachments",
-  "mail:write": "Change message and conversation state where you have Agent access",
+  "mail:write": "Change message and conversation state where you have Handle mail access",
   "mail:send":
-    "Manage drafts and attachments, then send, reply, or forward where you have Agent access",
+    "Manage drafts and attachments, then send, reply, or forward where you have Handle mail access",
   offline_access: "Stay connected until you revoke access"
 };
 

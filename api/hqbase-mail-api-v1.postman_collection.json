@@ -57,6 +57,16 @@
       "type": "string"
     },
     {
+      "key": "labelId",
+      "value": "lbl_example",
+      "type": "string"
+    },
+    {
+      "key": "signatureId",
+      "value": "sig_example",
+      "type": "string"
+    },
+    {
       "key": "action",
       "value": "read",
       "type": "string"
@@ -188,6 +198,112 @@
       ]
     },
     {
+      "name": "Labels",
+      "item": [
+        {
+          "name": "List labels",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/labels",
+              "variable": []
+            },
+            "description": "Lists shared workspace labels. Labels organize mail but never grant mailbox access or change folders."
+          },
+          "response": []
+        },
+        {
+          "name": "Add a label to a message",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/messages/:id/labels/:labelId",
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{id}}"
+                },
+                {
+                  "key": "labelId",
+                  "value": "{{labelId}}"
+                }
+              ]
+            },
+            "description": "Adds one existing label without changing mailbox access or the message folder."
+          },
+          "response": []
+        },
+        {
+          "name": "Remove a label from a message",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/messages/:id/labels/:labelId",
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{id}}"
+                },
+                {
+                  "key": "labelId",
+                  "value": "{{labelId}}"
+                }
+              ]
+            },
+            "description": "Removes one label without changing mailbox access or the message folder."
+          },
+          "response": []
+        },
+        {
+          "name": "Add a label to a conversation",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/conversations/:id/labels/:labelId",
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{id}}"
+                },
+                {
+                  "key": "labelId",
+                  "value": "{{labelId}}"
+                }
+              ]
+            },
+            "description": "Adds one existing label to every accessible message that the caller can organize. Inaccessible copies remain unchanged."
+          },
+          "response": []
+        },
+        {
+          "name": "Remove a label from a conversation",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/conversations/:id/labels/:labelId",
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{id}}"
+                },
+                {
+                  "key": "labelId",
+                  "value": "{{labelId}}"
+                }
+              ]
+            },
+            "description": "Removes one label from every accessible message that the caller can organize. Inaccessible copies remain unchanged."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
       "name": "Messages",
       "item": [
         {
@@ -210,6 +326,18 @@
                   "value": "",
                   "disabled": true,
                   "description": "Limit results to one accessible mailbox."
+                },
+                {
+                  "key": "labelId",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Limit results to messages assigned this existing label."
+                },
+                {
+                  "key": "labelIds",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Repeat this parameter to require every listed label on each returned message."
                 },
                 {
                   "key": "search",
@@ -402,6 +530,18 @@
                   "value": "",
                   "disabled": true,
                   "description": "Limit results to one accessible mailbox."
+                },
+                {
+                  "key": "labelId",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Limit results to conversations where an accessible message has this existing label."
+                },
+                {
+                  "key": "labelIds",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Repeat this parameter to require every listed label on accessible messages in each returned conversation."
                 },
                 {
                   "key": "search",
@@ -625,7 +765,7 @@
                 }
               ]
             },
-            "description": "Records the file part's Content-Type, or application/octet-stream when no type is present. One file and all files in one draft can each total at most 25 MiB; larger uploads return 413 ATTACHMENTS_TOO_LARGE.",
+            "description": "Records the file part's Content-Type, or application/octet-stream when no type is present. Set the optional inline field to true for a safe raster image that can be placed in the draft body. One file and all files in one draft can each total at most 25 MiB; larger uploads return 413 ATTACHMENTS_TOO_LARGE.",
             "body": {
               "mode": "formdata",
               "formdata": [
@@ -633,9 +773,38 @@
                   "key": "file",
                   "type": "file",
                   "src": []
+                },
+                {
+                  "key": "inline",
+                  "type": "text",
+                  "value": "true",
+                  "disabled": true,
+                  "description": "Set to true to store a safe raster image for inline use."
                 }
               ]
             }
+          },
+          "response": []
+        },
+        {
+          "name": "Render a safe inline draft image",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/drafts/:draftId/attachments/:id/inline",
+              "variable": [
+                {
+                  "key": "draftId",
+                  "value": "{{draftId}}"
+                },
+                {
+                  "key": "id",
+                  "value": "{{id}}"
+                }
+              ]
+            },
+            "description": "Returns a private inline image owned by the authenticated draft author."
           },
           "response": []
         },
@@ -744,6 +913,32 @@
                 }
               }
             }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Signatures",
+      "item": [
+        {
+          "name": "List signatures for a From address",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/signatures",
+              "variable": [],
+              "query": [
+                {
+                  "key": "from",
+                  "value": "support@example.com",
+                  "disabled": false,
+                  "description": "Exact sending address."
+                }
+              ]
+            },
+            "description": "Returns only personal, mailbox, and exact-domain signatures usable from the exact address."
           },
           "response": []
         }

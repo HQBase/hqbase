@@ -1,18 +1,11 @@
 export type Mailbox = {
   id: string;
   address: string;
-  addresses: Array<{
-    id: string;
-    mailboxId: string;
-    mailDomainId: string;
-    address: string;
-    displayName: string;
-    receiveEnabled: boolean;
-    sendEnabled: boolean;
-    isPrimary: boolean;
-  }>;
+  mailDomainId: string;
   displayName: string;
+  kind: "human" | "agent";
   isActive: boolean;
+  deletedAt: string | null;
   accessLevel: "read" | "agent" | "manager" | null;
   createdAt: string;
   updatedAt: string;

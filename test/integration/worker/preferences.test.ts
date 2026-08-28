@@ -19,10 +19,16 @@ describe("user mail preferences", () => {
                  1, ?, ?, 'member', 0)`
       ).bind(timestamp, timestamp),
       env.DB.prepare(
-        `INSERT INTO mailboxes (id, address, display_name, is_active, created_at, updated_at)
+        `INSERT INTO mail_domains
+         (id, name, receiving_status, sending_status, dns_status, is_enabled, created_at, updated_at)
+         VALUES ('dom_preferences', 'example.com', 'ready', 'ready', 'ready', 1, ?, ?)`
+      ).bind(timestamp, timestamp),
+      env.DB.prepare(
+        `INSERT INTO mailboxes
+         (id, address, mail_domain_id, display_name, is_active, created_at, updated_at)
          VALUES
-           ('mbx_preferences_one', 'one@example.com', 'One', 1, ?, ?),
-           ('mbx_preferences_two', 'two@example.com', 'Two', 1, ?, ?)`
+           ('mbx_preferences_one', 'one@example.com', 'dom_preferences', 'One', 1, ?, ?),
+           ('mbx_preferences_two', 'two@example.com', 'dom_preferences', 'Two', 1, ?, ?)`
       ).bind(timestamp, timestamp, timestamp, timestamp)
     ]);
   });

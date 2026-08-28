@@ -39,7 +39,7 @@ export function RoleGuidanceCopy(): React.ReactElement {
         label="Owner"
       />
       <RoleDescription
-        description="Manages the workspace but cannot change owner membership. Mailbox access requires an explicit grant."
+        description="Manages the workspace and can give themselves access to any mailbox, but cannot manage owners."
         label="Admin"
       />
       <RoleDescription

@@ -1,26 +1,28 @@
 import type * as React from "react";
-import { PiMagnifyingGlass, PiSidebarSimple } from "react-icons/pi";
+import { PiCaretDown, PiRobot, PiSidebarSimple } from "react-icons/pi";
 
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectTrigger,
-  SelectValue
-} from "@/components/ui/select";
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger
+} from "@/components/ui/dropdown-menu";
 import type { CurrentUser } from "@/features/auth/types";
 import type { MailConnectionStatus } from "@/features/events/types";
 import type { Mailbox } from "@/features/mailboxes/types";
 import type { UnreadCounts } from "@/features/notifications/types";
-import { mailboxUnreadLabel } from "@/features/notifications/unread";
-import type { FolderId, SettingsTabId } from "@/lib/routes";
+import { GlobalSearch } from "@/features/search/global-search";
+import type { GlobalSearchResult } from "@/features/search/types";
+import type { AgentTabId, FolderId, SettingsTabId } from "@/lib/routes";
 import { MobileNavigation } from "./mobile-navigation";
 
 type TopBarProps = {
   activeFolder: FolderId;
+  activeAgentTab?: AgentTabId | undefined;
   activeSettingsTab?: SettingsTabId | undefined;
   canManage?: boolean | undefined;
   connectionStatus?: MailConnectionStatus | undefined;
@@ -31,9 +33,12 @@ type TopBarProps = {
   search: string;
   unread: UnreadCounts;
   onCompose: () => void;
+  onAgentTabChange?: ((tab: AgentTabId) => void) | undefined;
   onFolderChange: (folder: FolderId) => void;
   onMailboxChange: (mailboxId: string) => void;
   onSearchChange: (search: string) => void;
+  onSearchSelect?: (result: GlobalSearchResult) => void;
+  onSearchSubmit?: (query: string) => void;
   onSettingsTabChange?: ((tab: SettingsTabId) => void) | undefined;
   onSignedOut: () => void;
   sidebarCollapsed?: boolean;
@@ -42,6 +47,7 @@ type TopBarProps = {
 
 export function TopBar({
   activeFolder,
+  activeAgentTab,
   activeSettingsTab,
   canManage,
   connectionStatus,
@@ -52,20 +58,28 @@ export function TopBar({
   search,
   unread,
   onCompose,
+  onAgentTabChange,
   onFolderChange,
   onMailboxChange,
   onSearchChange,
+  onSearchSelect = () => undefined,
+  onSearchSubmit = () => undefined,
   onSettingsTabChange,
   onSignedOut,
   sidebarCollapsed,
   onToggleSidebar
 }: TopBarProps): React.ReactElement {
+  const humanMailboxes = mailboxes.filter((mailbox) => mailbox.kind === "human");
+  const agentMailboxes = mailboxes.filter((mailbox) => mailbox.kind === "agent");
+  const selectedMailbox = mailboxes.find((mailbox) => mailbox.id === mailboxId);
+  const selectedMailboxLabel = selectedMailbox?.address ?? "All mailboxes";
+
   return (
     <header className="flex h-12 w-full shrink-0 touch-none items-center gap-2 border-b border-divider bg-toolbar px-3 lg:px-4">
       {sidebarCollapsed && onToggleSidebar ? (
         <Button
           aria-label="Show sidebar"
-          className="size-9 shrink-0 text-muted-foreground"
+          className="hidden size-9 shrink-0 text-muted-foreground lg:inline-flex"
           onClick={onToggleSidebar}
           size="icon"
           title="Show sidebar"
@@ -77,6 +91,7 @@ export function TopBar({
       ) : null}
       <MobileNavigation
         activeFolder={activeFolder}
+        activeAgentTab={activeAgentTab}
         activeSettingsTab={activeSettingsTab}
         canManage={canManage}
         connectionStatus={connectionStatus}
@@ -86,45 +101,65 @@ export function TopBar({
         unread={unread}
         user={user}
         onCompose={onCompose}
+        onAgentTabChange={onAgentTabChange}
         onFolderChange={onFolderChange}
         onMailboxChange={onMailboxChange}
         onSettingsTabChange={onSettingsTabChange}
         onSignedOut={onSignedOut}
       />
-      <div className="relative min-w-0 max-w-xl flex-1">
-        <PiMagnifyingGlass
-          aria-hidden="true"
-          className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground"
-        />
-        <Input
-          aria-label="Search mail"
-          className="h-8 border-transparent bg-muted/70 pl-8 text-xs shadow-none focus-visible:border-input focus-visible:ring-1"
-          placeholder="Search mail"
-          value={search}
-          onChange={(event) => onSearchChange(event.target.value)}
-        />
-      </div>
+      <GlobalSearch
+        query={search}
+        onQueryChange={onSearchChange}
+        onSelect={onSearchSelect}
+        onSubmit={onSearchSubmit}
+      />
       <div className="ml-auto flex shrink-0 items-center gap-2">
-        <Select value={mailboxId} onValueChange={onMailboxChange}>
-          <SelectTrigger
-            aria-label="Mailbox filter"
-            className="hidden h-8 w-52 border-transparent bg-muted/70 shadow-none lg:flex"
-          >
-            <SelectValue placeholder="All mailboxes" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectGroup>
-              <SelectItem value="all">
-                {mailboxUnreadLabel("All mailboxes", "all", unread)}
-              </SelectItem>
-              {mailboxes.map((mailbox) => (
-                <SelectItem key={mailbox.id} value={mailbox.id}>
-                  {mailboxUnreadLabel(mailbox.address, mailbox.id, unread)}
-                </SelectItem>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              aria-label="Mailbox filter"
+              className="hidden h-8 min-h-0 w-52 justify-between bg-muted/70 px-2.5 font-normal shadow-none lg:flex"
+              size="sm"
+              type="button"
+              variant="ghost"
+            >
+              <span className="truncate">{selectedMailboxLabel}</span>
+              <PiCaretDown aria-hidden="true" data-icon="inline-end" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-52" side="bottom">
+            <DropdownMenuRadioGroup value={mailboxId} onValueChange={onMailboxChange}>
+              <DropdownMenuRadioItem className="py-1 text-xs" value="all">
+                All mailboxes
+              </DropdownMenuRadioItem>
+              {humanMailboxes.map((mailbox) => (
+                <DropdownMenuRadioItem className="py-1 text-xs" key={mailbox.id} value={mailbox.id}>
+                  <span className="truncate">{mailbox.address}</span>
+                </DropdownMenuRadioItem>
               ))}
-            </SelectGroup>
-          </SelectContent>
-        </Select>
+            </DropdownMenuRadioGroup>
+            {agentMailboxes.length > 0 ? (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuLabel className="flex items-center gap-1.5 py-1 text-[11px] font-medium text-muted-foreground">
+                  <PiRobot aria-hidden="true" />
+                  Agent mailboxes
+                </DropdownMenuLabel>
+                <DropdownMenuRadioGroup value={mailboxId} onValueChange={onMailboxChange}>
+                  {agentMailboxes.map((mailbox) => (
+                    <DropdownMenuRadioItem
+                      className="py-1 text-xs"
+                      key={mailbox.id}
+                      value={mailbox.id}
+                    >
+                      <span className="truncate">{mailbox.address}</span>
+                    </DropdownMenuRadioItem>
+                  ))}
+                </DropdownMenuRadioGroup>
+              </>
+            ) : null}
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
     </header>
   );

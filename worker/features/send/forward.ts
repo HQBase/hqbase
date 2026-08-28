@@ -1,6 +1,5 @@
 import type { WorkerEnv } from "../../lib/env";
 import { AppError } from "../../lib/errors";
-import { parseWith } from "../../lib/validation";
 import {
   addDraftAttachment,
   deleteDraft,
@@ -10,38 +9,50 @@ import {
 import { findMailboxForSending } from "../mailboxes/queries";
 import { getMessageDetail } from "../messages/queries";
 import type { MessageDetail } from "../messages/types";
+import type { SignatureSnapshot } from "../signatures/types";
 
+import { assembleMessageBody } from "./body";
 import { sendNewMessage } from "./service";
-import { type ForwardMessageInput, type SendMessageInput, sendMessageSchema } from "./validation";
+import type { ForwardMessageInput, SendMessageInput } from "./validation";
 
 const maxForwardedAttachments = 20;
 
-export async function forwardMessage(env: WorkerEnv, input: ForwardMessageInput, userId: string) {
+export async function forwardMessage(
+  env: WorkerEnv,
+  input: ForwardMessageInput,
+  principalId: string,
+  signature?: SignatureSnapshot
+) {
   const original = await getMessageDetail(env.DB, input.messageId);
   if (!original) throw new AppError("MESSAGE_NOT_FOUND", "Message not found.", 404);
 
   const mailbox = await findMailboxForSending(env.DB, input.from);
   if (!mailbox) throw new AppError("MAILBOX_NOT_FOUND", "Sending mailbox not found.", 404);
+  if (!mailbox.isActive) {
+    throw new AppError("MAILBOX_DISABLED", "Disabled mailboxes cannot send email.", 400);
+  }
 
-  const body = forwardedBody(original, input.text, input.html);
+  const context = forwardedContext(original);
   const subject = input.subject ?? forwardSubject(original.subject);
-  const outbound = parseWith(sendMessageSchema, {
+  const originalAttachments = forwardableAttachments(original.attachments);
+  const outbound: SendMessageInput = {
     from: input.from,
     to: input.to,
     cc: input.cc,
     bcc: input.bcc,
     subject,
-    text: body.text,
-    html: body.html,
-    attachmentIds: input.attachmentIds
-  });
-  if (!input.includeOriginalAttachments || original.attachments.length === 0) {
-    return sendNewMessage(env, outbound, userId);
+    text: input.text,
+    html: input.html,
+    attachmentIds: input.attachmentIds,
+    signature: input.signature
+  };
+  if (!input.includeOriginalAttachments || originalAttachments.length === 0) {
+    return sendNewMessage(env, outbound, principalId, signature, context);
   }
 
-  requireForwardedAttachmentCount(original.attachments.length, input.attachmentIds.length);
+  requireForwardedAttachmentCount(originalAttachments.length, input.attachmentIds.length);
 
-  const draft = await saveDraft(env.DB, userId, {
+  const draft = await saveDraft(env.DB, principalId, {
     mailboxId: mailbox.id,
     replyToMessageId: null,
     forwardOfMessageId: original.id,
@@ -50,8 +61,9 @@ export async function forwardMessage(env: WorkerEnv, input: ForwardMessageInput,
     cc: input.cc,
     bcc: input.bcc,
     subject,
-    text: body.text,
-    html: body.html,
+    text: input.text,
+    html: input.html ?? "",
+    signature,
     version: undefined
   });
 
@@ -59,24 +71,33 @@ export async function forwardMessage(env: WorkerEnv, input: ForwardMessageInput,
   try {
     copiedAttachmentIds = await copyOriginalAttachments(
       env,
-      userId,
+      principalId,
       draft.id,
-      original.attachments
+      originalAttachments
     );
   } catch (error) {
-    await deleteDraft(env.DB, env.MAIL_OBJECTS, userId, draft.id);
+    await deleteDraft(env.DB, env.MAIL_OBJECTS, principalId, draft.id);
     throw error;
   }
 
-  return sendNewMessage(
-    env,
-    parseWith(sendMessageSchema, {
-      ...outbound,
-      attachmentIds: [...input.attachmentIds, ...copiedAttachmentIds],
-      draftId: draft.id
-    }),
-    userId
-  );
+  try {
+    return await sendNewMessage(
+      env,
+      {
+        ...outbound,
+        attachmentIds: [...input.attachmentIds, ...copiedAttachmentIds]
+      },
+      principalId,
+      signature,
+      context
+    );
+  } finally {
+    try {
+      await deleteDraft(env.DB, env.MAIL_OBJECTS, principalId, draft.id);
+    } catch {
+      // The temporary draft must not change a completed delivery result.
+    }
+  }
 }
 
 export async function sendForwardDraft(
@@ -84,40 +105,47 @@ export async function sendForwardDraft(
   input: SendMessageInput,
   draftId: string,
   originalMessageId: string,
-  userId: string
+  principalId: string,
+  signature?: SignatureSnapshot
 ) {
   const original = await getMessageDetail(env.DB, originalMessageId);
   if (!original) throw new AppError("MESSAGE_NOT_FOUND", "Message not found.", 404);
-  if (original.attachments.length === 0) {
-    return sendNewMessage(env, { ...input, draftId }, userId);
+  const authored = stripLegacyForwardContext(input);
+  const context = forwardedContext(original);
+  const originalAttachments = forwardableAttachments(original.attachments);
+  if (originalAttachments.length === 0) {
+    return sendNewMessage(env, { ...input, ...authored, draftId }, principalId, signature, context);
   }
 
-  requireForwardedAttachmentCount(original.attachments.length, input.attachmentIds.length);
+  requireForwardedAttachmentCount(originalAttachments.length, input.attachmentIds.length);
   const copiedAttachmentIds = await copyOriginalAttachments(
     env,
-    userId,
+    principalId,
     draftId,
-    original.attachments
+    originalAttachments
   );
   try {
     return await sendNewMessage(
       env,
       {
         ...input,
+        ...authored,
         attachmentIds: [...input.attachmentIds, ...copiedAttachmentIds],
         draftId
       },
-      userId
+      principalId,
+      signature,
+      context
     );
   } catch (error) {
-    await removeCopiedAttachments(env, userId, draftId, copiedAttachmentIds);
+    await removeCopiedAttachments(env, principalId, draftId, copiedAttachmentIds);
     throw error;
   }
 }
 
 async function copyOriginalAttachments(
   env: WorkerEnv,
-  userId: string,
+  principalId: string,
   draftId: string,
   attachments: MessageDetail["attachments"]
 ): Promise<string[]> {
@@ -135,7 +163,7 @@ async function copyOriginalAttachments(
       const file = new File([await object.arrayBuffer()], attachment.filename, {
         type: attachment.contentType
       });
-      const added = await addDraftAttachment(env.DB, userId, draftId, file);
+      const added = await addDraftAttachment(env.DB, principalId, draftId, file);
       copiedAttachmentIds.push(added.attachment.id);
       await env.MAIL_OBJECTS.put(added.r2Key, file.stream(), {
         httpMetadata: { contentType: added.attachment.contentType }
@@ -143,19 +171,25 @@ async function copyOriginalAttachments(
     }
     return copiedAttachmentIds;
   } catch (error) {
-    await removeCopiedAttachments(env, userId, draftId, copiedAttachmentIds);
+    await removeCopiedAttachments(env, principalId, draftId, copiedAttachmentIds);
     throw error;
   }
 }
 
+function forwardableAttachments(
+  attachments: MessageDetail["attachments"]
+): MessageDetail["attachments"] {
+  return attachments.filter((attachment) => attachment.disposition === "attachment");
+}
+
 async function removeCopiedAttachments(
   env: WorkerEnv,
-  userId: string,
+  principalId: string,
   draftId: string,
   attachmentIds: string[]
 ): Promise<void> {
   for (const attachmentId of attachmentIds) {
-    await removeDraftAttachment(env.DB, env.MAIL_OBJECTS, userId, draftId, attachmentId);
+    await removeDraftAttachment(env.DB, env.MAIL_OBJECTS, principalId, draftId, attachmentId);
   }
 }
 
@@ -174,10 +208,18 @@ export function forwardedBody(
   noteText = "",
   noteHtml?: string
 ): { text: string; html: string } {
+  const body = assembleMessageBody({
+    authored: { text: noteText, html: noteHtml },
+    context: forwardedContext(message)
+  });
+  return { text: body.text, html: body.html ?? "" };
+}
+
+export function forwardedContext(message: MessageDetail): { text: string; html: string } {
   const timestamp = message.receivedAt ?? message.sentAt ?? message.createdAt;
   const forwarded = [
     "---------- Forwarded message ---------",
-    `From: ${message.fromAddress}`,
+    `From: ${message.fromName ? `${message.fromName} <${message.fromAddress}>` : message.fromAddress}`,
     `Date: ${new Date(timestamp).toUTCString()}`,
     `Subject: ${message.subject}`,
     `To: ${message.to.join(", ")}`,
@@ -185,16 +227,39 @@ export function forwardedBody(
     "",
     message.textBody || message.snippet
   ].join("\n");
-  const text = [noteText.trim(), forwarded].filter(Boolean).join("\n\n");
-  const authoredHtml = noteHtml?.trim()
-    ? noteHtml.trim()
-    : noteText.trim()
-      ? `<p>${escapeHtml(noteText.trim()).replaceAll("\n", "<br>")}</p>`
-      : "";
   return {
-    text,
-    html: `${authoredHtml}<blockquote>${escapeHtml(forwarded).replaceAll("\n", "<br>")}</blockquote>`
+    text: forwarded,
+    html: `<blockquote>${escapeHtml(forwarded).replaceAll("\n", "<br>")}</blockquote>`
   };
+}
+
+function stripLegacyForwardContext(input: Pick<SendMessageInput, "html" | "text">): {
+  html?: string | undefined;
+  text: string;
+} {
+  const marker = "---------- Forwarded message ---------";
+  const markerIndex = input.text.lastIndexOf(marker);
+  if (markerIndex < 0) return { text: input.text, html: input.html };
+  const text = input.text.slice(0, markerIndex).trim();
+  const html = stripFinalForwardBlockquote(input.html);
+  return { text, ...(html ? { html } : {}) };
+}
+
+function stripFinalForwardBlockquote(html: string | undefined): string | undefined {
+  if (!html) return undefined;
+  const markerIndex = html.lastIndexOf("Forwarded message");
+  const blockStart = html.lastIndexOf("<blockquote", markerIndex);
+  const closingTag = "</blockquote>";
+  const blockEnd = html.indexOf(closingTag, markerIndex);
+  if (
+    markerIndex < 0 ||
+    blockStart < 0 ||
+    blockEnd < 0 ||
+    html.slice(blockEnd + closingTag.length).trim()
+  ) {
+    return html;
+  }
+  return html.slice(0, blockStart).trim() || undefined;
 }
 
 function forwardSubject(subject: string): string {

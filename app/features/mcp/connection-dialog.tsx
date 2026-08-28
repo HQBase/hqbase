@@ -1,5 +1,5 @@
 import * as React from "react";
-import { PiCheck, PiCopy, PiPaperPlaneTilt, PiShieldCheck } from "react-icons/pi";
+import { PiCheck, PiCopy, PiPaperPlaneTilt, PiShieldCheck, PiUser } from "react-icons/pi";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,40 +22,45 @@ export function McpConnectionDetails({
   user: CurrentUser;
 }): React.ReactElement {
   return (
-    <div className="flex flex-col gap-3 text-sm">
+    <div className="flex flex-col gap-5 text-sm">
       {showIdentity ? (
-        <section className="rounded-lg border bg-muted/30 px-3 py-2.5">
-          <p className="text-xs font-medium text-muted-foreground">Connecting as</p>
-          <div className="flex flex-wrap items-baseline gap-x-2">
-            <p className="font-medium">{user.name}</p>
-            <p className="text-xs text-muted-foreground">
-              {user.email} · {user.role}
-            </p>
+        <section className="rounded-xl border bg-muted/30 p-3.5">
+          <div className="flex items-start gap-3">
+            <span className="inline-flex size-9 shrink-0 items-center justify-center rounded-full border bg-background text-muted-foreground shadow-xs">
+              <PiUser aria-hidden="true" className="size-4.5" data-icon="connection-identity" />
+            </span>
+            <div className="min-w-0">
+              <p className="text-xs font-medium text-foreground">Connecting as</p>
+              <p className="mt-0.5 font-semibold text-foreground">{user.name}</p>
+              <p className="break-all text-xs text-muted-foreground">
+                {user.email} · {user.role}
+              </p>
+              <p className="mt-2 text-xs leading-4 text-muted-foreground">
+                After consent, HQBase rechecks this user&apos;s current workspace role and live
+                mailbox grants.
+              </p>
+            </div>
           </div>
-          <p className="mt-1 text-xs leading-4 text-muted-foreground">
-            After consent, HQBase rechecks this user&apos;s current workspace role and live mailbox
-            grants.
-          </p>
         </section>
       ) : null}
 
-      <Tabs defaultValue="read-only">
+      <Tabs defaultValue="mail-actions">
         <div className="flex flex-col gap-1.5">
           <p className="text-xs font-medium text-muted-foreground">Server profile</p>
           <TabsList
             aria-label="Server profile"
             className="inline-flex h-8 w-fit gap-1 rounded-full p-1"
           >
-            <TabsTrigger className="h-6 min-h-0 rounded-full px-3 text-xs" value="read-only">
-              Read only
-            </TabsTrigger>
             <TabsTrigger className="h-6 min-h-0 rounded-full px-3 text-xs" value="mail-actions">
               Mail actions
+            </TabsTrigger>
+            <TabsTrigger className="h-6 min-h-0 rounded-full px-3 text-xs" value="read-only">
+              Read only
             </TabsTrigger>
           </TabsList>
         </div>
 
-        <TabsContent className="mt-2" value="read-only">
+        <TabsContent className="mt-4" value="read-only">
           <McpEndpointOption
             description="Search and read allowed mail without changing it."
             endpoint={readOnlyEndpoint}
@@ -65,7 +70,7 @@ export function McpConnectionDetails({
             title="Read only"
           />
         </TabsContent>
-        <TabsContent className="mt-2" value="mail-actions">
+        <TabsContent className="mt-4" value="mail-actions">
           <McpEndpointOption
             description="Read mail, manage its state, work with drafts, and send."
             endpoint={fullEndpoint}
@@ -77,7 +82,7 @@ export function McpConnectionDetails({
         </TabsContent>
       </Tabs>
 
-      <section className="flex flex-col gap-1 rounded-lg border px-3 py-2.5 text-xs leading-4 text-muted-foreground">
+      <section className="flex flex-col gap-1 text-xs leading-4 text-muted-foreground">
         <p className="font-medium text-foreground">What happens next</p>
         <p>
           The client discovers HQBase OAuth 2.1, registers dynamically with PKCE, then opens sign-in
@@ -115,13 +120,13 @@ function McpEndpointOption({
   }
 
   return (
-    <section className="flex flex-col gap-3 rounded-lg border bg-muted/20 p-3">
+    <section className="flex flex-col gap-4">
       <div className="flex items-start gap-3">
-        <span className="mt-0.5 inline-flex size-8 shrink-0 items-center justify-center rounded-md border bg-background text-muted-foreground">
+        <span className="mt-0.5 inline-flex size-8 shrink-0 items-center justify-center text-muted-foreground">
           {icon}
         </span>
         <div className="min-w-0">
-          <p className="font-medium text-foreground">{title}</p>
+          <h3 className="font-medium text-foreground">{title}</h3>
           <p className="mt-0.5 text-xs text-muted-foreground">{description}</p>
         </div>
       </div>

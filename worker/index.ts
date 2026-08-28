@@ -26,7 +26,7 @@ export default {
     if (mailEventResponse) return mailEventResponse;
     const mcpResponse = await handleMcpRoute(request, env, ctx);
     if (mcpResponse) return mcpResponse;
-    if (url.pathname.startsWith("/api/")) {
+    if (url.pathname.startsWith("/api/") || url.pathname.startsWith("/management/")) {
       return apiRoutes.fetch(request, env, ctx);
     }
 
@@ -53,6 +53,7 @@ export default {
     ctx: ExecutionContext
   ): Promise<void> {
     const stored = await handleInboundEmail(message, env);
+    if (!stored) return;
     if (stored.inserted) {
       ctx.waitUntil(
         notifyInboundMessage(env, stored.message, stored.isUnassigned).catch(() => {

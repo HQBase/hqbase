@@ -3,13 +3,7 @@ import * as React from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { Dialog, DialogClose, DialogContent, DialogTitle } from "@/components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue
-} from "@/components/ui/select";
+import { DropdownSelect } from "@/components/ui/dropdown-select";
 import { flushHookEffects, renderComponent } from "../render-hook";
 
 afterEach(() => {
@@ -67,7 +61,7 @@ async function openDialog(onPointerDownOutside?: OutsideHandler) {
   return view;
 }
 
-function DialogWithOpenSelect({
+function DialogWithOpenDropdown({
   onPointerDownOutside
 }: {
   onPointerDownOutside: OutsideHandler;
@@ -77,15 +71,17 @@ function DialogWithOpenSelect({
     <Dialog defaultOpen>
       <DialogContent onPointerDownOutside={onPointerDownOutside}>
         <DialogTitle>Dialog with dropdown</DialogTitle>
-        <Select open={selectOpen} value="first" onOpenChange={setSelectOpen}>
-          <SelectTrigger aria-label="Test dropdown">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="first">First</SelectItem>
-            <SelectItem value="second">Second</SelectItem>
-          </SelectContent>
-        </Select>
+        <DropdownSelect
+          ariaLabel="Test dropdown"
+          open={selectOpen}
+          options={[
+            { label: "First", value: "first" },
+            { label: "Second", value: "second" }
+          ]}
+          value="first"
+          onOpenChange={setSelectOpen}
+          onValueChange={() => undefined}
+        />
         <output data-select-state>{selectOpen ? "open" : "closed"}</output>
       </DialogContent>
     </Dialog>
@@ -108,7 +104,7 @@ describe("dialog interactions", () => {
 
   it("closes a nested dropdown without closing its dialog", async () => {
     const outside = vi.fn();
-    const view = await renderComponent(<DialogWithOpenSelect onPointerDownOutside={outside} />);
+    const view = await renderComponent(<DialogWithOpenDropdown onPointerDownOutside={outside} />);
     await settleOutsideListeners();
     const overlay = dialogOverlay();
 

@@ -1,44 +1,37 @@
 import type * as React from "react";
 
 import { Button } from "@/components/ui/button";
+import { DropdownSelect } from "@/components/ui/dropdown-select";
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectTrigger,
-  SelectValue
-} from "@/components/ui/select";
-import type { CurrentUser } from "@/features/auth/types";
 import type { Mailbox } from "@/features/mailboxes/types";
 import type { UnreadCounts } from "@/features/notifications/types";
-import { inboxUnreadForMailbox, mailboxUnreadLabel } from "@/features/notifications/unread";
+import { inboxUnreadForMailbox } from "@/features/notifications/unread";
 import { cn } from "@/lib/cn";
-import type { FolderId, SettingsTabId } from "@/lib/routes";
-import { appRoutePath, draftFolder, mailFolders, settingsTabs } from "@/lib/routes";
-import { icons, PiNotePencil, settingsTabIcons, settingsTabLabels } from "./constants";
-import { DrawerMailFooter, DrawerSettingsFooter } from "./sidebar-drawer-extras";
+import type { AgentTabId, FolderId, SettingsTabId } from "@/lib/routes";
+import { agentTabs, appRoutePath, draftFolder, mailFolders, settingsTabs } from "@/lib/routes";
+import {
+  agentTabIcons,
+  agentTabLabels,
+  icons,
+  PiAddressBook,
+  PiNotePencil,
+  settingsTabIcons,
+  settingsTabLabels
+} from "./constants";
 import { isModifiedNavigation } from "./sidebar-helpers";
 
 export function SettingsNav({
   activeSettingsTab,
   canManage,
   isDrawer,
-  onFolderChange,
   onSettingsTabChange,
-  onCompose,
-  user,
-  onSignedOut
+  onCompose
 }: {
   activeSettingsTab: SettingsTabId | undefined;
   canManage: boolean;
   isDrawer: boolean;
-  onFolderChange: (folder: FolderId) => void;
   onSettingsTabChange: ((tab: SettingsTabId) => void) | undefined;
   onCompose: (() => void) | undefined;
-  user: CurrentUser;
-  onSignedOut: () => void;
 }): React.ReactElement {
   return (
     <>
@@ -59,7 +52,9 @@ export function SettingsNav({
         </span>
         {settingsTabs
           .filter((tab) => {
-            if ((tab === "domains" || tab === "updates") && !canManage) return false;
+            if ((tab === "domains" || tab === "updates") && !canManage) {
+              return false;
+            }
             return true;
           })
           .map((tab) => {
@@ -72,7 +67,7 @@ export function SettingsNav({
                 className={cn(
                   "h-8 justify-start gap-3 rounded-[16px] px-3.5 text-[13px] font-medium leading-none text-muted-foreground dark:font-normal [&_svg]:size-4 [&_svg]:shrink-0",
                   isDrawer && "h-11 rounded-[16px] text-sm",
-                  isActive && "bg-selected text-foreground"
+                  isActive && "bg-selected text-foreground [@media(hover:hover)]:hover:bg-selected"
                 )}
                 key={tab}
                 variant="ghost"
@@ -94,13 +89,75 @@ export function SettingsNav({
               </Button>
             );
           })}
-        {isDrawer ? (
-          <DrawerSettingsFooter
-            user={user}
-            onFolderChange={onFolderChange}
-            onSignedOut={onSignedOut}
-          />
-        ) : null}
+      </nav>
+    </>
+  );
+}
+
+export function AgentsNav({
+  activeAgentTab,
+  canManage,
+  isDrawer,
+  onAgentTabChange,
+  onCompose
+}: {
+  activeAgentTab: AgentTabId | undefined;
+  canManage: boolean;
+  isDrawer: boolean;
+  onAgentTabChange: ((tab: AgentTabId) => void) | undefined;
+  onCompose: (() => void) | undefined;
+}): React.ReactElement {
+  return (
+    <>
+      {onCompose ? (
+        <Button
+          className="btn-liquid-glass mb-4 h-10 w-full justify-start gap-3 rounded-full px-3.5 text-sm font-medium"
+          onClick={onCompose}
+          type="button"
+          variant="ghost"
+        >
+          <PiNotePencil className="size-4" />
+          <span className="leading-none">New email</span>
+        </Button>
+      ) : null}
+      <nav aria-label="Agents navigation" className="flex min-h-0 flex-1 flex-col gap-0.5">
+        <span className="mb-1 px-3.5 text-[10px] font-medium uppercase tracking-[0.12em] text-tertiary">
+          Agents
+        </span>
+        {agentTabs
+          .filter((tab) => tab === "connections" || canManage)
+          .map((tab) => {
+            const Icon = agentTabIcons[tab];
+            const label = agentTabLabels[tab];
+            const isActive = activeAgentTab === tab;
+            return (
+              <Button
+                asChild
+                className={cn(
+                  "h-8 justify-start gap-3 rounded-[16px] px-3.5 text-[13px] font-medium leading-none text-muted-foreground dark:font-normal [&_svg]:size-4 [&_svg]:shrink-0",
+                  isDrawer && "h-11 rounded-[16px] text-sm",
+                  isActive && "bg-selected text-foreground [@media(hover:hover)]:hover:bg-selected"
+                )}
+                key={tab}
+                variant="ghost"
+              >
+                <a
+                  aria-current={isActive ? "page" : undefined}
+                  data-navigation-item={isActive ? true : undefined}
+                  href={appRoutePath({ kind: "agents", tab })}
+                  onClick={(event) => {
+                    if (isModifiedNavigation(event)) return;
+                    if (!onAgentTabChange) return;
+                    event.preventDefault();
+                    onAgentTabChange(tab);
+                  }}
+                >
+                  <Icon />
+                  <span className="min-w-0 flex-1 truncate leading-none">{label}</span>
+                </a>
+              </Button>
+            );
+          })}
       </nav>
     </>
   );
@@ -114,20 +171,24 @@ export function MailNav({
   unread,
   isDrawer,
   onFolderChange,
-  onCompose,
-  user,
-  onSignedOut
+  onCompose
 }: {
   activeFolder: FolderId;
   draftCount: number;
   mailboxId: string;
-  mailboxFilter: { mailboxes: Mailbox[]; value: string; onChange: (v: string) => void } | undefined;
+  mailboxFilter:
+    | {
+        mailboxes: Mailbox[];
+        open?: boolean;
+        value: string;
+        onChange: (v: string) => void;
+        onOpenChange?: (open: boolean) => void;
+      }
+    | undefined;
   unread: UnreadCounts;
   isDrawer: boolean;
   onFolderChange: (folder: FolderId) => void;
   onCompose: (() => void) | undefined;
-  user: CurrentUser;
-  onSignedOut: () => void;
 }): React.ReactElement {
   const navigationFolders: Array<(typeof mailFolders)[number] | typeof draftFolder> = [];
   for (const folder of mailFolders) {
@@ -159,27 +220,26 @@ export function MailNav({
             >
               Mailbox
             </FieldLabel>
-            <Select value={mailboxFilter.value} onValueChange={mailboxFilter.onChange}>
-              <SelectTrigger
-                aria-label="Mailbox filter"
-                className="h-11 bg-muted/70 shadow-none [&>span]:truncate"
-                id="drawer-mailbox-filter"
-              >
-                <SelectValue placeholder="All mailboxes" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectGroup>
-                  <SelectItem value="all">
-                    {mailboxUnreadLabel("All mailboxes", "all", unread)}
-                  </SelectItem>
-                  {mailboxFilter.mailboxes.map((mailbox) => (
-                    <SelectItem key={mailbox.id} value={mailbox.id}>
-                      {mailboxUnreadLabel(mailbox.address, mailbox.id, unread)}
-                    </SelectItem>
-                  ))}
-                </SelectGroup>
-              </SelectContent>
-            </Select>
+            <DropdownSelect
+              ariaLabel="Mailbox filter"
+              className="h-11 min-h-11 bg-muted/70 shadow-none"
+              id="drawer-mailbox-filter"
+              options={[
+                {
+                  label: "All mailboxes",
+                  value: "all"
+                },
+                ...mailboxFilter.mailboxes.map((mailbox) => ({
+                  label: mailbox.address,
+                  value: mailbox.id
+                }))
+              ]}
+              placeholder="All mailboxes"
+              value={mailboxFilter.value}
+              {...(mailboxFilter.open === undefined ? {} : { open: mailboxFilter.open })}
+              {...(mailboxFilter.onOpenChange ? { onOpenChange: mailboxFilter.onOpenChange } : {})}
+              onValueChange={mailboxFilter.onChange}
+            />
           </Field>
         </FieldGroup>
       ) : null}
@@ -203,7 +263,8 @@ export function MailNav({
               className={cn(
                 "h-8 justify-start gap-3 rounded-[16px] px-3.5 text-[13px] font-medium leading-none text-muted-foreground dark:font-normal [&_svg]:size-4 [&_svg]:shrink-0",
                 isDrawer && "h-11 rounded-[16px] text-sm",
-                activeFolder === folder.id && "bg-selected text-foreground"
+                activeFolder === folder.id &&
+                  "bg-selected text-foreground [@media(hover:hover)]:hover:bg-selected"
               )}
               key={folder.id}
               variant="ghost"
@@ -236,9 +297,59 @@ export function MailNav({
             </Button>
           );
         })}
-        {isDrawer ? (
-          <DrawerMailFooter user={user} onFolderChange={onFolderChange} onSignedOut={onSignedOut} />
-        ) : null}
+      </nav>
+    </>
+  );
+}
+
+export function ContactsNav({
+  isDrawer,
+  onFolderChange,
+  onCompose
+}: {
+  isDrawer: boolean;
+  onFolderChange: (folder: FolderId) => void;
+  onCompose: (() => void) | undefined;
+}): React.ReactElement {
+  return (
+    <>
+      {onCompose ? (
+        <Button
+          className="btn-liquid-glass mb-4 h-10 w-full justify-start gap-3 rounded-full px-3.5 text-sm font-medium"
+          onClick={onCompose}
+          type="button"
+          variant="ghost"
+        >
+          <PiNotePencil className="size-4" />
+          <span className="leading-none">New email</span>
+        </Button>
+      ) : null}
+      <nav aria-label="Contacts navigation" className="flex min-h-0 flex-1 flex-col gap-0.5">
+        <span className="mb-1 px-3.5 text-[10px] font-medium uppercase tracking-[0.12em] text-tertiary">
+          Contacts
+        </span>
+        <Button
+          asChild
+          className={cn(
+            "h-8 justify-start gap-3 rounded-[16px] bg-selected px-3.5 text-[13px] font-medium leading-none text-foreground [@media(hover:hover)]:hover:bg-selected dark:font-normal [&_svg]:size-4 [&_svg]:shrink-0",
+            isDrawer && "h-11 rounded-[16px] text-sm"
+          )}
+          variant="ghost"
+        >
+          <a
+            aria-current="page"
+            data-navigation-item
+            href={appRoutePath({ kind: "contacts", contactId: null })}
+            onClick={(event) => {
+              if (isModifiedNavigation(event)) return;
+              event.preventDefault();
+              onFolderChange("contacts");
+            }}
+          >
+            <PiAddressBook />
+            <span className="min-w-0 flex-1 truncate leading-none">All contacts</span>
+          </a>
+        </Button>
       </nav>
     </>
   );

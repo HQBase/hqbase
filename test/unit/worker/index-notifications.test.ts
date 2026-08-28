@@ -45,6 +45,21 @@ describe("inbound notification scheduling", () => {
     expect(waitUntil).not.toHaveBeenCalled();
   });
 
+  it("does not schedule events after the recipient is rejected", async () => {
+    mocks.handleInboundEmail.mockResolvedValue(null);
+    const waitUntil = vi.fn();
+
+    await worker.email(
+      {} as ForwardableEmailMessage,
+      {} as WorkerEnv,
+      { waitUntil } as unknown as ExecutionContext
+    );
+
+    expect(mocks.notifyInboundMessage).not.toHaveBeenCalled();
+    expect(mocks.publishMessageMailEvent).not.toHaveBeenCalled();
+    expect(waitUntil).not.toHaveBeenCalled();
+  });
+
   it("schedules push after a newly stored inbound message", async () => {
     mocks.handleInboundEmail.mockResolvedValue({
       inserted: true,

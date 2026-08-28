@@ -2,6 +2,7 @@ import * as React from "react";
 import { PiEye, PiEyeSlash, PiPlus, PiTrash, PiWarningCircle } from "react-icons/pi";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { DropdownSelect } from "@/components/ui/dropdown-select";
 import {
   Field,
   FieldDescription,
@@ -12,14 +13,6 @@ import {
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectTrigger,
-  SelectValue
-} from "@/components/ui/select";
-import {
   Table,
   TableBody,
   TableCell,
@@ -28,8 +21,10 @@ import {
   TableRow
 } from "@/components/ui/table";
 import { LOGIN_EMAIL_HINT } from "@/lib/login-email";
+import { SetupCatchAllSettings } from "./setup-catch-all-settings";
 import type { MailboxDraft, MailboxErrors, OwnerErrors } from "./setup-validation";
 import { WizardActions, WizardPanel } from "./setup-wizard-parts";
+import type { SetupCatchAllSelection } from "./types";
 
 export type { MailboxDraft } from "./setup-validation";
 
@@ -138,7 +133,9 @@ export function OwnerStep({
 }
 
 export function MailboxStep({
+  catchAllByDomain,
   defaultFromMailboxAddress,
+  domains,
   errors,
   isPending,
   mailboxes,
@@ -147,10 +144,14 @@ export function MailboxStep({
   onComplete,
   onRemove,
   onSetDefaultFromMailboxAddress,
+  onSetCatchAllMailbox,
+  onSetCatchAllPolicy,
   onUpdate,
   submitError
 }: {
+  catchAllByDomain: Record<string, SetupCatchAllSelection>;
   defaultFromMailboxAddress: string;
+  domains: string[];
   errors: MailboxErrors;
   isPending: boolean;
   mailboxes: MailboxDraft[];
@@ -159,6 +160,8 @@ export function MailboxStep({
   onComplete: () => void;
   onRemove: (index: number) => void;
   onSetDefaultFromMailboxAddress: (address: string) => void;
+  onSetCatchAllMailbox: (domain: string, address: string) => void;
+  onSetCatchAllPolicy: (domain: string, policy: SetupCatchAllSelection["policy"]) => void;
   onUpdate: (index: number, patch: Partial<MailboxDraft>) => void;
   submitError: string | null;
 }): React.ReactElement {
@@ -183,7 +186,7 @@ export function MailboxStep({
             <TableRow className="[@media(hover:hover)]:hover:bg-transparent">
               <TableHead className="h-8 w-10 px-2 text-center text-xs">#</TableHead>
               <TableHead className="h-8 px-2 text-xs">Email address</TableHead>
-              <TableHead className="h-8 w-[34%] px-2 text-xs">Display name</TableHead>
+              <TableHead className="h-8 w-[34%] px-2 text-xs">Sender name</TableHead>
               <TableHead className="h-8 w-10 px-1">
                 <span className="sr-only">Actions</span>
               </TableHead>
@@ -214,7 +217,7 @@ export function MailboxStep({
                     <Field className="gap-1" data-invalid={Boolean(error.displayName)}>
                       {error.displayName ? <FieldError>{error.displayName}</FieldError> : null}
                       <Input
-                        aria-label={`Mailbox ${index + 1} display name`}
+                        aria-label={`Mailbox ${index + 1} sender name`}
                         aria-invalid={Boolean(error.displayName)}
                         className="h-8 shadow-none"
                         placeholder="Support"
@@ -248,24 +251,29 @@ export function MailboxStep({
         Add mailbox
       </Button>
 
+      <SetupCatchAllSettings
+        catchAllByDomain={catchAllByDomain}
+        domains={domains}
+        mailboxes={mailboxes}
+        onSetCatchAllMailbox={onSetCatchAllMailbox}
+        onSetCatchAllPolicy={onSetCatchAllPolicy}
+      />
+
       <Field className="max-w-md">
         <FieldLabel htmlFor="setup-default-from-mailbox">Default From mailbox</FieldLabel>
-        <Select value={defaultFromMailboxAddress} onValueChange={onSetDefaultFromMailboxAddress}>
-          <SelectTrigger id="setup-default-from-mailbox" className="w-full shadow-none">
-            <SelectValue placeholder="Choose a mailbox" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectGroup>
-              {mailboxes
-                .filter((mailbox) => mailbox.address)
-                .map((mailbox, index) => (
-                  <SelectItem key={`${index}:${mailbox.address}`} value={mailbox.address}>
-                    {mailbox.displayName || "Mailbox"} — {mailbox.address}
-                  </SelectItem>
-                ))}
-            </SelectGroup>
-          </SelectContent>
-        </Select>
+        <DropdownSelect
+          className="shadow-none"
+          id="setup-default-from-mailbox"
+          options={mailboxes
+            .filter((mailbox) => mailbox.address)
+            .map((mailbox) => ({
+              label: `${mailbox.displayName || "Mailbox"} — ${mailbox.address}`,
+              value: mailbox.address
+            }))}
+          placeholder="Choose a mailbox"
+          value={defaultFromMailboxAddress}
+          onValueChange={onSetDefaultFromMailboxAddress}
+        />
         <FieldDescription>
           New messages and forwards start from this mailbox. Replies use the mailbox that received
           the original message.

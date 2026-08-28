@@ -6,7 +6,7 @@ import { deviceCodeGrantType } from "../../../worker/auth/device-authorization";
 import { applyCurrentMigrations } from "./current-migrations";
 
 const origin = "https://hqbase.test";
-const apiResource = `${origin}/api/v1`;
+const apiResource = `${origin}/api/v2`;
 
 let clientId = "";
 let ownerCookie = "";
@@ -137,7 +137,7 @@ describe("OAuth Device Authorization Grant", () => {
       consentCount: 1
     });
 
-    const api = await SELF.fetch(`${origin}/api/v1/mailboxes`, {
+    const api = await SELF.fetch(`${origin}/api/v2/mailboxes`, {
       headers: { authorization: `Bearer ${token.access_token}` }
     });
     expect(api.status, await api.clone().text()).toBe(200);
@@ -179,7 +179,7 @@ describe("OAuth Device Authorization Grant", () => {
     await expect(replay.json()).resolves.toMatchObject({ error: "invalid_grant" });
 
     await env.DB.prepare('DELETE FROM "session" WHERE id = ?').bind(ownerSessionId).run();
-    const afterSessionEnd = await SELF.fetch(`${origin}/api/v1/mailboxes`, {
+    const afterSessionEnd = await SELF.fetch(`${origin}/api/v2/mailboxes`, {
       headers: { authorization: `Bearer ${token.access_token}` }
     });
     expect(afterSessionEnd.status).toBe(401);

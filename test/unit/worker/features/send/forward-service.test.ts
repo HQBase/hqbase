@@ -35,6 +35,7 @@ const original = {
   direction: "inbound" as const,
   folder: "inbox" as const,
   fromAddress: "sender@example.com",
+  fromName: "Sender",
   to: ["support@example.com"],
   cc: [],
   bcc: [],
@@ -57,9 +58,11 @@ const original = {
 const mailbox = {
   id: "mailbox-1",
   address: "support@example.com",
+  deletedAt: null,
   displayName: "Support",
+  kind: "human" as const,
   isActive: true,
-  addresses: [],
+  mailDomainId: "domain-1",
   createdAt: "2026-07-29T12:00:00.000Z",
   updatedAt: "2026-07-29T12:00:00.000Z"
 };
@@ -70,6 +73,7 @@ const sent = {
   direction: "outbound" as const,
   folder: "sent" as const,
   fromAddress: mailbox.address,
+  fromName: mailbox.displayName,
   to: ["recipient@example.com"],
   subject: "Fwd: Original",
   snippet: "Forwarded",
@@ -120,12 +124,102 @@ describe("forward service", () => {
         attachmentIds: [],
         from: mailbox.address,
         subject: "Fwd: Original",
-        text: expect.stringContaining("---------- Forwarded message ---------"),
+        text: "Please review",
         to: ["recipient@example.com"]
       }),
-      "user-1"
+      "user-1",
+      undefined,
+      expect.objectContaining({
+        text: expect.stringContaining("---------- Forwarded message ---------")
+      })
     );
     expect(saveDraft).not.toHaveBeenCalled();
+  });
+
+  it("does not copy inline message images as forwarded attachments", async () => {
+    vi.mocked(getMessageDetail).mockResolvedValue({
+      ...original,
+      attachments: [
+        {
+          id: "inline-logo",
+          messageId: original.id,
+          filename: "logo.png",
+          contentType: "image/png",
+          sizeBytes: 4,
+          contentId: "logo@example.com",
+          disposition: "inline",
+          r2Key: "mail/logo.png",
+          createdAt: original.createdAt
+        }
+      ]
+    });
+
+    await forwardMessage(
+      env,
+      {
+        messageId: original.id,
+        from: mailbox.address,
+        to: ["recipient@example.com"],
+        cc: [],
+        bcc: [],
+        text: "Please review",
+        attachmentIds: [],
+        includeOriginalAttachments: true
+      },
+      "user-1"
+    );
+
+    expect(saveDraft).not.toHaveBeenCalled();
+    expect(get).not.toHaveBeenCalled();
+    expect(sendNewMessage).toHaveBeenCalledWith(
+      env,
+      expect.objectContaining({ attachmentIds: [] }),
+      "user-1",
+      undefined,
+      expect.any(Object)
+    );
+  });
+
+  it("rejects a disabled mailbox before creating an attachment draft", async () => {
+    vi.mocked(findMailboxForSending).mockResolvedValue({ ...mailbox, isActive: false });
+    vi.mocked(getMessageDetail).mockResolvedValue({
+      ...original,
+      attachments: [
+        {
+          id: "attachment-1",
+          messageId: original.id,
+          filename: "original.txt",
+          contentType: "text/plain",
+          sizeBytes: 8,
+          contentId: null,
+          disposition: "attachment",
+          r2Key: "mail/original.txt",
+          createdAt: original.createdAt
+        }
+      ],
+      hasAttachments: true
+    });
+
+    await expect(
+      forwardMessage(
+        env,
+        {
+          messageId: original.id,
+          from: mailbox.address,
+          to: ["recipient@example.com"],
+          cc: [],
+          bcc: [],
+          text: "",
+          attachmentIds: [],
+          includeOriginalAttachments: true
+        },
+        "user-1"
+      )
+    ).rejects.toMatchObject({ code: "MAILBOX_DISABLED", status: 400 });
+
+    expect(saveDraft).not.toHaveBeenCalled();
+    expect(get).not.toHaveBeenCalled();
+    expect(sendNewMessage).not.toHaveBeenCalled();
   });
 
   it("copies original attachments through a temporary draft before sending", async () => {
@@ -135,7 +229,8 @@ describe("forward service", () => {
       filename: "original.txt",
       contentType: "text/plain",
       sizeBytes: 8,
-      contentId: null,
+      contentId: "<gmail-file@example.net>",
+      disposition: "attachment" as const,
       r2Key: "mail/original.txt",
       createdAt: original.createdAt
     };
@@ -156,6 +251,7 @@ describe("forward service", () => {
       subject: "Fwd: Original",
       text: "Forwarded",
       html: "<blockquote>Forwarded</blockquote>",
+      signature: { mode: "none", id: null, name: "", html: "", text: "" },
       version: 1,
       updatedAt: original.createdAt,
       attachments: []
@@ -168,7 +264,8 @@ describe("forward service", () => {
         id: "attachment-copy",
         filename: "original.txt",
         contentType: "text/plain",
-        sizeBytes: 8
+        sizeBytes: 8,
+        inline: false
       },
       r2Key: "drafts/user-1/draft-forward/attachment-copy"
     });
@@ -196,12 +293,16 @@ describe("forward service", () => {
     expect(sendNewMessage).toHaveBeenCalledWith(
       env,
       expect.objectContaining({
-        attachmentIds: ["attachment-copy"],
-        draftId: "draft-forward"
+        attachmentIds: ["attachment-copy"]
       }),
-      "user-1"
+      "user-1",
+      undefined,
+      expect.objectContaining({
+        text: expect.stringContaining("---------- Forwarded message ---------")
+      })
     );
-    expect(deleteDraft).not.toHaveBeenCalled();
+    expect(vi.mocked(sendNewMessage).mock.calls[0]?.[1]).not.toHaveProperty("draftId");
+    expect(deleteDraft).toHaveBeenCalledWith(env.DB, env.MAIL_OBJECTS, "user-1", "draft-forward");
   });
 
   it("adds original attachments when the web UI sends a forward draft", async () => {
@@ -215,6 +316,7 @@ describe("forward service", () => {
           contentType: "text/plain",
           sizeBytes: 8,
           contentId: null,
+          disposition: "attachment",
           r2Key: "mail/original.txt",
           createdAt: original.createdAt
         }
@@ -229,7 +331,8 @@ describe("forward service", () => {
         id: "attachment-copy",
         filename: "original.txt",
         contentType: "text/plain",
-        sizeBytes: 8
+        sizeBytes: 8,
+        inline: false
       },
       r2Key: "drafts/user-1/draft-web/attachment-copy"
     });
@@ -242,7 +345,8 @@ describe("forward service", () => {
         cc: [],
         bcc: [],
         subject: "Fwd: Original",
-        text: "---------- Forwarded message ---------",
+        text: "Authored quote\n\n---------- Forwarded message ---------",
+        html: "<blockquote>Authored quote</blockquote><blockquote>Forwarded message</blockquote>",
         attachmentIds: ["attachment-added"],
         draftId: "draft-web"
       },
@@ -256,9 +360,14 @@ describe("forward service", () => {
       expect.objectContaining({
         attachmentIds: ["attachment-added", "attachment-copy"],
         draftId: "draft-web",
-        text: "---------- Forwarded message ---------"
+        text: "Authored quote",
+        html: "<blockquote>Authored quote</blockquote>"
       }),
-      "user-1"
+      "user-1",
+      undefined,
+      expect.objectContaining({
+        text: expect.stringContaining("---------- Forwarded message ---------")
+      })
     );
     expect(saveDraft).not.toHaveBeenCalled();
     expect(removeDraftAttachment).not.toHaveBeenCalled();
@@ -275,6 +384,7 @@ describe("forward service", () => {
           contentType: "text/plain",
           sizeBytes: 8,
           contentId: null,
+          disposition: "attachment",
           r2Key: "mail/original.txt",
           createdAt: original.createdAt
         }
@@ -289,7 +399,8 @@ describe("forward service", () => {
         id: "attachment-copy",
         filename: "original.txt",
         contentType: "text/plain",
-        sizeBytes: 8
+        sizeBytes: 8,
+        inline: false
       },
       r2Key: "drafts/user-1/draft-web/attachment-copy"
     });

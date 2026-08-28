@@ -30,6 +30,9 @@
       "name": "Conversations"
     },
     {
+      "name": "Labels"
+    },
+    {
       "name": "Drafts"
     },
     {
@@ -37,6 +40,9 @@
     },
     {
       "name": "Events"
+    },
+    {
+      "name": "Signatures"
     }
   ],
   "paths": {
@@ -123,7 +129,7 @@
     "/api/v1/events": {
       "get": {
         "summary": "Open change event WebSocket",
-        "description": "Opens an authenticated wake-only WebSocket. The server sends `changed` frames for messages, mailboxes, and permitted drafts. Frames contain no mail data or cursors. After a frame or reconnect, read the authoritative REST resources and change journals. OAuth tokens require `mail:read`; draft frames also require `mail:send`. The authorization decision at upgrade is an event-delivery lease for 10 minutes. Credential or session revocation does not close the current socket immediately. The server closes the socket when the lease ends, and reconnection must use current credentials and permissions.",
+        "description": "Opens an authenticated wake-only WebSocket. The server sends `changed` frames for messages, mailboxes, shared labels, and permitted drafts. Frames contain no mail data or cursors. After a frame or reconnect, read the authoritative REST resources and change journals. OAuth tokens require `mail:read`; draft frames also require `mail:send`. The authorization decision at upgrade is an event-delivery lease for 10 minutes. Credential or session revocation does not close the current socket immediately. The server closes the socket when the lease ends, and reconnection must use current credentials and permissions.",
         "security": [
           {
             "oauth2": ["mail:read"]
@@ -146,7 +152,7 @@
         ],
         "responses": {
           "101": {
-            "description": "WebSocket established. Text frames use `{\"type\":\"changed\",\"topic\":\"messages|drafts|mailboxes\"}`."
+            "description": "WebSocket established. Text frames use `{\"type\":\"changed\",\"topic\":\"messages|drafts|mailboxes|labels\"}`."
           },
           "401": {
             "description": "Missing or invalid authentication",
@@ -305,6 +311,57 @@
         ]
       }
     },
+    "/api/v1/labels": {
+      "get": {
+        "summary": "List labels",
+        "description": "Lists shared workspace labels. Labels organize mail but never grant mailbox access or change folders.",
+        "security": [
+          {
+            "oauth2": ["mail:read"]
+          },
+          {
+            "cookieSession": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Workspace labels",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Label"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid authentication",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The mail:read permission is required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "tags": ["Labels"],
+        "operationId": "listLabels"
+      }
+    },
     "/api/v1/messages": {
       "get": {
         "summary": "List or search messages",
@@ -412,6 +469,32 @@
               "maxLength": 100
             },
             "description": "Limit results to one accessible mailbox."
+          },
+          {
+            "in": "query",
+            "name": "labelId",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 100
+            },
+            "description": "Limit results to messages assigned this existing label."
+          },
+          {
+            "in": "query",
+            "name": "labelIds",
+            "required": false,
+            "style": "form",
+            "explode": true,
+            "schema": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "maxLength": 100
+              }
+            },
+            "description": "Repeat this parameter to require every listed label on each returned message."
           },
           {
             "in": "query",
@@ -1124,6 +1207,140 @@
         ]
       }
     },
+    "/api/v1/messages/{id}/labels/{labelId}": {
+      "put": {
+        "summary": "Add a label to a message",
+        "description": "Adds one existing label without changing mailbox access or the message folder.",
+        "security": [
+          {
+            "oauth2": ["mail:write"]
+          },
+          {
+            "cookieSession": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Label assignment state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LabelAssignmentResult"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The caller cannot organize this message",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The message or label was not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "tags": ["Labels"],
+        "operationId": "addMessageLabel",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 100
+            }
+          },
+          {
+            "in": "path",
+            "name": "labelId",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 100
+            }
+          }
+        ]
+      },
+      "delete": {
+        "summary": "Remove a label from a message",
+        "description": "Removes one label without changing mailbox access or the message folder.",
+        "security": [
+          {
+            "oauth2": ["mail:write"]
+          },
+          {
+            "cookieSession": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Label assignment state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LabelAssignmentResult"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The caller cannot organize this message",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The message or label was not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "tags": ["Labels"],
+        "operationId": "removeMessageLabel",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 100
+            }
+          },
+          {
+            "in": "path",
+            "name": "labelId",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 100
+            }
+          }
+        ]
+      }
+    },
     "/api/v1/conversations": {
       "get": {
         "summary": "List or search conversations",
@@ -1219,6 +1436,32 @@
               "maxLength": 100
             },
             "description": "Limit results to one accessible mailbox."
+          },
+          {
+            "in": "query",
+            "name": "labelId",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 100
+            },
+            "description": "Limit results to conversations where an accessible message has this existing label."
+          },
+          {
+            "in": "query",
+            "name": "labelIds",
+            "required": false,
+            "style": "form",
+            "explode": true,
+            "schema": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "maxLength": 100
+              }
+            },
+            "description": "Repeat this parameter to require every listed label on accessible messages in each returned conversation."
           },
           {
             "in": "query",
@@ -1363,6 +1606,142 @@
             }
           }
         }
+      }
+    },
+    "/api/v1/conversations/{id}/labels/{labelId}": {
+      "put": {
+        "summary": "Add a label to a conversation",
+        "description": "Adds one existing label to every accessible message that the caller can organize. Inaccessible copies remain unchanged.",
+        "security": [
+          {
+            "oauth2": ["mail:write"]
+          },
+          {
+            "cookieSession": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Label assignment state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LabelAssignmentResult"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The caller cannot organize this conversation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The conversation or label was not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "tags": ["Labels"],
+        "operationId": "addConversationLabel",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "description": "One accessible message ID representing the conversation.",
+            "schema": {
+              "type": "string",
+              "maxLength": 100
+            }
+          },
+          {
+            "in": "path",
+            "name": "labelId",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 100
+            }
+          }
+        ]
+      },
+      "delete": {
+        "summary": "Remove a label from a conversation",
+        "description": "Removes one label from every accessible message that the caller can organize. Inaccessible copies remain unchanged.",
+        "security": [
+          {
+            "oauth2": ["mail:write"]
+          },
+          {
+            "cookieSession": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Label assignment state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LabelAssignmentResult"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The caller cannot organize this conversation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The conversation or label was not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "tags": ["Labels"],
+        "operationId": "removeConversationLabel",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "description": "One accessible message ID representing the conversation.",
+            "schema": {
+              "type": "string",
+              "maxLength": 100
+            }
+          },
+          {
+            "in": "path",
+            "name": "labelId",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 100
+            }
+          }
+        ]
       }
     },
     "/api/v1/drafts": {
@@ -1969,7 +2348,7 @@
     "/api/v1/drafts/{id}/attachments": {
       "post": {
         "summary": "Add a draft attachment",
-        "description": "Records the file part's Content-Type, or application/octet-stream when no type is present. One file and all files in one draft can each total at most 25 MiB; larger uploads return 413 ATTACHMENTS_TOO_LARGE.",
+        "description": "Records the file part's Content-Type, or application/octet-stream when no type is present. Set the optional inline field to true for a safe raster image that can be placed in the draft body. One file and all files in one draft can each total at most 25 MiB; larger uploads return 413 ATTACHMENTS_TOO_LARGE.",
         "security": [
           {
             "oauth2": ["mail:send"]
@@ -2039,6 +2418,16 @@
               }
             }
           },
+          "415": {
+            "description": "Unsupported inline media",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
           "429": {
             "description": "Rate limit exceeded",
             "content": {
@@ -2076,6 +2465,11 @@
                     "type": "string",
                     "format": "binary",
                     "contentEncoding": "binary"
+                  },
+                  "inline": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Set to true to store a safe raster image for inline use."
                   }
                 }
               },
@@ -2087,6 +2481,117 @@
             }
           }
         }
+      }
+    },
+    "/api/v1/drafts/{draftId}/attachments/{id}/inline": {
+      "get": {
+        "summary": "Render a safe inline draft image",
+        "description": "Returns a private inline image owned by the authenticated draft author.",
+        "security": [
+          {
+            "oauth2": ["mail:send"]
+          },
+          {
+            "cookieSession": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Inline draft image",
+            "content": {
+              "image/*": {
+                "schema": {
+                  "type": "string",
+                  "contentEncoding": "binary"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid authentication",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient OAuth scope or mailbox access",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Draft, attachment, or stored object not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Unsupported inline media",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "tags": ["Drafts"],
+        "operationId": "getDraftInlineAttachment",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "draftId",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100
+            }
+          },
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100
+            }
+          }
+        ]
       }
     },
     "/api/v1/drafts/{draftId}/attachments/{id}": {
@@ -2471,6 +2976,87 @@
           }
         }
       }
+    },
+    "/api/v1/signatures": {
+      "get": {
+        "summary": "List signatures for a From address",
+        "security": [
+          {
+            "oauth2": ["mail:send"]
+          },
+          {
+            "cookieSession": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Applicable signatures and the automatic selection",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SignatureCandidates"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid From address",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid authentication",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient OAuth scope or mailbox access",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Sending mailbox not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "tags": ["Signatures"],
+        "operationId": "listSignatures",
+        "description": "Returns only personal, mailbox, and exact-domain signatures usable from the exact address.",
+        "parameters": [
+          {
+            "name": "from",
+            "in": "query",
+            "required": true,
+            "description": "Exact sending address.",
+            "schema": {
+              "type": "string",
+              "format": "email",
+              "maxLength": 254
+            }
+          }
+        ]
+      }
     }
   },
   "components": {
@@ -2545,7 +3131,8 @@
             "format": "email"
           },
           "displayName": {
-            "type": "string"
+            "type": "string",
+            "description": "Shared sender name used with the mailbox address on future outbound messages."
           },
           "receiveEnabled": {
             "type": "boolean"
@@ -2582,10 +3169,13 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/MailboxAddress"
-            }
+            },
+            "minItems": 1,
+            "maxItems": 1
           },
           "displayName": {
-            "type": "string"
+            "type": "string",
+            "description": "Shared sender name used with the mailbox address on future outbound messages."
           },
           "isActive": {
             "type": "boolean"
@@ -2611,6 +3201,71 @@
           }
         }
       },
+      "Label": {
+        "type": "object",
+        "required": ["id", "name", "color", "createdAt", "updatedAt"],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          },
+          "color": {
+            "type": "string",
+            "enum": [
+              "gray",
+              "red",
+              "orange",
+              "amber",
+              "green",
+              "teal",
+              "blue",
+              "indigo",
+              "purple",
+              "pink"
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "LabelAssignmentResult": {
+        "type": "object",
+        "required": ["affected", "assigned", "labelId", "labels"],
+        "properties": {
+          "affected": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "assigned": {
+            "type": "boolean"
+          },
+          "labelId": {
+            "type": "string"
+          },
+          "messageId": {
+            "type": "string"
+          },
+          "threadId": {
+            "type": "string"
+          },
+          "labels": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Label"
+            }
+          }
+        }
+      },
       "MessageSummary": {
         "type": "object",
         "required": [
@@ -2620,6 +3275,7 @@
           "direction",
           "folder",
           "fromAddress",
+          "fromName",
           "to",
           "subject",
           "snippet",
@@ -2659,6 +3315,18 @@
           "fromAddress": {
             "type": "string",
             "format": "email"
+          },
+          "fromName": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Decoded inbound display name or the mailbox sender name snapshot for outbound mail. Treat it as untrusted display text and use fromAddress for matching and replies."
           },
           "to": {
             "type": "array",
@@ -2799,6 +3467,7 @@
           "contentType",
           "sizeBytes",
           "contentId",
+          "disposition",
           "createdAt"
         ],
         "properties": {
@@ -2826,6 +3495,11 @@
                 "type": "null"
               }
             ]
+          },
+          "disposition": {
+            "type": "string",
+            "enum": ["attachment", "inline"],
+            "description": "MIME presentation intent. A content ID does not make a part inline by itself."
           },
           "createdAt": {
             "type": "string",
@@ -2920,9 +3594,12 @@
         "type": "object",
         "required": [
           "afterQuotedHtml",
+          "afterQuotedHtmlHasRemoteImages",
           "hasRemoteImages",
           "html",
+          "htmlHasRemoteImages",
           "quotedHtml",
+          "quotedHtmlHasRemoteImages",
           "remoteMediaTrusted"
         ],
         "properties": {
@@ -2937,11 +3614,20 @@
               }
             ]
           },
+          "afterQuotedHtmlHasRemoteImages": {
+            "description": "Whether authored content after quoted reply history contains remote images.",
+            "type": "boolean"
+          },
           "hasRemoteImages": {
+            "description": "Whether any returned HTML fragment contains remote images.",
             "type": "boolean"
           },
           "html": {
             "type": "string"
+          },
+          "htmlHasRemoteImages": {
+            "description": "Whether the main HTML fragment contains remote images.",
+            "type": "boolean"
           },
           "quotedHtml": {
             "anyOf": [
@@ -2952,6 +3638,10 @@
                 "type": "null"
               }
             ]
+          },
+          "quotedHtmlHasRemoteImages": {
+            "description": "Whether the quoted reply history contains remote images.",
+            "type": "boolean"
           },
           "remoteMediaTrusted": {
             "type": "boolean"
@@ -3046,7 +3736,7 @@
       },
       "DraftAttachment": {
         "type": "object",
-        "required": ["id", "filename", "contentType", "sizeBytes"],
+        "required": ["id", "filename", "contentType", "sizeBytes", "inline"],
         "properties": {
           "id": {
             "type": "string"
@@ -3059,6 +3749,9 @@
           },
           "sizeBytes": {
             "type": "integer"
+          },
+          "inline": {
+            "type": "boolean"
           }
         }
       },
@@ -3143,6 +3836,9 @@
           "version": {
             "type": "integer",
             "minimum": 1
+          },
+          "signature": {
+            "$ref": "#/components/schemas/SignatureSelection"
           }
         }
       },
@@ -3153,7 +3849,7 @@
           },
           {
             "type": "object",
-            "required": ["id", "version", "updatedAt", "attachments"],
+            "required": ["id", "version", "updatedAt", "attachments", "signature"],
             "properties": {
               "id": {
                 "type": "string"
@@ -3170,6 +3866,9 @@
                 "items": {
                   "$ref": "#/components/schemas/DraftAttachment"
                 }
+              },
+              "signature": {
+                "$ref": "#/components/schemas/SignatureSnapshot"
               }
             }
           }
@@ -3282,6 +3981,9 @@
           },
           "draftId": {
             "type": "string"
+          },
+          "signature": {
+            "$ref": "#/components/schemas/SignatureSelection"
           }
         }
       },
@@ -3335,6 +4037,9 @@
           },
           "draftId": {
             "type": "string"
+          },
+          "signature": {
+            "$ref": "#/components/schemas/SignatureSelection"
           }
         }
       },
@@ -3405,6 +4110,135 @@
           "includeOriginalAttachments": {
             "type": "boolean",
             "default": true
+          },
+          "signature": {
+            "$ref": "#/components/schemas/SignatureSelection"
+          }
+        }
+      },
+      "SignatureSelection": {
+        "oneOf": [
+          {
+            "type": "object",
+            "required": ["mode"],
+            "properties": {
+              "mode": {
+                "type": "string",
+                "const": "automatic"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": ["mode", "id"],
+            "properties": {
+              "mode": {
+                "type": "string",
+                "const": "selected"
+              },
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 100
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": ["mode"],
+            "properties": {
+              "mode": {
+                "type": "string",
+                "const": "none"
+              }
+            }
+          }
+        ]
+      },
+      "SignatureSnapshot": {
+        "type": "object",
+        "required": ["mode", "id", "name", "html", "text"],
+        "properties": {
+          "mode": {
+            "type": "string",
+            "enum": ["automatic", "selected", "none"]
+          },
+          "id": {
+            "type": ["string", "null"]
+          },
+          "name": {
+            "type": "string"
+          },
+          "html": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          }
+        }
+      },
+      "Signature": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "html",
+          "text",
+          "scope",
+          "scopeId",
+          "scopeLabel",
+          "isDefault",
+          "createdAt",
+          "updatedAt"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "html": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          },
+          "scope": {
+            "type": "string",
+            "enum": ["user", "mailbox", "domain"]
+          },
+          "scopeId": {
+            "type": "string"
+          },
+          "scopeLabel": {
+            "type": "string"
+          },
+          "isDefault": {
+            "type": "boolean"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "SignatureCandidates": {
+        "type": "object",
+        "required": ["automaticSignatureId", "signatures"],
+        "properties": {
+          "automaticSignatureId": {
+            "type": ["string", "null"]
+          },
+          "signatures": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Signature"
+            }
           }
         }
       }

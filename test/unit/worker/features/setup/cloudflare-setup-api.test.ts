@@ -1,6 +1,7 @@
 import {
   attachWorkerCustomDomain,
   configureCloudflareDomain,
+  disconnectCloudflareDomain,
   listCloudflareZones,
   verifyCloudflareToken
 } from "@worker/features/setup/cloudflare";
@@ -385,6 +386,75 @@ describe("Cloudflare setup API", () => {
         }
       })
     ).rejects.toThrow("already routes to Worker other-worker");
+  });
+
+  it("disables only the catch-all route owned by this Worker", async () => {
+    const fetchMock = vi.fn<typeof fetch>((input, init) => {
+      const url = fetchInputUrl(input);
+      if (url === `${API_BASE}/zones/zone-1`) {
+        return Promise.resolve(
+          jsonResponse({ result: zone({ id: "zone-1", name: "example.com" }) })
+        );
+      }
+      if (url === `${API_BASE}/zones/zone-1/email/routing/rules/catch_all`) {
+        return Promise.resolve(
+          jsonResponse({
+            result:
+              init?.method === "PUT"
+                ? { actions: [{ type: "drop" }], enabled: false }
+                : { actions: [{ type: "worker", value: ["hqbase"] }], enabled: true }
+          })
+        );
+      }
+      return Promise.resolve(jsonResponse({ result: {} }));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      disconnectCloudflareDomain({
+        apiToken: "token-123",
+        domainName: "example.com",
+        workerName: "hqbase",
+        zoneId: "zone-1"
+      })
+    ).resolves.toEqual({ catchAllChanged: true });
+
+    const update = fetchMock.mock.calls.find(([, init]) => init?.method === "PUT");
+    expect(update?.[1]?.body).toBe(
+      JSON.stringify({
+        actions: [{ type: "drop" }],
+        enabled: false,
+        matchers: [{ type: "all" }],
+        name: "HQBase catch-all"
+      })
+    );
+  });
+
+  it("does not change a catch-all route controlled by another destination", async () => {
+    const fetchMock = vi.fn<typeof fetch>((input) => {
+      const url = fetchInputUrl(input);
+      if (url === `${API_BASE}/zones/zone-1`) {
+        return Promise.resolve(
+          jsonResponse({ result: zone({ id: "zone-1", name: "example.com" }) })
+        );
+      }
+      return Promise.resolve(
+        jsonResponse({
+          result: { actions: [{ type: "worker", value: ["other-worker"] }], enabled: true }
+        })
+      );
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      disconnectCloudflareDomain({
+        apiToken: "token-123",
+        domainName: "example.com",
+        workerName: "hqbase",
+        zoneId: "zone-1"
+      })
+    ).resolves.toEqual({ catchAllChanged: false });
+    expect(fetchMock.mock.calls.some(([, init]) => init?.method === "PUT")).toBe(false);
   });
 });
 

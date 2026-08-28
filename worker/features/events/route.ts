@@ -6,14 +6,14 @@ import { jsonResponse } from "../../lib/json";
 import { mailEventInternalHeaders } from "./durable-object";
 import type { MailEventTopic } from "./types";
 
-const eventPath = "/api/v1/events";
+const eventPaths = new Set(["/api/v1/events", "/api/v2/events"]);
 const workspaceHubName = "workspace";
 
 export async function handleMailEventRoute(
   request: Request,
   env: WorkerEnv
 ): Promise<Response | null> {
-  if (new URL(request.url).pathname !== eventPath) return null;
+  if (!eventPaths.has(new URL(request.url).pathname)) return null;
 
   const requestId = requestIdFor(request);
   try {
@@ -32,13 +32,13 @@ export async function handleMailEventRoute(
 
     const principal = await requireMailApiPrincipal(env, request, "mail:read");
     validateSessionOrigin(request, principal.authentication);
-    const topics: MailEventTopic[] = ["messages", "mailboxes"];
+    const topics: MailEventTopic[] = ["messages", "mailboxes", "labels"];
     if (principal.scopes.has("mail:send")) topics.push("drafts");
 
     const headers = new Headers({ upgrade: "websocket" });
     headers.set(mailEventInternalHeaders.requestId, requestId);
     headers.set(mailEventInternalHeaders.topics, topics.join(","));
-    headers.set(mailEventInternalHeaders.user, principal.auth.user.id);
+    headers.set(mailEventInternalHeaders.user, principal.principal.id);
     const response = await env.MAIL_EVENTS.getByName(workspaceHubName).fetch(
       new Request(request.url, { headers })
     );
@@ -58,7 +58,10 @@ export async function handleMailEventRoute(
   }
 }
 
-function validateSessionOrigin(request: Request, authentication: "bearer" | "session"): void {
+function validateSessionOrigin(
+  request: Request,
+  authentication: "agent" | "bearer" | "session"
+): void {
   if (authentication !== "session") return;
   const origin = request.headers.get("origin");
   if (origin !== new URL(request.url).origin) {

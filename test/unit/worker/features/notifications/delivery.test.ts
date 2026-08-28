@@ -44,6 +44,7 @@ const message = {
   direction: "inbound" as const,
   folder: "inbox" as const,
   fromAddress: "sender@example.com",
+  fromName: "Sender",
   to: ["support@example.com"],
   subject: "Private subject",
   snippet: "Private snippet",
