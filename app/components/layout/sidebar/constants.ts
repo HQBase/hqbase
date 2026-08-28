@@ -7,7 +7,6 @@ import {
   PiEnvelopeSimple,
   PiGear,
   PiGlobe,
-  PiKey,
   PiNotePencil,
   PiPalette,
   PiPaperPlaneTilt,
@@ -21,7 +20,7 @@ import {
   PiUsers,
   PiWarning
 } from "react-icons/pi";
-import type { AgentTabId, SettingsTabId } from "@/lib/routes";
+import type { SettingsTabId } from "@/lib/routes";
 
 export const icons = {
   inbox: PiTray,
@@ -71,16 +70,4 @@ export const settingsTabLabels: Record<SettingsTabId, string> = {
   debug: "Debug"
 };
 
-export const agentTabIcons: Record<AgentTabId, React.ComponentType<{ className?: string }>> = {
-  connections: PiPlug,
-  mailboxes: PiRobot,
-  provisioning: PiKey
-};
-
-export const agentTabLabels: Record<AgentTabId, string> = {
-  connections: "Connected apps",
-  mailboxes: "Mailbox agents",
-  provisioning: "Provisioning keys"
-};
-
-export { PiAddressBook, PiNotePencil };
+export { PiAddressBook, PiNotePencil, PiPlug };

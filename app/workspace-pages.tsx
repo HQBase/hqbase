@@ -13,7 +13,7 @@ import { SettingsPage } from "@/features/settings/settings-page";
 import type { SetupStatus } from "@/features/setup/types";
 import type { useUpdateMonitor } from "@/features/updates/use-update-monitor";
 import type { WorkspaceUser } from "@/features/users/types";
-import type { AgentTabId, AppRoute, FolderId, MailFolderId, SettingsTabId } from "@/lib/routes";
+import type { AppRoute, FolderId, MailFolderId, SettingsTabId } from "@/lib/routes";
 import type { useAppRoute } from "@/lib/use-app-route";
 
 const DraftComposeDialog = React.lazy(() =>
@@ -24,7 +24,6 @@ const DraftComposeDialog = React.lazy(() =>
 
 type WorkspacePagesProps = {
   activeFolder: FolderId;
-  agentTab: AgentTabId;
   contentMailboxes: Mailbox[];
   deletedMailboxes: Mailbox[];
   draftState: ReturnType<typeof useDrafts>;
@@ -50,7 +49,6 @@ type WorkspacePagesProps = {
 
 export function WorkspacePages({
   activeFolder,
-  agentTab,
   contentMailboxes,
   deletedMailboxes,
   draftState,
@@ -90,7 +88,6 @@ export function WorkspacePages({
     <>
       {activeFolder === "agents" ? (
         <AgentsPage
-          activeTab={agentTab}
           canManage={user.role === "owner" || user.role === "admin"}
           domains={setup.domains}
           mailboxes={mailboxes}

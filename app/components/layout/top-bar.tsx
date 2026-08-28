@@ -17,12 +17,11 @@ import type { Mailbox } from "@/features/mailboxes/types";
 import type { UnreadCounts } from "@/features/notifications/types";
 import { GlobalSearch } from "@/features/search/global-search";
 import type { GlobalSearchResult } from "@/features/search/types";
-import type { AgentTabId, FolderId, SettingsTabId } from "@/lib/routes";
+import type { FolderId, SettingsTabId } from "@/lib/routes";
 import { MobileNavigation } from "./mobile-navigation";
 
 type TopBarProps = {
   activeFolder: FolderId;
-  activeAgentTab?: AgentTabId | undefined;
   activeSettingsTab?: SettingsTabId | undefined;
   canManage?: boolean | undefined;
   connectionStatus?: MailConnectionStatus | undefined;
@@ -33,7 +32,6 @@ type TopBarProps = {
   search: string;
   unread: UnreadCounts;
   onCompose: () => void;
-  onAgentTabChange?: ((tab: AgentTabId) => void) | undefined;
   onFolderChange: (folder: FolderId) => void;
   onMailboxChange: (mailboxId: string) => void;
   onSearchChange: (search: string) => void;
@@ -47,7 +45,6 @@ type TopBarProps = {
 
 export function TopBar({
   activeFolder,
-  activeAgentTab,
   activeSettingsTab,
   canManage,
   connectionStatus,
@@ -58,7 +55,6 @@ export function TopBar({
   search,
   unread,
   onCompose,
-  onAgentTabChange,
   onFolderChange,
   onMailboxChange,
   onSearchChange,
@@ -91,7 +87,6 @@ export function TopBar({
       ) : null}
       <MobileNavigation
         activeFolder={activeFolder}
-        activeAgentTab={activeAgentTab}
         activeSettingsTab={activeSettingsTab}
         canManage={canManage}
         connectionStatus={connectionStatus}
@@ -101,7 +96,6 @@ export function TopBar({
         unread={unread}
         user={user}
         onCompose={onCompose}
-        onAgentTabChange={onAgentTabChange}
         onFolderChange={onFolderChange}
         onMailboxChange={onMailboxChange}
         onSettingsTabChange={onSettingsTabChange}

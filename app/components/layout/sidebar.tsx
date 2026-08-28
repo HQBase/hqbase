@@ -8,7 +8,7 @@ import type { MailConnectionStatus } from "@/features/events/types";
 import type { Mailbox } from "@/features/mailboxes/types";
 import type { UnreadCounts } from "@/features/notifications/types";
 import { cn } from "@/lib/cn";
-import type { AgentTabId, FolderId, SettingsTabId } from "@/lib/routes";
+import type { FolderId, SettingsTabId } from "@/lib/routes";
 import { appRoutePath } from "@/lib/routes";
 import { AccountMenu } from "./account-menu";
 import { quickAccess } from "./sidebar/constants";
@@ -35,11 +35,9 @@ type SidebarProps = {
   onSignedOut: () => void;
   variant?: "desktop" | "drawer";
   sidebarCollapsed?: boolean;
-  activeAgentTab?: AgentTabId | undefined;
   activeSettingsTab?: SettingsTabId | undefined;
   canManage?: boolean | undefined;
   connectionStatus?: MailConnectionStatus | undefined;
-  onAgentTabChange?: ((tab: AgentTabId) => void) | undefined;
   onSettingsTabChange?: ((tab: SettingsTabId) => void) | undefined;
   onToggleSidebar?: () => void;
 };
@@ -57,11 +55,9 @@ export function Sidebar({
   onSignedOut,
   variant = "desktop",
   sidebarCollapsed = false,
-  activeAgentTab,
   activeSettingsTab,
   canManage = false,
   connectionStatus = "connecting",
-  onAgentTabChange,
   onSettingsTabChange,
   onToggleSidebar
 }: SidebarProps): React.ReactElement {
@@ -125,7 +121,7 @@ export function Sidebar({
                       folder === "settings"
                         ? appRoutePath({ kind: "settings", tab: "mailboxes" })
                         : folder === "agents"
-                          ? appRoutePath({ kind: "agents", tab: "connections" })
+                          ? appRoutePath({ kind: "agents" })
                           : folder === "contacts"
                             ? appRoutePath({ kind: "contacts", contactId: null })
                             : appRoutePath({ kind: "mail", folder, messageId: null })
@@ -199,13 +195,7 @@ export function Sidebar({
               onSettingsTabChange={onSettingsTabChange}
             />
           ) : activeFolder === "agents" ? (
-            <AgentsNav
-              activeAgentTab={activeAgentTab}
-              canManage={canManage}
-              isDrawer={isDrawer}
-              onAgentTabChange={onAgentTabChange}
-              onCompose={onCompose}
-            />
+            <AgentsNav isDrawer={isDrawer} onCompose={onCompose} onFolderChange={onFolderChange} />
           ) : activeFolder === "contacts" ? (
             <ContactsNav
               isDrawer={isDrawer}

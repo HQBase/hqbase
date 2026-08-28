@@ -29,7 +29,6 @@ import { useUpdateMonitor } from "@/features/updates/use-update-monitor";
 import { listUsers } from "@/features/users/api";
 import type { WorkspaceUser } from "@/features/users/types";
 import {
-  type AgentTabId,
   type FolderId,
   isPublicAuthenticationPath,
   readAppRoute,
@@ -63,7 +62,6 @@ export function App(): React.ReactElement {
             ? "drafts"
             : route.folder;
   const settingsTab: SettingsTabId = route.kind === "settings" ? route.tab : "mailboxes";
-  const agentTab: AgentTabId = route.kind === "agents" ? route.tab : "connections";
   const currentUserId = user?.passwordSetupRequired ? null : (user?.id ?? null);
   const draftState = useDrafts(currentUserId);
   const contentMailboxes = React.useMemo(
@@ -176,10 +174,6 @@ export function App(): React.ReactElement {
   React.useEffect(() => {
     if (!user || isLoading) return;
     const canManage = user.role === "owner" || user.role === "admin";
-    if (route.kind === "agents" && !canManage && route.tab !== "connections") {
-      navigate({ kind: "agents", tab: "connections" }, true);
-      return;
-    }
     if (route.kind === "settings" && !canManage && ["domains", "updates"].includes(route.tab)) {
       navigate({ kind: "settings", tab: "mailboxes" }, true);
     }
@@ -290,7 +284,6 @@ export function App(): React.ReactElement {
         {({ openNew }) => (
           <AppShell
             activeFolder={activeFolder}
-            activeAgentTab={agentTab}
             activeSettingsTab={settingsTab}
             canManage={user.role === "owner" || user.role === "admin"}
             connectionStatus={connectionStatus}
@@ -307,13 +300,12 @@ export function App(): React.ReactElement {
               navigate({ kind: "settings", tab: "updates" });
             }}
             onCompose={() => openNew()}
-            onAgentTabChange={(tab) => navigate({ kind: "agents", tab })}
             onFolderChange={(folder) => {
               navigate(
                 folder === "settings"
                   ? { kind: "settings", tab: "mailboxes" }
                   : folder === "agents"
-                    ? { kind: "agents", tab: "connections" }
+                    ? { kind: "agents" }
                     : folder === "contacts"
                       ? { kind: "contacts", contactId: null }
                       : folder === "drafts"
@@ -334,7 +326,6 @@ export function App(): React.ReactElement {
               <div className="min-h-0 flex-1">
                 <WorkspacePages
                   activeFolder={activeFolder}
-                  agentTab={agentTab}
                   contentMailboxes={contentMailboxes}
                   deletedMailboxes={deletedMailboxes}
                   draftState={draftState}

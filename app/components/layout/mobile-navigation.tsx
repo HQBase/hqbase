@@ -7,12 +7,11 @@ import type { CurrentUser } from "@/features/auth/types";
 import type { MailConnectionStatus } from "@/features/events/types";
 import type { Mailbox } from "@/features/mailboxes/types";
 import type { UnreadCounts } from "@/features/notifications/types";
-import type { AgentTabId, FolderId, SettingsTabId } from "@/lib/routes";
+import type { FolderId, SettingsTabId } from "@/lib/routes";
 import { Sidebar } from "./sidebar";
 
 type MobileNavigationProps = {
   activeFolder: FolderId;
-  activeAgentTab?: AgentTabId | undefined;
   activeSettingsTab?: SettingsTabId | undefined;
   canManage?: boolean | undefined;
   connectionStatus?: MailConnectionStatus | undefined;
@@ -22,7 +21,6 @@ type MobileNavigationProps = {
   user: CurrentUser;
   unread: UnreadCounts;
   onCompose?: () => void;
-  onAgentTabChange?: ((tab: AgentTabId) => void) | undefined;
   onFolderChange: (folder: FolderId) => void;
   onMailboxChange: (mailboxId: string) => void;
   onSettingsTabChange?: ((tab: SettingsTabId) => void) | undefined;
@@ -31,7 +29,6 @@ type MobileNavigationProps = {
 
 export function MobileNavigation({
   activeFolder,
-  activeAgentTab,
   activeSettingsTab,
   canManage,
   connectionStatus,
@@ -41,7 +38,6 @@ export function MobileNavigation({
   unread,
   user,
   onCompose,
-  onAgentTabChange,
   onFolderChange,
   onMailboxChange,
   onSettingsTabChange,
@@ -92,11 +88,6 @@ export function MobileNavigation({
     setOpen(false);
   }
 
-  function handleAgentTabChange(tab: AgentTabId): void {
-    onAgentTabChange?.(tab);
-    setOpen(false);
-  }
-
   return (
     <Sheet
       open={open}
@@ -136,7 +127,6 @@ export function MobileNavigation({
         <SheetTitle className="sr-only">Navigation</SheetTitle>
         <Sidebar
           activeFolder={activeFolder}
-          activeAgentTab={activeAgentTab}
           activeSettingsTab={activeSettingsTab}
           canManage={canManage}
           connectionStatus={connectionStatus}
@@ -152,7 +142,6 @@ export function MobileNavigation({
           unread={unread}
           user={user}
           {...(onCompose ? { onCompose: handleCompose } : {})}
-          {...(onAgentTabChange ? { onAgentTabChange: handleAgentTabChange } : {})}
           onFolderChange={handleFolderChange}
           onSectionChange={handleSectionChange}
           {...(onSettingsTabChange ? { onSettingsTabChange: handleSettingsTabChange } : {})}

@@ -304,28 +304,23 @@ describe("mail shell", () => {
     expect(html).not.toContain("Your mail");
   });
 
-  it("shows connected apps and machine identities in the Agents navigation", () => {
+  it("shows one destination in the Agents navigation", () => {
     const html = renderToStaticMarkup(
       <Sidebar
-        activeAgentTab="connections"
         activeFolder="agents"
         canManage
         mailboxId="all"
         unread={unread}
         user={user}
-        onAgentTabChange={() => undefined}
         onFolderChange={() => undefined}
         onSignedOut={() => undefined}
       />
     );
 
     expect(html).toContain('aria-label="Agents navigation"');
-    expect(html).toContain('href="/agents/connections"');
-    expect(html).toContain('href="/agents/mailboxes"');
-    expect(html).toContain('href="/agents/provisioning"');
-    expect(html).toContain("Connected apps");
-    expect(html).toContain("Mailbox agents");
-    expect(html).toContain("Provisioning keys");
+    expect(html).toContain('href="/agents"');
+    expect(html).toContain("All connections");
+    expect(html).not.toContain('href="/agents/mailboxes"');
   });
 
   it("scopes the Inbox count to the selected mailbox", () => {

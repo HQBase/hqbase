@@ -88,11 +88,12 @@ const destinations: ReadonlyArray<
     path: "/settings/interface"
   },
   {
-    id: "connected-apps",
-    label: "Connected apps",
-    description: "Agents",
-    terms: "mcp api skill oauth",
-    path: "/agents/connections"
+    id: "agents",
+    label: "Agents",
+    description: "Connections",
+    terms:
+      "all connections connected apps mailbox agents provisioning keys provisioner management mcp api skill oauth",
+    path: "/agents"
   },
   {
     id: "users",
@@ -101,21 +102,6 @@ const destinations: ReadonlyArray<
     managementOnly: true,
     terms: "people members",
     path: "/settings/users"
-  },
-  {
-    id: "mailbox-agents",
-    label: "Mailbox agents",
-    description: "Agents",
-    managementOnly: true,
-    path: "/agents/mailboxes"
-  },
-  {
-    id: "provisioning-keys",
-    label: "Provisioning keys",
-    description: "Agents",
-    managementOnly: true,
-    terms: "provisioner management api",
-    path: "/agents/provisioning"
   },
   {
     id: "domains",
