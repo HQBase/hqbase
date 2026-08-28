@@ -19,6 +19,21 @@ import {
 } from "./constants";
 import { isModifiedNavigation } from "./sidebar-helpers";
 
+function NewEmailButton({ onCompose }: { onCompose: (() => void) | undefined }) {
+  if (!onCompose) return null;
+  return (
+    <Button
+      className="btn-liquid-glass mb-4 h-10 w-full justify-start gap-3 rounded-full px-3.5 text-sm font-medium"
+      onClick={onCompose}
+      type="button"
+      variant="ghost"
+    >
+      <PiNotePencil className="size-4" />
+      <span className="leading-none">New email</span>
+    </Button>
+  );
+}
+
 export function SettingsNav({
   activeSettingsTab,
   canManage,
@@ -34,17 +49,7 @@ export function SettingsNav({
 }): React.ReactElement {
   return (
     <>
-      {onCompose ? (
-        <Button
-          className="btn-liquid-glass mb-4 h-10 w-full justify-start gap-3 rounded-full px-3.5 text-sm font-medium"
-          onClick={onCompose}
-          type="button"
-          variant="ghost"
-        >
-          <PiNotePencil className="size-4" />
-          <span className="leading-none">New email</span>
-        </Button>
-      ) : null}
+      <NewEmailButton onCompose={onCompose} />
       <nav aria-label="Settings navigation" className="flex min-h-0 flex-1 flex-col gap-0.5">
         <span className="mb-1 px-3.5 text-[10px] font-medium uppercase tracking-[0.12em] text-tertiary">
           Settings
@@ -104,17 +109,7 @@ export function AgentsNav({
 }): React.ReactElement {
   return (
     <>
-      {onCompose ? (
-        <Button
-          className="btn-liquid-glass mb-4 h-10 w-full justify-start gap-3 rounded-full px-3.5 text-sm font-medium"
-          onClick={onCompose}
-          type="button"
-          variant="ghost"
-        >
-          <PiNotePencil className="size-4" />
-          <span className="leading-none">New email</span>
-        </Button>
-      ) : null}
+      <NewEmailButton onCompose={onCompose} />
       <nav aria-label="Agents navigation" className="flex min-h-0 flex-1 flex-col gap-0.5">
         <span className="mb-1 px-3.5 text-[10px] font-medium uppercase tracking-[0.12em] text-tertiary">
           Agents
@@ -183,17 +178,7 @@ export function MailNav({
 
   return (
     <>
-      {onCompose ? (
-        <Button
-          className="btn-liquid-glass mb-4 h-10 w-full justify-start gap-3 rounded-full px-3.5 text-sm font-medium"
-          onClick={onCompose}
-          type="button"
-          variant="ghost"
-        >
-          <PiNotePencil className="size-4" />
-          <span className="leading-none">New email</span>
-        </Button>
-      ) : null}
+      <NewEmailButton onCompose={onCompose} />
       {isDrawer && mailboxFilter ? (
         <FieldGroup className="mb-4 gap-0 px-2">
           <Field className="gap-1.5">
@@ -296,17 +281,7 @@ export function ContactsNav({
 }): React.ReactElement {
   return (
     <>
-      {onCompose ? (
-        <Button
-          className="btn-liquid-glass mb-4 h-10 w-full justify-start gap-3 rounded-full px-3.5 text-sm font-medium"
-          onClick={onCompose}
-          type="button"
-          variant="ghost"
-        >
-          <PiNotePencil className="size-4" />
-          <span className="leading-none">New email</span>
-        </Button>
-      ) : null}
+      <NewEmailButton onCompose={onCompose} />
       <nav aria-label="Contacts navigation" className="flex min-h-0 flex-1 flex-col gap-0.5">
         <span className="mb-1 px-3.5 text-[10px] font-medium uppercase tracking-[0.12em] text-tertiary">
           Contacts
