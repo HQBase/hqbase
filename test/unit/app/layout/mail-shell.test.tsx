@@ -437,6 +437,16 @@ describe("mail shell", () => {
     expect(html).toContain('href="/mail/drafts/draft%2Fone"');
     expect(html).toContain("1 attachment");
     expect(html).not.toContain("2 attachments");
+    expect(html).toContain("grid-cols-[2.5rem_minmax(0,1fr)_4rem]");
+    expect(html).toContain("sm:grid-cols-[2rem_minmax(7rem,18%)_1rem_minmax(0,1fr)_1.75rem_4rem]");
+    expect(html).toContain("sm:col-start-3 sm:row-start-1 sm:flex");
+    expect(html).toContain("sm:col-start-4 sm:row-start-1 sm:h-8 sm:items-center");
+    expect(html).toContain("sm:col-start-6 sm:row-start-1 sm:text-[12px]");
+    expect(html).not.toContain("w-[5.75rem]");
+    expect(html.match(/aria-label="1 attachment"/gu)).toHaveLength(2);
+    expect(html.indexOf('aria-label="1 attachment"')).toBeLessThan(
+      html.indexOf("Quarterly follow-up")
+    );
   });
 
   it("combines the compact folder label and conversation count in one list header", () => {

@@ -1,10 +1,10 @@
 import type * as React from "react";
 import { PiNotePencil, PiPaperclip } from "react-icons/pi";
-import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { groupDrafts } from "@/features/messages/conversation-display";
-import { cn } from "@/lib/cn";
+import { MailListHeader, mailListRowClassName } from "@/features/messages/mail-list-layout";
 import { formatConversationTimestamp } from "@/lib/format";
 import { appRoutePath } from "@/lib/routes";
 
@@ -44,12 +44,7 @@ export function DraftsPage({
   if (selectedId && !selectedDraft && !isLoading) {
     return (
       <div className="flex h-full flex-col bg-list">
-        <div className="flex h-11 shrink-0 items-center border-b border-divider bg-toolbar">
-          <div className="mx-auto flex w-full max-w-[960px] items-center justify-between gap-3 px-4 sm:px-6 lg:px-8">
-            <span className="text-sm font-medium text-foreground">Drafts</span>
-            <span className="text-[12px] tabular-nums text-tertiary">{draftsCountLabel}</span>
-          </div>
-        </div>
+        <MailListHeader countLabel={draftsCountLabel} title="Drafts" />
         <div className="flex flex-1 flex-col items-center justify-center gap-4 p-8 text-center">
           <div className="flex size-9 items-center justify-center rounded-md border border-divider bg-reader text-muted-foreground">
             <PiNotePencil className="size-4" />
@@ -71,12 +66,7 @@ export function DraftsPage({
   if (isLoading && drafts.length === 0) {
     return (
       <div className="flex h-full flex-col bg-list">
-        <div className="flex h-11 shrink-0 items-center border-b border-divider bg-toolbar">
-          <div className="mx-auto flex w-full max-w-[960px] items-center justify-between gap-3 px-4 sm:px-6 lg:px-8">
-            <span className="text-sm font-medium text-foreground">Drafts</span>
-            <span className="text-[12px] tabular-nums text-tertiary">{draftsCountLabel}</span>
-          </div>
-        </div>
+        <MailListHeader countLabel={draftsCountLabel} title="Drafts" />
         <div className="flex flex-1 items-center justify-center p-8 text-muted-foreground">
           <Spinner />
         </div>
@@ -88,12 +78,7 @@ export function DraftsPage({
 
   return (
     <div className="flex h-full flex-col bg-list" data-mobile-view="message-list">
-      <div className="flex h-11 shrink-0 items-center border-b border-divider bg-toolbar">
-        <div className="mx-auto flex w-full max-w-[960px] items-center justify-between gap-3 px-4 sm:px-6 lg:px-8">
-          <span className="text-sm font-medium text-foreground">Drafts</span>
-          <span className="text-[12px] tabular-nums text-tertiary">{draftsCountLabel}</span>
-        </div>
-      </div>
+      <MailListHeader countLabel={draftsCountLabel} title="Drafts" />
       <div className="min-h-0 flex-1 overflow-hidden">
         <div className="h-full overflow-auto overscroll-contain will-change-transform">
           {visibleDrafts.length === 0 ? (
@@ -101,7 +86,7 @@ export function DraftsPage({
               <EmptyDrafts filtered={drafts.length > 0} />
             </div>
           ) : (
-            <div className="mx-auto w-full max-w-[960px] px-4 pb-5 sm:px-6 lg:px-8">
+            <div className="mx-auto w-full max-w-[960px] px-1 pb-5 sm:px-6 lg:px-8">
               {groups.map((group) => (
                 <section
                   aria-labelledby={`draft-group-${group.key}`}
@@ -109,7 +94,7 @@ export function DraftsPage({
                   key={group.key}
                 >
                   <h2
-                    className="pb-1.5 pt-6 text-[13px] font-medium text-foreground"
+                    className="px-3 pb-1.5 pt-6 text-[13px] font-medium text-foreground sm:px-0"
                     id={`draft-group-${group.key}`}
                   >
                     {group.label}
@@ -147,13 +132,11 @@ function DraftListItem({
   const subject = draft.subject.trim() || "No subject";
   const snippet = draft.text.trim().replace(/\s+/g, " ") || "No message content";
   const attachmentCount = draft.attachments.filter((attachment) => !attachment.inline).length;
+  const avatarInitial = recipients === "No recipients" ? "?" : recipients.charAt(0).toUpperCase();
 
   return (
     <a
-      className={cn(
-        "group flex w-full items-center gap-4 rounded-xl px-3 py-2 text-left text-[13px] leading-5 transition-colors [@media(hover:hover)]:hover:bg-hover focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring",
-        isActive && "bg-selected"
-      )}
+      className={mailListRowClassName(isActive)}
       href={appRoutePath({ kind: "drafts", draftId: draft.id })}
       onClick={(event) => {
         if (isModifiedNavigation(event)) return;
@@ -161,24 +144,25 @@ function DraftListItem({
         onSelect(draft.id);
       }}
     >
-      <span className="flex h-10 min-h-10 w-11 min-w-11 shrink-0 items-center justify-center">
-        <Badge className="h-5 shrink-0 border-transparent bg-[oklch(0.65_0.22_25/0.14)] px-1.5 text-[10px] text-[oklch(0.61_0.20_25)] dark:bg-white/[0.07] dark:text-[oklch(0.70_0.20_25)] dark:border-white/[0.07]">
-          Draft
-        </Badge>
-      </span>
-      <span className="flex w-[30%] min-w-0 max-w-[16rem] shrink-0 items-center gap-2">
-        <span className="min-w-0 truncate text-[13px] font-normal text-muted-foreground">
-          {recipients}
+      <Avatar aria-hidden="true" className="row-span-2 size-10 sm:hidden">
+        <AvatarFallback className="font-medium uppercase">{avatarInitial}</AvatarFallback>
+      </Avatar>
+      <span className="col-start-3 row-start-2 flex shrink-0 self-end justify-self-end sm:col-start-1 sm:row-start-1 sm:self-center sm:justify-self-auto">
+        <span
+          aria-label="Draft"
+          className="flex size-10 min-h-10 min-w-10 items-end justify-center pb-px text-tertiary sm:size-8 sm:min-h-8 sm:min-w-8 sm:items-center sm:pb-0"
+          role="img"
+        >
+          <PiNotePencil
+            aria-hidden="true"
+            className="pointer-events-none size-[18px] -translate-y-px sm:size-4 sm:translate-y-0"
+          />
         </span>
       </span>
-      <span className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden">
-        <span className="min-w-0 flex-1 truncate">
-          <span className="font-medium text-foreground dark:text-white">{subject}</span>
-          <span className="text-muted-foreground">
-            {" — "}
-            {snippet}
-          </span>
-        </span>
+      <span className="col-start-2 row-start-1 flex min-w-0 items-center gap-1 font-normal text-foreground/85 dark:text-white/65 sm:col-start-2 sm:row-start-1">
+        <span className="min-w-0 truncate">{recipients}</span>
+      </span>
+      <span className="hidden items-center justify-center sm:col-start-3 sm:row-start-1 sm:flex">
         {attachmentCount > 0 ? (
           <PiPaperclip
             aria-label={`${attachmentCount} attachment${attachmentCount === 1 ? "" : "s"}`}
@@ -186,8 +170,26 @@ function DraftListItem({
           />
         ) : null}
       </span>
+      <span className="col-start-2 row-start-2 flex min-w-0 items-end gap-2 overflow-hidden sm:col-start-4 sm:row-start-1 sm:h-8 sm:items-center">
+        {attachmentCount > 0 ? (
+          <PiPaperclip
+            aria-label={`${attachmentCount} attachment${attachmentCount === 1 ? "" : "s"}`}
+            className="pointer-events-none size-3.5 shrink-0 self-center text-tertiary sm:hidden"
+          />
+        ) : null}
+        <span className="min-w-0 flex-1 sm:mr-2 sm:overflow-hidden">
+          <span className="block truncate font-normal text-foreground/85 dark:text-white/65 sm:inline">
+            {subject}
+          </span>
+          <span className="block truncate text-muted-foreground sm:inline">
+            <span className="hidden sm:inline">{" — "}</span>
+            {snippet}
+          </span>
+        </span>
+      </span>
+      <span className="hidden min-w-0 items-center justify-center sm:col-start-5 sm:row-start-1 sm:flex sm:w-7 sm:min-w-7" />
       <time
-        className="w-[5.75rem] shrink-0 text-right text-[12px] tabular-nums text-muted-foreground"
+        className="col-start-3 row-start-1 shrink-0 whitespace-nowrap text-right text-[11px] tabular-nums text-muted-foreground sm:col-start-6 sm:row-start-1 sm:text-[12px]"
         dateTime={draft.updatedAt}
       >
         {formatConversationTimestamp(draft.updatedAt)}

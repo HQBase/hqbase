@@ -220,7 +220,7 @@ describe("conversation reader", () => {
     expect(html).toContain("Load more conversations");
     expect(html.match(/max-w-\[960px\]/gu)).toHaveLength(2);
     expect(html).not.toContain("max-w-[1200px]");
-    const header = html.match(/<div[^>]*data-inbox-header-layout[^>]*>/u)?.[0];
+    const header = html.match(/<div[^>]*data-mail-list-header-layout[^>]*>/u)?.[0];
     expect(header).toContain(
       "sm:grid-cols-[2rem_minmax(7rem,18%)_1rem_minmax(0,1fr)_1.75rem_4rem]"
     );
