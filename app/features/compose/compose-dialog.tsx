@@ -14,6 +14,7 @@ import {
   composeTitle,
   type DraftSaveState,
   defaultSendingIdentity,
+  draftEditorHtml,
   draftRecoveryKey,
   draftStatus,
   findDraftForComposer,
@@ -183,17 +184,20 @@ export function ComposeDialog({
           initial.updatedAt
         );
         migrateDraftRecovery(exactRecoveryKey, legacyRecoveryKey, recovered);
+        const initialText = recovered?.text ?? initial.text;
+        const initialHtml = draftEditorHtml(initialText, recovered?.html ?? initial.html);
         draftRef.current = initial;
         setDraft(initial);
         onDraftReadyRef.current?.(initial.id);
-        initializeAutosave(initial);
+        initializeAutosave(
+          recovered ? initial : { ...initial, text: initialText, html: initialHtml }
+        );
         setFrom(recovered?.from ?? initial.from);
         setTo(recovered?.to ?? initial.to.join(", "));
         setCc(recovered?.cc ?? initial.cc.join(", "));
         setBcc(recovered?.bcc ?? initial.bcc.join(", "));
         setSubject(recovered?.subject ?? initial.subject);
-        setText(recovered?.text ?? initial.text);
-        const initialHtml = recovered?.html ?? (initial.html || "<p></p>");
+        setText(initialText);
         htmlRef.current = initialHtml;
         setHtml(initialHtml);
         replaceAttachments(initial.attachments);

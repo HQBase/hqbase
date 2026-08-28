@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   composeContextLabel,
   defaultSendingIdentity,
+  draftEditorHtml,
   draftRecoveryKey,
   findDraftForComposer,
   forwardedMessage,
@@ -226,6 +227,16 @@ describe("composer state", () => {
     expect(normalizeDraftHtml("", "<p></p>")).toBe("");
     expect(serializeDraft("from@example.com", "", "", "", "", "", "<p></p>")).toBe(
       serializeDraft("from@example.com", "", "", "", "", "", "")
+    );
+  });
+
+  it("safely opens plain-text drafts in the rich editor", () => {
+    expect(draftEditorHtml("First <line> & next\nSecond", "<p></p>")).toBe(
+      "<p>First &lt;line&gt; &amp; next<br>Second</p>"
+    );
+    expect(draftEditorHtml("Text fallback", "<p><br></p>")).toBe("<p>Text fallback</p>");
+    expect(draftEditorHtml("Text fallback", '<p><img src="cid:image"></p>')).toBe(
+      '<p><img src="cid:image"></p>'
     );
   });
 

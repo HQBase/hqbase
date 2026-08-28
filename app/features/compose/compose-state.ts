@@ -139,6 +139,15 @@ export function normalizeDraftHtml(text: string, html: string): string {
   return text.trim() ? html : "";
 }
 
+const emptyEditorHtml =
+  /^(?:(?:\s|&nbsp;|&#160;|<br\s*\/?>)|<p>(?:\s|&nbsp;|&#160;|<br\s*\/?>)*<\/p>)*$/i;
+
+export function draftEditorHtml(text: string, html: string): string {
+  if (!emptyEditorHtml.test(html)) return html;
+  if (!text.trim()) return "<p></p>";
+  return `<p>${escapeHtml(text).replace(/\r\n?|\n/g, "<br>")}</p>`;
+}
+
 export type DraftRecovery = {
   from: string;
   to: string;

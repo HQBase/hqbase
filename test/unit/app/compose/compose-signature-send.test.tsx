@@ -7,6 +7,7 @@ import type { SignatureSelection } from "@/features/signatures/types";
 import { flushHookEffects, renderComponent } from "../render-hook";
 
 type CapturedComposeProps = {
+  html: string;
   isPending: boolean;
   sendDisabled: boolean;
   signatureDisabled: boolean;
@@ -164,6 +165,31 @@ describe("compose signature send ordering", () => {
     );
     await signatureSave;
     expect(mocks.captured?.sendDisabled).toBe(false);
+    await view.unmount();
+  });
+
+  it("opens a text-only draft without creating autosave drift", async () => {
+    const textOnlyDraft = {
+      ...draft,
+      text: "First <line> & next\nSecond",
+      html: "<p></p>"
+    };
+    mocks.listDrafts.mockResolvedValue([textOnlyDraft]);
+    const view = await renderComponent(
+      <ComposeDialog
+        draftId={draft.id}
+        mailboxes={[mailbox]}
+        open
+        onOpenChange={() => undefined}
+        onSent={() => undefined}
+      />
+    );
+    await flushHookEffects();
+    await flushHookEffects();
+
+    const html = "<p>First &lt;line&gt; &amp; next<br>Second</p>";
+    expect(mocks.captured?.html).toBe(html);
+    expect(mocks.initializeAutosave).toHaveBeenCalledWith({ ...textOnlyDraft, html });
     await view.unmount();
   });
 
