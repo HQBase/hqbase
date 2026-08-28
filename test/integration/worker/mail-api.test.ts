@@ -997,6 +997,14 @@ describe("HQBase Mail API", () => {
   });
 
   it("sends a web forward draft with its original attachments", async () => {
+    const labelId = "lbl_api_draft_transfer";
+    const labelTimestamp = "2026-08-28T12:00:00.000Z";
+    await env.DB.prepare(
+      `INSERT INTO labels (id, name, color, created_by_user_id, created_at, updated_at)
+       VALUES (?, 'Send with draft', 'teal', ?, ?, ?)`
+    )
+      .bind(labelId, userId, labelTimestamp, labelTimestamp)
+      .run();
     const created = await apiFetch("/api/v2/drafts", fullToken, {
       body: JSON.stringify({
         mailboxId: "mbx_api",
@@ -1012,6 +1020,22 @@ describe("HQBase Mail API", () => {
     });
     expect(created.status, await created.clone().text()).toBe(201);
     const draft = (await created.json()) as { id: string };
+    const labeled = await apiFetch(`/api/v2/drafts/${draft.id}/labels/${labelId}`, fullToken, {
+      method: "PUT"
+    });
+    expect(labeled.status, await labeled.clone().text()).toBe(200);
+    await expect(labeled.json()).resolves.toMatchObject({
+      assigned: true,
+      draftId: draft.id,
+      labels: [expect.objectContaining({ id: labelId })]
+    });
+    expect(
+      await env.DB.prepare(
+        "SELECT COUNT(*) AS count FROM message_labels WHERE message_id = 'msg_api' AND label_id = ?"
+      )
+        .bind(labelId)
+        .first()
+    ).toEqual({ count: 0 });
 
     const response = await apiFetch("/api/v2/send", fullToken, {
       body: JSON.stringify({
@@ -1032,10 +1056,16 @@ describe("HQBase Mail API", () => {
       attachments: [{ contentType: "text/plain", filename: "hello.txt", sizeBytes: 5 }],
       folder: "sent",
       hasAttachments: true,
+      labels: [expect.objectContaining({ id: labelId, name: "Send with draft" })],
       subject: "Fwd: API message"
     });
     const deletedDraft = await apiFetch(`/api/v2/drafts/${draft.id}`, fullToken);
     expect(deletedDraft.status).toBe(404);
+    expect(
+      await env.DB.prepare("SELECT COUNT(*) AS count FROM draft_labels WHERE draft_id = ?")
+        .bind(draft.id)
+        .first()
+    ).toEqual({ count: 0 });
   });
 
   it("limits unassigned mail to authenticated owners", async () => {

@@ -5,7 +5,6 @@ vi.mock("@worker/db/client", () => ({
   nowIso: vi.fn(() => "2026-07-10T00:00:00.000Z")
 }));
 vi.mock("@worker/db/drizzle", () => ({
-  createDatabase: vi.fn(),
   getRows: vi.fn()
 }));
 
@@ -26,7 +25,7 @@ vi.mock("@worker/features/messages/threading", () => ({
   touchThread: vi.fn()
 }));
 
-import { createDatabase, getRows } from "@worker/db/drizzle";
+import { getRows } from "@worker/db/drizzle";
 import { draftAttachmentObjects } from "@worker/features/drafts/attachment-lookups";
 import { findMailboxForSending } from "@worker/features/mailboxes/queries";
 import {
@@ -73,14 +72,17 @@ const sentSummary = {
 describe("send service", () => {
   const send = vi.fn();
   const deleteObject = vi.fn();
-  const deleteDraftRun = vi.fn();
+  const batch = vi.fn();
+  const preparedStatement = { bind: vi.fn() };
+  preparedStatement.bind.mockReturnValue(preparedStatement);
+  const prepare = vi.fn(() => preparedStatement);
   const get = vi.fn();
   const put = vi.fn();
   const env = {
     ASSETS: {} as Fetcher,
     BETTER_AUTH_SECRET: "test-secret",
     CLOUDFLARE_OAUTH_CLIENT_ID: "1c413f324b518b452096929b847e6703",
-    DB: {} as D1Database,
+    DB: { batch, prepare } as unknown as D1Database,
     HQBASE_APP_VERSION: "0.1.3",
     HQBASE_RELEASE_PUBLIC_KEY: "MCowBQYDK2VwAyEAsVwKniCvpHDwbbnjTPP0SuIIG97cRL+iFBQvay9OrU4=",
     HQBASE_RELEASE_MANIFEST_URL:
@@ -101,10 +103,7 @@ describe("send service", () => {
     vi.mocked(draftAttachmentObjects).mockResolvedValue([]);
     vi.mocked(getRows).mockResolvedValue([]);
     deleteObject.mockResolvedValue(undefined);
-    deleteDraftRun.mockResolvedValue({ meta: { changes: 1 } });
-    vi.mocked(createDatabase).mockReturnValue({
-      delete: () => ({ where: () => ({ run: deleteDraftRun }) })
-    } as never);
+    batch.mockResolvedValue([]);
   });
 
   it("uses Cloudflare's generated Message-ID for new messages", async () => {
@@ -316,7 +315,7 @@ describe("send service", () => {
       env.DB,
       expect.objectContaining({ r2Key: "sent/2026-07-10/html-1-1" })
     );
-    expect(deleteDraftRun).not.toHaveBeenCalled();
+    expect(batch).not.toHaveBeenCalled();
   });
 
   it("copies attachments from multiple owned drafts when draftId is omitted", async () => {

@@ -46,7 +46,12 @@ export async function listAccessibleDrafts(
 export async function listAccessibleDraftPage(
   env: WorkerEnv,
   principal: DraftPrincipal,
-  input: { cursor?: string | undefined; limit: number; search?: string | undefined }
+  input: {
+    cursor?: string | undefined;
+    labelIds?: readonly string[] | undefined;
+    limit: number;
+    search?: string | undefined;
+  }
 ): Promise<AccessibleDraftPage> {
   const page = await listDraftPage(env.DB, draftPrincipalId(principal), input);
   return {

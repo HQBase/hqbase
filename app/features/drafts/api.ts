@@ -1,6 +1,6 @@
 import { apiDelete, apiGetPage, apiPatch, apiPost } from "@/lib/api-client";
 
-import type { Draft, DraftAttachment, DraftInput } from "./types";
+import type { Draft, DraftAttachment, DraftInput, DraftLabelMutationResult } from "./types";
 
 export async function listDrafts(): Promise<Draft[]> {
   const drafts: Draft[] = [];
@@ -20,6 +20,31 @@ export const updateDraft = (id: string, input: DraftInput) =>
   apiPatch<Draft>(`/api/v2/drafts/${id}`, input);
 
 export const deleteDraft = (id: string) => apiDelete(`/api/v2/drafts/${id}`);
+
+export async function setDraftLabel(
+  draftId: string,
+  labelId: string,
+  assigned: boolean
+): Promise<DraftLabelMutationResult> {
+  const path = `/api/v2/drafts/${draftId}/labels/${labelId}`;
+  const response = await fetch(path, {
+    credentials: "include",
+    method: assigned ? "PUT" : "DELETE",
+    ...(assigned ? { body: "{}", headers: { "content-type": "application/json" } } : {})
+  });
+  const body = (await response.json().catch(() => null)) as
+    | DraftLabelMutationResult
+    | { error?: { message?: string } }
+    | null;
+  if (!response.ok) {
+    throw new Error(
+      body && "error" in body
+        ? (body.error?.message ?? "Label could not be updated.")
+        : "Label could not be updated."
+    );
+  }
+  return body as DraftLabelMutationResult;
+}
 
 export const deleteDraftAttachment = (draftId: string, id: string) =>
   apiDelete(`/api/v2/drafts/${draftId}/attachments/${id}`);

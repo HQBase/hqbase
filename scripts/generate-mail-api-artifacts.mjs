@@ -144,6 +144,7 @@ function validateOpenApi(document, version) {
     `${apiBasePath}/conversations/{id}/labels/{labelId}`,
     `${apiBasePath}/drafts`,
     `${apiBasePath}/drafts/changes`,
+    `${apiBasePath}/drafts/{id}/labels/{labelId}`,
     `${apiBasePath}/signatures`,
     `${apiBasePath}/send`,
     `${apiBasePath}/reply`,

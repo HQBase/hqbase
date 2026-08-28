@@ -41,6 +41,7 @@ DROP TABLE IF EXISTS oauthClient;
 DROP TABLE IF EXISTS agent_credentials;
 DROP TABLE IF EXISTS agents;
 DROP TABLE IF EXISTS contacts;
+DROP TABLE IF EXISTS draft_labels;
 DROP TABLE IF EXISTS push_subscriptions;
 DROP TABLE IF EXISTS message_sender_preferences;
 DROP TABLE IF EXISTS user_mail_preferences;

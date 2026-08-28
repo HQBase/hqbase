@@ -32,7 +32,8 @@ const draft: Draft = {
   signature: { mode: "automatic", id: null, name: "", html: "", text: "" },
   version: 1,
   updatedAt: "2026-07-29T00:00:00.000Z",
-  attachments: []
+  attachments: [],
+  labels: []
 };
 
 function options(overrides: Partial<Parameters<typeof useDraftAutosave>[0]> = {}) {

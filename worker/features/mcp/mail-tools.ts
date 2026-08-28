@@ -47,6 +47,9 @@ export function registerMailTools(
   schedule: MailEventScheduler
 ): void {
   if (principal.scopes.has("mail:read")) registerReadTools(server, env, principal);
+  if (principal.scopes.has("mail:write") || principal.scopes.has("mail:send")) {
+    registerLabelWriteTools(server, env, principal, schedule);
+  }
   if (principal.scopes.has("mail:write")) registerWriteTools(server, env, principal, schedule);
 }
 
@@ -202,8 +205,6 @@ function registerWriteTools(
   principal: McpPrincipal,
   schedule: MailEventScheduler
 ): void {
-  registerLabelWriteTools(server, env, principal, schedule);
-
   server.registerTool(
     "update_message",
     {

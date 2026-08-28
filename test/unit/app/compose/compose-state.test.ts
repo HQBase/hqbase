@@ -103,7 +103,8 @@ describe("composer state", () => {
       signature: { mode: "automatic", id: null, name: "", html: "", text: "" },
       version: 1,
       updatedAt: "2026-07-29T14:00:00.000Z",
-      attachments: []
+      attachments: [],
+      labels: []
     });
     const drafts = [draft("draft-one"), draft("draft-two")];
 

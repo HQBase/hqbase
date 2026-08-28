@@ -78,7 +78,8 @@ const draft: Draft = {
   signature: { mode: "automatic", id: null, name: "", html: "", text: "" },
   version: 1,
   updatedAt: "2026-08-24T12:00:00.000Z",
-  attachments: []
+  attachments: [],
+  labels: []
 };
 const mailbox = {
   id: "mailbox-1",

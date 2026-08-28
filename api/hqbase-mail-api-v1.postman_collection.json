@@ -300,6 +300,50 @@
             "description": "Removes one label from every accessible message that the caller can organize. Inaccessible copies remain unchanged."
           },
           "response": []
+        },
+        {
+          "name": "Add a label to a draft",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/drafts/:id/labels/:labelId",
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{id}}"
+                },
+                {
+                  "key": "labelId",
+                  "value": "{{labelId}}"
+                }
+              ]
+            },
+            "description": "Adds one existing label on a caller-owned private draft."
+          },
+          "response": []
+        },
+        {
+          "name": "Remove a label from a draft",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/drafts/:id/labels/:labelId",
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{id}}"
+                },
+                {
+                  "key": "labelId",
+                  "value": "{{labelId}}"
+                }
+              ]
+            },
+            "description": "Removes one existing label on a caller-owned private draft."
+          },
+          "response": []
         }
       ]
     },
@@ -622,6 +666,24 @@
                   "value": "",
                   "disabled": true,
                   "description": "Opaque cursor from the previous page. Read it from the Link header and send it unchanged."
+                },
+                {
+                  "key": "search",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Literal draft search across sender, recipients, subject, and plain text."
+                },
+                {
+                  "key": "labelId",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Require one assigned draft label."
+                },
+                {
+                  "key": "labelIds",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Repeat to require every selected draft label."
                 }
               ]
             },

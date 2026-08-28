@@ -1,8 +1,7 @@
-import { and, eq, sql } from "drizzle-orm";
+import { sql } from "drizzle-orm";
 
 import { newId, nowIso } from "../../db/client";
-import { createDatabase, getRows } from "../../db/drizzle";
-import { drafts } from "../../db/schema";
+import { getRows } from "../../db/drizzle";
 import type { WorkerEnv } from "../../lib/env";
 import { AppError } from "../../lib/errors";
 import { findMailboxForSending } from "../mailboxes/queries";
@@ -302,10 +301,21 @@ async function storeSentMessage(
             JOIN drafts d ON d.id = a.draft_id
             WHERE d.id = ${input.draftId} AND d.principal_id = ${input.principalId}`
       );
-      await createDatabase(env.DB)
-        .delete(drafts)
-        .where(and(eq(drafts.id, input.draftId), eq(drafts.principalId, input.principalId)))
-        .run();
+      await env.DB.batch([
+        env.DB.prepare(
+          `INSERT OR IGNORE INTO message_labels
+             (message_id, label_id, assigned_by_principal_id, created_at)
+             SELECT ?, assignment.label_id, assignment.assigned_by_principal_id,
+                    assignment.created_at
+             FROM draft_labels assignment
+             JOIN drafts draft ON draft.id = assignment.draft_id
+             WHERE draft.id = ? AND draft.principal_id = ?`
+        ).bind(message.id, input.draftId, input.principalId),
+        env.DB.prepare("DELETE FROM drafts WHERE id = ? AND principal_id = ?").bind(
+          input.draftId,
+          input.principalId
+        )
+      ]);
       const retainedKeys = new Set(input.storedAttachments.map((attachment) => attachment.r2Key));
       const unusedKeys = draftObjects
         .map((object) => object.r2_key)

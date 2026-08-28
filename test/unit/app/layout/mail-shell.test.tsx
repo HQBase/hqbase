@@ -385,6 +385,13 @@ describe("mail shell", () => {
   });
 
   it("lists private drafts as reopenable rows with filtering and attachment state", () => {
+    const label = {
+      color: "teal" as const,
+      createdAt: "2026-07-29T13:00:00.000Z",
+      id: "label-follow-up",
+      name: "Follow up",
+      updatedAt: "2026-07-29T13:00:00.000Z"
+    };
     const html = renderToStaticMarkup(
       <DraftsPage
         drafts={[
@@ -418,15 +425,20 @@ describe("mail shell", () => {
                 sizeBytes: 8,
                 inline: true
               }
-            ]
+            ],
+            labels: [label]
           }
         ]}
         isLoading={false}
+        labelIds={[label.id]}
+        labels={[label]}
         mailboxId="all"
         search=""
         selectedId={null}
         onBack={() => undefined}
+        onLabelChange={() => undefined}
         onSelect={() => undefined}
+        onToggleLabel={() => undefined}
       />
     );
 
@@ -436,6 +448,10 @@ describe("mail shell", () => {
     expect(html).toContain("Here is the requested summary.");
     expect(html).toContain('href="/mail/drafts/draft%2Fone"');
     expect(html).toContain("1 attachment");
+    expect(html).toContain("Filter by labels: Follow up");
+    expect(html).toContain("Labels: Follow up");
+    expect(html).toContain('data-message-labels="compact"');
+    expect(html).toContain('data-message-labels="desktop"');
     expect(html).not.toContain("2 attachments");
     expect(html).toContain("grid-cols-[2.5rem_minmax(0,1fr)_4rem]");
     expect(html).toContain("sm:grid-cols-[2rem_minmax(7rem,18%)_1rem_minmax(0,1fr)_1.75rem_4rem]");

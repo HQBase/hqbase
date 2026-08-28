@@ -3,6 +3,7 @@ import * as React from "react";
 import { AgentsPage } from "@/features/agents/agents-page";
 import type { CurrentUser } from "@/features/auth/types";
 import { ContactsPage } from "@/features/contacts/contacts-page";
+import { setDraftLabel } from "@/features/drafts/api";
 import { DraftsPage } from "@/features/drafts/drafts-page";
 import type { useDrafts } from "@/features/drafts/use-drafts";
 import { InboxPage } from "@/features/inbox/inbox-page";
@@ -150,11 +151,18 @@ export function WorkspacePages({
         <DraftsPage
           drafts={draftState.drafts}
           isLoading={draftState.isLoading}
+          labelIds={labelIds}
+          labels={labels}
           mailboxId={mailboxId}
           search={search}
           selectedId={selectedDraftId}
           onBack={() => navigate({ kind: "drafts", draftId: null })}
+          onLabelChange={onLabelChange}
           onSelect={(draftId) => navigate({ kind: "drafts", draftId })}
+          onToggleLabel={async (draftId, label, assigned) => {
+            const result = await setDraftLabel(draftId, label.id, assigned);
+            draftState.applyLabels(result.draftId, result.labels);
+          }}
         />
       ) : (
         <InboxPage

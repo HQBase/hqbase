@@ -5,9 +5,11 @@ import { accessibleMessageScope } from "../../auth/mailbox-access";
 import type { WorkerEnv } from "../../lib/env";
 import { AppError } from "../../lib/errors";
 import { recordAudit } from "../audit/service";
+import { getAccessibleDraft } from "../drafts/access";
 import {
   type MailEventScheduler,
   publishMessageMailEvent,
+  publishUserMailEvent,
   scheduleMailEvent
 } from "../events/service";
 import {
@@ -16,6 +18,7 @@ import {
   listLabels,
   requireLabel,
   setConversationLabel,
+  setDraftLabel,
   setMessageLabel
 } from "../labels/queries";
 import { requireMessageAccess } from "../messages/access";
@@ -56,17 +59,49 @@ function registerLabelMutationTool(
   server.registerTool(
     name,
     {
-      description: `${assigned ? "Add" : "Remove"} one shared label on a message or accessible conversation. Labels organize mail but never change mailbox access or folders.`,
+      description: `${assigned ? "Add" : "Remove"} one shared label on a message, accessible conversation, or private draft. Labels organize mail but never change mailbox access or folders.`,
       inputSchema: {
+        draftId: z.string().min(1).max(100).optional(),
         labelId: z.string().min(1).max(100),
-        messageId: z.string().min(1).max(100),
-        target: z.enum(["message", "conversation"]).default("message")
+        messageId: z.string().min(1).max(100).optional(),
+        target: z.enum(["message", "conversation", "draft"]).default("message")
       },
       annotations: { destructiveHint: true, idempotentHint: true, openWorldHint: false }
     },
-    ({ labelId, messageId, target }) =>
+    ({ draftId, labelId, messageId, target }) =>
       toolResult(async () => {
         const label = await requireLabel(env.DB, labelId);
+        if (target === "draft") {
+          requireToolScope(principal, "mail:send");
+          if (!draftId) {
+            throw new AppError("MCP_INVALID_TARGET", "draftId is required for a draft label.", 400);
+          }
+          await getAccessibleDraft(env, principal, draftId);
+          const result = await setDraftLabel(env.DB, {
+            assigned,
+            draftId,
+            labelId: label.id,
+            principalId: principal.userId
+          });
+          scheduleMailEvent(schedule, publishUserMailEvent(env, principal.userId, "drafts"));
+          await recordLabelMutation(env, principal, assigned, "draft", draftId);
+          return {
+            affected: result.affected,
+            assigned,
+            draftId,
+            labelId: label.id,
+            labels: result.labels
+          };
+        }
+
+        requireToolScope(principal, "mail:write");
+        if (!messageId) {
+          throw new AppError(
+            "MCP_INVALID_TARGET",
+            "messageId is required for a message or conversation label.",
+            400
+          );
+        }
         await requireLabelAccess(env, principal, messageId);
         if (target === "message") {
           const result = await setMessageLabel(env.DB, {
@@ -137,7 +172,7 @@ function recordLabelMutation(
   env: WorkerEnv,
   principal: McpPrincipal,
   assigned: boolean,
-  resourceType: "message" | "conversation",
+  resourceType: "message" | "conversation" | "draft",
   resourceId: string
 ) {
   return recordAudit(env.DB, {
@@ -149,4 +184,10 @@ function recordLabelMutation(
     resourceId,
     outcome: "success"
   });
+}
+
+function requireToolScope(principal: McpPrincipal, scope: "mail:send" | "mail:write"): void {
+  if (!principal.scopes.has(scope)) {
+    throw new AppError("MCP_SCOPE_REQUIRED", `This action requires ${scope}.`, 403);
+  }
 }

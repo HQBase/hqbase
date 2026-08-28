@@ -1,3 +1,4 @@
+import type { MailLabel } from "../labels/queries";
 import type { SignatureSnapshot } from "../signatures/types";
 
 export type DraftAttachment = {
@@ -24,4 +25,5 @@ export type Draft = {
   version: number;
   updatedAt: string;
   attachments: DraftAttachment[];
+  labels: MailLabel[];
 };

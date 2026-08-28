@@ -1,11 +1,12 @@
 import * as React from "react";
-
+import type { MailLabel } from "@/features/labels/types";
 import { listDrafts } from "./api";
 import type { Draft } from "./types";
 
 export function useDrafts(userId: string | null): {
   drafts: Draft[];
   isLoading: boolean;
+  applyLabels: (draftId: string, labels: MailLabel[]) => void;
   refresh: () => Promise<void>;
 } {
   const [drafts, setDrafts] = React.useState<Draft[]>([]);
@@ -50,5 +51,11 @@ export function useDrafts(userId: string | null): {
     };
   }, [refresh, userId]);
 
-  return { drafts, isLoading, refresh };
+  const applyLabels = React.useCallback((draftId: string, labels: MailLabel[]): void => {
+    setDrafts((current) =>
+      current.map((draft) => (draft.id === draftId ? { ...draft, labels } : draft))
+    );
+  }, []);
+
+  return { applyLabels, drafts, isLoading, refresh };
 }
