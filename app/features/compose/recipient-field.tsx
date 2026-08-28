@@ -164,7 +164,8 @@ function sourceLabel(source: ContactSource): string {
 }
 
 export function recipientQuery(value: string): string {
-  return value.split(/[,\n]/).at(-1)?.trim() ?? "";
+  const query = value.split(/[,\n]/).at(-1)?.trim() ?? "";
+  return query && invalidRecipients(query).length > 0 ? query : "";
 }
 
 export function insertRecipient(value: string, email: string): string {

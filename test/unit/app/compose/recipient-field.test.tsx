@@ -18,7 +18,9 @@ describe("recipient field", () => {
     mocks.listRecipientSuggestions.mockReset().mockResolvedValue([]);
   });
 
-  it("reads the active recipient and inserts a unique suggestion", () => {
+  it("searches only an unfinished active recipient and inserts a unique suggestion", () => {
+    expect(recipientQuery("one@example.com")).toBe("");
+    expect(recipientQuery("one@example.com, two@example.com")).toBe("");
     expect(recipientQuery("one@example.com, ali")).toBe("ali");
     expect(insertRecipient("one@example.com, ali", "alice@example.com")).toBe(
       "one@example.com, alice@example.com, "
