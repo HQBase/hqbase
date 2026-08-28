@@ -367,10 +367,10 @@ test("candidate mail experience contracts work together", async ({ request }) =>
     id: string;
   };
   expect(secondDomain.catchAllPolicy).toBe("unassigned");
-  const disconnectWithoutGrant = await request.post(`/api/domains/${secondDomain.id}/disconnect`);
-  expect(disconnectWithoutGrant.status()).toBe(401);
-  await expect(disconnectWithoutGrant.json()).resolves.toMatchObject({
-    error: { code: "CLOUDFLARE_ACCESS_REQUIRED" }
+  const disconnectWithoutZone = await request.post(`/api/domains/${secondDomain.id}/disconnect`);
+  expect(disconnectWithoutZone.status()).toBe(409);
+  await expect(disconnectWithoutZone.json()).resolves.toMatchObject({
+    error: { code: "DOMAIN_ZONE_REQUIRED" }
   });
   const forgetConnected = await request.delete(`/api/domains/${secondDomain.id}`, {
     data: { confirmation: secondDomainName }
