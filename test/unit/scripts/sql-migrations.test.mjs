@@ -39,7 +39,8 @@ const expectedMigrationNames = [
   "0023_message_sender_names.sql",
   "0024_draft_inline_images.sql",
   "0025_activate_catch_all_policy.sql",
-  "0026_domain_disconnect.sql"
+  "0026_domain_disconnect.sql",
+  "0027_message_attachment_disposition.sql"
 ];
 const expectedAfterDeployMigrationNames = [
   "0001_remove_mailbox_alias_storage.sql",
@@ -435,6 +436,10 @@ describe("SQL migration contract", () => {
     expect(draftColumns.map((column) => column.name)).not.toContain("user_id");
     const draftAttachmentColumns = database.prepare("PRAGMA table_info(draft_attachments)").all();
     expect(draftAttachmentColumns.map((column) => column.name)).toContain("content_id");
+    const messageAttachmentColumns = database
+      .prepare("PRAGMA table_info(message_attachments)")
+      .all();
+    expect(messageAttachmentColumns.map((column) => column.name)).toContain("disposition");
     const messageColumns = database.prepare("PRAGMA table_info(messages)").all();
     expect(messageColumns.map((column) => column.name)).toContain("delivered_to_address");
     expect(messageColumns.map((column) => column.name)).toContain("from_name");

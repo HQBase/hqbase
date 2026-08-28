@@ -479,14 +479,16 @@ describe("conversation reader", () => {
                 filename: "logo.png",
                 contentType: "image/png",
                 sizeBytes: 4,
-                contentId: "logo@example.com"
+                contentId: "logo@example.com",
+                disposition: "inline"
               },
               {
                 id: "report",
                 filename: "report.pdf",
                 contentType: "application/pdf",
                 sizeBytes: 8,
-                contentId: null
+                contentId: "gmail-report@example.com",
+                disposition: "attachment"
               }
             ]
           }

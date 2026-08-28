@@ -147,6 +147,7 @@ describe("forward service", () => {
           contentType: "image/png",
           sizeBytes: 4,
           contentId: "logo@example.com",
+          disposition: "inline",
           r2Key: "mail/logo.png",
           createdAt: original.createdAt
         }
@@ -191,6 +192,7 @@ describe("forward service", () => {
           contentType: "text/plain",
           sizeBytes: 8,
           contentId: null,
+          disposition: "attachment",
           r2Key: "mail/original.txt",
           createdAt: original.createdAt
         }
@@ -227,7 +229,8 @@ describe("forward service", () => {
       filename: "original.txt",
       contentType: "text/plain",
       sizeBytes: 8,
-      contentId: null,
+      contentId: "<gmail-file@example.net>",
+      disposition: "attachment" as const,
       r2Key: "mail/original.txt",
       createdAt: original.createdAt
     };
@@ -313,6 +316,7 @@ describe("forward service", () => {
           contentType: "text/plain",
           sizeBytes: 8,
           contentId: null,
+          disposition: "attachment",
           r2Key: "mail/original.txt",
           createdAt: original.createdAt
         }
@@ -380,6 +384,7 @@ describe("forward service", () => {
           contentType: "text/plain",
           sizeBytes: 8,
           contentId: null,
+          disposition: "attachment",
           r2Key: "mail/original.txt",
           createdAt: original.createdAt
         }

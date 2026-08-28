@@ -179,7 +179,7 @@ async function copyOriginalAttachments(
 function forwardableAttachments(
   attachments: MessageDetail["attachments"]
 ): MessageDetail["attachments"] {
-  return attachments.filter((attachment) => !attachment.contentId);
+  return attachments.filter((attachment) => attachment.disposition === "attachment");
 }
 
 async function removeCopiedAttachments(

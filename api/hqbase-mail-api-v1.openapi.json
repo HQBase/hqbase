@@ -3467,6 +3467,7 @@
           "contentType",
           "sizeBytes",
           "contentId",
+          "disposition",
           "createdAt"
         ],
         "properties": {
@@ -3494,6 +3495,11 @@
                 "type": "null"
               }
             ]
+          },
+          "disposition": {
+            "type": "string",
+            "enum": ["attachment", "inline"],
+            "description": "MIME presentation intent. A content ID does not make a part inline by itself."
           },
           "createdAt": {
             "type": "string",

@@ -12,6 +12,7 @@ const attachment = {
   contentType: "image/png",
   sizeBytes: 120,
   contentId: "<signature-logo@example.com>",
+  disposition: "inline" as const,
   r2Key: "messages/logo.png",
   createdAt: "2026-07-13T00:00:00.000Z"
 };

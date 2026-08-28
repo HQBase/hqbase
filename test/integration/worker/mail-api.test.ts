@@ -246,8 +246,9 @@ describe("HQBase Mail API", () => {
       ),
       env.DB.prepare(
         `INSERT INTO message_attachments
-         (id, message_id, filename, content_type, size_bytes, content_id, r2_key, created_at)
-         VALUES ('att_api', 'msg_api', 'hello.txt', 'text/plain', 5, NULL, 'mail/api/hello.txt', ?)`
+         (id, message_id, filename, content_type, size_bytes, content_id, disposition, r2_key, created_at)
+         VALUES ('att_api', 'msg_api', 'hello.txt', 'text/plain', 5,
+                 '<gmail-file@example.net>', 'attachment', 'mail/api/hello.txt', ?)`
       ).bind(now.toISOString())
     ]);
     await env.MAIL_OBJECTS.put("mail/api/hello.txt", "hello", {
@@ -651,7 +652,12 @@ describe("HQBase Mail API", () => {
       fromName: string | null;
     };
     expect(payload.fromName).toBe("Sender Example");
-    expect(payload.attachments[0]).toMatchObject({ id: "att_api", filename: "hello.txt" });
+    expect(payload.attachments[0]).toMatchObject({
+      contentId: "<gmail-file@example.net>",
+      disposition: "attachment",
+      filename: "hello.txt",
+      id: "att_api"
+    });
     expect(payload.attachments[0]).not.toHaveProperty("r2Key");
 
     const attachment = await apiFetch("/api/v2/attachments/att_api", readToken);

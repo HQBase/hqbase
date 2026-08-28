@@ -591,6 +591,7 @@ describe("send service", () => {
       contentType: "image/png",
       sizeBytes: 3,
       contentId: "<logo@example.com>",
+      disposition: "inline" as const,
       r2Key: "mail/logo.png",
       createdAt: "2026-07-10T00:00:00.000Z"
     };

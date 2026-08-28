@@ -139,6 +139,46 @@ describe("catch-all domain policy", () => {
     });
   });
 
+  it("stores Gmail Content-ID files as downloadable attachments", async () => {
+    await readyDomain("route-gmail-attachment.example");
+    const mailbox = await createMailbox(env.DB, {
+      address: "contact@route-gmail-attachment.example",
+      displayName: "Contact"
+    });
+    const result = await storeInboundEmail(env.DB, env.MAIL_OBJECTS, {
+      envelopeRecipient: mailbox.address,
+      mailboxId: mailbox.id,
+      parsed: {
+        ...parsedEmail,
+        attachments: [
+          {
+            content: new TextEncoder().encode("pdf").buffer,
+            contentId: "<gmail-file@example.net>",
+            contentType: "application/pdf",
+            disposition: "attachment",
+            filename: "gmail-file.pdf"
+          }
+        ],
+        messageId: "<gmail-attachment@example.net>",
+        subject: "Gmail attachment"
+      },
+      raw: new TextEncoder().encode("From: sender@gmail.com\r\n\r\nHello").buffer
+    });
+    expect(result.inserted).toBe(true);
+
+    const stored = await env.DB.prepare(
+      `SELECT content_id, disposition
+       FROM message_attachments
+       WHERE message_id = ?`
+    )
+      .bind(result.message.id)
+      .first<{ content_id: string; disposition: string }>();
+    expect(stored).toEqual({
+      content_id: "<gmail-file@example.net>",
+      disposition: "attachment"
+    });
+  });
+
   it("requires a replacement before disabling or deleting the destination", async () => {
     const domain = await readyDomain("route-lifecycle.example");
     const mailbox = await createMailbox(env.DB, {

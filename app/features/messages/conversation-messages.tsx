@@ -68,7 +68,7 @@ export function ConversationMessages({
   function renderMessage(message: MessageDetail, isLast: boolean): React.ReactElement {
     const timestamp = message.receivedAt ?? message.sentAt ?? message.createdAt;
     const downloadableAttachments = message.attachments.filter(
-      (attachment) => !attachment.contentId
+      (attachment) => attachment.disposition === "attachment"
     );
     return (
       <article

@@ -97,6 +97,7 @@ export async function storeInboundEmail(
       contentType: attachment.contentType,
       sizeBytes: attachmentSize(attachment.content),
       contentId: attachment.contentId,
+      disposition: messageAttachmentDisposition(attachment),
       r2Key
     });
   }
@@ -110,10 +111,15 @@ export async function storeInboundEmail(
 
 export function hasDownloadableAttachments(attachments: ParsedEmail["attachments"]): boolean {
   return attachments.some(
-    (attachment) =>
-      attachment.disposition === "attachment" ||
-      (attachment.disposition === null && !attachment.contentId)
+    (attachment) => messageAttachmentDisposition(attachment) === "attachment"
   );
+}
+
+function messageAttachmentDisposition(
+  attachment: ParsedEmail["attachments"][number]
+): "attachment" | "inline" {
+  if (attachment.disposition === "attachment") return "attachment";
+  return attachment.disposition === "inline" || attachment.contentId ? "inline" : "attachment";
 }
 
 async function findDuplicate(db: D1Database, dedupeKey: string): Promise<MessageSummary | null> {

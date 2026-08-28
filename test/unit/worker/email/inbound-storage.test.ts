@@ -46,7 +46,7 @@ describe("planInboundStorage", () => {
     expect(plan.dedupeKey).toBeNull();
   });
 
-  it("does not count inline MIME images as downloadable attachments", () => {
+  it("uses MIME disposition when an attachment also has a content ID", () => {
     const attachment = {
       filename: "logo.png",
       contentType: "image/png",

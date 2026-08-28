@@ -113,6 +113,7 @@ export async function insertAttachment(
       contentType: input.contentType,
       sizeBytes: input.sizeBytes,
       contentId: input.contentId,
+      disposition: input.disposition,
       r2Key: input.r2Key,
       createdAt: timestamp
     })
@@ -125,6 +126,7 @@ export async function insertAttachment(
     contentType: input.contentType,
     sizeBytes: input.sizeBytes,
     contentId: input.contentId,
+    disposition: input.disposition,
     r2Key: input.r2Key,
     createdAt: timestamp
   };
@@ -358,6 +360,7 @@ function mapAttachment(row: AttachmentRow): StoredAttachment {
     contentType: row.content_type,
     sizeBytes: row.size_bytes,
     contentId: row.content_id,
+    disposition: row.disposition,
     r2Key: row.r2_key,
     createdAt: row.created_at
   };

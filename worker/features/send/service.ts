@@ -290,6 +290,7 @@ async function storeSentMessage(
         contentType: attachment.contentType,
         sizeBytes: attachment.sizeBytes,
         contentId: attachment.contentId,
+        disposition: attachment.disposition,
         r2Key: attachment.r2Key
       });
     }

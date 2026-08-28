@@ -59,6 +59,7 @@ export type MessageDetail = MessageSummary & {
     contentType: string;
     sizeBytes: number;
     contentId: string | null;
+    disposition: "attachment" | "inline";
   }>;
 };
 

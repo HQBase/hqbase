@@ -84,10 +84,19 @@ export const messageAttachments = sqliteTable(
     contentType: text("content_type").notNull(),
     sizeBytes: integer("size_bytes").notNull(),
     contentId: text("content_id"),
+    disposition: text("disposition", { enum: ["attachment", "inline"] })
+      .default("attachment")
+      .notNull(),
     r2Key: text("r2_key").notNull(),
     createdAt: text("created_at").notNull()
   },
-  (table) => [index("message_attachments_message_idx").on(table.messageId)]
+  (table) => [
+    check(
+      "message_attachments_disposition_check",
+      sql`${table.disposition} IN ('attachment', 'inline')`
+    ),
+    index("message_attachments_message_idx").on(table.messageId)
+  ]
 );
 
 export const messageChanges = sqliteTable(

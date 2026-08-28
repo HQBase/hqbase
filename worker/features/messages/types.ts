@@ -20,6 +20,7 @@ export type StoredAttachment = {
   contentType: string;
   sizeBytes: number;
   contentId: string | null;
+  disposition: "attachment" | "inline";
   r2Key: string;
   createdAt: string;
 };
@@ -116,6 +117,7 @@ export type AttachmentRow = {
   content_type: string;
   size_bytes: number;
   content_id: string | null;
+  disposition: "attachment" | "inline";
   r2_key: string;
   created_at: string;
 };
@@ -153,5 +155,6 @@ export type InsertAttachmentInput = {
   contentType: string;
   sizeBytes: number;
   contentId: string | null;
+  disposition: "attachment" | "inline";
   r2Key: string;
 };
