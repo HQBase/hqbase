@@ -7,9 +7,7 @@ import { MailboxSettings } from "@/features/mailboxes/mailbox-settings";
 import type { Mailbox } from "@/features/mailboxes/types";
 import { NotificationSettings } from "@/features/notifications/notification-settings";
 import type { NotificationController } from "@/features/notifications/types";
-import { DebugSettings } from "@/features/settings/debug-settings";
 import { InterfaceSettings } from "@/features/settings/interface-settings";
-import { SettingsSection } from "@/features/settings/settings-section";
 import type { SetupStatus } from "@/features/setup/types";
 import { SignatureSettings } from "@/features/signatures/signature-settings";
 import type { UpdateStatus } from "@/features/updates/types";
@@ -73,17 +71,13 @@ export function SettingsPage({
             onChanged={onRefresh}
           />
         ) : null}
-        {activeTab === "users" ? (
-          canManage ? (
-            <UserSettings
-              currentUser={currentUser}
-              managedDomains={setup.domains.map((domain) => domain.name)}
-              users={users}
-              onChanged={onRefresh}
-            />
-          ) : (
-            <NoUserAccess />
-          )
+        {activeTab === "users" && canManage ? (
+          <UserSettings
+            currentUser={currentUser}
+            managedDomains={setup.domains.map((domain) => domain.name)}
+            users={users}
+            onChanged={onRefresh}
+          />
         ) : null}
         {activeTab === "domains" && canManage ? (
           <DomainSettings
@@ -92,10 +86,12 @@ export function SettingsPage({
             onChanged={onRefresh}
           />
         ) : null}
-        {activeTab === "notifications" ? (
-          <NotificationSettings notifications={notifications} />
+        {activeTab === "preferences" ? (
+          <div className="flex flex-col gap-10">
+            <InterfaceSettings />
+            <NotificationSettings notifications={notifications} />
+          </div>
         ) : null}
-        {activeTab === "interface" ? <InterfaceSettings /> : null}
         {activeTab === "labels" ? (
           <LabelSettings canManage={canManage} labels={labels} onChanged={onLabelsChanged} />
         ) : null}
@@ -110,21 +106,7 @@ export function SettingsPage({
             onUpdateStarted={onUpdateStarted}
           />
         ) : null}
-        {activeTab === "debug" ? <DebugSettings setup={setup} /> : null}
       </div>
     </div>
-  );
-}
-
-function NoUserAccess(): React.ReactElement {
-  return (
-    <SettingsSection
-      description="Only owner and admin users can manage workspace users."
-      title="Users"
-    >
-      <p className="text-sm text-muted-foreground">
-        You can still read and send shared workspace email.
-      </p>
-    </SettingsSection>
   );
 }

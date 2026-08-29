@@ -83,7 +83,7 @@ export function UserOnboardingDialog({
       reset();
     } catch (error) {
       onCreated();
-      toast.error(error instanceof Error ? error.message : "User onboarding failed.");
+      toast.error(error instanceof Error ? error.message : "Person onboarding failed.");
     } finally {
       setPending(false);
     }
@@ -100,7 +100,7 @@ export function UserOnboardingDialog({
       <DialogTrigger asChild>
         <Button size="sm" type="button">
           <PiUserPlus data-icon="inline-start" />
-          Add user
+          Add person
         </Button>
       </DialogTrigger>
       <DialogContent className="w-[min(92vw,560px)]">
@@ -109,7 +109,7 @@ export function UserOnboardingDialog({
         ) : (
           <>
             <DialogHeader>
-              <DialogTitle>Add user</DialogTitle>
+              <DialogTitle>Add person</DialogTitle>
               <DialogDescription>
                 Choose how this person will receive workspace sign-in access.
               </DialogDescription>
@@ -130,7 +130,7 @@ export function UserOnboardingDialog({
               </TabsList>
               <TabsContent value="email_invite">
                 <p className="mb-5 text-sm text-muted-foreground">
-                  Send a seven-day link so the user can choose their own password.
+                  Send a seven-day link so the person can choose their own password.
                 </p>
                 <UserIdentityForm
                   email={email}
@@ -235,7 +235,7 @@ function UserIdentityForm({
         </DialogClose>
         <Button disabled={pending} type="submit">
           {pending ? <Spinner data-icon="inline-start" /> : null}
-          {method === "email_invite" ? "Send invitation" : "Create user"}
+          {method === "email_invite" ? "Send invitation" : "Create person"}
         </Button>
       </DialogFooter>
     </form>
@@ -266,7 +266,7 @@ export function TemporaryPasswordReveal({
         <PiKey />
         <AlertTitle>Shown once</AlertTitle>
         <AlertDescription>
-          HQBase stores only the password hash. The user must replace this password after signing
+          HQBase stores only the password hash. The person must replace this password after signing
           in.
         </AlertDescription>
       </Alert>

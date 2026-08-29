@@ -311,11 +311,11 @@ describe("mail shell", () => {
     expect(html).not.toContain("rounded-r-[24px]");
   });
 
-  it("shows settings tabs in the left navigation instead of a top tab bar", () => {
+  it("groups Settings destinations by purpose", () => {
     const html = renderToStaticMarkup(
       <Sidebar
         activeFolder="settings"
-        activeSettingsTab="notifications"
+        activeSettingsTab="preferences"
         canManage
         mailboxId="all"
         unread={unread}
@@ -327,13 +327,45 @@ describe("mail shell", () => {
     );
 
     expect(html).toContain('aria-label="Settings navigation"');
+    expect(html).toContain("Workspace");
+    expect(html).toContain("Mail");
+    expect(html).toContain("Personal");
+    expect(html).toContain("System");
+    expect(html).toContain("mt-auto");
     expect(html).toContain("Mailboxes");
-    expect(html).toContain("Notifications");
-    expect(html).toContain("Debug");
-    expect(html).toContain('href="/settings/notifications"');
+    expect(html).toContain("People");
+    expect(html).toContain("Preferences");
+    expect(html).toContain('href="/settings/preferences"');
+    expect(html).not.toContain("Debug");
     expect(html).not.toContain('href="/settings/agents"');
     expect(html).toContain('aria-current="page"');
     expect(html).not.toContain("Your mail");
+    expect(html.indexOf("Preferences")).toBeLessThan(html.indexOf("System"));
+    expect(html.indexOf("System")).toBeLessThan(html.indexOf("Updates"));
+  });
+
+  it("hides workspace administration from people who cannot manage it", () => {
+    const html = renderToStaticMarkup(
+      <Sidebar
+        activeFolder="settings"
+        activeSettingsTab="preferences"
+        mailboxId="all"
+        unread={unread}
+        user={{ ...user, role: "member" }}
+        onFolderChange={() => undefined}
+        onSettingsTabChange={() => undefined}
+        onSignedOut={() => undefined}
+      />
+    );
+
+    expect(html).toContain("Mailboxes");
+    expect(html).toContain("Labels");
+    expect(html).toContain("Signatures");
+    expect(html).toContain("Preferences");
+    expect(html).not.toContain("Domains");
+    expect(html).not.toContain("People");
+    expect(html).not.toContain("System");
+    expect(html).not.toContain("Updates");
   });
 
   it("shows one destination in the Agents navigation", () => {

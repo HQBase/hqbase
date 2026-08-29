@@ -56,13 +56,19 @@ describe("application routing", () => {
     }
   });
 
-  it("keeps OAuth return aliases and the retired General tab compatible", () => {
+  it("keeps OAuth return aliases and retired Settings pages compatible", () => {
     expect(readAppRoute("/?cloudflare=connected&settings=domains")).toEqual({
       kind: "settings",
       tab: "domains"
     });
     expect(readAppRoute("/?settings=updates")).toEqual({ kind: "settings", tab: "updates" });
-    expect(readAppRoute("/settings/general")).toEqual({ kind: "settings", tab: "debug" });
+    for (const path of ["/settings/debug", "/settings/general"]) {
+      expect(readAppRoute(path)).toEqual({ kind: "settings", tab: "mailboxes" });
+    }
+    for (const path of ["/settings/interface", "/settings/notifications"]) {
+      expect(readAppRoute(path)).toEqual({ kind: "settings", tab: "preferences" });
+      expect(appRoutePath(readAppRoute(path))).toBe("/settings/preferences");
+    }
     expect(readAppRoute("/catchall")).toEqual({
       kind: "mail",
       folder: "catchall",

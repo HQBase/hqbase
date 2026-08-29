@@ -58,7 +58,7 @@ export function UserSettings({
       }
       onChanged();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "User onboarding action failed.");
+      toast.error(error instanceof Error ? error.message : "Person onboarding action failed.");
     } finally {
       setPendingAction(null);
     }
@@ -69,7 +69,7 @@ export function UserSettings({
       <SettingsSection
         action={<UserOnboardingDialog managedDomains={managedDomains} onCreated={onChanged} />}
         description="Workspace identities and sign-in access"
-        title="Users"
+        title="People"
       >
         <Table containerClassName="rounded-lg border">
           <TableHeader className="bg-muted/40">
@@ -90,7 +90,7 @@ export function UserSettings({
             {users.length === 0 ? (
               <TableRow>
                 <TableCell className="h-24 text-center text-muted-foreground" colSpan={5}>
-                  No users yet.
+                  No people yet.
                 </TableCell>
               </TableRow>
             ) : null}

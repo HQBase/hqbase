@@ -2,17 +2,15 @@ import {
   PiAddressBook,
   PiArchive,
   PiArrowsClockwise,
-  PiBell,
-  PiBug,
   PiEnvelopeSimple,
   PiGear,
   PiGlobe,
   PiNotePencil,
-  PiPalette,
   PiPaperPlaneTilt,
   PiPlug,
   PiRobot,
   PiSignature,
+  PiSlidersHorizontal,
   PiStar,
   PiTag,
   PiTrash,
@@ -48,26 +46,22 @@ export const settingsTabIcons: Record<
   React.ComponentType<{ className?: string }>
 > = {
   mailboxes: PiEnvelopeSimple,
-  users: PiUsers,
   domains: PiGlobe,
-  notifications: PiBell,
-  interface: PiPalette,
+  users: PiUsers,
   labels: PiTag,
   signatures: PiSignature,
-  updates: PiArrowsClockwise,
-  debug: PiBug
+  preferences: PiSlidersHorizontal,
+  updates: PiArrowsClockwise
 };
 
 export const settingsTabLabels: Record<SettingsTabId, string> = {
   mailboxes: "Mailboxes",
-  users: "Users",
   domains: "Domains",
-  notifications: "Notifications",
-  interface: "Interface",
+  users: "People",
   labels: "Labels",
   signatures: "Signatures",
-  updates: "Updates",
-  debug: "Debug"
+  preferences: "Preferences",
+  updates: "Updates"
 };
 
 export { PiAddressBook, PiNotePencil, PiPlug };

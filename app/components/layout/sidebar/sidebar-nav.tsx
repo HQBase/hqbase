@@ -9,7 +9,7 @@ import type { UnreadCounts } from "@/features/notifications/types";
 import { inboxUnreadForMailbox } from "@/features/notifications/unread";
 import { cn } from "@/lib/cn";
 import type { FolderId, SettingsTabId } from "@/lib/routes";
-import { appRoutePath, draftFolder, mailFolders, settingsTabs } from "@/lib/routes";
+import { appRoutePath, draftFolder, mailFolders } from "@/lib/routes";
 import {
   icons,
   PiAddressBook,
@@ -19,6 +19,13 @@ import {
   settingsTabLabels
 } from "./constants";
 import { isModifiedNavigation } from "./sidebar-helpers";
+
+const settingsGroups = [
+  { label: "Workspace", tabs: ["mailboxes", "domains", "users"] },
+  { label: "Mail", tabs: ["labels", "signatures"] },
+  { label: "Personal", tabs: ["preferences"] },
+  { label: "System", tabs: ["updates"] }
+] as const satisfies ReadonlyArray<{ label: string; tabs: readonly SettingsTabId[] }>;
 
 function NewEmailButton({ onCompose }: { onCompose: (() => void) | undefined }) {
   if (!onCompose) return null;
@@ -51,49 +58,59 @@ export function SettingsNav({
   return (
     <>
       <NewEmailButton onCompose={onCompose} />
-      <nav aria-label="Settings navigation" className="flex min-h-0 flex-1 flex-col gap-0.5">
-        <span className="mb-1 px-3.5 text-[10px] font-medium uppercase tracking-[0.12em] text-tertiary">
-          Settings
-        </span>
-        {settingsTabs
-          .filter((tab) => {
-            if ((tab === "domains" || tab === "updates") && !canManage) {
-              return false;
-            }
-            return true;
-          })
-          .map((tab) => {
-            const Icon = settingsTabIcons[tab];
-            const label = settingsTabLabels[tab];
-            const isActive = activeSettingsTab === tab;
-            return (
-              <Button
-                asChild
-                className={cn(
-                  "h-8 justify-start gap-3 rounded-[16px] px-3.5 text-[13px] font-medium leading-none text-muted-foreground dark:font-normal [&_svg]:size-4 [&_svg]:shrink-0",
-                  isDrawer && "h-11 rounded-[16px] text-sm",
-                  isActive && "bg-selected text-foreground [@media(hover:hover)]:hover:bg-selected"
-                )}
-                key={tab}
-                variant="ghost"
-              >
-                <a
-                  aria-current={isActive ? "page" : undefined}
-                  data-navigation-item={isActive ? true : undefined}
-                  href={appRoutePath({ kind: "settings", tab })}
-                  onClick={(event) => {
-                    if (isModifiedNavigation(event)) return;
-                    if (!onSettingsTabChange) return;
-                    event.preventDefault();
-                    onSettingsTabChange(tab);
-                  }}
-                >
-                  <Icon />
-                  <span className="min-w-0 flex-1 truncate leading-none">{label}</span>
-                </a>
-              </Button>
-            );
-          })}
+      <nav
+        aria-label="Settings navigation"
+        className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto"
+      >
+        {settingsGroups.map((group) => {
+          const tabs = group.tabs.filter(
+            (tab) => canManage || !["domains", "users", "updates"].includes(tab)
+          );
+          if (tabs.length === 0) return null;
+          return (
+            <div
+              className={cn("flex flex-col gap-0.5", group.label === "System" && "mt-auto")}
+              key={group.label}
+            >
+              <span className="mb-1 px-3.5 text-[10px] font-medium uppercase tracking-[0.12em] text-tertiary">
+                {group.label}
+              </span>
+              {tabs.map((tab) => {
+                const Icon = settingsTabIcons[tab];
+                const label = settingsTabLabels[tab];
+                const isActive = activeSettingsTab === tab;
+                return (
+                  <Button
+                    asChild
+                    className={cn(
+                      "h-8 justify-start gap-3 rounded-[16px] px-3.5 text-[13px] font-medium leading-none text-muted-foreground dark:font-normal [&_svg]:size-4 [&_svg]:shrink-0",
+                      isDrawer && "h-11 rounded-[16px] text-sm",
+                      isActive &&
+                        "bg-selected text-foreground [@media(hover:hover)]:hover:bg-selected"
+                    )}
+                    key={tab}
+                    variant="ghost"
+                  >
+                    <a
+                      aria-current={isActive ? "page" : undefined}
+                      data-navigation-item={isActive ? true : undefined}
+                      href={appRoutePath({ kind: "settings", tab })}
+                      onClick={(event) => {
+                        if (isModifiedNavigation(event)) return;
+                        if (!onSettingsTabChange) return;
+                        event.preventDefault();
+                        onSettingsTabChange(tab);
+                      }}
+                    >
+                      <Icon />
+                      <span className="min-w-0 flex-1 truncate leading-none">{label}</span>
+                    </a>
+                  </Button>
+                );
+              })}
+            </div>
+          );
+        })}
       </nav>
     </>
   );

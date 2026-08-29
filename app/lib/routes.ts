@@ -19,14 +19,12 @@ const folders = [
 
 export const settingsTabs = [
   "mailboxes",
-  "users",
   "domains",
-  "notifications",
-  "interface",
+  "users",
   "labels",
   "signatures",
-  "updates",
-  "debug"
+  "preferences",
+  "updates"
 ] as const;
 
 export type MailFolderId = (typeof mailFolders)[number]["id"];
@@ -48,9 +46,10 @@ export function isPublicAuthenticationPath(pathname: string): boolean {
 
 const legacySettingsTabs: Record<string, SettingsTabId> = {
   access: "mailboxes",
-  domains: "domains",
-  general: "debug",
-  updates: "updates"
+  debug: "mailboxes",
+  general: "mailboxes",
+  interface: "preferences",
+  notifications: "preferences"
 };
 
 export function readAppRoute(input: string | URL): AppRoute {
