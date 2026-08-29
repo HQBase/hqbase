@@ -149,6 +149,18 @@ describe("mobile navigation", () => {
             kind: "human",
             mailDomainId: "domain-1",
             updatedAt: "2026-08-24T12:00:00.000Z"
+          },
+          {
+            accessLevel: "manager",
+            address: "archive@example.com",
+            createdAt: "2026-08-24T12:00:00.000Z",
+            deletedAt: null,
+            displayName: "Archive",
+            id: "mailbox-disabled",
+            isActive: false,
+            kind: "human",
+            mailDomainId: "domain-1",
+            updatedAt: "2026-08-24T12:00:00.000Z"
           }
         ]}
         unread={{
@@ -183,6 +195,11 @@ describe("mobile navigation", () => {
 
     expect(document.body.textContent).toContain("support@example.com");
     expect(document.body.textContent).not.toContain("support@example.com (4)");
+    const disabledMailbox = Array.from(
+      document.body.querySelectorAll<HTMLElement>('[role="menuitemradio"]')
+    ).find((item) => item.textContent?.includes("archive@example.com"));
+    expect(disabledMailbox?.textContent).toContain("Disabled");
+    expect(disabledMailbox?.getAttribute("data-disabled")).toBeNull();
     await view.unmount();
   });
 

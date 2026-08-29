@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import type { CurrentUser } from "@/features/auth/types";
 import type { MailConnectionStatus } from "@/features/events/types";
+import { MailboxFilterLabel } from "@/features/mailboxes/mailbox-filter-label";
 import type { Mailbox } from "@/features/mailboxes/types";
 import type { UnreadCounts } from "@/features/notifications/types";
 import { GlobalSearch } from "@/features/search/global-search";
@@ -68,7 +69,6 @@ export function TopBar({
   const humanMailboxes = mailboxes.filter((mailbox) => mailbox.kind === "human");
   const agentMailboxes = mailboxes.filter((mailbox) => mailbox.kind === "agent");
   const selectedMailbox = mailboxes.find((mailbox) => mailbox.id === mailboxId);
-  const selectedMailboxLabel = selectedMailbox?.address ?? "All mailboxes";
 
   return (
     <header className="flex h-12 w-full shrink-0 touch-none items-center gap-2 border-b border-divider bg-toolbar px-3 lg:px-4">
@@ -117,7 +117,11 @@ export function TopBar({
               type="button"
               variant="ghost"
             >
-              <span className="truncate">{selectedMailboxLabel}</span>
+              {selectedMailbox ? (
+                <MailboxFilterLabel mailbox={selectedMailbox} />
+              ) : (
+                <span className="min-w-0 flex-1 truncate text-left">All mailboxes</span>
+              )}
               <PiCaretDown aria-hidden="true" data-icon="inline-end" />
             </Button>
           </DropdownMenuTrigger>
@@ -128,7 +132,7 @@ export function TopBar({
               </DropdownMenuRadioItem>
               {humanMailboxes.map((mailbox) => (
                 <DropdownMenuRadioItem className="py-1 text-xs" key={mailbox.id} value={mailbox.id}>
-                  <span className="truncate">{mailbox.address}</span>
+                  <MailboxFilterLabel mailbox={mailbox} />
                 </DropdownMenuRadioItem>
               ))}
             </DropdownMenuRadioGroup>
@@ -146,7 +150,7 @@ export function TopBar({
                       key={mailbox.id}
                       value={mailbox.id}
                     >
-                      <span className="truncate">{mailbox.address}</span>
+                      <MailboxFilterLabel mailbox={mailbox} />
                     </DropdownMenuRadioItem>
                   ))}
                 </DropdownMenuRadioGroup>

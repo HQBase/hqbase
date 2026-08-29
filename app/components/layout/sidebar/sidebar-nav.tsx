@@ -3,6 +3,7 @@ import type * as React from "react";
 import { Button } from "@/components/ui/button";
 import { DropdownSelect } from "@/components/ui/dropdown-select";
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
+import { MailboxFilterLabel } from "@/features/mailboxes/mailbox-filter-label";
 import type { Mailbox } from "@/features/mailboxes/types";
 import type { UnreadCounts } from "@/features/notifications/types";
 import { inboxUnreadForMailbox } from "@/features/notifications/unread";
@@ -198,7 +199,7 @@ export function MailNav({
                   value: "all"
                 },
                 ...mailboxFilter.mailboxes.map((mailbox) => ({
-                  label: mailbox.address,
+                  label: <MailboxFilterLabel mailbox={mailbox} />,
                   value: mailbox.id
                 }))
               ]}

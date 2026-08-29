@@ -36,6 +36,12 @@ const mailbox: Mailbox = {
   createdAt: "2026-07-30T12:00:00.000Z",
   updatedAt: "2026-07-30T12:00:00.000Z"
 };
+const disabledMailbox: Mailbox = {
+  ...mailbox,
+  id: "mailbox-disabled",
+  address: "archive@example.com",
+  isActive: false
+};
 
 describe("mail shell", () => {
   it("uses the full header width and keeps mail actions in a right-aligned group", () => {
@@ -84,6 +90,29 @@ describe("mail shell", () => {
 
     expect(html).toContain(">support@example.com<");
     expect(html).not.toContain("support@example.com (4)");
+  });
+
+  it("marks a selected disabled mailbox in the header filter", () => {
+    const html = renderToStaticMarkup(
+      <TopBar
+        activeFolder="inbox"
+        draftCount={0}
+        mailboxId={disabledMailbox.id}
+        mailboxes={[mailbox, disabledMailbox]}
+        search=""
+        unread={unread}
+        user={user}
+        onCompose={() => undefined}
+        onFolderChange={() => undefined}
+        onMailboxChange={() => undefined}
+        onSearchChange={() => undefined}
+        onSignedOut={() => undefined}
+      />
+    );
+
+    expect(html).toContain("archive@example.com");
+    expect(html).toContain("Disabled");
+    expect(html).toContain("text-muted-foreground");
   });
 
   it("exposes the desktop sidebar state from the sidebar header control", () => {

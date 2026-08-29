@@ -64,7 +64,9 @@ export function DropdownSelect({
           type="button"
           variant="outline"
         >
-          <span className="min-w-0 truncate text-left">{selected?.label ?? placeholder}</span>
+          <span className="min-w-0 flex-1 truncate text-left">
+            {selected?.label ?? placeholder}
+          </span>
           <PiCaretDown aria-hidden="true" className="size-3.5 text-muted-foreground" />
         </Button>
       </DropdownMenuTrigger>
@@ -80,7 +82,7 @@ export function DropdownSelect({
               key={option.value}
               value={option.value}
             >
-              <span className="min-w-0 truncate">{option.label}</span>
+              <span className="min-w-0 flex-1 truncate">{option.label}</span>
             </DropdownMenuRadioItem>
           ))}
         </DropdownMenuRadioGroup>
