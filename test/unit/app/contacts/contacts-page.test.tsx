@@ -113,7 +113,7 @@ describe("contacts page", () => {
     const privateDetails = privateHeading?.closest("details");
     expect(privateDetails).toBeDefined();
     expect(privateDetails?.open).toBe(false);
-    expect(privateHeading?.closest("summary")).toBeDefined();
+    expect(privateHeading?.closest("summary")).toBeTruthy();
     expect(privateDetails?.className).not.toContain("rounded-xl");
     expect(privateDetails?.className).not.toContain("bg-background");
 
