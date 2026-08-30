@@ -168,6 +168,32 @@ describe("HQBase release deployment", () => {
     });
     expect(normalized.d1_databases[0]).not.toHaveProperty("migrations_pattern");
   });
+  it("uses only the Durable Objects exported by the verified release", () => {
+    const deploymentConfig = {
+      name: "customer-worker",
+      durable_objects: {
+        bindings: [{ name: "MAIL_EVENTS", class_name: "MailEvents" }]
+      },
+      migrations: [{ tag: "mail-events-v1", new_sqlite_classes: ["MailEvents"] }]
+    };
+    const previous = normalizeConfig(deploymentConfig, "1.2.0", "a".repeat(64), {});
+    expect(previous).not.toHaveProperty("durable_objects");
+    expect(previous).not.toHaveProperty("migrations");
+
+    const releaseConfig = {
+      durable_objects: {
+        bindings: [{ name: "MAIL_EVENTS", class_name: "MailEvents" }]
+      },
+      migrations: [{ tag: "mail-events-v1", new_sqlite_classes: ["MailEvents"] }]
+    };
+    const candidate = normalizeConfig(
+      { name: "customer-worker" },
+      "1.3.0",
+      "b".repeat(64),
+      releaseConfig
+    );
+    expect(candidate).toMatchObject(releaseConfig);
+  });
   it("creates an immutable active-version tag from the signed HQBase artifact", () => {
     expect(hqbaseReleaseTag("0.1.5", "a".repeat(64))).toBe(`hqbase:0.1.5:${"a".repeat(64)}`);
     expect(() => hqbaseReleaseTag("0.1.5", "not-a-digest")).toThrow("identity");
