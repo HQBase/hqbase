@@ -25,17 +25,27 @@ function baseStyles(theme: AppTheme): string {
       ? {
           foreground: "#f2f2f2",
           link: "#93c5fd",
-          quoteBorder: "#404040"
+          quoteBorder: "#404040",
+          scrollbar: "rgb(242 242 242 / 18%)",
+          scrollbarHover: "rgb(242 242 242 / 30%)"
         }
       : {
           foreground: "#171717",
           link: "#1d4ed8",
-          quoteBorder: "#d4d4d4"
+          quoteBorder: "#d4d4d4",
+          scrollbar: "rgb(23 23 23 / 18%)",
+          scrollbarHover: "rgb(23 23 23 / 30%)"
         };
 
   return `
   :root { color-scheme: ${theme}; }
   * { box-sizing: border-box; }
+  * { scrollbar-color: ${palette.scrollbar} transparent; scrollbar-width: thin; }
+  *::-webkit-scrollbar { width: 6px; height: 6px; }
+  *::-webkit-scrollbar-track, *::-webkit-scrollbar-corner { background: transparent; }
+  *::-webkit-scrollbar-thumb { min-height: 24px; border: 1px solid transparent; border-radius: 999px; background: ${palette.scrollbar}; background-clip: content-box; }
+  *::-webkit-scrollbar-thumb:hover { background: ${palette.scrollbarHover}; }
+  *::-webkit-scrollbar-button { display: none; width: 0; height: 0; }
   html { overflow-x: auto; overflow-y: hidden; -webkit-overflow-scrolling: touch; background: transparent; }
   body { margin: 0; padding: 0; background: transparent; color: ${palette.foreground}; font: small/1.5 Arial, Helvetica, sans-serif; }
   a { color: ${palette.link}; }

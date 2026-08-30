@@ -18,6 +18,13 @@ describe("button", () => {
     expect(html).not.toContain("will-change-transform");
   });
 
+  it("uses a thin focus outline without a glow", () => {
+    const html = renderToStaticMarkup(<Button>Action</Button>);
+
+    expect(html).toContain("focus-visible:outline-1");
+    expect(html).not.toContain("focus-visible:ring");
+  });
+
   it("matches actions to adjacent field heights", () => {
     const textAction = renderToStaticMarkup(<Button size="field">Save</Button>);
     const iconAction = renderToStaticMarkup(<Button size="fieldIcon">Copy</Button>);

@@ -149,7 +149,7 @@ function McpEndpointOption({
         <Button
           aria-label={`Copy ${title} endpoint`}
           onClick={() => void copyEndpoint()}
-          size="sm"
+          size="field"
           type="button"
           variant="outline"
         >

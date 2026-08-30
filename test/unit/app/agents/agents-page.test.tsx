@@ -108,6 +108,11 @@ describe("Agents page", () => {
     await flushHookEffects(() => clickButton(document.body, "AI assistant"));
     expect(document.body.textContent).toContain("Connect an AI assistant");
     expect(document.body.textContent).toContain("Server profile");
+    expect(
+      document.body.querySelector<HTMLButtonElement>(
+        '[aria-label="Copy Read, manage & send endpoint"]'
+      )?.className
+    ).toContain("h-[38px] min-h-[38px]");
     await flushHookEffects(() => clickButton(document.body, "Back"));
     expect(document.body.textContent).toContain("Choose how the software will access HQBase");
     await view.unmount();

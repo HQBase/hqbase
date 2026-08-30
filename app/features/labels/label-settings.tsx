@@ -168,7 +168,6 @@ export function LabelSettings({
           <DialogFooter>
             <Button
               disabled={pending}
-              size="sm"
               type="button"
               variant="ghost"
               onClick={() => setRemoving(null)}
@@ -177,7 +176,6 @@ export function LabelSettings({
             </Button>
             <Button
               disabled={pending}
-              size="sm"
               type="button"
               variant="destructive"
               onClick={() => void remove()}

@@ -301,14 +301,13 @@ function CreateContactDialog({
           <DialogFooter>
             <Button
               disabled={pending}
-              size="sm"
               type="button"
               variant="ghost"
               onClick={() => onOpenChange(false)}
             >
               Cancel
             </Button>
-            <Button disabled={pending} size="sm" type="submit">
+            <Button disabled={pending} type="submit">
               {pending ? <Spinner aria-hidden="true" /> : null}
               Save contact
             </Button>

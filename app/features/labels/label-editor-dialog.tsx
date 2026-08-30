@@ -99,14 +99,13 @@ export function LabelEditorDialog({
           <DialogFooter className="mt-4">
             <Button
               disabled={pending}
-              size="sm"
               type="button"
               variant="ghost"
               onClick={() => onOpenChange(false)}
             >
               Cancel
             </Button>
-            <Button disabled={pending || !name.trim()} size="sm" type="submit">
+            <Button disabled={pending || !name.trim()} type="submit">
               {pending ? <Spinner aria-hidden="true" /> : null}
               {editing === "new" ? "Create label" : "Save label"}
             </Button>

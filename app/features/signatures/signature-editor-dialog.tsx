@@ -154,18 +154,13 @@ export function SignatureEditorDialog({
           <DialogFooter>
             <Button
               disabled={pending}
-              size="sm"
               type="button"
               variant="ghost"
               onClick={() => onOpenChange(false)}
             >
               Cancel
             </Button>
-            <Button
-              disabled={pending || !name.trim() || !text.trim() || !scope}
-              size="sm"
-              type="submit"
-            >
+            <Button disabled={pending || !name.trim() || !text.trim() || !scope} type="submit">
               {pending ? <Spinner aria-hidden="true" /> : null}
               Save signature
             </Button>

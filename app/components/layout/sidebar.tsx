@@ -4,7 +4,6 @@ import { PiSidebar, PiSidebarSimple } from "react-icons/pi";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import type { CurrentUser } from "@/features/auth/types";
-import type { MailConnectionStatus } from "@/features/events/types";
 import type { Mailbox } from "@/features/mailboxes/types";
 import type { UnreadCounts } from "@/features/notifications/types";
 import { cn } from "@/lib/cn";
@@ -12,7 +11,6 @@ import type { FolderId, SettingsTabId } from "@/lib/routes";
 import { appRoutePath } from "@/lib/routes";
 import { AccountMenu } from "./account-menu";
 import { quickAccess } from "./sidebar/constants";
-import { MailConnectionIndicator } from "./sidebar/mail-connection-indicator";
 import { isModifiedNavigation } from "./sidebar/sidebar-helpers";
 import { AgentsNav, ContactsNav, MailNav, SettingsNav } from "./sidebar/sidebar-nav";
 
@@ -37,7 +35,6 @@ type SidebarProps = {
   sidebarCollapsed?: boolean;
   activeSettingsTab?: SettingsTabId | undefined;
   canManage?: boolean | undefined;
-  connectionStatus?: MailConnectionStatus | undefined;
   onSettingsTabChange?: ((tab: SettingsTabId) => void) | undefined;
   onToggleSidebar?: () => void;
 };
@@ -57,7 +54,6 @@ export function Sidebar({
   sidebarCollapsed = false,
   activeSettingsTab,
   canManage = false,
-  connectionStatus = "connecting",
   onSettingsTabChange,
   onToggleSidebar
 }: SidebarProps): React.ReactElement {
@@ -151,7 +147,7 @@ export function Sidebar({
           )}
         >
           <div className="mb-5 flex h-9 items-center justify-between gap-3 px-3.5 pr-0">
-            <div className="flex min-w-0 items-center gap-3">
+            <div className="flex min-w-0 items-center">
               <span className="truncate text-sm font-semibold leading-none tracking-tight">
                 {activeFolder === "settings"
                   ? "Settings"
@@ -161,7 +157,6 @@ export function Sidebar({
                       ? "Contacts"
                       : "Mail"}
               </span>
-              <MailConnectionIndicator status={connectionStatus} />
             </div>
             {onToggleSidebar ? (
               <TooltipProvider delayDuration={250}>

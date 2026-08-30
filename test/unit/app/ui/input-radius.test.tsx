@@ -23,4 +23,22 @@ describe("input radius", () => {
       )
     ).toContain("h-[38px]");
   });
+
+  it("changes only the border when a field receives focus", () => {
+    const input = renderToStaticMarkup(<Input />);
+    const textarea = renderToStaticMarkup(<Textarea />);
+    const group = renderToStaticMarkup(
+      <InputGroup>
+        <InputGroupInput />
+      </InputGroup>
+    );
+
+    expect(input).toContain("focus-visible:border-ring");
+    expect(input).toContain("focus-visible:shadow-none");
+    expect(input).not.toContain("focus-visible:ring");
+    expect(textarea).toContain("focus-visible:border-ring");
+    expect(textarea).not.toContain("focus-visible:ring");
+    expect(group).toContain("focus-within:border-ring");
+    expect(group).not.toContain("focus-within:ring");
+  });
 });

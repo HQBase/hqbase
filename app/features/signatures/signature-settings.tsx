@@ -199,7 +199,6 @@ export function SignatureSettings({
           <DialogFooter>
             <Button
               disabled={pending}
-              size="sm"
               type="button"
               variant="ghost"
               onClick={() => setRemoving(null)}
@@ -208,7 +207,6 @@ export function SignatureSettings({
             </Button>
             <Button
               disabled={pending}
-              size="sm"
               type="button"
               variant="destructive"
               onClick={() => void remove()}

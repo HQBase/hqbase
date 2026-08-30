@@ -116,6 +116,9 @@ describe("mobile application shell", () => {
     expect(addConnectionDialog).toContain("Use the Mail API skill instead");
     expect(addConnectionDialog).toContain('onSelect("mailbox")');
     expect(addConnectionDialog).toContain('onSelect("provisioner")');
+    expect(addConnectionDialog).toContain("items-center gap-3");
+    expect(addConnectionDialog).toContain("[&_svg]:size-5");
+    expect(addConnectionDialog).not.toContain("rounded-md border bg-muted/30");
     expect(connectionsTable).toContain('className="block sm:table"');
     expect(connectionsTable).toContain("Setup instructions");
     expect(connectionsTable).toContain('status="Authorized"');
@@ -147,6 +150,19 @@ describe("mobile application shell", () => {
     expect(styles).toContain("@media (max-width: 767px)");
     expect(styles).toContain('[contenteditable="true"][class]');
     expect(styles).toContain("font-size: 16px");
+  });
+
+  it("uses quiet focus treatments and compact trackless scrollbars", () => {
+    expect(styles).toContain('input:not([type="checkbox"]):not([type="radio"])');
+    expect(styles).toContain("border-color: hsl(var(--ring))");
+    expect(styles).toContain("box-shadow: none");
+    expect(styles).toContain("*::-webkit-scrollbar");
+    expect(styles).toContain("width: 6px");
+    expect(styles).toContain("scrollbar-width: thin");
+    expect(styles).toContain("*::-webkit-scrollbar-track");
+    expect(styles).toContain("background: transparent");
+    expect(styles).toContain("border-radius: 999px");
+    expect(styles).toContain("*::-webkit-scrollbar-thumb:hover");
   });
 
   it("keeps persistent mail chrome fixed and ignores pans that begin in the header", () => {

@@ -43,6 +43,10 @@ describe("message HTML view", () => {
     expect(blocked).toContain("overflow-x: auto");
     expect(blocked).toContain("overflow-y: hidden");
     expect(blocked).toContain("-webkit-overflow-scrolling: touch");
+    expect(blocked).toContain("scrollbar-width: thin");
+    expect(blocked).toContain("*::-webkit-scrollbar { width: 6px; height: 6px; }");
+    expect(blocked).toContain("*::-webkit-scrollbar-track");
+    expect(blocked).toContain("*::-webkit-scrollbar-thumb:hover");
     expect(blocked).toContain("margin: 0; padding: 0");
     expect(blocked).not.toContain("min-height: 100%");
     expect(blocked).not.toContain("max-width: 100%");
