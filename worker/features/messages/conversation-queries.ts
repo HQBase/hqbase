@@ -61,6 +61,8 @@ export async function listConversationPage(
       totalCount: filters.cursor ? null : 0
     };
   }
+  const visibility =
+    filters.folder === "trash" ? sql`messages.folder = 'trash'` : sql`messages.folder <> 'trash'`;
 
   const eligibilityWhere: SQL[] = [];
   if (filters.mailboxId) {
@@ -124,7 +126,7 @@ export async function listConversationPage(
          SELECT messages.*,
            COALESCE(messages.received_at, messages.sent_at, messages.created_at) AS activity_at
          FROM messages
-         WHERE ${scope}
+         WHERE ${scope} AND ${visibility}
        ),
        eligible_threads AS (
          SELECT DISTINCT accessible.thread_id
