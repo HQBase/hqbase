@@ -25,17 +25,22 @@ vi.mock("@/features/messages/api", async (importOriginal) => ({
 vi.mock("@/features/messages/message-detail", () => ({
   MessageDetail: ({
     messages,
-    onMessageAction
+    onMessageAction,
+    onRefresh
   }: {
     messages: MessageDetailType[];
     onMessageAction: (
       message: MessageDetailType,
       action: MessageFolderAction
     ) => Promise<void> | void;
+    onRefresh: () => Promise<void> | void;
   }) => {
     const firstMessage = messages[0];
     return (
       <div data-visible-message-ids={messages.map((message) => message.id).join(",")}>
+        <button data-refresh-thread onClick={() => void onRefresh()} type="button">
+          Refresh thread
+        </button>
         {firstMessage ? (
           <button
             data-trash-message={firstMessage.id}
@@ -173,6 +178,78 @@ describe("Inbox message visibility", () => {
     );
 
     expect(visibleMessageIds(view.container)).toBe("msg_1");
+    await view.unmount();
+  });
+
+  it("ignores a stale refresh after another thread opens", async () => {
+    const secondThreadMessage = {
+      ...firstMessage,
+      id: "msg_other",
+      threadId: "thr_other",
+      subject: "Other conversation",
+      textBody: "Other conversation body"
+    };
+    let delayFirstThread = false;
+    let resolveFirstThread: ((messages: MessageDetailType[]) => void) | undefined;
+    mocks.getMessageThread.mockImplementation((messageId: string) => {
+      if (messageId === secondThreadMessage.id) return Promise.resolve([secondThreadMessage]);
+      if (!delayFirstThread) return Promise.resolve([firstMessage]);
+      return new Promise<MessageDetailType[]>((resolve) => {
+        resolveFirstThread = resolve;
+      });
+    });
+
+    function Harness() {
+      const [selectedId, setSelectedId] = React.useState<string | null>(firstMessage.id);
+      return (
+        <>
+          <button
+            data-select-other
+            onClick={() => setSelectedId(secondThreadMessage.id)}
+            type="button"
+          >
+            Select other
+          </button>
+          <InboxPage
+            activeFolder="inbox"
+            conversations={[
+              {
+                ...firstMessage,
+                isStarred: false,
+                messageCount: 1,
+                unreadCount: 0
+              }
+            ]}
+            defaultFromMailboxId="mbx_1"
+            hasMore={false}
+            isLoadingMore={false}
+            loadMoreError={null}
+            mailboxes={[]}
+            selectedId={selectedId}
+            totalCount={1}
+            onConversationAction={() => undefined}
+            onLoadMore={() => undefined}
+            onMessageRouteChange={(_folder, messageId) => setSelectedId(messageId)}
+            onRefresh={() => undefined}
+            onSelect={() => undefined}
+          />
+        </>
+      );
+    }
+
+    const view = await renderComponent(<Harness />);
+    await flushHookEffects();
+    delayFirstThread = true;
+    await flushHookEffects(() =>
+      view.container.querySelector<HTMLButtonElement>("[data-refresh-thread]")?.click()
+    );
+    await flushHookEffects(() =>
+      view.container.querySelector<HTMLButtonElement>("[data-select-other]")?.click()
+    );
+    expect(visibleMessageIds(view.container)).toBe(secondThreadMessage.id);
+
+    await flushHookEffects(() => resolveFirstThread?.([firstMessage]));
+    expect(visibleMessageIds(view.container)).toBe(secondThreadMessage.id);
     await view.unmount();
   });
 });

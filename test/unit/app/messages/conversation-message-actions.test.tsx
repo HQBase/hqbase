@@ -137,6 +137,39 @@ describe("conversation message actions", () => {
     await view.unmount();
   });
 
+  it("tracks pending actions for each message independently", async () => {
+    const resolvers = new Map<string, () => void>();
+    const onMessageAction = vi.fn(
+      (message: MessageDetail) =>
+        new Promise<void>((resolve) => {
+          resolvers.set(message.id, resolve);
+        })
+    );
+    const view = await renderComponent(
+      <ConversationMessages
+        messages={[firstMessage, secondMessage]}
+        onMessageAction={onMessageAction}
+      />
+    );
+    document.body.appendChild(view.container);
+
+    await selectArchive(view.container, firstMessage.id);
+    expect(messageActionTrigger(view.container, firstMessage.id)?.disabled).toBe(true);
+    expect(messageActionTrigger(view.container, secondMessage.id)?.disabled).toBe(false);
+
+    await selectArchive(view.container, secondMessage.id);
+    expect(onMessageAction).toHaveBeenCalledTimes(2);
+    expect(messageActionTrigger(view.container, secondMessage.id)?.disabled).toBe(true);
+
+    await flushHookEffects(() => resolvers.get(firstMessage.id)?.());
+    expect(messageActionTrigger(view.container, firstMessage.id)?.disabled).toBe(false);
+    expect(messageActionTrigger(view.container, secondMessage.id)?.disabled).toBe(true);
+
+    await flushHookEffects(() => resolvers.get(secondMessage.id)?.());
+    expect(messageActionTrigger(view.container, secondMessage.id)?.disabled).toBe(false);
+    await view.unmount();
+  });
+
   it("removes the counted thread control after it reveals the hidden messages", async () => {
     const messages = Array.from({ length: 4 }, (_, index) => ({
       ...firstMessage,
@@ -206,3 +239,24 @@ describe("conversation message actions", () => {
     await view.unmount();
   });
 });
+
+function messageActionTrigger(container: HTMLElement, messageId: string): HTMLButtonElement | null {
+  return container.querySelector<HTMLButtonElement>(`[data-message-actions-id="${messageId}"]`);
+}
+
+async function selectArchive(container: HTMLElement, messageId: string): Promise<void> {
+  const trigger = messageActionTrigger(container, messageId);
+  await flushHookEffects(() => {
+    trigger?.dispatchEvent(
+      new PointerEvent("pointerdown", { bubbles: true, button: 0, pointerType: "mouse" })
+    );
+    trigger?.click();
+  });
+  await flushHookEffects(() =>
+    document.body
+      .querySelector<HTMLElement>(
+        `[data-message-actions-menu="${messageId}"] [data-message-action="archive"]`
+      )
+      ?.click()
+  );
+}

@@ -75,6 +75,9 @@ export function InboxPage({
   const [thread, setThread] = React.useState<MessageDetailType[]>([]);
   const [detailError, setDetailError] = React.useState<string | null>(null);
   const [detailLoading, setDetailLoading] = React.useState(false);
+  const threadLoadRequestRef = React.useRef(0);
+  const threadContextRef = React.useRef("");
+  threadContextRef.current = `${activeFolder}:${selectedId ?? ""}`;
   const onRefreshRef = React.useRef(onRefresh);
   const onMessageRouteChangeRef = React.useRef(onMessageRouteChange);
   React.useEffect(() => {
@@ -86,7 +89,12 @@ export function InboxPage({
 
   const loadThread = React.useCallback(
     async (messageId: string) => {
+      const requestId = ++threadLoadRequestRef.current;
+      const context = threadContextRef.current;
       const messages = visibleThreadMessages(await getMessageThread(messageId), activeFolder);
+      if (requestId !== threadLoadRequestRef.current || context !== threadContextRef.current) {
+        return null;
+      }
       setThread(messages);
       return messages;
     },
@@ -255,7 +263,7 @@ export function InboxPage({
               await runMessageAction(message.id, action);
               await onRefresh();
               const visibleMessages = await loadThread(selectedId);
-              if (visibleMessages.length === 0) onMessageRouteChange(activeFolder, null);
+              if (visibleMessages?.length === 0) onMessageRouteChange(activeFolder, null);
             }}
             onBack={() => onMessageRouteChange(activeFolder, null)}
             {...(onDraftsChange ? { onDraftsChange } : {})}

@@ -44,7 +44,8 @@ export function ConversationMessages({
   const [expandedThreadId, setExpandedThreadId] = React.useState<string | null>(null);
   const previousThreadId = React.useRef(threadId);
   const showMiddle = threadId !== null && expandedThreadId === threadId;
-  const [pendingMessageId, setPendingMessageId] = React.useState<string | null>(null);
+  const [pendingMessageIds, setPendingMessageIds] = React.useState<Set<string>>(() => new Set());
+  const pendingMessageIdsRef = React.useRef(new Set<string>());
   React.useEffect(() => {
     if (previousThreadId.current === threadId) return;
     previousThreadId.current = threadId;
@@ -181,13 +182,16 @@ export function ConversationMessages({
               <MessageActions
                 isLast={isLast}
                 message={message}
-                pending={pendingMessageId !== null}
+                pending={pendingMessageIds.has(message.id)}
                 onAction={async (action) => {
-                  setPendingMessageId(message.id);
+                  if (pendingMessageIdsRef.current.has(message.id)) return;
+                  pendingMessageIdsRef.current.add(message.id);
+                  setPendingMessageIds(new Set(pendingMessageIdsRef.current));
                   try {
                     await onMessageAction(message, action);
                   } finally {
-                    setPendingMessageId(null);
+                    pendingMessageIdsRef.current.delete(message.id);
+                    setPendingMessageIds(new Set(pendingMessageIdsRef.current));
                   }
                 }}
               />
