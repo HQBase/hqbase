@@ -1,5 +1,5 @@
 import * as React from "react";
-import { PiCaretDown } from "react-icons/pi";
+import { PiCaretDown, PiCaretUp } from "react-icons/pi";
 import { Button } from "@/components/ui/button";
 import { DropdownSelect } from "@/components/ui/dropdown-select";
 import { Input } from "@/components/ui/input";
@@ -22,14 +22,15 @@ export function ComposeFields(props: {
   setBcc: (value: string) => void;
   setSubject: (value: string) => void;
 }) {
-  const [showOptionalRecipients, setShowOptionalRecipients] = React.useState(() =>
-    Boolean(props.cc.trim() || props.bcc.trim())
+  const hasOptionalRecipients = Boolean(props.cc.trim() || props.bcc.trim());
+  const [showOptionalRecipients, setShowOptionalRecipients] = React.useState(
+    () => hasOptionalRecipients
   );
   const optionalRecipientsId = React.useId();
 
   React.useEffect(() => {
-    if (props.cc.trim() || props.bcc.trim()) setShowOptionalRecipients(true);
-  }, [props.cc, props.bcc]);
+    if (hasOptionalRecipients) setShowOptionalRecipients(true);
+  }, [hasOptionalRecipients]);
 
   return (
     <div className="flex flex-col px-5">
@@ -52,18 +53,22 @@ export function ComposeFields(props: {
         label={
           <>
             To
-            {!showOptionalRecipients ? (
+            {!hasOptionalRecipients ? (
               <Button
                 aria-controls={optionalRecipientsId}
-                aria-expanded="false"
-                aria-label="Show Cc and Bcc"
+                aria-expanded={showOptionalRecipients}
+                aria-label={showOptionalRecipients ? "Hide Cc and Bcc" : "Show Cc and Bcc"}
                 className="size-7 min-h-7 min-w-7 shrink-0 rounded-full p-0 text-muted-foreground"
                 size="sm"
                 type="button"
                 variant="ghost"
-                onClick={() => setShowOptionalRecipients(true)}
+                onClick={() => setShowOptionalRecipients((visible) => !visible)}
               >
-                <PiCaretDown aria-hidden="true" />
+                {showOptionalRecipients ? (
+                  <PiCaretUp aria-hidden="true" />
+                ) : (
+                  <PiCaretDown aria-hidden="true" />
+                )}
               </Button>
             ) : null}
           </>
