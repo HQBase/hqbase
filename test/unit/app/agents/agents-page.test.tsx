@@ -177,7 +177,8 @@ describe("Agents page", () => {
     vi.mocked(listAgents).mockResolvedValue([deletedAgent]);
     const view = await renderPage();
 
-    expect(view.container.textContent).toContain("Mailbox deleted");
+    expect(view.container.textContent).toContain("Deleted");
+    expect(view.container.textContent).not.toContain("Mailbox deleted");
     await openAgentMenu(view.container, deletedAgent.name);
     expect(document.body.textContent).toContain("Setup instructions");
     expect(document.body.textContent).not.toContain("Enable");

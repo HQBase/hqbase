@@ -187,24 +187,26 @@ export function InboxPage({
       <div className="flex h-full flex-col bg-reader">
         {(detailLoading || thread.length === 0) && !detailError ? (
           <div className="flex h-full flex-col">
-            <div className="flex h-12 shrink-0 items-center gap-2 border-b border-divider bg-toolbar px-3">
-              <Button
-                aria-label="Back to messages"
-                className="size-10 min-h-10 min-w-10 shrink-0 text-tertiary"
-                onClick={() => onMessageRouteChange(activeFolder, null)}
-                size="icon"
-                type="button"
-                variant="ghost"
-              >
-                <PiArrowLeft aria-hidden="true" className="pointer-events-none" />
-              </Button>
-              <span className="flex items-center gap-2 text-sm text-muted-foreground">
-                <span
-                  className="pointer-events-none size-4 rounded-full border-2 border-muted-foreground/20 border-t-foreground animate-spin"
-                  aria-hidden="true"
-                />
-                Loading conversation…
-              </span>
+            <div className="shrink-0 border-b border-divider bg-toolbar px-3 sm:px-5">
+              <div className="relative flex h-11 items-center gap-2 py-2">
+                <Button
+                  aria-label="Back to messages"
+                  className="size-10 min-h-10 min-w-10 shrink-0 bg-transparent text-tertiary [@media(hover:hover)]:hover:bg-selected [@media(hover:hover)]:hover:text-foreground"
+                  onClick={() => onMessageRouteChange(activeFolder, null)}
+                  size="icon"
+                  type="button"
+                  variant="ghost"
+                >
+                  <PiArrowLeft aria-hidden="true" className="pointer-events-none size-3.5" />
+                </Button>
+                <span className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <span
+                    className="pointer-events-none size-4 rounded-full border-2 border-muted-foreground/20 border-t-foreground animate-spin"
+                    aria-hidden="true"
+                  />
+                  Loading conversation…
+                </span>
+              </div>
             </div>
             <div className="flex flex-1 items-center justify-center p-8">
               <span

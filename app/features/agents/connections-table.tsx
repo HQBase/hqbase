@@ -176,7 +176,7 @@ function MachineRow({
   onSetup: (agent: ManagedAgent) => void;
 }): React.ReactElement {
   const mailboxDeleted = agent.profile === "mailbox" && agent.mailbox?.isDeleted === true;
-  const status = mailboxDeleted ? "Mailbox deleted" : agent.isActive ? "Enabled" : "Disabled";
+  const status = mailboxDeleted ? "Deleted" : agent.isActive ? "Enabled" : "Disabled";
   const access = machineAccessLabel(agent);
 
   return (
