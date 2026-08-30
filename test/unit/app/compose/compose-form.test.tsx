@@ -74,10 +74,13 @@ describe("compose form", () => {
     );
 
     expect(scrollArea?.className).toContain("overflow-auto");
+    expect(scrollArea?.className).toContain("flex-col");
     expect(scrollArea?.contains(editor ?? null)).toBe(true);
     expect(scrollArea?.contains(signature ?? null)).toBe(true);
     expect(editor?.contains(signature ?? null)).toBe(false);
     expect(editor?.getAttribute("contenteditable")).toBe("true");
+    expect(editor?.parentElement?.className).toContain("flex-1");
+    expect(editor?.parentElement?.className).toContain("[&_.ProseMirror]:!min-h-full");
     expect(signature?.getAttribute("contenteditable")).toBeNull();
     await view.unmount();
   });

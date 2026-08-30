@@ -91,11 +91,14 @@ export function ComposeForm(props: ComposeFormProps): React.ReactElement {
             setSubject={props.onSetSubject}
           />
           <div
-            className={cn(props.presentation === "window" && "min-h-0 flex-1 overflow-auto")}
+            className={cn(
+              props.presentation === "window" && "flex min-h-0 flex-1 flex-col overflow-auto"
+            )}
             data-compose-scroll-area
           >
             <RichEmailEditor
               contained={false}
+              fill={props.presentation === "window"}
               html={props.html}
               onFiles={props.onFiles}
               onImages={props.onImages}

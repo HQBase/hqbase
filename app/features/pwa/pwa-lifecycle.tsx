@@ -39,10 +39,10 @@ export function PwaLifecycle(): React.ReactElement | null {
   return (
     <aside
       aria-live="polite"
-      className="fixed right-4 bottom-4 left-4 z-[100] mx-auto flex max-w-lg items-center justify-between gap-3 rounded-xl border border-border bg-popover px-3.5 py-2.5 text-sm text-popover-foreground shadow-[0_8px_24px_rgb(0_0_0/0.18)]"
+      className="fixed right-4 bottom-4 left-4 z-[100] mx-auto flex max-w-lg items-center justify-between gap-3 rounded-xl border border-border bg-popover px-3.5 py-2.5 text-sm text-popover-foreground shadow-[0_14px_38px_rgb(0_0_0/0.32)]"
       role="status"
     >
-      <span>
+      <span className={online && update ? "text-xs font-semibold" : undefined}>
         {online
           ? "A new version of HQBase is ready."
           : "You're offline. HQBase will reconnect when your connection returns."}

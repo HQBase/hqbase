@@ -19,10 +19,10 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
 import { EMAIL_IMAGE_ACCEPT, isSafeRasterImage, type RichEmailImage } from "./email-images";
 import { Tool } from "./rich-email-editor-tool";
-
 export function RichEmailEditor({
   allowDataImages = false,
   contained = true,
+  fill = false,
   html,
   onChange,
   onFiles,
@@ -30,6 +30,7 @@ export function RichEmailEditor({
 }: {
   allowDataImages?: boolean;
   contained?: boolean;
+  fill?: boolean;
   html: string;
   onChange: (html: string, text: string) => void;
   onFiles?: (files: File[]) => Promise<void> | void;
@@ -49,7 +50,6 @@ export function RichEmailEditor({
     onFilesRef.current = onFiles;
     onImagesRef.current = onImages;
   }, [onChange, onFiles, onImages]);
-
   const insertFiles = React.useCallback(
     async (files: File[], position: number) => {
       const sourceEditor = editorRef.current;
@@ -74,7 +74,6 @@ export function RichEmailEditor({
           if (attachments.length) await onFilesRef.current?.(attachments);
           if (!images.length || editorRef.current !== sourceEditor || sourceEditor.isDestroyed)
             return;
-
           const uploaded = await onImagesRef.current(images, sourceEditor.getHTML());
           const safe = uploaded.filter((image) => isAllowedImageSource(image.src, allowDataImages));
           await insertionTurn;
@@ -110,7 +109,6 @@ export function RichEmailEditor({
     },
     [allowDataImages]
   );
-
   const imageExtension = React.useMemo(
     () =>
       Image.extend({
@@ -155,7 +153,6 @@ export function RichEmailEditor({
       }),
     [allowDataImages]
   );
-
   const editor = useEditor(
     {
       extensions: [
@@ -275,8 +272,13 @@ export function RichEmailEditor({
     if (!href) editor.chain().focus().unsetLink().run();
     else editor.chain().focus().extendMarkRange("link").setLink({ href }).run();
   };
+  const rootClass = cn(
+    contained && "min-h-0 flex-1 overflow-auto",
+    fill && "flex min-h-0 flex-1 flex-col"
+  );
+  const editorClass = cn(fill && "min-h-60 flex-1 [&_.ProseMirror]:!min-h-full");
   return (
-    <div className={cn(contained && "min-h-0 flex-1 overflow-auto")}>
+    <div className={rootClass}>
       <div
         className="sticky top-0 z-10 flex flex-wrap gap-1 border-b bg-card px-4 py-2"
         role="toolbar"
@@ -356,17 +358,15 @@ export function RichEmailEditor({
           <PiEraser />
         </Tool>
       </div>
-      <EditorContent editor={editor} />
+      <EditorContent className={editorClass} editor={editor} />
     </div>
   );
 }
-
 function isAllowedImageSource(source: string, allowDataImages: boolean): boolean {
   return allowDataImages
     ? /^data:image\/(?:avif|gif|jpeg|png|webp);base64,[A-Za-z0-9+/]+={0,2}$/u.test(source)
     : /^\/api\/v[12]\/drafts\/[^/?#]+\/attachments\/[^/?#]+\/inline$/u.test(source);
 }
-
 function resizeSelectedImage(editor: Editor, scale: number): void {
   const position = editor.state.selection.from;
   const node = editor.state.doc.nodeAt(position);
@@ -392,7 +392,6 @@ function resizeSelectedImage(editor: Editor, scale: number): void {
     .updateAttributes("image", { width: nextWidth, height: nextHeight })
     .run();
 }
-
 function positiveNumber(value: unknown): number | null {
   const number = Number(value);
   return Number.isFinite(number) && number > 0 ? number : null;
