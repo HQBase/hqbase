@@ -224,7 +224,7 @@ export function PullToRefresh({
       </div>
       <div
         className={cn(
-          "h-full overflow-auto overscroll-contain will-change-transform",
+          "h-full overflow-auto overscroll-contain [scrollbar-gutter:stable] will-change-transform",
           status !== "pulling" && "transition-transform duration-200 motion-reduce:transition-none"
         )}
         data-pull-to-refresh-scroll=""

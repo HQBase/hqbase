@@ -275,7 +275,7 @@ export function TemporaryPasswordReveal({
         <Button
           aria-label="Copy temporary password"
           onClick={() => void copyPassword()}
-          size="icon"
+          size="fieldIcon"
         >
           <PiCopy />
         </Button>

@@ -97,6 +97,7 @@ describe("conversation list pagination", () => {
     );
     const scrollContainer = rendered.container.querySelector<HTMLDivElement>(".overscroll-contain");
     expect(scrollContainer).not.toBeNull();
+    expect(scrollContainer?.className).toContain("[scrollbar-gutter:stable]");
 
     await flushHookEffects(() => {
       scrollContainer?.dispatchEvent(touchEvent("touchstart", 20, 100));

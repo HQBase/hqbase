@@ -31,6 +31,16 @@ describe("local database seed fixture", () => {
           (SELECT COUNT(*) FROM threads) AS threads,
           (SELECT COUNT(*) FROM messages) AS messages,
           (SELECT COUNT(*) FROM drafts) AS drafts,
+          (SELECT COUNT(*) FROM labels) AS labels,
+          (SELECT COUNT(*) FROM draft_labels) AS draft_labels,
+          (SELECT COUNT(*) FROM messages message
+           WHERE NOT EXISTS (
+             SELECT 1 FROM message_labels assignment WHERE assignment.message_id = message.id
+           )) AS unlabeled_messages,
+          (SELECT COUNT(*) FROM drafts draft
+           WHERE NOT EXISTS (
+             SELECT 1 FROM draft_labels assignment WHERE assignment.draft_id = draft.id
+           )) AS unlabeled_drafts,
           (SELECT COUNT(*) FROM mailboxes) AS mailboxes,
           (SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'mailbox_addresses') AS alias_tables,
           (SELECT COUNT(*) FROM principals) AS principals,
@@ -39,6 +49,10 @@ describe("local database seed fixture", () => {
       threads: number;
       messages: number;
       drafts: number;
+      labels: number;
+      draft_labels: number;
+      unlabeled_messages: number;
+      unlabeled_drafts: number;
       mailboxes: number;
       alias_tables: number;
       principals: number;
@@ -48,10 +62,14 @@ describe("local database seed fixture", () => {
       threads: 116,
       messages: 123,
       drafts: 4,
+      labels: 11,
+      draft_labels: 5,
+      unlabeled_messages: 0,
+      unlabeled_drafts: 0,
       mailboxes: 8,
       alias_tables: 0,
       principals: 4,
-      seed_version: '"local-demo-v3"'
+      seed_version: '"local-demo-v4"'
     });
 
     const promotedMailboxes = await env.DB.prepare(

@@ -148,6 +148,7 @@ describe("setup UI", () => {
     expect(html).toContain("<table");
     expect(html).toContain("support@northstar.example");
     expect(html).toContain("privacy@fieldnotes.example");
+    expect(html).toContain("h-[30px]");
     expect(html).toContain("Add mailbox");
     expect(html).toContain("Default From mailbox");
     expect(html).toContain("Mail to unknown addresses");

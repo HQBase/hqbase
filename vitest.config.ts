@@ -23,6 +23,7 @@ export default defineConfig({
       include: ["app/**/*.{ts,tsx}", "worker/**/*.ts"],
       exclude: [
         "app/components/ui/**",
+        "app/features/ui-lab/**",
         "app/main.tsx",
         "worker/index.ts",
         "worker/features/domains/queries.ts",

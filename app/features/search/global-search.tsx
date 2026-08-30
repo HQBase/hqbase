@@ -128,7 +128,7 @@ export function GlobalSearch({
     <div className={cn("relative min-w-0 max-w-xl flex-1", className)} ref={rootRef}>
       <PiMagnifyingGlass
         aria-hidden="true"
-        className="pointer-events-none absolute left-2.5 top-4 z-10 size-3.5 -translate-y-1/2 text-muted-foreground"
+        className="pointer-events-none absolute left-2.5 top-[15px] z-10 size-3.5 -translate-y-1/2 text-muted-foreground"
       />
       <Input
         ref={inputRef}
@@ -140,7 +140,7 @@ export function GlobalSearch({
         aria-expanded={listOpen}
         aria-label="Search HQBase"
         autoComplete="off"
-        className="h-8 border-transparent bg-muted/70 pl-8 pr-9 text-xs shadow-none focus-visible:border-input focus-visible:ring-1"
+        className="h-[30px] border-transparent bg-muted/70 pl-8 pr-9 text-xs shadow-none focus-visible:border-input focus-visible:ring-1"
         maxLength={200}
         placeholder="Search HQBase"
         role="combobox"
@@ -162,7 +162,7 @@ export function GlobalSearch({
       {query.length > 0 ? (
         <button
           aria-label="Clear search"
-          className="absolute right-0.5 top-0.5 z-10 grid size-7 place-items-center rounded-md text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+          className="absolute right-0.5 top-px z-10 grid size-7 place-items-center rounded-md text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
           title="Clear search"
           type="button"
           onClick={() => {

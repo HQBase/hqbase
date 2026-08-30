@@ -28,6 +28,7 @@ describe("compose fields", () => {
     expect(html).toContain('aria-label="Cc"');
     expect(html).toContain('aria-label="Bcc"');
     expect(html).toContain("Support — support@example.com");
+    expect(html).toContain("[&amp;_input]:h-[38px]");
     expect(html).not.toContain("Replying to");
   });
 });

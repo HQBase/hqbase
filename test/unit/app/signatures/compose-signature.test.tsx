@@ -57,9 +57,10 @@ describe("compose signature", () => {
       'iframe[title="Signature preview"]'
     );
     expect(preview?.srcdoc).toContain("HQBase Support");
-    expect(
-      view.container.querySelector<HTMLButtonElement>('[aria-label="Signature"]')?.textContent
-    ).toContain("Support · Support");
+    const trigger = view.container.querySelector<HTMLButtonElement>('[aria-label="Signature"]');
+    expect(trigger?.textContent).toContain("Support · Support");
+    expect(trigger?.className).toContain("h-[42px]");
+    expect(trigger?.className).toContain("sm:h-[34px]");
 
     await openSignatureMenu(view.container);
     const options = Array.from(

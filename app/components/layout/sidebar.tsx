@@ -104,7 +104,7 @@ export function Sidebar({
                   asChild
                   className={cn(
                     "text-tertiary [@media(hover:hover)]:hover:bg-muted/70 [@media(hover:hover)]:hover:text-foreground",
-                    isDrawer ? "size-10" : "size-9",
+                    "size-10 min-h-10 min-w-10",
                     isActive &&
                       "bg-selected text-foreground [@media(hover:hover)]:hover:bg-selected"
                   )}

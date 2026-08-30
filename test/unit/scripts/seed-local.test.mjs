@@ -17,7 +17,7 @@ describe("local database seed", () => {
       new Date("2026-08-14T18:00:00.000Z")
     );
 
-    expect(sql).toContain("'local_seed_version', '\"local-demo-v3\"'");
+    expect(sql).toContain("'local_seed_version', '\"local-demo-v4\"'");
     expect(sql).toContain("'setup_complete', 'true'");
     expect(sql).toContain("'owner@hqbase.test'");
     expect(sql).toContain("'admin@hqbase.test'");
@@ -32,6 +32,10 @@ describe("local database seed", () => {
     expect(sql).toContain("'msg_local_bulk_0001'");
     expect(sql).toContain("'msg_local_bulk_0100'");
     expect(sql).toContain("'thr_local_bulk_0100'");
+    expect(sql).toContain("'lbl_local_customer', 'Customer', 'blue'");
+    expect(sql).toContain('INSERT OR IGNORE INTO "message_labels"');
+    expect(sql).toContain("WHERE \"id\" = 'drf_local_followup'");
+    expect(sql).toContain("WHERE \"id\" = 'drf_local_clara_refund'");
     expect(sql).toContain("'2026-08-14T16:00:00.000Z'");
   });
 

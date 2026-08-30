@@ -1,4 +1,4 @@
-export const seedVersion = "local-demo-v3";
+export const seedVersion = "local-demo-v4";
 
 export const bulkBuckets = [
   { days: 7, count: 25 },

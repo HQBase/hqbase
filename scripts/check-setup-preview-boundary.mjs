@@ -9,7 +9,9 @@ const contents = await Promise.all(
 const production = contents.join("\n");
 
 for (const marker of [
+  "/__ui/design",
   "/__ui/setup",
+  "Design UI lab",
   "Setup UI lab",
   "Development fixtures only",
   "tweakcn.com/live-preview.min.js"

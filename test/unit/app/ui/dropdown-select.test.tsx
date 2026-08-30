@@ -25,7 +25,9 @@ describe("dropdown select", () => {
 
     const trigger = view.container.querySelector<HTMLButtonElement>('[aria-label="Access"]');
     expect(trigger?.textContent).toContain("Read");
-    expect(trigger?.className).toContain("h-9");
+    expect(trigger?.className).toContain("h-[34px]");
+    expect(trigger?.className).toContain("min-h-[34px]");
+    expect(trigger?.className).toContain("rounded-[calc(var(--radius)+2px)]");
 
     await flushHookEffects(() => {
       trigger?.dispatchEvent(

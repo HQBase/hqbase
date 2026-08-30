@@ -56,7 +56,7 @@ export function DropdownSelect({
           aria-label={ariaLabel}
           aria-required={required || undefined}
           className={cn(
-            "h-9 min-h-9 w-full justify-between overflow-hidden px-3 font-normal shadow-sm",
+            "h-[34px] min-h-[34px] w-full justify-between overflow-hidden rounded-[calc(var(--radius)+2px)] px-3 font-normal shadow-sm",
             className
           )}
           disabled={disabled}

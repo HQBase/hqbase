@@ -129,21 +129,27 @@ export function MailboxTable({
                 </TableCell>
               ) : null}
               <TableCell className="max-w-52">
-                <button
-                  className="block max-w-full truncate rounded-sm text-left font-medium underline-offset-4 [@media(hover:hover)]:hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  type="button"
-                  onClick={() => onOpenDetails(mailbox)}
-                >
-                  {mailbox.address}
-                </button>
+                <div className="flex min-w-0 items-center gap-1.5">
+                  <button
+                    className="min-w-0 flex-1 truncate rounded-sm text-left font-medium underline-offset-4 [@media(hover:hover)]:hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    type="button"
+                    onClick={() => onOpenDetails(mailbox)}
+                  >
+                    {mailbox.address}
+                  </button>
+                  {catchAllDomainByMailbox[mailbox.id] ? (
+                    <Badge
+                      className="max-w-36 shrink-0 truncate"
+                      title={`Catch-all for ${catchAllDomainByMailbox[mailbox.id]}`}
+                      variant="outline"
+                    >
+                      Catch-all for {catchAllDomainByMailbox[mailbox.id]}
+                    </Badge>
+                  ) : null}
+                </div>
                 <span className="mt-0.5 block truncate text-xs text-muted-foreground sm:hidden">
                   {mailbox.displayName}
                 </span>
-                {catchAllDomainByMailbox[mailbox.id] ? (
-                  <Badge className="mt-1" variant="outline">
-                    Catch-all for {catchAllDomainByMailbox[mailbox.id]}
-                  </Badge>
-                ) : null}
               </TableCell>
               <TableCell className="hidden sm:table-cell">{mailbox.displayName}</TableCell>
               <TableCell onClick={canManage ? (event) => event.stopPropagation() : undefined}>
@@ -170,7 +176,7 @@ export function MailboxTable({
                   />
                 ) : (
                   <button
-                    className="min-h-10 rounded-sm text-left text-xs text-muted-foreground underline-offset-4 [@media(hover:hover)]:hover:text-foreground [@media(hover:hover)]:hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    className="min-h-8 rounded-sm text-left text-xs text-muted-foreground underline-offset-4 [@media(hover:hover)]:hover:text-foreground [@media(hover:hover)]:hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     type="button"
                     onClick={() => onOpenDetails(mailbox)}
                   >

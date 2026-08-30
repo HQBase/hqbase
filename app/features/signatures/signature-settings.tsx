@@ -142,7 +142,6 @@ export function SignatureSettings({
                     <TableCell className="space-x-1 text-right">
                       <Button
                         aria-label={`Edit ${signature.name}`}
-                        className="size-9"
                         size="icon"
                         type="button"
                         variant="ghost"
@@ -152,7 +151,7 @@ export function SignatureSettings({
                       </Button>
                       <Button
                         aria-label={`Delete ${signature.name}`}
-                        className="size-9 text-destructive"
+                        className="text-destructive"
                         size="icon"
                         type="button"
                         variant="ghost"

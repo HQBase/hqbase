@@ -313,6 +313,7 @@ describe("settings presentation", () => {
     expect(html).toContain(">Readiness<");
     expect(html).toContain(">Unknown-address mail<");
     expect(html).toContain(">Active<");
+    expect(html).toContain(">Actions<");
     expect(html).toContain("example.com");
     expect(html).toContain("Portal");
     expect(html).toContain("Send needs attention");

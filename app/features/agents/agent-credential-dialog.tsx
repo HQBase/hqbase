@@ -95,7 +95,7 @@ export function AgentCredentialContent({
         <Button
           aria-label="Copy agent credential"
           onClick={() => void copyCredential()}
-          size="icon"
+          size="fieldIcon"
         >
           <PiCopy />
         </Button>

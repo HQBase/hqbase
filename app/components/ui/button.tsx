@@ -21,10 +21,12 @@ const buttonVariants = cva(
         liquidGlass: "btn-liquid-glass rounded-full"
       },
       size: {
-        default: "h-10 px-4 py-2 min-h-10",
-        sm: "h-9 min-h-9 rounded-md px-3 text-xs",
-        lg: "h-11 rounded-md px-5",
-        icon: "size-10 min-h-10 min-w-10"
+        default: "h-[30px] min-h-[30px] px-4 py-1",
+        sm: "h-[27px] min-h-[27px] rounded-md px-3 text-xs",
+        lg: "h-[33px] min-h-[33px] rounded-md px-5",
+        icon: "size-[30px] min-h-[30px] min-w-[30px]",
+        field: "h-[38px] min-h-[38px] px-4 text-[13px]",
+        fieldIcon: "size-[38px] min-h-[38px] min-w-[38px]"
       }
     },
     defaultVariants: {

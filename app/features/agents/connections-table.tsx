@@ -133,7 +133,7 @@ function OAuthRow({
 
   return (
     <TableRow className="grid grid-cols-[minmax(0,1fr)_44px] sm:table-row">
-      <TableCell className="min-w-0 py-3 sm:table-cell sm:py-2">
+      <TableCell className="min-w-0 py-3 sm:table-cell sm:py-1">
         <Name icon={<PiPlug />} name={connection.name} secondary={connectionType} />
         <MobileDetails access={access} status="Authorized" />
       </TableCell>
@@ -181,7 +181,7 @@ function MachineRow({
 
   return (
     <TableRow className="grid grid-cols-[minmax(0,1fr)_44px] sm:table-row">
-      <TableCell className="min-w-0 py-3 sm:table-cell sm:py-2">
+      <TableCell className="min-w-0 py-3 sm:table-cell sm:py-1">
         <Name
           icon={agent.profile === "mailbox" ? <PiMailbox /> : <PiKey />}
           name={agent.name}

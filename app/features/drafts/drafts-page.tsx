@@ -104,7 +104,10 @@ export function DraftsPage({
         title="Drafts"
       />
       <div className="min-h-0 flex-1 overflow-hidden">
-        <div className="h-full overflow-auto overscroll-contain will-change-transform">
+        <div
+          className="h-full overflow-auto overscroll-contain [scrollbar-gutter:stable] will-change-transform"
+          data-draft-list-scroll=""
+        >
           {visibleDrafts.length === 0 ? (
             <div className="mx-auto w-full max-w-[960px] px-4 sm:px-6 lg:px-8">
               <EmptyDrafts filtered={drafts.length > 0} />

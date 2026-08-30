@@ -40,12 +40,12 @@ export function MailboxAccessCell({
   return (
     <Button
       aria-label={`View access for ${mailbox.address}`}
-      className="h-auto min-h-10 max-w-full justify-start whitespace-normal px-0 py-1 text-left text-xs font-normal text-muted-foreground [@media(hover:hover)]:hover:bg-transparent [@media(hover:hover)]:hover:text-foreground"
+      className="h-[30px] min-h-[30px] max-w-full justify-start whitespace-nowrap px-0 py-0.5 text-left text-xs font-normal text-muted-foreground [@media(hover:hover)]:hover:bg-transparent [@media(hover:hover)]:hover:text-foreground"
       type="button"
       variant="ghost"
       onClick={onManage}
     >
-      <span className="line-clamp-2">
+      <span className="truncate">
         {formatMailboxAccessSummary(mailbox.id, policies.grants, users, policies.loading)}
       </span>
     </Button>
@@ -104,7 +104,7 @@ export function MailboxAccessPolicyDialog({
                   <TableCell>
                     <DropdownSelect
                       ariaLabel={`${user.name} access to ${mailbox?.address ?? "mailbox"}`}
-                      className="w-32 shadow-none"
+                      className="h-[30px] min-h-[30px] w-32 px-2.5 text-[13px] shadow-none"
                       disabled={policies.busy === key || !mailbox}
                       options={[
                         { label: "No access", value: "none" },

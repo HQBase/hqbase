@@ -18,6 +18,10 @@ if (import.meta.env.DEV && new URLSearchParams(window.location.search).has("twea
 }
 
 async function loadRootComponent(): Promise<React.ComponentType> {
+  if (import.meta.env.DEV && window.location.pathname === "/__ui/design") {
+    return (await import("./features/ui-lab/design-preview")).DesignPreview;
+  }
+
   if (import.meta.env.DEV && window.location.pathname === "/__ui/setup") {
     return (await import("./features/setup/setup-preview")).SetupPreview;
   }

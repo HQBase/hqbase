@@ -167,6 +167,35 @@ describe("mail shell", () => {
     expect(topBarHtml).not.toContain('aria-label="Hide sidebar"');
   });
 
+  it("keeps sidebar navigation at its established desktop and drawer sizes", () => {
+    const desktopHtml = renderToStaticMarkup(
+      <Sidebar
+        activeFolder="inbox"
+        mailboxId="all"
+        unread={unread}
+        user={user}
+        onFolderChange={() => undefined}
+        onSignedOut={() => undefined}
+      />
+    );
+    const drawerHtml = renderToStaticMarkup(
+      <Sidebar
+        activeFolder="inbox"
+        mailboxId="all"
+        unread={unread}
+        user={user}
+        onFolderChange={() => undefined}
+        onSignedOut={() => undefined}
+        variant="drawer"
+      />
+    );
+
+    expect(desktopHtml).toContain("h-10 min-h-10 justify-start");
+    expect(desktopHtml).toContain("size-10 min-h-10 min-w-10");
+    expect(drawerHtml).toContain("h-11 min-h-11 rounded-[16px]");
+    expect(drawerHtml).toContain("size-10 min-h-10 min-w-10");
+  });
+
   it("shows an accessible mail connection status beside the sidebar title", () => {
     const labels = {
       connecting: "Connecting to live updates",
@@ -291,7 +320,7 @@ describe("mail shell", () => {
     expect(html).toContain("flex h-full w-full");
     expect(html).toContain('aria-label="Mailbox filter"');
     expect(html).toContain('id="drawer-mailbox-filter"');
-    expect(html).toContain("h-11 min-h-11");
+    expect(html).toContain("h-[42px] min-h-[42px]");
     expect(html).toContain('for="drawer-mailbox-filter">Mailbox</label>');
     expect(html.indexOf(">Mailbox</label>")).toBeLessThan(html.indexOf(">Inbox</span>"));
     expect(html).toContain('aria-current="page"');
@@ -511,6 +540,8 @@ describe("mail shell", () => {
     expect(html).toContain("1 attachment");
     expect(html).toContain("Filter by labels: Follow up");
     expect(html).toContain("Labels: Follow up");
+    const draftScroll = html.match(/<div[^>]*data-draft-list-scroll=""[^>]*>/u)?.[0];
+    expect(draftScroll).toContain("[scrollbar-gutter:stable]");
     expect(html).toContain('data-message-labels="compact"');
     expect(html).toContain('data-message-labels="desktop"');
     expect(html).not.toContain("2 attachments");

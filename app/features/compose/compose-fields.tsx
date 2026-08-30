@@ -81,7 +81,7 @@ function Row({
   return (
     <div className={`grid grid-cols-[3rem_minmax(0,1fr)] items-center ${border ? "border-b" : ""}`}>
       <span className="text-xs text-muted-foreground">{label}</span>
-      <div className="[&_input]:h-10 [&_input]:rounded-none [&_input]:border-0 [&_input]:bg-transparent [&_input]:px-0 [&_input]:shadow-none [&_input]:focus-visible:ring-0">
+      <div className="[&_input]:h-[38px] [&_input]:rounded-none [&_input]:border-0 [&_input]:bg-transparent [&_input]:px-0 [&_input]:shadow-none [&_input]:focus-visible:ring-0">
         {children}
       </div>
     </div>

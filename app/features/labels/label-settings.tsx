@@ -102,7 +102,6 @@ export function LabelSettings({
                     <span className="inline-flex items-center gap-1">
                       <Button
                         aria-label={`Edit ${label.name}`}
-                        className="size-9"
                         size="icon"
                         type="button"
                         variant="ghost"
@@ -112,7 +111,7 @@ export function LabelSettings({
                       </Button>
                       <Button
                         aria-label={`Delete ${label.name}`}
-                        className="size-9 text-destructive"
+                        className="text-destructive"
                         size="icon"
                         type="button"
                         variant="ghost"

@@ -83,8 +83,8 @@ export function SettingsNav({
                   <Button
                     asChild
                     className={cn(
-                      "h-8 justify-start gap-3 rounded-[16px] px-3.5 text-[13px] font-medium leading-none text-muted-foreground dark:font-normal [&_svg]:size-4 [&_svg]:shrink-0",
-                      isDrawer && "h-11 rounded-[16px] text-sm",
+                      "h-10 min-h-10 justify-start gap-3 rounded-[16px] px-3.5 text-[13px] font-medium leading-none text-muted-foreground dark:font-normal [&_svg]:size-4 [&_svg]:shrink-0",
+                      isDrawer && "h-11 min-h-11 rounded-[16px] text-sm",
                       isActive &&
                         "bg-selected text-foreground [@media(hover:hover)]:hover:bg-selected"
                     )}
@@ -135,8 +135,8 @@ export function AgentsNav({
         <Button
           asChild
           className={cn(
-            "h-8 justify-start gap-3 rounded-[16px] bg-selected px-3.5 text-[13px] font-medium leading-none text-foreground [@media(hover:hover)]:hover:bg-selected dark:font-normal [&_svg]:size-4 [&_svg]:shrink-0",
-            isDrawer && "h-11 rounded-[16px] text-sm"
+            "h-10 min-h-10 justify-start gap-3 rounded-[16px] bg-selected px-3.5 text-[13px] font-medium leading-none text-foreground [@media(hover:hover)]:hover:bg-selected dark:font-normal [&_svg]:size-4 [&_svg]:shrink-0",
+            isDrawer && "h-11 min-h-11 rounded-[16px] text-sm"
           )}
           variant="ghost"
         >
@@ -208,7 +208,7 @@ export function MailNav({
             </FieldLabel>
             <DropdownSelect
               ariaLabel="Mailbox filter"
-              className="h-11 min-h-11 bg-muted/70 shadow-none"
+              className="h-[42px] min-h-[42px] bg-muted/70 shadow-none"
               id="drawer-mailbox-filter"
               options={[
                 {
@@ -247,8 +247,8 @@ export function MailNav({
             <Button
               asChild
               className={cn(
-                "h-8 justify-start gap-3 rounded-[16px] px-3.5 text-[13px] font-medium leading-none text-muted-foreground dark:font-normal [&_svg]:size-4 [&_svg]:shrink-0",
-                isDrawer && "h-11 rounded-[16px] text-sm",
+                "h-10 min-h-10 justify-start gap-3 rounded-[16px] px-3.5 text-[13px] font-medium leading-none text-muted-foreground dark:font-normal [&_svg]:size-4 [&_svg]:shrink-0",
+                isDrawer && "h-11 min-h-11 rounded-[16px] text-sm",
                 activeFolder === folder.id &&
                   "bg-selected text-foreground [@media(hover:hover)]:hover:bg-selected"
               )}
@@ -307,8 +307,8 @@ export function ContactsNav({
         <Button
           asChild
           className={cn(
-            "h-8 justify-start gap-3 rounded-[16px] bg-selected px-3.5 text-[13px] font-medium leading-none text-foreground [@media(hover:hover)]:hover:bg-selected dark:font-normal [&_svg]:size-4 [&_svg]:shrink-0",
-            isDrawer && "h-11 rounded-[16px] text-sm"
+            "h-10 min-h-10 justify-start gap-3 rounded-[16px] bg-selected px-3.5 text-[13px] font-medium leading-none text-foreground [@media(hover:hover)]:hover:bg-selected dark:font-normal [&_svg]:size-4 [&_svg]:shrink-0",
+            isDrawer && "h-11 min-h-11 rounded-[16px] text-sm"
           )}
           variant="ghost"
         >
