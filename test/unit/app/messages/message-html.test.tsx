@@ -92,7 +92,7 @@ describe("message HTML view", () => {
     );
 
     expect(html).toContain(
-      "Remote images are hidden. Loading them may reveal that you opened this email."
+      "Some remote images are hidden. Loading them may reveal that you opened this email."
     );
     expect(html).toContain("Load images");
     expect(html).toContain("Always load from this sender");

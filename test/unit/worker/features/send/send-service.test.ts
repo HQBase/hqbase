@@ -226,6 +226,61 @@ describe("send service", () => {
     );
   });
 
+  it("sends and stores inline images from forwarded HTML context", async () => {
+    send.mockResolvedValue({ messageId: "<cloudflare-forward-image@example.com>" });
+
+    await sendNewMessage(
+      env,
+      {
+        attachmentIds: [],
+        bcc: [],
+        cc: [],
+        from: mailbox.address,
+        subject: "Forwarded image",
+        text: "Please review",
+        to: ["owner@example.com"]
+      },
+      undefined,
+      undefined,
+      {
+        text: "Forwarded content",
+        html: '<blockquote><img src="cid:forwarded-logo@example.com"></blockquote>'
+      },
+      [
+        {
+          id: "forwarded-logo",
+          filename: "logo.png",
+          contentType: "image/png",
+          sizeBytes: 3,
+          contentId: "forwarded-logo@example.com",
+          disposition: "inline",
+          r2Key: "mail/original-logo.png",
+          content: new Uint8Array([1, 2, 3]).buffer
+        }
+      ]
+    );
+
+    const payload = send.mock.calls[0]?.[0] as Parameters<SendEmail["send"]>[0];
+    expect(payload.html).toContain('src="cid:forwarded-logo@example.com"');
+    expect(payload.attachments).toEqual([
+      expect.objectContaining({
+        contentId: "forwarded-logo@example.com",
+        disposition: "inline",
+        filename: "logo.png"
+      })
+    ]);
+    expect(put).toHaveBeenCalledWith("sent/2026-07-10/html-1-1", expect.any(ArrayBuffer), {
+      httpMetadata: { contentType: "image/png" }
+    });
+    expect(insertAttachment).toHaveBeenCalledWith(
+      env.DB,
+      expect.objectContaining({
+        contentId: "forwarded-logo@example.com",
+        r2Key: "sent/2026-07-10/html-1-1"
+      })
+    );
+  });
+
   it("uses only referenced private draft images and removes unused draft objects", async () => {
     send.mockResolvedValue({ messageId: "<cloudflare-inline@example.com>" });
     vi.mocked(draftAttachmentObjects).mockResolvedValue([

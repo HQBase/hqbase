@@ -26,6 +26,7 @@ type ComposeFormProps = {
   fromDisabled: boolean;
   html: string;
   identities: SendingIdentity[];
+  includedAttachments: MessageDetail["attachments"];
   isPending: boolean;
   mode: ComposeMode;
   presentation: "window" | "thread";
@@ -115,7 +116,11 @@ export function ComposeForm(props: ComposeFormProps): React.ReactElement {
           {props.replyMessage ? (
             <ReplyQuotePreview messages={props.replyMessages} target={props.replyMessage} />
           ) : null}
-          <AttachmentList attachments={props.attachments} onRemove={props.onRemoveAttachment} />
+          <AttachmentList
+            attachments={props.attachments}
+            includedAttachments={props.includedAttachments}
+            onRemove={props.onRemoveAttachment}
+          />
           <footer
             className={cn(
               "flex items-center justify-between gap-2 border-t bg-background/50 px-5 py-3",

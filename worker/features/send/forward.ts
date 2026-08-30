@@ -1,3 +1,4 @@
+import { nowIso } from "../../db/client";
 import type { WorkerEnv } from "../../lib/env";
 import { AppError } from "../../lib/errors";
 import {
@@ -12,6 +13,15 @@ import type { MessageDetail } from "../messages/types";
 import type { SignatureSnapshot } from "../signatures/types";
 
 import { assembleMessageBody } from "./body";
+import {
+  loadAttachments,
+  loadQuotedMessageHtml,
+  maxAttachmentBytes,
+  maxAttachmentCount,
+  prepareSignature,
+  type StoredOutgoingAttachment,
+  totalAttachmentBytes
+} from "./content-attachments";
 import { sendNewMessage } from "./service";
 import type { ForwardMessageInput, SendMessageInput } from "./validation";
 
@@ -32,7 +42,6 @@ export async function forwardMessage(
     throw new AppError("MAILBOX_DISABLED", "Disabled mailboxes cannot send email.", 400);
   }
 
-  const context = forwardedContext(original);
   const subject = input.subject ?? forwardSubject(original.subject);
   const originalAttachments = forwardableAttachments(original.attachments);
   const outbound: SendMessageInput = {
@@ -47,7 +56,21 @@ export async function forwardMessage(
     signature: input.signature
   };
   if (!input.includeOriginalAttachments || originalAttachments.length === 0) {
-    return sendNewMessage(env, outbound, principalId, signature, context);
+    const forwarded = await loadForwardedContext(
+      env,
+      original,
+      input.attachmentIds,
+      principalId,
+      signature
+    );
+    return sendNewMessage(
+      env,
+      outbound,
+      principalId,
+      signature,
+      forwarded.context,
+      forwarded.inlineAttachments
+    );
   }
 
   requireForwardedAttachmentCount(originalAttachments.length, input.attachmentIds.length);
@@ -81,15 +104,24 @@ export async function forwardMessage(
   }
 
   try {
+    const attachmentIds = [...input.attachmentIds, ...copiedAttachmentIds];
+    const forwarded = await loadForwardedContext(
+      env,
+      original,
+      attachmentIds,
+      principalId,
+      signature
+    );
     return await sendNewMessage(
       env,
       {
         ...outbound,
-        attachmentIds: [...input.attachmentIds, ...copiedAttachmentIds]
+        attachmentIds
       },
       principalId,
       signature,
-      context
+      forwarded.context,
+      forwarded.inlineAttachments
     );
   } finally {
     try {
@@ -111,10 +143,23 @@ export async function sendForwardDraft(
   const original = await getMessageDetail(env.DB, originalMessageId);
   if (!original) throw new AppError("MESSAGE_NOT_FOUND", "Message not found.", 404);
   const authored = stripLegacyForwardContext(input);
-  const context = forwardedContext(original);
   const originalAttachments = forwardableAttachments(original.attachments);
   if (originalAttachments.length === 0) {
-    return sendNewMessage(env, { ...input, ...authored, draftId }, principalId, signature, context);
+    const forwarded = await loadForwardedContext(
+      env,
+      original,
+      input.attachmentIds,
+      principalId,
+      signature
+    );
+    return sendNewMessage(
+      env,
+      { ...input, ...authored, draftId },
+      principalId,
+      signature,
+      forwarded.context,
+      forwarded.inlineAttachments
+    );
   }
 
   requireForwardedAttachmentCount(originalAttachments.length, input.attachmentIds.length);
@@ -125,17 +170,26 @@ export async function sendForwardDraft(
     originalAttachments
   );
   try {
+    const attachmentIds = [...input.attachmentIds, ...copiedAttachmentIds];
+    const forwarded = await loadForwardedContext(
+      env,
+      original,
+      attachmentIds,
+      principalId,
+      signature
+    );
     return await sendNewMessage(
       env,
       {
         ...input,
         ...authored,
-        attachmentIds: [...input.attachmentIds, ...copiedAttachmentIds],
+        attachmentIds,
         draftId
       },
       principalId,
       signature,
-      context
+      forwarded.context,
+      forwarded.inlineAttachments
     );
   } catch (error) {
     await removeCopiedAttachments(env, principalId, draftId, copiedAttachmentIds);
@@ -215,21 +269,54 @@ export function forwardedBody(
   return { text: body.text, html: body.html ?? "" };
 }
 
-export function forwardedContext(message: MessageDetail): { text: string; html: string } {
+export function forwardedContext(
+  message: MessageDetail,
+  forwardedHtml?: string
+): { text: string; html: string } {
   const timestamp = message.receivedAt ?? message.sentAt ?? message.createdAt;
-  const forwarded = [
+  const headers = [
     "---------- Forwarded message ---------",
     `From: ${message.fromName ? `${message.fromName} <${message.fromAddress}>` : message.fromAddress}`,
     `Date: ${new Date(timestamp).toUTCString()}`,
     `Subject: ${message.subject}`,
     `To: ${message.to.join(", ")}`,
-    ...(message.cc.length ? [`Cc: ${message.cc.join(", ")}`] : []),
-    "",
-    message.textBody || message.snippet
-  ].join("\n");
+    ...(message.cc.length ? [`Cc: ${message.cc.join(", ")}`] : [])
+  ];
+  const bodyText = message.textBody || message.snippet;
+  const forwarded = [...headers, "", bodyText].join("\n");
+  const htmlBody = forwardedHtml ?? escapeHtml(bodyText).replaceAll("\n", "<br>");
   return {
     text: forwarded,
-    html: `<blockquote>${escapeHtml(forwarded).replaceAll("\n", "<br>")}</blockquote>`
+    html: `<blockquote>${escapeHtml(headers.join("\n")).replaceAll("\n", "<br>")}<br><br>${htmlBody}</blockquote>`
+  };
+}
+
+async function loadForwardedContext(
+  env: WorkerEnv,
+  message: MessageDetail,
+  attachmentIds: string[],
+  principalId: string,
+  signature?: SignatureSnapshot
+): Promise<{
+  context: { text: string; html: string };
+  inlineAttachments: StoredOutgoingAttachment[];
+}> {
+  if (!message.htmlAvailable) {
+    return { context: forwardedContext(message), inlineAttachments: [] };
+  }
+  const authoredAttachments = await loadAttachments(env, attachmentIds, principalId);
+  const signatureAttachments = prepareSignature(signature, nowIso()).attachments;
+  const baseAttachments = [...authoredAttachments, ...signatureAttachments];
+  const quoted = await loadQuotedMessageHtml(
+    env,
+    message.id,
+    message.attachments,
+    maxAttachmentBytes - totalAttachmentBytes(baseAttachments),
+    maxAttachmentCount - baseAttachments.length
+  );
+  return {
+    context: forwardedContext(message, quoted.html),
+    inlineAttachments: quoted.inlineAttachments
   };
 }
 

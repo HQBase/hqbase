@@ -323,7 +323,7 @@ export function RemoteImagesAlert({
     <Alert className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-2 gap-y-1 rounded-md border-border/60 bg-muted/50 px-2.5 py-1.5 text-xs sm:grid-cols-[auto_minmax(0,1fr)_auto] [&>svg]:static [&>svg]:size-3.5 [&>svg]:text-muted-foreground [&>svg~*]:pl-0">
       <PiImageBroken />
       <AlertTitle className="mb-0 min-w-0 line-clamp-2 text-[11px] font-semibold leading-[14px] tracking-normal">
-        Remote images are hidden. Loading them may reveal that you opened this email.
+        Some remote images are hidden. Loading them may reveal that you opened this email.
       </AlertTitle>
       <AlertDescription className="col-start-2 row-start-2 flex flex-wrap gap-1 pt-0.5 sm:col-start-3 sm:row-start-1 sm:flex-nowrap sm:pt-0">
         <Button
