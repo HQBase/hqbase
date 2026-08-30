@@ -675,6 +675,16 @@ describe("send service", () => {
       sentAt: "2026-07-10T00:05:00.000Z",
       createdAt: "2026-07-10T00:05:00.000Z"
     };
+    const trashedMessage = {
+      ...firstMessage,
+      id: "message-trashed",
+      folder: "trash" as const,
+      messageId: "<trashed@example.com>",
+      snippet: "Deleted message",
+      textBody: "Deleted message",
+      receivedAt: "2026-07-10T00:03:00.000Z",
+      createdAt: "2026-07-10T00:03:00.000Z"
+    };
     const laterMessage = {
       ...targetMessage,
       id: "message-3",
@@ -690,7 +700,12 @@ describe("send service", () => {
       createdAt: "2026-07-10T00:10:00.000Z"
     };
     vi.mocked(getMessageDetail).mockResolvedValue(targetMessage);
-    vi.mocked(listThreadMessages).mockResolvedValue([firstMessage, targetMessage, laterMessage]);
+    vi.mocked(listThreadMessages).mockResolvedValue([
+      firstMessage,
+      trashedMessage,
+      targetMessage,
+      laterMessage
+    ]);
     send.mockResolvedValue({ messageId: "<cloudflare-reply@example.com>" });
 
     await replyToMessage(
@@ -721,6 +736,7 @@ describe("send service", () => {
     const payloadText = payload.text ?? "";
     expect(payloadText).toContain("Second message");
     expect(payloadText).toContain("First message");
+    expect(payloadText).not.toContain("Deleted message");
     expect(payloadText).not.toContain("Later message");
     expect(payloadText.indexOf("Second message")).toBeLessThan(
       payloadText.indexOf("First message")

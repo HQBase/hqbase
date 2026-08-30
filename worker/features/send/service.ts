@@ -136,7 +136,9 @@ export async function replyToMessage(
     throw new AppError("MESSAGE_NOT_FOUND", "Message not found.", 404);
   }
   const threadMessages = messageScope
-    ? await listThreadMessages(env.DB, original.threadId, messageScope)
+    ? (await listThreadMessages(env.DB, original.threadId, messageScope)).filter(
+        (message) => (message.folder === "trash") === (original.folder === "trash")
+      )
     : [original];
   const targetIndex = threadMessages.findIndex((message) => message.id === original.id);
   const replyChain = targetIndex < 0 ? [original] : threadMessages.slice(0, targetIndex + 1);
