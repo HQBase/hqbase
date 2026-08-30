@@ -197,6 +197,7 @@ function ActionsPreview(): React.ReactElement {
 }
 
 function FormsPreview(): React.ReactElement {
+  const [compactChoice, setCompactChoice] = React.useState("read");
   const [delivery, setDelivery] = React.useState("privacy");
 
   return (
@@ -257,6 +258,26 @@ function FormsPreview(): React.ReactElement {
           <Input placeholder="Default input" />
           <Input disabled placeholder="Disabled input" />
           <Input aria-invalid="true" defaultValue="Invalid value" />
+        </div>
+      </Specimen>
+      <Specimen
+        path="app/components/ui/input.tsx · dropdown-select.tsx · button.tsx"
+        title="Compact inline controls"
+      >
+        <div className="flex max-w-lg items-center gap-2">
+          <Input defaultValue="Northstar Support" size="sm" />
+          <Button>Save</Button>
+          <DropdownSelect
+            ariaLabel="Compact access"
+            className="w-32"
+            options={[
+              { label: "Read", value: "read" },
+              { label: "Manager", value: "manager" }
+            ]}
+            size="sm"
+            value={compactChoice}
+            onValueChange={setCompactChoice}
+          />
         </div>
       </Specimen>
     </InventorySection>

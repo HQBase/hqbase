@@ -26,6 +26,7 @@ type DropdownSelectProps = {
   options: DropdownSelectOption[];
   placeholder?: React.ReactNode;
   required?: boolean;
+  size?: "default" | "sm";
   value: string;
   onOpenChange?: (open: boolean) => void;
   onValueChange: (value: string) => void;
@@ -40,6 +41,7 @@ export function DropdownSelect({
   options,
   placeholder = "Choose an option",
   required = false,
+  size = "default",
   value,
   onOpenChange,
   onValueChange
@@ -56,9 +58,11 @@ export function DropdownSelect({
           aria-label={ariaLabel}
           aria-required={required || undefined}
           className={cn(
-            "h-[34px] min-h-[34px] w-full justify-between overflow-hidden rounded-[calc(var(--radius)+2px)] px-3 font-normal shadow-sm",
+            "w-full justify-between overflow-hidden rounded-[calc(var(--radius)+2px)] px-3 font-normal shadow-sm",
+            size === "sm" ? "h-[30px] min-h-[30px]" : "h-[34px] min-h-[34px]",
             className
           )}
+          data-size={size}
           disabled={disabled}
           id={id}
           type="button"

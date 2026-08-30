@@ -94,21 +94,22 @@ export function MailboxDetailsSheet({
                     Sender name
                   </Label>
                   <Input
-                    className="text-[13px]"
+                    className="text-[13px] max-sm:h-[38px]"
                     id="mailbox-sender-name"
                     maxLength={80}
                     required
+                    size="sm"
                     value={senderName}
                     onChange={(event) => setSenderName(event.target.value)}
                   />
                 </div>
                 <Button
+                  className="max-sm:h-[38px] max-sm:min-h-[38px]"
                   disabled={
                     senderNamePending ||
                     !senderName.trim() ||
                     senderName.trim() === mailbox.displayName
                   }
-                  size="field"
                   type="submit"
                 >
                   {senderNamePending ? <Spinner aria-hidden="true" /> : null}

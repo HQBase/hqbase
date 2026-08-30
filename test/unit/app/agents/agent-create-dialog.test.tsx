@@ -108,13 +108,18 @@ describe("agent creation form", () => {
     const onCreated = vi.fn();
     const view = await renderComponent(
       <Dialog>
-        <AgentCreateForm domains={[]} mailboxes={[]} profile="mailbox" onCreated={onCreated} />
+        <AgentCreateForm
+          domains={[{ id: "dom_example", name: "example.com", isEnabled: true }]}
+          mailboxes={[]}
+          profile="mailbox"
+          onCreated={onCreated}
+        />
       </Dialog>
     );
     document.body.appendChild(view.container);
 
     setInput(view.container, "#new-agent-name", " Support assistant ");
-    setInput(view.container, "#new-agent-mailbox-address", "Support@Example.com");
+    setInput(view.container, "#new-agent-mailbox-address", "Support");
     setInput(view.container, "#new-agent-mailbox-name", " Support ");
     await flushHookEffects(() => view.container.querySelector("form")?.requestSubmit());
 

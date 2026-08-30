@@ -14,6 +14,7 @@ import { DropdownSelect } from "@/components/ui/dropdown-select";
 import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
+import { DomainSuffixInput, hasCompleteDomainSuffix } from "@/features/domains/domain-suffix-input";
 import type { Mailbox } from "@/features/mailboxes/types";
 import { createAgent } from "./api";
 import type {
@@ -66,7 +67,9 @@ export function AgentCreateForm({
           mailbox: { id: mailboxChoice }
         };
       }
-      if (!address.trim() || !displayName.trim()) return null;
+      if (!hasCompleteDomainSuffix(address, enabledDomains, "@") || !displayName.trim()) {
+        return null;
+      }
       return {
         profile,
         name: normalizedName,
@@ -99,7 +102,8 @@ export function AgentCreateForm({
   const canSubmit =
     name.trim().length > 0 &&
     (profile === "mailbox"
-      ? mailboxChoice !== newMailboxValue || (address.trim() !== "" && displayName.trim() !== "")
+      ? mailboxChoice !== newMailboxValue ||
+        (hasCompleteDomainSuffix(address, enabledDomains, "@") && displayName.trim() !== "")
       : mailDomainId !== "" && Number.isInteger(Number(mailboxLimit)) && Number(mailboxLimit) >= 1);
 
   return (
@@ -149,16 +153,22 @@ export function AgentCreateForm({
               </Field>
               {mailboxChoice === newMailboxValue ? (
                 <>
-                  <Field>
+                  <Field data-disabled={enabledDomains.length === 0}>
                     <FieldLabel htmlFor="new-agent-mailbox-address">Email address</FieldLabel>
-                    <Input
+                    <DomainSuffixInput
+                      domains={enabledDomains}
                       id="new-agent-mailbox-address"
-                      placeholder="assistant@example.com"
+                      placeholder="assistant"
                       required
-                      type="email"
+                      separator="@"
                       value={address}
-                      onChange={(event) => setAddress(event.target.value)}
+                      onValueChange={setAddress}
                     />
+                    {enabledDomains.length === 0 ? (
+                      <FieldDescription>
+                        Enable an email domain before creating a new mailbox.
+                      </FieldDescription>
+                    ) : null}
                   </Field>
                   <Field>
                     <FieldLabel htmlFor="new-agent-mailbox-name">Sender name</FieldLabel>

@@ -1,4 +1,5 @@
 import * as React from "react";
+import { Button } from "@/components/ui/button";
 import { readUpdateProgress } from "@/features/updates/update-progress";
 import { playNotificationSound } from "@/lib/notification-sounds";
 import { type PwaUpdate, registerPwa } from "./register";
@@ -38,7 +39,7 @@ export function PwaLifecycle(): React.ReactElement | null {
   return (
     <aside
       aria-live="polite"
-      className="fixed right-4 bottom-4 left-4 z-[100] mx-auto flex max-w-xl items-center justify-between gap-4 rounded-lg border border-border bg-popover px-4 py-3 text-sm text-popover-foreground shadow-lg"
+      className="fixed right-4 bottom-4 left-4 z-[100] mx-auto flex max-w-lg items-center justify-between gap-3 rounded-xl border border-border bg-popover px-3.5 py-2.5 text-sm text-popover-foreground shadow-[0_8px_24px_rgb(0_0_0/0.18)]"
       role="status"
     >
       <span>
@@ -47,13 +48,14 @@ export function PwaLifecycle(): React.ReactElement | null {
           : "You're offline. HQBase will reconnect when your connection returns."}
       </span>
       {online && update ? (
-        <button
-          className="shrink-0 rounded-md bg-primary px-3 py-2 font-medium text-primary-foreground outline-none [@media(hover:hover)]:hover:bg-primary/90 focus-visible:ring-2 focus-visible:ring-ring"
+        <Button
+          className="shrink-0 rounded-lg px-3.5"
           onClick={update.activate}
+          size="sm"
           type="button"
         >
           Reload
-        </button>
+        </Button>
       ) : null}
     </aside>
   );

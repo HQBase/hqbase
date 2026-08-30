@@ -13,7 +13,7 @@ describe("input radius", () => {
     expect(renderToStaticMarkup(field)).toContain("rounded-[calc(var(--radius)+2px)]");
   });
 
-  it("uses the compact shared single-line field height", () => {
+  it("uses the normal shared single-line field height", () => {
     expect(renderToStaticMarkup(<Input />)).toContain("h-[38px]");
     expect(
       renderToStaticMarkup(
@@ -22,6 +22,17 @@ describe("input radius", () => {
         </InputGroup>
       )
     ).toContain("h-[38px]");
+  });
+
+  it("offers a 30px compact input and group", () => {
+    expect(renderToStaticMarkup(<Input size="sm" />)).toContain("h-[30px]");
+    expect(
+      renderToStaticMarkup(
+        <InputGroup size="sm">
+          <InputGroupInput />
+        </InputGroup>
+      )
+    ).toContain("h-[30px]");
   });
 
   it("changes only the border when a field receives focus", () => {

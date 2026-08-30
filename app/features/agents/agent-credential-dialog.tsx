@@ -87,15 +87,17 @@ export function AgentCredentialContent({
       <div className="flex items-center gap-2">
         <Input
           aria-label="Agent credential"
-          className="font-mono text-base sm:text-xs"
+          className="font-mono text-base max-sm:h-[38px] sm:text-xs"
           readOnly
+          size="sm"
           value={credential}
           onFocus={(event) => event.currentTarget.select()}
         />
         <Button
           aria-label="Copy agent credential"
+          className="max-sm:size-[38px] max-sm:min-h-[38px] max-sm:min-w-[38px]"
           onClick={() => void copyCredential()}
-          size="fieldIcon"
+          size="icon"
         >
           <PiCopy />
         </Button>

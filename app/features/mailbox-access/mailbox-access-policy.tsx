@@ -104,7 +104,7 @@ export function MailboxAccessPolicyDialog({
                   <TableCell>
                     <DropdownSelect
                       ariaLabel={`${user.name} access to ${mailbox?.address ?? "mailbox"}`}
-                      className="h-[30px] min-h-[30px] w-32 px-2.5 text-[13px] shadow-none"
+                      className="w-32 px-2.5 text-[13px] shadow-none"
                       disabled={policies.busy === key || !mailbox}
                       options={[
                         { label: "No access", value: "none" },
@@ -112,6 +112,7 @@ export function MailboxAccessPolicyDialog({
                         { label: "Handle mail", value: "agent" },
                         { label: "Manager", value: "manager" }
                       ]}
+                      size="sm"
                       value={value}
                       onValueChange={(next) =>
                         mailbox

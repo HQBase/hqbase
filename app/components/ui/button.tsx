@@ -24,9 +24,7 @@ const buttonVariants = cva(
         default: "h-[30px] min-h-[30px] px-4 py-1",
         sm: "h-[27px] min-h-[27px] rounded-md px-3 text-xs",
         lg: "h-[33px] min-h-[33px] rounded-md px-5",
-        icon: "size-[30px] min-h-[30px] min-w-[30px]",
-        field: "h-[38px] min-h-[38px] px-4 text-[13px]",
-        fieldIcon: "size-[38px] min-h-[38px] min-w-[38px]"
+        icon: "size-[30px] min-h-[30px] min-w-[30px]"
       }
     },
     defaultVariants: {

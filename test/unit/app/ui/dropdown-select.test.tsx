@@ -66,4 +66,21 @@ describe("dropdown select", () => {
     ).toBe(true);
     await view.unmount();
   });
+
+  it("offers a compact dropdown height", async () => {
+    const view = await renderComponent(
+      <DropdownSelect
+        ariaLabel="Compact access"
+        options={[{ label: "Read", value: "read" }]}
+        size="sm"
+        value="read"
+        onValueChange={() => undefined}
+      />
+    );
+
+    const trigger = view.container.querySelector('[aria-label="Compact access"]');
+    expect(trigger?.className).toContain("h-[30px]");
+    expect(trigger?.className).toContain("min-h-[30px]");
+    await view.unmount();
+  });
 });

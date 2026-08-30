@@ -143,10 +143,11 @@ export function GlobalSearch({
         aria-expanded={listOpen}
         aria-label="Search HQBase"
         autoComplete="off"
-        className="h-[30px] border-transparent bg-muted/70 pl-8 pr-9 text-xs shadow-none focus-visible:border-input focus-visible:ring-1"
+        className="border-transparent bg-muted/70 pl-8 pr-9 text-xs shadow-none focus-visible:border-input focus-visible:ring-1"
         maxLength={200}
         placeholder="Search HQBase"
         role="combobox"
+        size="sm"
         spellCheck={false}
         value={query}
         onBlur={(event) => {

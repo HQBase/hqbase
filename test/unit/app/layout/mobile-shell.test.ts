@@ -130,7 +130,8 @@ describe("mobile application shell", () => {
   it("uses one responsive Agents list with contextual setup", () => {
     expect(agentConnectionDetails).toContain("export function AgentSkillDetails");
     expect(agentConnectionDetails).not.toContain('aria-label="Connection method"');
-    expect(mcpConnectionDetails).toContain("text-base sm:text-xs");
+    expect(mcpConnectionDetails).toContain("text-base max-sm:h-[38px] sm:text-xs");
+    expect(mcpConnectionDetails).toContain('size="sm"');
     expect(mcpConnectionDetails).toContain('value="read-only"');
     expect(mcpConnectionDetails).toContain('value="mail-actions"');
     expect(agentsPage).toContain("All connections");

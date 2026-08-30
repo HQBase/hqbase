@@ -60,17 +60,18 @@ export function AgentSkillDetails({
           </label>
           <Input
             aria-label="Agent Skill URL"
-            className="min-w-0 font-mono text-base sm:text-xs"
+            className="min-w-0 font-mono text-base max-sm:h-[38px] sm:text-xs"
             id={skillUrlId}
             readOnly
+            size="sm"
             value={skillUrl}
             onFocus={(event) => event.currentTarget.select()}
           />
           <div className="grid grid-cols-2 gap-2 sm:flex sm:shrink-0">
             <Button
               aria-label="Copy Agent Skill URL"
+              className="max-sm:h-[38px] max-sm:min-h-[38px]"
               onClick={() => void copyUrl()}
-              size="field"
               type="button"
               variant="outline"
             >
@@ -81,7 +82,7 @@ export function AgentSkillDetails({
               )}
               {copied ? "Copied" : "Copy URL"}
             </Button>
-            <Button asChild size="field" variant="outline">
+            <Button asChild className="max-sm:h-[38px] max-sm:min-h-[38px]" variant="outline">
               <a download="SKILL.md" href={skillUrl}>
                 <PiDownload aria-hidden="true" data-icon="inline-start" />
                 Download Skill

@@ -140,16 +140,17 @@ function McpEndpointOption({
           {title} Streamable HTTP endpoint
         </label>
         <Input
-          className="min-w-0 font-mono text-base sm:text-xs"
+          className="min-w-0 font-mono text-base max-sm:h-[38px] sm:text-xs"
           id={endpointId}
           readOnly
+          size="sm"
           value={endpoint}
           onFocus={(event) => event.currentTarget.select()}
         />
         <Button
           aria-label={`Copy ${title} endpoint`}
+          className="max-sm:h-[38px] max-sm:min-h-[38px]"
           onClick={() => void copyEndpoint()}
-          size="field"
           type="button"
           variant="outline"
         >

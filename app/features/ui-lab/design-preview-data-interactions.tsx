@@ -34,7 +34,6 @@ import {
   DropdownMenuTrigger
 } from "@/components/ui/dropdown-menu";
 import { Field, FieldLabel } from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { PullToRefresh } from "@/components/ui/pull-to-refresh";
 import {
@@ -55,6 +54,7 @@ import {
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { DomainSuffixInput } from "@/features/domains/domain-suffix-input";
 
 import { InventorySection, Specimen } from "./design-preview-shared";
 
@@ -311,6 +311,8 @@ function FeedbackPreview(): React.ReactElement {
 }
 
 function OverlaysPreview(): React.ReactElement {
+  const [mailboxAddress, setMailboxAddress] = React.useState("support@northstar.example");
+
   return (
     <InventorySection
       description="Interactive dialog and drawer surfaces rendered through the real portals."
@@ -331,7 +333,16 @@ function OverlaysPreview(): React.ReactElement {
             </DialogHeader>
             <Field>
               <FieldLabel htmlFor="dialog-address">Email address</FieldLabel>
-              <Input defaultValue="support" id="dialog-address" />
+              <DomainSuffixInput
+                domains={[
+                  { id: "northstar", name: "northstar.example" },
+                  { id: "fieldnotes", name: "fieldnotes.example" }
+                ]}
+                id="dialog-address"
+                separator="@"
+                value={mailboxAddress}
+                onValueChange={setMailboxAddress}
+              />
             </Field>
             <DialogFooter>
               <Button type="button" variant="outline">

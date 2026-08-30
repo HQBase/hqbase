@@ -25,11 +25,9 @@ describe("button", () => {
     expect(html).not.toContain("focus-visible:ring");
   });
 
-  it("matches actions to adjacent field heights", () => {
-    const textAction = renderToStaticMarkup(<Button size="field">Save</Button>);
-    const iconAction = renderToStaticMarkup(<Button size="fieldIcon">Copy</Button>);
+  it("uses the compact field-and-action height by default", () => {
+    const html = renderToStaticMarkup(<Button>Save</Button>);
 
-    expect(textAction).toContain("h-[38px] min-h-[38px]");
-    expect(iconAction).toContain("size-[38px] min-h-[38px] min-w-[38px]");
+    expect(html).toContain("h-[30px] min-h-[30px]");
   });
 });

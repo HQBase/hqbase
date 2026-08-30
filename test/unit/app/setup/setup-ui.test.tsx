@@ -147,7 +147,8 @@ describe("setup UI", () => {
     expect(html).toContain('aria-label="Mailboxes"');
     expect(html).toContain("<table");
     expect(html).toContain("support@northstar.example");
-    expect(html).toContain("privacy@fieldnotes.example");
+    expect(html).toContain('value="privacy"');
+    expect(html).toContain("@fieldnotes.example");
     expect(html).toContain("h-[30px]");
     expect(html).toContain("Add mailbox");
     expect(html).toContain('aria-label="Actions for mailbox 1"');
