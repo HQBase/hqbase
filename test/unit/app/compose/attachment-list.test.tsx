@@ -30,4 +30,27 @@ describe("compose attachment list", () => {
     expect(html).not.toContain("logo.png");
     expect(html).toContain("report.pdf");
   });
+
+  it("shows original files as included without a remove action", () => {
+    const html = renderToStaticMarkup(
+      <AttachmentList
+        attachments={[]}
+        includedAttachments={[
+          {
+            id: "original-file",
+            filename: "original.pdf",
+            contentType: "application/pdf",
+            sizeBytes: 2048,
+            contentId: null,
+            disposition: "attachment"
+          }
+        ]}
+        onRemove={() => undefined}
+      />
+    );
+
+    expect(html).toContain("Included from original message");
+    expect(html).toContain("original.pdf");
+    expect(html).not.toContain("Remove original.pdf");
+  });
 });

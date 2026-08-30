@@ -6,7 +6,7 @@ import { setConversationLabel } from "@/features/labels/api";
 import { LabelFilter } from "@/features/labels/label-filter";
 import type { MailLabel } from "@/features/labels/types";
 import type { Mailbox } from "@/features/mailboxes/types";
-import { getMessageThread, runConversationAction } from "@/features/messages/api";
+import { getMessageThread, runConversationAction, runMessageAction } from "@/features/messages/api";
 import { MailListHeader } from "@/features/messages/mail-list-layout";
 import { MessageDetail } from "@/features/messages/message-detail";
 import { MessageList } from "@/features/messages/message-list";
@@ -75,15 +75,36 @@ export function InboxPage({
   const [thread, setThread] = React.useState<MessageDetailType[]>([]);
   const [detailError, setDetailError] = React.useState<string | null>(null);
   const [detailLoading, setDetailLoading] = React.useState(false);
+  const threadLoadRequestRef = React.useRef(0);
+  const committedThreadContextRef = React.useRef({ activeFolder, selectedId });
   const onRefreshRef = React.useRef(onRefresh);
+  const onMessageRouteChangeRef = React.useRef(onMessageRouteChange);
+  React.useLayoutEffect(() => {
+    committedThreadContextRef.current = { activeFolder, selectedId };
+  }, [activeFolder, selectedId]);
   React.useEffect(() => {
     onRefreshRef.current = onRefresh;
   }, [onRefresh]);
+  React.useEffect(() => {
+    onMessageRouteChangeRef.current = onMessageRouteChange;
+  }, [onMessageRouteChange]);
 
-  const loadThread = React.useCallback(async (messageId: string) => {
-    const messages = await getMessageThread(messageId);
-    setThread(messages);
-  }, []);
+  const loadThread = React.useCallback(
+    async (messageId: string) => {
+      const requestId = ++threadLoadRequestRef.current;
+      const context = committedThreadContextRef.current;
+      const messages = visibleThreadMessages(await getMessageThread(messageId), activeFolder);
+      if (
+        requestId !== threadLoadRequestRef.current ||
+        context !== committedThreadContextRef.current
+      ) {
+        return null;
+      }
+      setThread(messages);
+      return messages;
+    },
+    [activeFolder]
+  );
 
   React.useEffect(() => {
     if (!selectedId) {
@@ -99,9 +120,16 @@ export function InboxPage({
     void getMessageThread(selectedId)
       .then((messages) => {
         if (cancelled) return;
-        setThread(messages);
+        const visibleMessages = visibleThreadMessages(messages, activeFolder);
+        setThread(visibleMessages);
+        if (visibleMessages.length === 0) {
+          onMessageRouteChangeRef.current(activeFolder, null);
+          return;
+        }
         if (
-          messages.some((message) => message.direction === "inbound" && message.readAt === null)
+          visibleMessages.some(
+            (message) => message.direction === "inbound" && message.readAt === null
+          )
         ) {
           void runConversationAction(selectedId, "read", activeFolder)
             .then((updated) => {
@@ -236,6 +264,12 @@ export function InboxPage({
             selectedId={readerSelectedId}
             showBack
             onAction={handleAction}
+            onMessageAction={async (message, action) => {
+              await runMessageAction(message.id, action);
+              await onRefresh();
+              const visibleMessages = await loadThread(selectedId);
+              if (visibleMessages?.length === 0) onMessageRouteChange(activeFolder, null);
+            }}
             onBack={() => onMessageRouteChange(activeFolder, null)}
             {...(onDraftsChange ? { onDraftsChange } : {})}
             onRefresh={async () => {
@@ -295,4 +329,12 @@ export function InboxPage({
       </div>
     </div>
   );
+}
+
+function visibleThreadMessages(
+  messages: MessageDetailType[],
+  activeFolder: MailFolderId
+): MessageDetailType[] {
+  const showsTrash = activeFolder === "trash";
+  return messages.filter((message) => (message.folder === "trash") === showsTrash);
 }

@@ -72,12 +72,7 @@ export function AccountMenu({
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-52" side="top">
-        <DropdownMenuLabel>
-          <div className="flex flex-col gap-1">
-            <span>{user.name}</span>
-            <span className="text-xs font-normal text-muted-foreground">{user.role}</span>
-          </div>
-        </DropdownMenuLabel>
+        <DropdownMenuLabel>{user.name}</DropdownMenuLabel>
         <DropdownMenuItem className="gap-2" onSelect={() => void handleSignOut()}>
           <PiSignOut aria-hidden="true" className="pointer-events-none size-4" />
           Sign out

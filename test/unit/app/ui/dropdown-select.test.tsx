@@ -28,6 +28,7 @@ describe("dropdown select", () => {
     expect(trigger?.className).toContain("h-[34px]");
     expect(trigger?.className).toContain("min-h-[34px]");
     expect(trigger?.className).toContain("rounded-[calc(var(--radius)+2px)]");
+    expect(trigger?.dataset.slot).toBe("dropdown-select");
 
     await flushHookEffects(() => {
       trigger?.dispatchEvent(

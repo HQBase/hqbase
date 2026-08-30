@@ -47,7 +47,8 @@ export async function sendNewMessage(
   input: SendMessageInput,
   principalId?: string,
   signature?: SignatureSnapshot,
-  context?: MessageBodyPart
+  context?: MessageBodyPart,
+  contextAttachments: StoredOutgoingAttachment[] = []
 ): Promise<MessageSummary> {
   const mailbox = await ensureActiveMailbox(env.DB, input.from);
 
@@ -62,12 +63,17 @@ export async function sendNewMessage(
   });
   const preparedDraftAttachments = prepareStoredAttachments(authored.attachments, timestamp);
   const preparedSignature = prepareSignature(signature, timestamp);
+  const preparedContextAttachments = prepareStoredAttachments(contextAttachments, timestamp);
   const body = assembleMessageBody({
     authored: authored.body,
     signature: preparedSignature.snapshot,
     context
   });
-  const attachments = [...preparedDraftAttachments, ...preparedSignature.attachments];
+  const attachments = [
+    ...preparedDraftAttachments,
+    ...preparedSignature.attachments,
+    ...preparedContextAttachments
+  ];
   requireAttachmentLimits(attachments);
   const email = {
     from: { name: mailbox.displayName, email: mailbox.address },
@@ -75,7 +81,11 @@ export async function sendNewMessage(
     subject: input.subject,
     text: body.text
   };
-  const stagedAttachments = [...preparedDraftAttachments, ...preparedSignature.attachments];
+  const stagedAttachments = [
+    ...preparedDraftAttachments,
+    ...preparedSignature.attachments,
+    ...preparedContextAttachments
+  ];
   await stageOutgoingAttachments(env.MAIL_OBJECTS, stagedAttachments);
   const sendResult = await sendWithStagedCleanup(
     env,
@@ -126,7 +136,9 @@ export async function replyToMessage(
     throw new AppError("MESSAGE_NOT_FOUND", "Message not found.", 404);
   }
   const threadMessages = messageScope
-    ? await listThreadMessages(env.DB, original.threadId, messageScope)
+    ? (await listThreadMessages(env.DB, original.threadId, messageScope)).filter(
+        (message) => (message.folder === "trash") === (original.folder === "trash")
+      )
     : [original];
   const targetIndex = threadMessages.findIndex((message) => message.id === original.id);
   const replyChain = targetIndex < 0 ? [original] : threadMessages.slice(0, targetIndex + 1);

@@ -32,6 +32,7 @@ describe("compose form", () => {
         identities={[
           { address: "support@example.com", displayName: "Support", mailboxId: "mailbox-1" }
         ]}
+        includedAttachments={[]}
         isPending={false}
         mode="new"
         presentation="window"

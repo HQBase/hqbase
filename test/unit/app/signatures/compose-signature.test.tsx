@@ -56,6 +56,7 @@ describe("compose signature", () => {
     const preview = view.container.querySelector<HTMLIFrameElement>(
       'iframe[title="Signature preview"]'
     );
+    expect(view.container.firstElementChild?.className).toContain("shrink-0");
     expect(preview?.srcdoc).toContain("HQBase Support");
     const trigger = view.container.querySelector<HTMLButtonElement>('[aria-label="Signature"]');
     expect(trigger?.textContent).toContain("Support · Support");

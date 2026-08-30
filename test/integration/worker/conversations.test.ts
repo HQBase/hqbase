@@ -173,6 +173,22 @@ describe("conversation persistence", () => {
       })
     ).resolves.toMatchObject({ affected: 1 });
 
+    const inboxAfterTrash = await listConversations(env.DB, filters);
+    const trashAfterTrash = await listConversations(env.DB, {
+      folder: "trash",
+      scope: { includeUnassigned: false, mailboxIds: ["mbx_conversations"] }
+    });
+    expect(
+      inboxAfterTrash.find((conversation) => conversation.threadId === alice?.threadId)
+    ).toMatchObject({
+      id: "msg_root_a",
+      messageCount: 1,
+      unreadCount: 0
+    });
+    expect(trashAfterTrash).toEqual([
+      expect.objectContaining({ id: "msg_reply_a", messageCount: 1, unreadCount: 0 })
+    ]);
+
     await expect(
       updateConversationAction(env.DB, {
         action: "restore",

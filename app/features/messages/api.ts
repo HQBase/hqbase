@@ -1,6 +1,13 @@
 import { apiGet, apiPost } from "@/lib/api-client";
 import type { MailFolderId } from "@/lib/routes";
-import type { ConversationAction, ConversationPage, MessageDetail, MessageHtml } from "./types";
+import type {
+  ConversationAction,
+  ConversationPage,
+  MessageDetail,
+  MessageFolderAction,
+  MessageHtml,
+  MessageSummary
+} from "./types";
 
 export type MessageListParams = {
   cursor?: string | undefined;
@@ -42,4 +49,11 @@ export async function runConversationAction(
   folder: MailFolderId
 ): Promise<{ affected: number; threadId: string }> {
   return apiPost(`/api/v2/conversations/${id}/${action}`, { folder });
+}
+
+export async function runMessageAction(
+  id: string,
+  action: MessageFolderAction
+): Promise<MessageSummary> {
+  return apiPost(`/api/v2/messages/${id}/${action}`);
 }

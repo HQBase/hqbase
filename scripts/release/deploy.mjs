@@ -64,7 +64,8 @@ export async function deploy(options = {}) {
     const config = normalizeConfig(
       JSON.parse(readFileSync(configFile, "utf8")),
       manifest.version,
-      manifest.artifact.sha256
+      manifest.artifact.sha256,
+      JSON.parse(readFileSync(resolve(source, "wrangler.jsonc"), "utf8"))
     );
     const recordWorkerDeployed = () => recordWorkerDeployedForConfig(configFile, config.name);
     writeFileSync(resolve(source, "wrangler.jsonc"), `${JSON.stringify(config, null, 2)}\n`);

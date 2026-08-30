@@ -226,6 +226,61 @@ describe("send service", () => {
     );
   });
 
+  it("sends and stores inline images from forwarded HTML context", async () => {
+    send.mockResolvedValue({ messageId: "<cloudflare-forward-image@example.com>" });
+
+    await sendNewMessage(
+      env,
+      {
+        attachmentIds: [],
+        bcc: [],
+        cc: [],
+        from: mailbox.address,
+        subject: "Forwarded image",
+        text: "Please review",
+        to: ["owner@example.com"]
+      },
+      undefined,
+      undefined,
+      {
+        text: "Forwarded content",
+        html: '<blockquote><img src="cid:forwarded-logo@example.com"></blockquote>'
+      },
+      [
+        {
+          id: "forwarded-logo",
+          filename: "logo.png",
+          contentType: "image/png",
+          sizeBytes: 3,
+          contentId: "forwarded-logo@example.com",
+          disposition: "inline",
+          r2Key: "mail/original-logo.png",
+          content: new Uint8Array([1, 2, 3]).buffer
+        }
+      ]
+    );
+
+    const payload = send.mock.calls[0]?.[0] as Parameters<SendEmail["send"]>[0];
+    expect(payload.html).toContain('src="cid:forwarded-logo@example.com"');
+    expect(payload.attachments).toEqual([
+      expect.objectContaining({
+        contentId: "forwarded-logo@example.com",
+        disposition: "inline",
+        filename: "logo.png"
+      })
+    ]);
+    expect(put).toHaveBeenCalledWith("sent/2026-07-10/html-1-1", expect.any(ArrayBuffer), {
+      httpMetadata: { contentType: "image/png" }
+    });
+    expect(insertAttachment).toHaveBeenCalledWith(
+      env.DB,
+      expect.objectContaining({
+        contentId: "forwarded-logo@example.com",
+        r2Key: "sent/2026-07-10/html-1-1"
+      })
+    );
+  });
+
   it("uses only referenced private draft images and removes unused draft objects", async () => {
     send.mockResolvedValue({ messageId: "<cloudflare-inline@example.com>" });
     vi.mocked(draftAttachmentObjects).mockResolvedValue([
@@ -620,6 +675,16 @@ describe("send service", () => {
       sentAt: "2026-07-10T00:05:00.000Z",
       createdAt: "2026-07-10T00:05:00.000Z"
     };
+    const trashedMessage = {
+      ...firstMessage,
+      id: "message-trashed",
+      folder: "trash" as const,
+      messageId: "<trashed@example.com>",
+      snippet: "Deleted message",
+      textBody: "Deleted message",
+      receivedAt: "2026-07-10T00:03:00.000Z",
+      createdAt: "2026-07-10T00:03:00.000Z"
+    };
     const laterMessage = {
       ...targetMessage,
       id: "message-3",
@@ -635,7 +700,12 @@ describe("send service", () => {
       createdAt: "2026-07-10T00:10:00.000Z"
     };
     vi.mocked(getMessageDetail).mockResolvedValue(targetMessage);
-    vi.mocked(listThreadMessages).mockResolvedValue([firstMessage, targetMessage, laterMessage]);
+    vi.mocked(listThreadMessages).mockResolvedValue([
+      firstMessage,
+      trashedMessage,
+      targetMessage,
+      laterMessage
+    ]);
     send.mockResolvedValue({ messageId: "<cloudflare-reply@example.com>" });
 
     await replyToMessage(
@@ -666,6 +736,7 @@ describe("send service", () => {
     const payloadText = payload.text ?? "";
     expect(payloadText).toContain("Second message");
     expect(payloadText).toContain("First message");
+    expect(payloadText).not.toContain("Deleted message");
     expect(payloadText).not.toContain("Later message");
     expect(payloadText.indexOf("Second message")).toBeLessThan(
       payloadText.indexOf("First message")

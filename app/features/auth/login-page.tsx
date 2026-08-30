@@ -64,7 +64,7 @@ export function LoginPage({ onLogin }: LoginPageProps): React.ReactElement {
               Login email
               <Input
                 autoComplete="email"
-                className="bg-background shadow-none focus-visible:ring-1"
+                className="bg-background shadow-none"
                 id="login-email"
                 onChange={(event) => setEmail(event.target.value)}
                 required
@@ -84,7 +84,7 @@ export function LoginPage({ onLogin }: LoginPageProps): React.ReactElement {
               </div>
               <Input
                 autoComplete="current-password"
-                className="bg-background shadow-none focus-visible:ring-1"
+                className="bg-background shadow-none"
                 id="login-password"
                 onChange={(event) => setPassword(event.target.value)}
                 required

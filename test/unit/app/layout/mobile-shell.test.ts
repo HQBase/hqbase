@@ -177,8 +177,13 @@ describe("mobile application shell", () => {
 
   it("uses quiet focus treatments and compact trackless scrollbars", () => {
     expect(styles).toContain('input:not([type="checkbox"]):not([type="radio"])');
-    expect(styles).toContain("border-color: hsl(var(--ring))");
-    expect(styles).toContain("box-shadow: none");
+    expect(styles).toContain("--focus-border: 0 0% 48%");
+    expect(styles).toContain("--focus-border: 0 0% 38%");
+    expect(styles).toContain("border-color: hsl(var(--focus-border)) !important");
+    expect(styles).toContain("--tw-ring-shadow: 0 0 #0000 !important");
+    expect(styles).toContain("box-shadow: none !important");
+    expect(styles).toContain('[data-slot="dropdown-select"]:focus-visible');
+    expect(styles).toContain('[contenteditable="true"][data-compose-autofocus]');
     expect(styles).toContain("*::-webkit-scrollbar");
     expect(styles).toContain("width: 6px");
     expect(styles).toContain("scrollbar-width: thin");

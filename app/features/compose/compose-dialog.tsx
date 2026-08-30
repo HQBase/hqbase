@@ -326,6 +326,7 @@ export function ComposeDialog({
       fromDisabled={isSignaturePending}
       html={html}
       identities={identities}
+      includedAttachments={mode === "forward" ? (message?.attachments ?? []) : []}
       isPending={isPending}
       mode={mode}
       presentation={presentation}

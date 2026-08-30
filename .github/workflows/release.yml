@@ -45,11 +45,11 @@ jobs:
           }
           release_version="$(node --input-type=module -e '
             import { readFileSync } from "node:fs";
+            import { assertStableReleaseVersion } from "./scripts/release/version.mjs";
             const packageJson = JSON.parse(readFileSync("package.json", "utf8"));
-            if (!/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(packageJson.version)) {
-              throw new Error("package.json version must be semantic.");
-            }
-            process.stdout.write(packageJson.version);
+            process.stdout.write(
+              assertStableReleaseVersion(packageJson.version, "package.json version")
+            );
           ')"
           previous_tag="$(gh release list --exclude-drafts --exclude-pre-releases --limit 1 --json tagName --jq '.[0].tagName // ""')"
           if gh release view "v${release_version}" >/dev/null 2>&1; then

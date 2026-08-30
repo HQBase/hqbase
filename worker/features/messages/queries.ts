@@ -231,8 +231,7 @@ export async function listThreadMessages(
     db,
     sql`${messageSelect}
        WHERE thread_id = ${threadId} AND ${scopeCondition}
-       ORDER BY COALESCE(received_at, sent_at, created_at) ASC
-       LIMIT 100`
+       ORDER BY COALESCE(received_at, sent_at, created_at) ASC`
   );
   return Promise.all(rows.map((row) => mapMessageDetail(db, row)));
 }

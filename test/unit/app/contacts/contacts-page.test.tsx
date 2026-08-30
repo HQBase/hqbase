@@ -110,8 +110,12 @@ describe("contacts page", () => {
     const privateHeading = [...view.container.querySelectorAll("h2")].find(
       (heading) => heading.textContent === "Private contact details"
     );
-    expect(privateHeading?.closest("section")?.className).not.toContain("rounded-xl");
-    expect(privateHeading?.closest("section")?.className).not.toContain("bg-background");
+    const privateDetails = privateHeading?.closest("details");
+    expect(privateDetails).toBeDefined();
+    expect(privateDetails?.open).toBe(false);
+    expect(privateHeading?.closest("summary")).toBeTruthy();
+    expect(privateDetails?.className).not.toContain("rounded-xl");
+    expect(privateDetails?.className).not.toContain("bg-background");
 
     const newEmail = Array.from(view.container.querySelectorAll("button")).find((button) =>
       button.textContent?.includes("New email")

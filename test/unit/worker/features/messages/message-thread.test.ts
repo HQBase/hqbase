@@ -36,7 +36,7 @@ const row: MessageRow = {
 };
 
 describe("message threads", () => {
-  it("loads messages chronologically from only accessible mailboxes", async () => {
+  it("loads the complete thread chronologically from only accessible mailboxes", async () => {
     const threadBind = vi.fn(() => ({ all: vi.fn(async () => ({ results: [row] })) }));
     const attachmentBind = vi.fn(() => ({ all: vi.fn(async () => ({ results: [] })) }));
     const prepare = vi.fn((sql: string) =>
@@ -56,6 +56,7 @@ describe("message threads", () => {
     });
     expect(prepare.mock.calls[0]?.[0]).toContain("ORDER BY COALESCE");
     expect(prepare.mock.calls[0]?.[0]).toContain("SELECT messages.* FROM messages");
+    expect(prepare.mock.calls[0]?.[0]).not.toMatch(/\bLIMIT\b/u);
     expect(threadBind).toHaveBeenCalledWith("thr_1", "mbx_allowed", "mbx_second");
     expect(prepare.mock.calls[0]?.[0]).not.toContain("IS NULL");
   });

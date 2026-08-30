@@ -10,7 +10,8 @@ vi.mock("@worker/features/mailboxes/queries", () => ({
   findMailboxForSending: vi.fn()
 }));
 vi.mock("@worker/features/messages/queries", () => ({
-  getMessageDetail: vi.fn()
+  getMessageDetail: vi.fn(),
+  getMessageHtmlKey: vi.fn()
 }));
 vi.mock("@worker/features/send/service", () => ({
   sendNewMessage: vi.fn()
@@ -23,7 +24,7 @@ import {
   saveDraft
 } from "@worker/features/drafts/queries";
 import { findMailboxForSending } from "@worker/features/mailboxes/queries";
-import { getMessageDetail } from "@worker/features/messages/queries";
+import { getMessageDetail, getMessageHtmlKey } from "@worker/features/messages/queries";
 import { forwardMessage, sendForwardDraft } from "@worker/features/send/forward";
 import { sendNewMessage } from "@worker/features/send/service";
 import type { WorkerEnv } from "@worker/lib/env";
@@ -96,6 +97,7 @@ describe("forward service", () => {
   beforeEach(() => {
     vi.resetAllMocks();
     vi.mocked(getMessageDetail).mockResolvedValue(original);
+    vi.mocked(getMessageHtmlKey).mockResolvedValue(null);
     vi.mocked(findMailboxForSending).mockResolvedValue(mailbox);
     vi.mocked(sendNewMessage).mockResolvedValue(sent);
   });
@@ -131,7 +133,8 @@ describe("forward service", () => {
       undefined,
       expect.objectContaining({
         text: expect.stringContaining("---------- Forwarded message ---------")
-      })
+      }),
+      []
     );
     expect(saveDraft).not.toHaveBeenCalled();
   });
@@ -176,7 +179,8 @@ describe("forward service", () => {
       expect.objectContaining({ attachmentIds: [] }),
       "user-1",
       undefined,
-      expect.any(Object)
+      expect.any(Object),
+      []
     );
   });
 
@@ -300,7 +304,8 @@ describe("forward service", () => {
       undefined,
       expect.objectContaining({
         text: expect.stringContaining("---------- Forwarded message ---------")
-      })
+      }),
+      []
     );
     expect(vi.mocked(sendNewMessage).mock.calls[0]?.[1]).not.toHaveProperty("draftId");
     expect(deleteDraft).toHaveBeenCalledWith(env.DB, env.MAIL_OBJECTS, "user-1", "draft-forward");
@@ -368,10 +373,73 @@ describe("forward service", () => {
       undefined,
       expect.objectContaining({
         text: expect.stringContaining("---------- Forwarded message ---------")
-      })
+      }),
+      []
     );
     expect(saveDraft).not.toHaveBeenCalled();
     expect(removeDraftAttachment).not.toHaveBeenCalled();
+  });
+
+  it("keeps sanitized HTML images and referenced inline files in a forward", async () => {
+    const inlineAttachment = {
+      id: "inline-logo",
+      messageId: original.id,
+      filename: "logo.png",
+      contentType: "image/png",
+      sizeBytes: 4,
+      contentId: "logo@example.com",
+      disposition: "inline" as const,
+      r2Key: "mail/logo.png",
+      createdAt: original.createdAt
+    };
+    vi.mocked(getMessageDetail).mockResolvedValue({
+      ...original,
+      htmlAvailable: true,
+      attachments: [inlineAttachment]
+    });
+    vi.mocked(getMessageHtmlKey).mockResolvedValue("mail/message.html");
+    get.mockImplementation(async (key: string) =>
+      key === "mail/message.html"
+        ? {
+            text: async () =>
+              '<p>Original <img src="cid:logo@example.com"><img src="https://images.example.com/remote.png"></p>'
+          }
+        : {
+            arrayBuffer: async () => new Uint8Array([1, 2, 3, 4]).buffer
+          }
+    );
+
+    await forwardMessage(
+      env,
+      {
+        messageId: original.id,
+        from: mailbox.address,
+        to: ["recipient@example.com"],
+        cc: [],
+        bcc: [],
+        text: "Please review",
+        attachmentIds: [],
+        includeOriginalAttachments: true
+      },
+      "user-1"
+    );
+
+    expect(sendNewMessage).toHaveBeenCalledWith(
+      env,
+      expect.any(Object),
+      "user-1",
+      undefined,
+      expect.objectContaining({
+        html: expect.stringContaining('src="https://images.example.com/remote.png"')
+      }),
+      [
+        expect.objectContaining({
+          contentId: "logo@example.com",
+          disposition: "inline",
+          filename: "logo.png"
+        })
+      ]
+    );
   });
 
   it("removes copied attachments when a web forward draft is not sent", async () => {

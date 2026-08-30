@@ -98,8 +98,8 @@ export function compareVersions(left, right) {
   return 0;
 }
 
-export function normalizeConfig(config, version, artifactSha256) {
-  return {
+export function normalizeConfig(config, version, artifactSha256, releaseConfig = config) {
+  const normalized = {
     ...config,
     $schema: "./node_modules/wrangler/config-schema.json",
     main: "worker/index.ts",
@@ -131,6 +131,18 @@ export function normalizeConfig(config, version, artifactSha256) {
       return normalized;
     })
   };
+
+  if (releaseConfig.durable_objects) {
+    normalized.durable_objects = releaseConfig.durable_objects;
+  } else {
+    delete normalized.durable_objects;
+  }
+  if (releaseConfig.migrations) {
+    normalized.migrations = releaseConfig.migrations;
+  } else {
+    delete normalized.migrations;
+  }
+  return normalized;
 }
 
 export function hqbaseReleaseTag(version, artifactSha256) {
