@@ -1,5 +1,5 @@
 import * as React from "react";
-import { PiArrowLeft, PiEnvelopeSimple, PiNotePencil, PiTrash } from "react-icons/pi";
+import { PiArrowLeft, PiCaretDown, PiEnvelopeSimple, PiNotePencil, PiTrash } from "react-icons/pi";
 import { toast } from "sonner";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -247,11 +247,17 @@ export function ContactDetailView({
                 New email
               </Button>
             </div>
-            <section>
-              <div className="flex items-center gap-2">
-                <PiNotePencil aria-hidden="true" className="text-muted-foreground" />
-                <h2 className="text-sm font-medium">Private contact details</h2>
-              </div>
+            <details className="group">
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-md py-1 text-left [&::-webkit-details-marker]:hidden">
+                <span className="flex items-center gap-2">
+                  <PiNotePencil aria-hidden="true" className="text-muted-foreground" />
+                  <h2 className="text-sm font-medium">Private contact details</h2>
+                </span>
+                <PiCaretDown
+                  aria-hidden="true"
+                  className="size-4 text-muted-foreground transition-transform duration-200 group-open:rotate-180 motion-reduce:transition-none"
+                />
+              </summary>
               <FieldGroup className="mt-4 gap-4">
                 <Field>
                   <FieldLabel htmlFor="contact-name">Name</FieldLabel>
@@ -296,7 +302,7 @@ export function ContactDetailView({
                   ) : null}
                 </div>
               </FieldGroup>
-            </section>
+            </details>
             <section>
               <h2 className="text-sm font-medium">Email exchanges</h2>
               {detail.conversations.length === 0 ? (

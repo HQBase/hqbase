@@ -17,7 +17,7 @@ export function RoleSelect({
   return (
     <DropdownSelect
       ariaLabel={ariaLabel}
-      className="w-32 px-2.5 text-[13px] shadow-none focus-visible:ring-1"
+      className="w-32 px-2.5 text-[13px] shadow-none"
       disabled={disabled}
       options={roles.map((role) => ({ label: role, value: role }))}
       size="sm"

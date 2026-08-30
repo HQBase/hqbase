@@ -119,7 +119,7 @@ export function DeviceCodeEntry({
               <Input
                 autoCapitalize="characters"
                 autoComplete="one-time-code"
-                className="bg-background font-mono uppercase tracking-widest shadow-none focus-visible:ring-1"
+                className="bg-background font-mono uppercase tracking-widest shadow-none"
                 id="device-code"
                 maxLength={12}
                 onChange={(event) => onInputCodeChange(event.target.value)}

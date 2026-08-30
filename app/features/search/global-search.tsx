@@ -143,7 +143,7 @@ export function GlobalSearch({
         aria-expanded={listOpen}
         aria-label="Search HQBase"
         autoComplete="off"
-        className="border-transparent bg-muted/70 pl-8 pr-9 text-xs shadow-none focus-visible:border-input focus-visible:ring-1"
+        className="border-transparent bg-muted/70 pl-8 pr-9 text-xs shadow-none"
         maxLength={200}
         placeholder="Search HQBase"
         role="combobox"
@@ -166,7 +166,7 @@ export function GlobalSearch({
       {query.length > 0 ? (
         <button
           aria-label="Clear search"
-          className="absolute right-0.5 top-px z-10 grid size-7 place-items-center rounded-md text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+          className="absolute right-0.5 top-px z-10 grid size-7 place-items-center rounded-md text-muted-foreground transition-colors hover:text-foreground"
           title="Clear search"
           type="button"
           onClick={() => {

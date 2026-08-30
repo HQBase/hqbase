@@ -164,7 +164,7 @@ export function RichEmailEditor({
       editorProps: {
         attributes: {
           class: cn(
-            "prose prose-sm min-h-60 max-w-none px-5 py-4 text-sm outline-none",
+            "prose prose-sm min-h-48 max-w-none px-5 py-4 text-sm outline-none",
             "[&_a]:text-primary [&_a]:underline [&_blockquote]:border-l-2 [&_blockquote]:pl-3 [&_p]:my-2",
             "[&_img]:h-auto [&_img]:max-w-full [&_[data-resize-container]]:max-w-full",
             "[&_[data-resize-handle]]:hidden [&_[data-resize-handle]]:touch-none",
@@ -265,18 +265,15 @@ export function RichEmailEditor({
     if (editor && editor.getHTML() !== html)
       editor.commands.setContent(html || "<p></p>", { emitUpdate: false });
   }, [editor, html]);
-  if (!editor) return <div className="min-h-60" />;
+  if (!editor) return <div className="min-h-48" />;
   const link = () => {
     const href = window.prompt("Link URL", editor.getAttributes("link").href ?? "https://");
     if (href === null) return;
     if (!href) editor.chain().focus().unsetLink().run();
     else editor.chain().focus().extendMarkRange("link").setLink({ href }).run();
   };
-  const rootClass = cn(
-    contained && "min-h-0 flex-1 overflow-auto",
-    fill && "flex min-h-0 flex-1 flex-col"
-  );
-  const editorClass = cn(fill && "min-h-60 flex-1 [&_.ProseMirror]:!min-h-full");
+  const rootClass = cn(contained && "min-h-0 flex-1 overflow-auto", fill && "flex flex-1 flex-col");
+  const editorClass = cn(fill && "min-h-48 flex-1 [&_.ProseMirror]:!min-h-full");
   return (
     <div className={rootClass}>
       <div

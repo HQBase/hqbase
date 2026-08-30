@@ -58,6 +58,8 @@ describe("compose window", () => {
     expect(dialog?.style.bottom).toBe("0px");
     expect(dialog?.style.right).toBe("16px");
     expect(dialog?.className).toContain("lg:resize");
+    expect(dialog?.className).toContain("lg:h-[min(34rem,calc(100vh-5rem))]");
+    expect(dialog?.className).not.toContain("lg:h-[min(42rem,calc(100vh-5rem))]");
     expect(document.body.textContent).not.toContain("Expand compose");
 
     Object.assign(header ?? {}, {

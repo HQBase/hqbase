@@ -64,7 +64,7 @@
     --destructive-foreground: 0 0% 98%;
     --border: 0 0% 88%;
     --input: 0 0% 82%;
-    --ring: 0 0% 35%;
+    --focus-border: 0 0% 48%;
     --surface-rail: 240 4% 96%;
     --surface-sidebar: 240 5% 99%;
     --surface-toolbar: 240 5% 100%;
@@ -98,7 +98,7 @@
     --destructive-foreground: 0 0% 98%;
     --border: 0 0% 15%;
     --input: 0 0% 18%;
-    --ring: 0 0% 55%;
+    --focus-border: 0 0% 38%;
     --surface-rail: 240 5% 4%;
     --surface-sidebar: 240 5% 7%;
     --surface-toolbar: 240 5% 8%;
@@ -272,25 +272,32 @@
   [role="option"],
   [tabindex]:not([tabindex="-1"])
 ):focus-visible {
-  --tw-ring-offset-shadow: 0 0 #0000;
-  --tw-ring-shadow: 0 0 #0000;
-  outline: 1px solid hsl(var(--ring));
-  outline-offset: 1px;
+  --tw-ring-offset-shadow: 0 0 #0000 !important;
+  --tw-ring-shadow: 0 0 #0000 !important;
+  outline: 1px solid hsl(var(--focus-border)) !important;
+  outline-offset: 1px !important;
 }
 
 :where(input:not([type="checkbox"]):not([type="radio"]), textarea, select):focus-visible {
-  --tw-ring-offset-shadow: 0 0 #0000;
-  --tw-ring-shadow: 0 0 #0000;
-  border-color: hsl(var(--ring));
-  box-shadow: none;
-  outline: none;
+  border-color: hsl(var(--focus-border)) !important;
+  box-shadow: none !important;
+  outline: none !important;
 }
 
-[data-slot="input-group"]:focus-within {
-  --tw-ring-offset-shadow: 0 0 #0000;
-  --tw-ring-shadow: 0 0 #0000;
-  border-color: hsl(var(--ring));
-  box-shadow: none;
+:where([contenteditable="true"][data-compose-autofocus]):focus-visible {
+  outline: none !important;
+}
+
+[data-slot="input-group"]:focus-within,
+[data-slot="dropdown-select"]:focus-visible {
+  border-color: hsl(var(--focus-border)) !important;
+  box-shadow: none !important;
+  outline: none !important;
+}
+
+:where(input, textarea, select)[aria-invalid="true"]:focus-visible,
+[data-slot="input-group"][data-invalid="true"]:focus-within {
+  border-color: hsl(var(--destructive)) !important;
 }
 
 * {

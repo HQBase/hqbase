@@ -133,7 +133,7 @@ export function ComposeWindow({
       aria-labelledby={titleId}
       aria-modal="false"
       className={cn(
-        "fixed inset-0 z-[60] flex h-[100dvh] w-full flex-col overflow-hidden bg-card pt-[env(safe-area-inset-top)] shadow-2xl outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring lg:inset-auto lg:bottom-0 lg:right-4 lg:z-[60] lg:h-[min(42rem,calc(100vh-5rem))] lg:max-h-[calc(100vh-1rem)] lg:min-h-96 lg:w-[min(42rem,calc(100vw-2rem))] lg:max-w-[calc(100vw-2rem)] lg:min-w-96 lg:rounded-t-lg lg:border lg:pt-0",
+        "fixed inset-0 z-[60] flex h-[100dvh] w-full flex-col overflow-hidden bg-card pt-[env(safe-area-inset-top)] shadow-2xl outline-none lg:inset-auto lg:bottom-0 lg:right-4 lg:z-[60] lg:h-[min(34rem,calc(100vh-5rem))] lg:max-h-[calc(100vh-1rem)] lg:min-h-96 lg:w-[min(42rem,calc(100vw-2rem))] lg:max-w-[calc(100vw-2rem)] lg:min-w-96 lg:rounded-t-lg lg:border lg:pt-0",
         !minimized && "lg:resize",
         minimized &&
           "lg:h-auto lg:min-h-0 lg:w-80 lg:min-w-0 lg:shrink-0 lg:resize-none lg:translate-x-0 lg:rounded-b-none lg:rounded-t-lg",

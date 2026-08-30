@@ -111,7 +111,7 @@ export function ComposeSignature({
   }
 
   return (
-    <div className="px-5 pb-3">
+    <div className="shrink-0 px-5 pb-3">
       <SignaturePreview signature={signature} />
       <div className="mt-1.5 flex max-w-full items-center gap-2">
         <span className="text-xs text-muted-foreground">Signature</span>

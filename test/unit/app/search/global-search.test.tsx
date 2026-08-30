@@ -48,6 +48,8 @@ describe("global search", () => {
     );
     const input = requiredInput(view.container);
     expect(input.className).toContain("h-[30px]");
+    expect(input.className).not.toContain("focus-visible:ring");
+    expect(input.className).not.toContain("focus-visible:border-input");
 
     await setInput(input, "old");
     await flushHookEffects(() => vi.advanceTimersByTime(200));
@@ -113,6 +115,7 @@ describe("global search", () => {
     const clear = view.container.querySelector<HTMLButtonElement>('[aria-label="Clear search"]');
     const focus = vi.spyOn(input, "focus");
     expect(clear).not.toBeNull();
+    expect(clear?.className).not.toContain("focus-visible:ring");
 
     await flushHookEffects(() => clear?.click());
 

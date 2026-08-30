@@ -11,6 +11,31 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
+describe("rich email editor layout", () => {
+  it("uses a compact height and keeps filled content from shrinking through the signature", async () => {
+    const view = await renderComponent(
+      <RichEmailEditor
+        contained={false}
+        fill
+        html="<p>Hello</p>"
+        onChange={() => undefined}
+        onImages={async () => []}
+      />
+    );
+    document.body.appendChild(view.container);
+
+    const editor = view.container.querySelector<HTMLElement>(".ProseMirror");
+    const editorContent = editor?.parentElement;
+    const editorRoot = editorContent?.parentElement;
+    expect(editor?.className).toContain("min-h-48");
+    expect(editor?.className).not.toContain("min-h-60");
+    expect(editorContent?.className).toContain("min-h-48");
+    expect(editorRoot?.className).toContain("flex-1");
+    expect(editorRoot?.className).not.toContain("min-h-0");
+    await view.unmount();
+  });
+});
+
 describe("rich email editor images", () => {
   it("uploads an image and shows one resize control only after selection", async () => {
     const onChange = vi.fn();

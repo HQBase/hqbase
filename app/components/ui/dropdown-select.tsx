@@ -63,6 +63,7 @@ export function DropdownSelect({
             className
           )}
           data-size={size}
+          data-slot="dropdown-select"
           disabled={disabled}
           id={id}
           type="button"
