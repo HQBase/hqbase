@@ -37,6 +37,10 @@ const sheet = readFileSync(
   new URL("../../../../app/components/ui/sheet.tsx", import.meta.url),
   "utf8"
 );
+const dialog = readFileSync(
+  new URL("../../../../app/components/ui/dialog.tsx", import.meta.url),
+  "utf8"
+);
 const composeWindow = readFileSync(
   new URL("../../../../app/features/compose/compose-window.tsx", import.meta.url),
   "utf8"
@@ -103,6 +107,24 @@ describe("mobile application shell", () => {
     expect(composeWindow).toContain("pt-[env(safe-area-inset-top)]");
     expect(threadComposeSurface).toContain("pt-[env(safe-area-inset-top)]");
     expect(composeForm).toContain("pb-[max(1rem,env(safe-area-inset-bottom))]");
+  });
+
+  it("keeps compact dialogs and their close controls below device cutouts", () => {
+    expect(dialog).toContain('data-slot="dialog-content"');
+    expect(dialog).toContain("max-md:size-10");
+    expect(styles).toContain(
+      "--dialog-safe-top: max(1rem, calc(env(safe-area-inset-top) + 0.75rem))"
+    );
+    expect(styles).toContain("top: var(--dialog-safe-top)");
+    expect(styles).toContain(
+      "max-height: calc(100dvh - var(--dialog-safe-top) - var(--dialog-safe-bottom))"
+    );
+    expect(styles).toContain("transform: translateX(-50%)");
+  });
+
+  it("uses the theme rail surface in the compact navigation drawer", () => {
+    expect(sidebar).toContain('? "bg-rail px-1');
+    expect(sidebar).not.toContain("bg-black");
   });
 
   it("uses one responsive Agents list with contextual setup", () => {

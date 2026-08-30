@@ -194,6 +194,8 @@ describe("mail shell", () => {
     expect(desktopHtml).toContain("size-10 min-h-10 min-w-10");
     expect(drawerHtml).toContain("h-11 min-h-11 rounded-[16px]");
     expect(drawerHtml).toContain("size-10 min-h-10 min-w-10");
+    expect(drawerHtml).toContain("bg-rail");
+    expect(drawerHtml).not.toContain("bg-black");
   });
 
   it("keeps connection transport status out of the sidebar", () => {
@@ -319,7 +321,8 @@ describe("mail shell", () => {
     expect(html).toContain('aria-label="Settings"');
     expect(html).not.toContain(">Contacts</span>");
     expect(html).not.toContain(">Settings</span>");
-    expect(html).toContain("bg-black");
+    expect(html).toContain("bg-rail");
+    expect(html).not.toContain("bg-black");
     expect(html).toContain("bg-transparent");
     expect(html).not.toContain("border-l border-divider");
     expect(html).toContain("w-full items-center");

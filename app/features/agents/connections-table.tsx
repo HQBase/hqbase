@@ -1,6 +1,7 @@
 import type * as React from "react";
 import {
   PiArrowClockwise,
+  PiArrowCounterClockwise,
   PiDotsThree,
   PiFileText,
   PiKey,
@@ -44,6 +45,7 @@ export function ConnectionsTable({
   onDisable,
   onEnable,
   onRevoke,
+  onRestore,
   onRotate,
   onSetup
 }: {
@@ -54,6 +56,7 @@ export function ConnectionsTable({
   onDisable: (agent: ManagedAgent) => void;
   onEnable: (agent: ManagedAgent) => void;
   onRevoke: (connection: OAuthConnection) => void;
+  onRestore: (agent: ManagedAgent) => void;
   onRotate: (agent: ManagedAgent) => void;
   onSetup: (agent: ManagedAgent) => void;
 }): React.ReactElement {
@@ -96,6 +99,7 @@ export function ConnectionsTable({
                   pending={pendingId === row.id}
                   onDisable={onDisable}
                   onEnable={onEnable}
+                  onRestore={onRestore}
                   onRotate={onRotate}
                   onSetup={onSetup}
                 />
@@ -179,6 +183,7 @@ function MachineRow({
   pending,
   onDisable,
   onEnable,
+  onRestore,
   onRotate,
   onSetup
 }: {
@@ -186,6 +191,7 @@ function MachineRow({
   pending: boolean;
   onDisable: (agent: ManagedAgent) => void;
   onEnable: (agent: ManagedAgent) => void;
+  onRestore: (agent: ManagedAgent) => void;
   onRotate: (agent: ManagedAgent) => void;
   onSetup: (agent: ManagedAgent) => void;
 }): React.ReactElement {
@@ -223,37 +229,53 @@ function MachineRow({
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuGroup>
-              <DropdownMenuItem className="gap-2" onSelect={() => onSetup(agent)}>
-                <PiFileText />
-                Setup instructions
-              </DropdownMenuItem>
-            </DropdownMenuGroup>
-            {!mailboxDeleted ? <DropdownMenuSeparator /> : null}
-            {!mailboxDeleted ? (
+            {mailboxDeleted ? (
               <DropdownMenuGroup>
-                {agent.isActive ? (
-                  <>
-                    <DropdownMenuItem className="gap-2" onSelect={() => onRotate(agent)}>
-                      <PiArrowClockwise />
-                      Rotate credential
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      className="gap-2 text-destructive"
-                      onSelect={() => onDisable(agent)}
-                    >
-                      <PiPause />
-                      Disable
-                    </DropdownMenuItem>
-                  </>
-                ) : (
+                <DropdownMenuItem className="gap-2" onSelect={() => onRestore(agent)}>
+                  <PiArrowCounterClockwise />
+                  Restore mailbox
+                </DropdownMenuItem>
+              </DropdownMenuGroup>
+            ) : agent.isActive ? (
+              <>
+                <DropdownMenuGroup>
+                  <DropdownMenuItem className="gap-2" onSelect={() => onSetup(agent)}>
+                    <PiFileText />
+                    Setup instructions
+                  </DropdownMenuItem>
+                </DropdownMenuGroup>
+                <DropdownMenuSeparator />
+                <DropdownMenuGroup>
+                  <DropdownMenuItem className="gap-2" onSelect={() => onRotate(agent)}>
+                    <PiArrowClockwise />
+                    Rotate credential
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    className="gap-2 text-destructive"
+                    onSelect={() => onDisable(agent)}
+                  >
+                    <PiPause />
+                    Disable
+                  </DropdownMenuItem>
+                </DropdownMenuGroup>
+              </>
+            ) : (
+              <>
+                <DropdownMenuGroup>
                   <DropdownMenuItem className="gap-2" onSelect={() => onEnable(agent)}>
                     <PiPlay />
                     Enable
                   </DropdownMenuItem>
-                )}
-              </DropdownMenuGroup>
-            ) : null}
+                </DropdownMenuGroup>
+                <DropdownMenuSeparator />
+                <DropdownMenuGroup>
+                  <DropdownMenuItem className="gap-2" onSelect={() => onSetup(agent)}>
+                    <PiFileText />
+                    Setup instructions
+                  </DropdownMenuItem>
+                </DropdownMenuGroup>
+              </>
+            )}
           </DropdownMenuContent>
         </DropdownMenu>
       </TableCell>

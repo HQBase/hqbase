@@ -236,6 +236,15 @@
 }
 
 @media (max-width: 767px) {
+  [data-slot="dialog-content"] {
+    --dialog-safe-top: max(1rem, calc(env(safe-area-inset-top) + 0.75rem));
+    --dialog-safe-bottom: max(1rem, calc(env(safe-area-inset-bottom) + 0.75rem));
+    top: var(--dialog-safe-top);
+    max-height: calc(100dvh - var(--dialog-safe-top) - var(--dialog-safe-bottom));
+    transform: translateX(-50%);
+    overflow-y: auto;
+  }
+
   input:not([type="checkbox"]):not([type="radio"]),
   textarea[class],
   [contenteditable="true"][class] {

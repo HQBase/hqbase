@@ -73,7 +73,7 @@ export function Sidebar({
           className={cn(
             "flex w-12 shrink-0 flex-col items-center",
             isDrawer
-              ? "bg-black px-1 pb-[max(1.25rem,calc(env(safe-area-inset-bottom)+0.5rem))] pt-[max(1.25rem,calc(env(safe-area-inset-top)+0.5rem))]"
+              ? "bg-rail px-1 pb-[max(1.25rem,calc(env(safe-area-inset-bottom)+0.5rem))] pt-[max(1.25rem,calc(env(safe-area-inset-top)+0.5rem))]"
               : "py-2 pr-2 pl-1"
           )}
         >
