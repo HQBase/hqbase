@@ -76,14 +76,22 @@ export function InboxPage({
   const [detailError, setDetailError] = React.useState<string | null>(null);
   const [detailLoading, setDetailLoading] = React.useState(false);
   const onRefreshRef = React.useRef(onRefresh);
+  const onMessageRouteChangeRef = React.useRef(onMessageRouteChange);
   React.useEffect(() => {
     onRefreshRef.current = onRefresh;
   }, [onRefresh]);
+  React.useEffect(() => {
+    onMessageRouteChangeRef.current = onMessageRouteChange;
+  }, [onMessageRouteChange]);
 
-  const loadThread = React.useCallback(async (messageId: string) => {
-    const messages = await getMessageThread(messageId);
-    setThread(messages);
-  }, []);
+  const loadThread = React.useCallback(
+    async (messageId: string) => {
+      const messages = visibleThreadMessages(await getMessageThread(messageId), activeFolder);
+      setThread(messages);
+      return messages;
+    },
+    [activeFolder]
+  );
 
   React.useEffect(() => {
     if (!selectedId) {
@@ -99,9 +107,16 @@ export function InboxPage({
     void getMessageThread(selectedId)
       .then((messages) => {
         if (cancelled) return;
-        setThread(messages);
+        const visibleMessages = visibleThreadMessages(messages, activeFolder);
+        setThread(visibleMessages);
+        if (visibleMessages.length === 0) {
+          onMessageRouteChangeRef.current(activeFolder, null);
+          return;
+        }
         if (
-          messages.some((message) => message.direction === "inbound" && message.readAt === null)
+          visibleMessages.some(
+            (message) => message.direction === "inbound" && message.readAt === null
+          )
         ) {
           void runConversationAction(selectedId, "read", activeFolder)
             .then((updated) => {
@@ -239,7 +254,8 @@ export function InboxPage({
             onMessageAction={async (message, action) => {
               await runMessageAction(message.id, action);
               await onRefresh();
-              if (selectedId) await loadThread(selectedId);
+              const visibleMessages = await loadThread(selectedId);
+              if (visibleMessages.length === 0) onMessageRouteChange(activeFolder, null);
             }}
             onBack={() => onMessageRouteChange(activeFolder, null)}
             {...(onDraftsChange ? { onDraftsChange } : {})}
@@ -300,4 +316,12 @@ export function InboxPage({
       </div>
     </div>
   );
+}
+
+function visibleThreadMessages(
+  messages: MessageDetailType[],
+  activeFolder: MailFolderId
+): MessageDetailType[] {
+  const showsTrash = activeFolder === "trash";
+  return messages.filter((message) => (message.folder === "trash") === showsTrash);
 }

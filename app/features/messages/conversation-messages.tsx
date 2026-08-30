@@ -265,7 +265,7 @@ function MessageActions({
               onSelect={() => void onAction("trash")}
             >
               <PiTrash aria-hidden="true" className="size-4" />
-              Move message to Trash
+              Move to trash
             </DropdownMenuItem>
           ) : null}
         </DropdownMenuGroup>

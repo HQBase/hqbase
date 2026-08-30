@@ -99,7 +99,7 @@ describe("conversation message actions", () => {
     });
     const menu = document.body.querySelector<HTMLElement>('[data-message-actions-menu="msg_1"]');
     expect(menu?.textContent).toContain("Archive message");
-    expect(menu?.textContent).toContain("Move message to Trash");
+    expect(menu?.textContent).toContain("Move to trash");
     await flushHookEffects(() =>
       menu?.querySelector<HTMLElement>('[data-message-action="archive"]')?.click()
     );
@@ -128,7 +128,7 @@ describe("conversation message actions", () => {
     const menu = document.body.querySelector<HTMLElement>('[data-message-actions-menu="msg_1"]');
     expect(menu?.textContent).toContain("Restore message");
     expect(menu?.textContent).not.toContain("Archive message");
-    expect(menu?.textContent).not.toContain("Move message to Trash");
+    expect(menu?.textContent).not.toContain("Move to trash");
     await flushHookEffects(() =>
       menu?.querySelector<HTMLElement>('[data-message-action="restore"]')?.click()
     );
