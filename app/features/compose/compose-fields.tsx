@@ -1,4 +1,6 @@
-import type * as React from "react";
+import * as React from "react";
+import { PiCaretDown } from "react-icons/pi";
+import { Button } from "@/components/ui/button";
 import { DropdownSelect } from "@/components/ui/dropdown-select";
 import { Input } from "@/components/ui/input";
 import type { ComposeMode } from "./compose-state";
@@ -20,6 +22,15 @@ export function ComposeFields(props: {
   setBcc: (value: string) => void;
   setSubject: (value: string) => void;
 }) {
+  const [showOptionalRecipients, setShowOptionalRecipients] = React.useState(() =>
+    Boolean(props.cc.trim() || props.bcc.trim())
+  );
+  const optionalRecipientsId = React.useId();
+
+  React.useEffect(() => {
+    if (props.cc.trim() || props.bcc.trim()) setShowOptionalRecipients(true);
+  }, [props.cc, props.bcc]);
+
   return (
     <div className="flex flex-col px-5">
       <Row label="From">
@@ -38,24 +49,47 @@ export function ComposeFields(props: {
         />
       </Row>
       <Row label="To">
-        <RecipientField
-          autoFocus={props.mode !== "reply"}
-          label="To"
-          required
-          value={props.to}
-          onChange={props.setTo}
-        />
-      </Row>
-      <div className="grid grid-cols-1 border-b sm:grid-cols-2 sm:divide-x">
-        <Row label="Cc" border={false}>
-          <RecipientField label="Cc" value={props.cc} onChange={props.setCc} />
-        </Row>
-        <div className="sm:pl-4">
-          <Row label="Bcc" border={false}>
-            <RecipientField label="Bcc" value={props.bcc} onChange={props.setBcc} />
-          </Row>
+        <div className="flex min-w-0 items-center gap-1">
+          <div className="min-w-0 flex-1">
+            <RecipientField
+              autoFocus={props.mode !== "reply"}
+              label="To"
+              required
+              value={props.to}
+              onChange={props.setTo}
+            />
+          </div>
+          {!showOptionalRecipients ? (
+            <Button
+              aria-controls={optionalRecipientsId}
+              aria-expanded="false"
+              aria-label="Show Cc and Bcc"
+              className="size-7 min-h-7 min-w-7 shrink-0 rounded-full p-0 text-muted-foreground"
+              size="sm"
+              type="button"
+              variant="ghost"
+              onClick={() => setShowOptionalRecipients(true)}
+            >
+              <PiCaretDown aria-hidden="true" />
+            </Button>
+          ) : null}
         </div>
-      </div>
+      </Row>
+      {showOptionalRecipients ? (
+        <div
+          className="grid grid-cols-1 border-b sm:grid-cols-2 sm:divide-x"
+          id={optionalRecipientsId}
+        >
+          <Row label="Cc" border={false}>
+            <RecipientField label="Cc" value={props.cc} onChange={props.setCc} />
+          </Row>
+          <div className="sm:pl-4">
+            <Row label="Bcc" border={false}>
+              <RecipientField label="Bcc" value={props.bcc} onChange={props.setBcc} />
+            </Row>
+          </div>
+        </div>
+      ) : null}
       {props.mode !== "reply" ? (
         <Row label="Subject">
           <Input
