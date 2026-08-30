@@ -1,5 +1,5 @@
 import * as React from "react";
-import { PiArrowClockwise, PiCopy, PiKey, PiPlay } from "react-icons/pi";
+import { PiCopy, PiKey } from "react-icons/pi";
 import { toast } from "sonner";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -87,15 +87,17 @@ export function AgentCredentialContent({
       <div className="flex items-center gap-2">
         <Input
           aria-label="Agent credential"
-          className="font-mono text-base sm:text-xs"
+          className="font-mono text-base max-sm:h-[38px] sm:text-xs"
           readOnly
+          size="sm"
           value={credential}
           onFocus={(event) => event.currentTarget.select()}
         />
         <Button
           aria-label="Copy agent credential"
+          className="max-sm:size-[38px] max-sm:min-h-[38px] max-sm:min-w-[38px]"
           onClick={() => void copyCredential()}
-          size="fieldIcon"
+          size="icon"
         >
           <PiCopy />
         </Button>
@@ -118,26 +120,15 @@ export function AgentCredentialContent({
 
 export function AgentSetupDialog({
   agent,
-  onClose,
-  onEnable,
-  onRotate
+  onClose
 }: {
   agent: ManagedAgent | null;
   onClose: () => void;
-  onEnable: (agent: ManagedAgent) => void;
-  onRotate: (agent: ManagedAgent) => void;
 }): React.ReactElement {
   return (
     <Dialog open={agent !== null} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="max-h-[92dvh] w-[min(92vw,560px)] overflow-y-auto">
-        {agent ? (
-          <AgentSetupContent
-            agent={agent}
-            onClose={onClose}
-            onEnable={onEnable}
-            onRotate={onRotate}
-          />
-        ) : null}
+        {agent ? <AgentSetupContent agent={agent} onClose={onClose} /> : null}
       </DialogContent>
     </Dialog>
   );
@@ -145,19 +136,14 @@ export function AgentSetupDialog({
 
 function AgentSetupContent({
   agent,
-  onClose,
-  onEnable,
-  onRotate
+  onClose
 }: {
   agent: ManagedAgent;
   onClose: () => void;
-  onEnable: (agent: ManagedAgent) => void;
-  onRotate: (agent: ManagedAgent) => void;
 }): React.ReactElement {
   const skillPath = skillPathForProfile(agent.profile);
   const [skillUrl, setSkillUrl] = React.useState(skillPath);
   const skillUrlId = React.useId();
-  const mailboxDeleted = agent.profile === "mailbox" && agent.mailbox?.isDeleted === true;
 
   React.useEffect(() => {
     setSkillUrl(new URL(skillPath, window.location.origin).toString());
@@ -184,32 +170,6 @@ function AgentSetupContent({
         skillUrlId={skillUrlId}
         title={agent.profile === "mailbox" ? "Mailbox agent skill" : "Provisioning skill"}
       />
-      <section className="rounded-lg border px-3 py-3 text-sm">
-        <p className="font-medium">Lost the credential?</p>
-        <p className="mt-1 text-xs text-muted-foreground">
-          {mailboxDeleted
-            ? "Restore the mailbox first. You can then enable this identity to create a new credential."
-            : agent.isActive
-              ? "Rotate it to stop the old credential and reveal a new one once."
-              : "Enable this identity to reveal a fresh credential once."}
-        </p>
-        {!mailboxDeleted ? (
-          <Button
-            className="mt-3"
-            size="sm"
-            type="button"
-            variant="outline"
-            onClick={() => (agent.isActive ? onRotate(agent) : onEnable(agent))}
-          >
-            {agent.isActive ? (
-              <PiArrowClockwise data-icon="inline-start" />
-            ) : (
-              <PiPlay data-icon="inline-start" />
-            )}
-            {agent.isActive ? "Rotate credential" : "Enable"}
-          </Button>
-        ) : null}
-      </section>
       <p className="text-xs text-muted-foreground">
         Need the full recap? Read the{" "}
         <a

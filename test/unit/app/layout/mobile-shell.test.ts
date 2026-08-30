@@ -37,6 +37,10 @@ const sheet = readFileSync(
   new URL("../../../../app/components/ui/sheet.tsx", import.meta.url),
   "utf8"
 );
+const dialog = readFileSync(
+  new URL("../../../../app/components/ui/dialog.tsx", import.meta.url),
+  "utf8"
+);
 const composeWindow = readFileSync(
   new URL("../../../../app/features/compose/compose-window.tsx", import.meta.url),
   "utf8"
@@ -105,10 +109,29 @@ describe("mobile application shell", () => {
     expect(composeForm).toContain("pb-[max(1rem,env(safe-area-inset-bottom))]");
   });
 
+  it("keeps compact dialogs and their close controls below device cutouts", () => {
+    expect(dialog).toContain('data-slot="dialog-content"');
+    expect(dialog).toContain("max-md:size-10");
+    expect(styles).toContain(
+      "--dialog-safe-top: max(1rem, calc(env(safe-area-inset-top) + 0.75rem))"
+    );
+    expect(styles).toContain("top: var(--dialog-safe-top)");
+    expect(styles).toContain(
+      "max-height: calc(100dvh - var(--dialog-safe-top) - var(--dialog-safe-bottom))"
+    );
+    expect(styles).toContain("transform: translateX(-50%)");
+  });
+
+  it("uses the theme rail surface in the compact navigation drawer", () => {
+    expect(sidebar).toContain('? "bg-rail px-1');
+    expect(sidebar).not.toContain("bg-black");
+  });
+
   it("uses one responsive Agents list with contextual setup", () => {
     expect(agentConnectionDetails).toContain("export function AgentSkillDetails");
     expect(agentConnectionDetails).not.toContain('aria-label="Connection method"');
-    expect(mcpConnectionDetails).toContain("text-base sm:text-xs");
+    expect(mcpConnectionDetails).toContain("text-base max-sm:h-[38px] sm:text-xs");
+    expect(mcpConnectionDetails).toContain('size="sm"');
     expect(mcpConnectionDetails).toContain('value="read-only"');
     expect(mcpConnectionDetails).toContain('value="mail-actions"');
     expect(agentsPage).toContain("All connections");
@@ -116,6 +139,9 @@ describe("mobile application shell", () => {
     expect(addConnectionDialog).toContain("Use the Mail API skill instead");
     expect(addConnectionDialog).toContain('onSelect("mailbox")');
     expect(addConnectionDialog).toContain('onSelect("provisioner")');
+    expect(addConnectionDialog).toContain("items-center gap-3");
+    expect(addConnectionDialog).toContain("[&_svg]:size-5");
+    expect(addConnectionDialog).not.toContain("rounded-md border bg-muted/30");
     expect(connectionsTable).toContain('className="block sm:table"');
     expect(connectionsTable).toContain("Setup instructions");
     expect(connectionsTable).toContain('status="Authorized"');
@@ -147,6 +173,19 @@ describe("mobile application shell", () => {
     expect(styles).toContain("@media (max-width: 767px)");
     expect(styles).toContain('[contenteditable="true"][class]');
     expect(styles).toContain("font-size: 16px");
+  });
+
+  it("uses quiet focus treatments and compact trackless scrollbars", () => {
+    expect(styles).toContain('input:not([type="checkbox"]):not([type="radio"])');
+    expect(styles).toContain("border-color: hsl(var(--ring))");
+    expect(styles).toContain("box-shadow: none");
+    expect(styles).toContain("*::-webkit-scrollbar");
+    expect(styles).toContain("width: 6px");
+    expect(styles).toContain("scrollbar-width: thin");
+    expect(styles).toContain("*::-webkit-scrollbar-track");
+    expect(styles).toContain("background: transparent");
+    expect(styles).toContain("border-radius: 999px");
+    expect(styles).toContain("*::-webkit-scrollbar-thumb:hover");
   });
 
   it("keeps persistent mail chrome fixed and ignores pans that begin in the header", () => {

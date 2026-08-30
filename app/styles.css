@@ -110,18 +110,6 @@
     --text-tertiary: 240 3% 50%;
   }
 
-  html[data-tweakcn-preview] {
-    --surface-rail: var(--background);
-    --surface-sidebar: var(--sidebar, var(--card));
-    --surface-toolbar: var(--card);
-    --surface-list: var(--background);
-    --surface-reader: var(--background);
-    --surface-selected: var(--sidebar-accent, var(--accent));
-    --surface-hover: var(--muted);
-    --divider-subtle: var(--border);
-    --text-tertiary: var(--muted-foreground);
-  }
-
   html {
     background-color: hsl(var(--background));
     overscroll-behavior: none;
@@ -248,6 +236,15 @@
 }
 
 @media (max-width: 767px) {
+  [data-slot="dialog-content"] {
+    --dialog-safe-top: max(1rem, calc(env(safe-area-inset-top) + 0.75rem));
+    --dialog-safe-bottom: max(1rem, calc(env(safe-area-inset-bottom) + 0.75rem));
+    top: var(--dialog-safe-top);
+    max-height: calc(100dvh - var(--dialog-safe-top) - var(--dialog-safe-bottom));
+    transform: translateX(-50%);
+    overflow-y: auto;
+  }
+
   input:not([type="checkbox"]):not([type="radio"]),
   textarea[class],
   [contenteditable="true"][class] {
@@ -263,4 +260,68 @@
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+:where(
+  a[href],
+  button,
+  summary,
+  [contenteditable="true"],
+  [role="button"],
+  [role="menuitem"],
+  [role="option"],
+  [tabindex]:not([tabindex="-1"])
+):focus-visible {
+  --tw-ring-offset-shadow: 0 0 #0000;
+  --tw-ring-shadow: 0 0 #0000;
+  outline: 1px solid hsl(var(--ring));
+  outline-offset: 1px;
+}
+
+:where(input:not([type="checkbox"]):not([type="radio"]), textarea, select):focus-visible {
+  --tw-ring-offset-shadow: 0 0 #0000;
+  --tw-ring-shadow: 0 0 #0000;
+  border-color: hsl(var(--ring));
+  box-shadow: none;
+  outline: none;
+}
+
+[data-slot="input-group"]:focus-within {
+  --tw-ring-offset-shadow: 0 0 #0000;
+  --tw-ring-shadow: 0 0 #0000;
+  border-color: hsl(var(--ring));
+  box-shadow: none;
+}
+
+* {
+  scrollbar-color: hsl(var(--foreground) / 0.18) transparent;
+  scrollbar-width: thin;
+}
+
+*::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+*::-webkit-scrollbar-track,
+*::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  min-height: 24px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background-color: hsl(var(--foreground) / 0.18);
+  background-clip: content-box;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background-color: hsl(var(--foreground) / 0.3);
+}
+
+*::-webkit-scrollbar-button {
+  display: none;
+  width: 0;
+  height: 0;
 }

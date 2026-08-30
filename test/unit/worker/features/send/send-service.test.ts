@@ -18,7 +18,8 @@ vi.mock("@worker/features/messages/queries", () => ({
   getMessageDetail: vi.fn(),
   getMessageHtmlKey: vi.fn(),
   insertAttachment: vi.fn(),
-  insertMessage: vi.fn()
+  insertMessage: vi.fn(),
+  listThreadMessages: vi.fn()
 }));
 vi.mock("@worker/features/messages/threading", () => ({
   createThread: vi.fn(),
@@ -32,7 +33,8 @@ import {
   getMessageDetail,
   getMessageHtmlKey,
   insertAttachment,
-  insertMessage
+  insertMessage,
+  listThreadMessages
 } from "@worker/features/messages/queries";
 import { createThread, touchThread } from "@worker/features/messages/threading";
 import { replyToMessage, sendNewMessage } from "@worker/features/send/service";
@@ -580,6 +582,94 @@ describe("send service", () => {
     expect(put).toHaveBeenCalledWith("sent/2026-07-10/html-1.html", quotedHtml, {
       httpMetadata: { contentType: "text/html; charset=utf-8" }
     });
+  });
+
+  it("quotes accessible thread messages through the selected reply target", async () => {
+    const firstMessage = {
+      ...sentSummary,
+      id: "message-1",
+      attachments: [],
+      bcc: [],
+      cc: [],
+      deliveredToAddress: "support@example.com",
+      direction: "inbound" as const,
+      folder: "inbox" as const,
+      fromAddress: "owner@example.com",
+      fromName: "Owner Example",
+      htmlAvailable: false,
+      inReplyTo: null,
+      messageId: "<first@example.com>",
+      references: [],
+      textBody: "First message"
+    };
+    const targetMessage = {
+      ...firstMessage,
+      id: "message-2",
+      direction: "outbound" as const,
+      folder: "sent" as const,
+      fromAddress: mailbox.address,
+      fromName: mailbox.displayName,
+      to: ["owner@example.com"],
+      deliveredToAddress: null,
+      inReplyTo: "<first@example.com>",
+      messageId: "<target@example.com>",
+      references: ["<first@example.com>"],
+      snippet: "Second message",
+      textBody: "Second message",
+      receivedAt: null,
+      sentAt: "2026-07-10T00:05:00.000Z",
+      createdAt: "2026-07-10T00:05:00.000Z"
+    };
+    const laterMessage = {
+      ...targetMessage,
+      id: "message-3",
+      direction: "inbound" as const,
+      folder: "inbox" as const,
+      fromAddress: "owner@example.com",
+      fromName: "Owner Example",
+      messageId: "<later@example.com>",
+      snippet: "Later message",
+      textBody: "Later message",
+      receivedAt: "2026-07-10T00:10:00.000Z",
+      sentAt: null,
+      createdAt: "2026-07-10T00:10:00.000Z"
+    };
+    vi.mocked(getMessageDetail).mockResolvedValue(targetMessage);
+    vi.mocked(listThreadMessages).mockResolvedValue([firstMessage, targetMessage, laterMessage]);
+    send.mockResolvedValue({ messageId: "<cloudflare-reply@example.com>" });
+
+    await replyToMessage(
+      env,
+      {
+        attachmentIds: [],
+        bcc: [],
+        cc: [],
+        from: mailbox.address,
+        messageId: targetMessage.id,
+        text: "Third message",
+        to: ["owner@example.com"]
+      },
+      "user-1",
+      undefined,
+      { includeUnassigned: false, mailboxIds: [mailbox.id] }
+    );
+
+    expect(listThreadMessages).toHaveBeenCalledWith(env.DB, "thread-1", {
+      includeUnassigned: false,
+      mailboxIds: [mailbox.id]
+    });
+    const payload = send.mock.calls[0]?.[0] as Parameters<SendEmail["send"]>[0];
+    expect(payload.headers).toEqual({
+      "In-Reply-To": "<target@example.com>",
+      References: "<first@example.com> <target@example.com>"
+    });
+    const payloadText = payload.text ?? "";
+    expect(payloadText).toContain("Second message");
+    expect(payloadText).toContain("First message");
+    expect(payloadText).not.toContain("Later message");
+    expect(payloadText.indexOf("Second message")).toBeLessThan(
+      payloadText.indexOf("First message")
+    );
   });
 
   it("quotes safe rich HTML and carries referenced CID images as inline attachments", async () => {

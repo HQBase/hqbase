@@ -1,6 +1,7 @@
 import type * as React from "react";
 import {
   PiArrowClockwise,
+  PiArrowCounterClockwise,
   PiDotsThree,
   PiFileText,
   PiKey,
@@ -16,6 +17,7 @@ import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger
@@ -43,6 +45,7 @@ export function ConnectionsTable({
   onDisable,
   onEnable,
   onRevoke,
+  onRestore,
   onRotate,
   onSetup
 }: {
@@ -53,6 +56,7 @@ export function ConnectionsTable({
   onDisable: (agent: ManagedAgent) => void;
   onEnable: (agent: ManagedAgent) => void;
   onRevoke: (connection: OAuthConnection) => void;
+  onRestore: (agent: ManagedAgent) => void;
   onRotate: (agent: ManagedAgent) => void;
   onSetup: (agent: ManagedAgent) => void;
 }): React.ReactElement {
@@ -95,6 +99,7 @@ export function ConnectionsTable({
                   pending={pendingId === row.id}
                   onDisable={onDisable}
                   onEnable={onEnable}
+                  onRestore={onRestore}
                   onRotate={onRotate}
                   onSetup={onSetup}
                 />
@@ -144,17 +149,30 @@ function OAuthRow({
         <StatusBadge status="Authorized" />
       </TableCell>
       <TableCell className="flex items-center justify-end px-1.5 text-right sm:table-cell sm:px-3">
-        <Button
-          aria-label={`Revoke ${connection.name}`}
-          className="text-muted-foreground hover:text-destructive"
-          disabled={pending}
-          size="icon"
-          type="button"
-          variant="ghost"
-          onClick={() => onRevoke(connection)}
-        >
-          <PiTrash />
-        </Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              aria-label={`Actions for ${connection.name}`}
+              disabled={pending}
+              size="icon"
+              type="button"
+              variant="ghost"
+            >
+              <PiDotsThree aria-hidden="true" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuGroup>
+              <DropdownMenuItem
+                className="gap-2 text-destructive"
+                onSelect={() => onRevoke(connection)}
+              >
+                <PiTrash aria-hidden="true" />
+                Revoke connection
+              </DropdownMenuItem>
+            </DropdownMenuGroup>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </TableCell>
     </TableRow>
   );
@@ -165,6 +183,7 @@ function MachineRow({
   pending,
   onDisable,
   onEnable,
+  onRestore,
   onRotate,
   onSetup
 }: {
@@ -172,6 +191,7 @@ function MachineRow({
   pending: boolean;
   onDisable: (agent: ManagedAgent) => void;
   onEnable: (agent: ManagedAgent) => void;
+  onRestore: (agent: ManagedAgent) => void;
   onRotate: (agent: ManagedAgent) => void;
   onSetup: (agent: ManagedAgent) => void;
 }): React.ReactElement {
@@ -209,32 +229,53 @@ function MachineRow({
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuItem className="gap-2" onSelect={() => onSetup(agent)}>
-              <PiFileText />
-              Setup instructions
-            </DropdownMenuItem>
-            {!mailboxDeleted ? <DropdownMenuSeparator /> : null}
-            {!mailboxDeleted && agent.isActive ? (
+            {mailboxDeleted ? (
+              <DropdownMenuGroup>
+                <DropdownMenuItem className="gap-2" onSelect={() => onRestore(agent)}>
+                  <PiArrowCounterClockwise />
+                  Restore mailbox
+                </DropdownMenuItem>
+              </DropdownMenuGroup>
+            ) : agent.isActive ? (
               <>
-                <DropdownMenuItem className="gap-2" onSelect={() => onRotate(agent)}>
-                  <PiArrowClockwise />
-                  Rotate credential
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  className="gap-2 text-destructive"
-                  onSelect={() => onDisable(agent)}
-                >
-                  <PiPause />
-                  Disable
-                </DropdownMenuItem>
+                <DropdownMenuGroup>
+                  <DropdownMenuItem className="gap-2" onSelect={() => onSetup(agent)}>
+                    <PiFileText />
+                    Setup instructions
+                  </DropdownMenuItem>
+                </DropdownMenuGroup>
+                <DropdownMenuSeparator />
+                <DropdownMenuGroup>
+                  <DropdownMenuItem className="gap-2" onSelect={() => onRotate(agent)}>
+                    <PiArrowClockwise />
+                    Rotate credential
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    className="gap-2 text-destructive"
+                    onSelect={() => onDisable(agent)}
+                  >
+                    <PiPause />
+                    Disable
+                  </DropdownMenuItem>
+                </DropdownMenuGroup>
               </>
-            ) : null}
-            {!mailboxDeleted && !agent.isActive ? (
-              <DropdownMenuItem className="gap-2" onSelect={() => onEnable(agent)}>
-                <PiPlay />
-                Enable
-              </DropdownMenuItem>
-            ) : null}
+            ) : (
+              <>
+                <DropdownMenuGroup>
+                  <DropdownMenuItem className="gap-2" onSelect={() => onEnable(agent)}>
+                    <PiPlay />
+                    Enable
+                  </DropdownMenuItem>
+                </DropdownMenuGroup>
+                <DropdownMenuSeparator />
+                <DropdownMenuGroup>
+                  <DropdownMenuItem className="gap-2" onSelect={() => onSetup(agent)}>
+                    <PiFileText />
+                    Setup instructions
+                  </DropdownMenuItem>
+                </DropdownMenuGroup>
+              </>
+            )}
           </DropdownMenuContent>
         </DropdownMenu>
       </TableCell>

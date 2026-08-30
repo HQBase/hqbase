@@ -2,6 +2,7 @@ import * as React from "react";
 import { PiAddressBook, PiClock, PiEnvelopeSimple } from "react-icons/pi";
 import { listRecipientSuggestions } from "@/features/contacts/api";
 import type { ContactSource, ContactSummary } from "@/features/contacts/types";
+import { useDropdownPlacement } from "@/hooks/use-dropdown-placement";
 import { cn } from "@/lib/cn";
 import { invalidRecipients, splitRecipients } from "./compose-state";
 
@@ -24,9 +25,11 @@ export function RecipientField({
   const [error, setError] = React.useState<string | null>(null);
   const requestId = React.useRef(0);
   const inputRef = React.useRef<HTMLInputElement>(null);
+  const listRef = React.useRef<HTMLDivElement>(null);
   const listId = React.useId();
   const query = recipientQuery(value);
   const open = focused && query.length > 0 && suggestions.length > 0;
+  const placement = useDropdownPlacement(open, inputRef, listRef);
 
   React.useEffect(() => {
     if (autoFocus) inputRef.current?.focus();
@@ -112,9 +115,15 @@ export function RecipientField({
       ) : null}
       {open ? (
         <div
-          className="absolute inset-x-0 top-full z-50 mt-1 overflow-hidden rounded-lg border bg-popover p-1 text-popover-foreground shadow-md"
+          className={cn(
+            "absolute inset-x-0 z-50 overflow-y-auto rounded-lg border bg-popover p-1 text-popover-foreground shadow-md",
+            placement.side === "top" ? "bottom-full mb-2" : "top-full mt-2"
+          )}
+          data-side={placement.side}
           id={listId}
+          ref={listRef}
           role="listbox"
+          style={{ maxHeight: placement.maxHeight }}
         >
           {suggestions.map((contact, index) => (
             <button

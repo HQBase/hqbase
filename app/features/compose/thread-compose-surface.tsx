@@ -29,22 +29,23 @@ export function ThreadComposeSurface({
   const previousFocusRef = React.useRef<HTMLElement | null>(null);
   const titleId = React.useId();
   const statusId = React.useId();
+  const isDesktop =
+    typeof window !== "undefined" && window.matchMedia("(min-width: 1024px)").matches;
 
   React.useEffect(() => {
+    if (isDesktop && (!inlineTarget || inlineTarget.hasAttribute("data-composer-parking"))) return;
     previousFocusRef.current =
       document.activeElement instanceof HTMLElement ? document.activeElement : null;
     const frame = window.requestAnimationFrame(() => {
+      surfaceRef.current?.scrollIntoView({ block: "start" });
       const target = surfaceRef.current?.querySelector<HTMLElement>("[data-compose-autofocus]");
-      (target ?? surfaceRef.current)?.focus();
+      (target ?? surfaceRef.current)?.focus({ preventScroll: true });
     });
     return () => {
       window.cancelAnimationFrame(frame);
       previousFocusRef.current?.focus();
     };
-  }, []);
-
-  const isDesktop =
-    typeof window !== "undefined" && window.matchMedia("(min-width: 1024px)").matches;
+  }, [inlineTarget, isDesktop]);
 
   const desktop = (
     <section

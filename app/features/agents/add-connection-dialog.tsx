@@ -155,14 +155,14 @@ function ConnectionChoice({
 }): React.ReactElement {
   return (
     <button
-      className="flex min-h-20 w-full items-start gap-3 rounded-lg border p-3 text-left transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      className="flex min-h-20 w-full items-center gap-3 rounded-lg border p-3 text-left transition-colors hover:bg-muted/50 focus-visible:outline focus-visible:outline-1 focus-visible:outline-offset-1 focus-visible:outline-ring [&_svg]:size-5"
       type="button"
       onClick={onClick}
     >
-      <span className="mt-0.5 inline-flex size-9 shrink-0 items-center justify-center rounded-md border bg-muted/30 text-muted-foreground">
+      <span className="inline-flex size-10 shrink-0 items-center justify-center text-muted-foreground">
         {icon}
       </span>
-      <span>
+      <span className="min-w-0">
         <span className="block font-medium">{title}</span>
         <span className="mt-1 block text-xs leading-4 text-muted-foreground">{description}</span>
       </span>

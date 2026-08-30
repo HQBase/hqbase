@@ -3,7 +3,8 @@ import { PiNotePencil, PiPaperclip } from "react-icons/pi";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
-import { LabelFilter, LabelMenu, LabelStack } from "@/features/labels/label-controls";
+import { LabelMenu, LabelStack } from "@/features/labels/label-controls";
+import { LabelFilter } from "@/features/labels/label-filter";
 import type { MailLabel } from "@/features/labels/types";
 import { groupDrafts } from "@/features/messages/conversation-display";
 import { MailListHeader, mailListRowClassName } from "@/features/messages/mail-list-layout";
@@ -21,7 +22,9 @@ type DraftsPageProps = {
   mailboxId: string;
   search: string;
   selectedId: string | null;
+  canCreateLabels?: boolean;
   onBack: () => void;
+  onLabelsChanged?: (() => Promise<void>) | undefined;
   onLabelChange: (labelIds: string[]) => void;
   onSelect: (draftId: string) => void;
   onToggleLabel: (draftId: string, label: MailLabel, assigned: boolean) => Promise<void> | void;
@@ -35,8 +38,10 @@ export function DraftsPage({
   mailboxId,
   search,
   selectedId,
+  canCreateLabels = false,
   onBack,
   onLabelChange,
+  onLabelsChanged,
   onSelect,
   onToggleLabel
 }: DraftsPageProps): React.ReactElement {
@@ -130,8 +135,10 @@ export function DraftsPage({
                     {group.drafts.map((draft) => (
                       <DraftListItem
                         draft={draft}
+                        canCreateLabels={canCreateLabels}
                         isActive={draft.id === selectedId}
                         labels={labels}
+                        onLabelsChanged={onLabelsChanged}
                         key={draft.id}
                         onSelect={onSelect}
                         onToggleLabel={(label, assigned) =>
@@ -152,14 +159,18 @@ export function DraftsPage({
 
 function DraftListItem({
   draft,
+  canCreateLabels,
   isActive,
   labels,
+  onLabelsChanged,
   onSelect,
   onToggleLabel
 }: {
   draft: Draft;
+  canCreateLabels: boolean;
   isActive: boolean;
   labels: MailLabel[];
+  onLabelsChanged?: (() => Promise<void>) | undefined;
   onSelect: (draftId: string) => void;
   onToggleLabel: (label: MailLabel, assigned: boolean) => Promise<void> | void;
 }): React.ReactElement {
@@ -185,11 +196,13 @@ function DraftListItem({
         <AvatarFallback className="font-medium uppercase">{avatarInitial}</AvatarFallback>
       </Avatar>
       <span className="col-start-3 row-start-2 flex shrink-0 self-end justify-self-end sm:col-start-1 sm:row-start-1 sm:self-center sm:justify-self-auto">
-        {labels.length > 0 ? (
+        {labels.length > 0 || canCreateLabels ? (
           <LabelMenu
             assigned={draft.labels}
+            canCreateLabels={canCreateLabels}
             className="sm:hidden"
             labels={labels}
+            onLabelsChanged={onLabelsChanged}
             onToggle={onToggleLabel}
             showTagIcon
           />
@@ -198,7 +211,7 @@ function DraftListItem({
           aria-label="Draft"
           className={cn(
             "size-10 min-h-10 min-w-10 items-end justify-center pb-px text-tertiary sm:size-8 sm:min-h-8 sm:min-w-8 sm:items-center sm:pb-0",
-            labels.length > 0 ? "hidden sm:flex" : "flex"
+            labels.length > 0 || canCreateLabels ? "hidden sm:flex" : "flex"
           )}
           role="img"
         >
@@ -252,14 +265,16 @@ function DraftListItem({
           />
         </span>
       ) : null}
-      {labels.length > 0 ? (
+      {labels.length > 0 || canCreateLabels ? (
         <LabelMenu
           assigned={draft.labels}
+          canCreateLabels={canCreateLabels}
           className={cn(
             "z-10 hidden max-w-[75%] justify-self-end overflow-hidden [@media(hover:hover)]:hover:bg-[hsl(var(--message-row-surface))] [@media(hover:hover)]:hover:text-foreground/80 sm:col-start-4 sm:row-start-1 sm:inline-flex",
             labelContainerClass
           )}
           labels={labels}
+          onLabelsChanged={onLabelsChanged}
           onToggle={onToggleLabel}
           showAssignedLabels
           showTagIcon

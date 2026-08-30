@@ -17,6 +17,7 @@ import {
   type OAuthConnection,
   revokeOAuthConnection
 } from "@/features/connected-apps/api";
+import { restoreMailbox } from "@/features/mailboxes/api";
 import type { Mailbox } from "@/features/mailboxes/types";
 import { SettingsSection } from "@/features/settings/settings-section";
 import { AddConnectionDialog } from "./add-connection-dialog";
@@ -140,6 +141,30 @@ export function AgentsPage({
     }
   }
 
+  async function restoreAgentMailbox(agent: ManagedAgent): Promise<void> {
+    if (agent.profile !== "mailbox" || !agent.mailbox) return;
+    setPendingId(agentRowId(agent));
+    try {
+      const mailbox = await restoreMailbox(agent.mailbox.id);
+      updateAgent({
+        ...agent,
+        isActive: false,
+        mailbox: {
+          id: mailbox.id,
+          address: mailbox.address,
+          displayName: mailbox.displayName,
+          isDeleted: mailbox.deletedAt !== null
+        }
+      });
+      toast.success(`${mailbox.address} restored. Enable its identity to create a new credential.`);
+      await onChanged();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Mailbox could not be restored.");
+    } finally {
+      setPendingId(null);
+    }
+  }
+
   async function confirmAction(): Promise<void> {
     if (!confirmation) return;
     setPendingId(
@@ -207,6 +232,7 @@ export function AgentsPage({
             onDisable={(agent) => setConfirmation({ action: "disable", agent })}
             onEnable={(agent) => void enableAgent(agent)}
             onRevoke={(connection) => setConfirmation({ action: "revoke", connection })}
+            onRestore={(agent) => void restoreAgentMailbox(agent)}
             onRotate={startRotate}
             onSetup={setSetupAgent}
           />
@@ -223,12 +249,7 @@ export function AgentsPage({
         onOpenChange={setAddOpen}
       />
 
-      <AgentSetupDialog
-        agent={setupAgent}
-        onClose={() => setSetupAgent(null)}
-        onEnable={(agent) => void enableAgent(agent)}
-        onRotate={startRotate}
-      />
+      <AgentSetupDialog agent={setupAgent} onClose={() => setSetupAgent(null)} />
       <AgentCredentialDialog reveal={credential} onDone={() => void finishCredentialReveal()} />
       <ConfirmationDialog
         confirmation={confirmation}

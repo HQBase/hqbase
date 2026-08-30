@@ -29,9 +29,6 @@ export function ConversationMessages({
   const [expandedThreadId, setExpandedThreadId] = React.useState<string | null>(null);
   const previousThreadId = React.useRef(threadId);
   const showMiddle = threadId !== null && expandedThreadId === threadId;
-  const replyTarget =
-    [...messages].reverse().find((message) => message.direction === "inbound") ?? messages.at(-1);
-
   React.useEffect(() => {
     if (previousThreadId.current === threadId) return;
     previousThreadId.current = threadId;
@@ -129,11 +126,11 @@ export function ConversationMessages({
         {onCompose && isLast ? (
           <footer className="mt-5 flex flex-wrap items-center gap-2">
             <Button
-              aria-label={`Reply to message from ${replyTarget?.fromAddress ?? message.fromAddress}`}
+              aria-label={`Reply to message from ${message.fromAddress}`}
               className="h-9 min-w-24 rounded-full px-4"
               data-compose-action="reply"
-              data-compose-message-id={replyTarget?.id ?? message.id}
-              onClick={() => onCompose(replyTarget ?? message, "reply")}
+              data-compose-message-id={message.id}
+              onClick={() => onCompose(message, "reply")}
               size="sm"
               type="button"
               variant="outline"

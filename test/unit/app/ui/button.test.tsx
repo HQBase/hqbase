@@ -18,11 +18,16 @@ describe("button", () => {
     expect(html).not.toContain("will-change-transform");
   });
 
-  it("matches actions to adjacent field heights", () => {
-    const textAction = renderToStaticMarkup(<Button size="field">Save</Button>);
-    const iconAction = renderToStaticMarkup(<Button size="fieldIcon">Copy</Button>);
+  it("uses a thin focus outline without a glow", () => {
+    const html = renderToStaticMarkup(<Button>Action</Button>);
 
-    expect(textAction).toContain("h-[38px] min-h-[38px]");
-    expect(iconAction).toContain("size-[38px] min-h-[38px] min-w-[38px]");
+    expect(html).toContain("focus-visible:outline-1");
+    expect(html).not.toContain("focus-visible:ring");
+  });
+
+  it("uses the compact field-and-action height by default", () => {
+    const html = renderToStaticMarkup(<Button>Save</Button>);
+
+    expect(html).toContain("h-[30px] min-h-[30px]");
   });
 });

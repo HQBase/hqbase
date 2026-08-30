@@ -3,7 +3,7 @@ import { PiArrowLeft } from "react-icons/pi";
 
 import { Button } from "@/components/ui/button";
 import { setConversationLabel } from "@/features/labels/api";
-import { LabelFilter } from "@/features/labels/label-controls";
+import { LabelFilter } from "@/features/labels/label-filter";
 import type { MailLabel } from "@/features/labels/types";
 import type { Mailbox } from "@/features/mailboxes/types";
 import { getMessageThread, runConversationAction } from "@/features/messages/api";
@@ -38,7 +38,9 @@ type InboxPageProps = {
   onMessageRouteChange: (folder: MailFolderId, messageId: string | null) => void;
   onSelect: (messageId: string) => void;
   totalCount: number | null;
+  canCreateLabels?: boolean;
   canOrganizeConversation?: (mailboxId: string | null) => boolean;
+  onLabelsChanged?: (() => Promise<void>) | undefined;
 };
 
 export function InboxPage({
@@ -61,6 +63,8 @@ export function InboxPage({
   onMessageRouteChange,
   onSelect,
   totalCount,
+  canCreateLabels = false,
+  onLabelsChanged,
   canOrganizeConversation = () => false
 }: InboxPageProps): React.ReactElement {
   const activeLabel = mailFolders.find((folder) => folder.id === activeFolder)?.label ?? "Messages";
@@ -223,7 +227,9 @@ export function InboxPage({
             isLoading={detailLoading}
             key={selectedId}
             canOrganizeLabels={canOrganizeConversation(selectedMailboxId)}
+            canCreateLabels={canCreateLabels}
             labels={labels}
+            onLabelsChanged={onLabelsChanged}
             mailboxes={mailboxes}
             messages={thread}
             routeMessageId={selectedId}
@@ -282,7 +288,9 @@ export function InboxPage({
             await onRefresh();
           }}
           canOrganizeConversation={canOrganizeConversation}
+          canCreateLabels={canCreateLabels}
           labels={labels}
+          onLabelsChanged={onLabelsChanged}
         />
       </div>
     </div>

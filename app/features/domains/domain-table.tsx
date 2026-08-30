@@ -249,9 +249,10 @@ function CatchAllSelect({
   return (
     <DropdownSelect
       ariaLabel={`${domain.name} unknown-address mail`}
-      className="h-[30px] min-h-[30px] max-w-sm px-2.5 text-[13px] shadow-none"
+      className="max-w-sm px-2.5 text-[13px] shadow-none"
       disabled={disabled}
       options={options}
+      size="sm"
       value={value}
       onValueChange={(nextValue) => {
         if (nextValue.startsWith("mailbox:")) {

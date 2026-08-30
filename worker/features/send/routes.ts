@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { requireMailApiPrincipal } from "../../auth/mail-api";
-import { requireMailboxAccess } from "../../auth/mailbox-access";
+import { accessibleMessageScope, requireMailboxAccess } from "../../auth/mailbox-access";
 import type { HonoApp } from "../../lib/env";
 import { AppError } from "../../lib/errors";
 import { readJson } from "../../lib/json";
@@ -81,6 +81,12 @@ sendRoutes.post("/reply", async (c) => {
   });
   const input = parseWith(replyMessageSchema, await readJson(c.req.raw));
   await requireMessageAccess(c.env.DB, principal.id, principal.role, input.messageId, "agent");
+  const messageScope = await accessibleMessageScope(
+    c.env.DB,
+    principal.id,
+    principal.role,
+    "agent"
+  );
   const mailbox = await findMailboxForSending(c.env.DB, input.from);
   if (!mailbox) throw new AppError("MAILBOX_NOT_FOUND", "Sending mailbox not found.", 404);
   await requireMailboxAccess(c.env.DB, principal.id, principal.role, mailbox.id, "agent");
@@ -95,7 +101,7 @@ sendRoutes.post("/reply", async (c) => {
     draft
   );
   await requireDraftAttachmentIdsAccess(c.env, draftPrincipal, input.attachmentIds);
-  const sent = await replyToMessage(c.env, input, principal.id, signature);
+  const sent = await replyToMessage(c.env, input, principal.id, signature, messageScope);
   scheduleSentMailEvents(c.env, (promise) => c.executionCtx.waitUntil(promise), {
     draftId: input.draftId,
     mailboxId: mailbox.id,

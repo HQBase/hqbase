@@ -14,8 +14,10 @@ type MessageListItemProps = {
   conversation: ConversationSummary;
   href: string;
   isActive: boolean;
+  canCreateLabels?: boolean;
   canOrganizeLabels?: boolean;
   labels?: MailLabel[];
+  onLabelsChanged?: (() => Promise<void>) | undefined;
   onSelect: (conversation: ConversationSummary) => void;
   onToggleLabel?: (label: MailLabel, assigned: boolean) => Promise<void> | void;
   onToggleStar: (conversation: ConversationSummary) => void;
@@ -25,8 +27,10 @@ export function MessageListItem({
   conversation,
   href,
   isActive,
+  canCreateLabels = false,
   canOrganizeLabels = false,
   labels = [],
+  onLabelsChanged,
   onSelect,
   onToggleLabel,
   onToggleStar
@@ -166,15 +170,17 @@ export function MessageListItem({
           />
         </span>
       ) : null}
-      {labels.length > 0 && onToggleLabel && canOrganizeLabels ? (
+      {(labels.length > 0 || canCreateLabels) && onToggleLabel && canOrganizeLabels ? (
         <LabelMenu
           assigned={assignedLabels}
+          canCreateLabels={canCreateLabels}
           canOrganizeLabels={canOrganizeLabels}
           className={cn(
             "z-10 hidden max-w-[75%] justify-self-end overflow-hidden [@media(hover:hover)]:hover:bg-[hsl(var(--message-row-surface))] [@media(hover:hover)]:hover:text-foreground/80 sm:col-start-4 sm:row-start-1 sm:inline-flex",
             labelContainerClass
           )}
           labels={labels}
+          onLabelsChanged={onLabelsChanged}
           onToggle={onToggleLabel}
           showAssignedLabels
           showTagIcon

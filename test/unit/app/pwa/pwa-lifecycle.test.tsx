@@ -34,6 +34,13 @@ describe("PWA lifecycle", () => {
     expect(view.container.textContent).toContain("Reload");
     expect(mocks.playNotificationSound).toHaveBeenCalledOnce();
     expect(mocks.playNotificationSound).toHaveBeenCalledWith("update-ready");
+    const notice = view.container.querySelector('[role="status"]');
+    expect(notice?.className).toContain("max-w-lg");
+    expect(notice?.className).toContain("rounded-xl");
+    expect(notice?.className).toContain("shadow-[0_14px_38px_rgb(0_0_0/0.32)]");
+    expect(notice?.querySelector("span")?.className).toContain("text-xs");
+    expect(notice?.querySelector("span")?.className).toContain("font-semibold");
+    expect(view.container.querySelector("button")?.className).toContain("rounded-lg");
 
     await flushHookEffects(() => mocks.onUpdateReady?.({ activate }));
     expect(mocks.playNotificationSound).toHaveBeenCalledOnce();

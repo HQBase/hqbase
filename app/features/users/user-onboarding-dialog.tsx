@@ -271,11 +271,18 @@ export function TemporaryPasswordReveal({
         </AlertDescription>
       </Alert>
       <div className="flex items-center gap-2">
-        <Input aria-label="Temporary password" readOnly value={credential.password} />
+        <Input
+          aria-label="Temporary password"
+          className="max-sm:h-[38px]"
+          readOnly
+          size="sm"
+          value={credential.password}
+        />
         <Button
           aria-label="Copy temporary password"
+          className="max-sm:size-[38px] max-sm:min-h-[38px] max-sm:min-w-[38px]"
           onClick={() => void copyPassword()}
-          size="fieldIcon"
+          size="icon"
         >
           <PiCopy />
         </Button>

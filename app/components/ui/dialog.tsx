@@ -24,7 +24,7 @@ DialogOverlay.displayName = DialogPrimitive.Overlay.displayName;
 export const DialogContent = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content>
->(({ className, children, onPointerDownOutside, ...props }, ref) => (
+>(({ className, children, onClick, onPointerDownOutside, ...props }, ref) => (
   <DialogPortal>
     <DialogOverlay />
     <DialogPrimitive.Content
@@ -32,7 +32,12 @@ export const DialogContent = React.forwardRef<
         "fixed left-1/2 top-1/2 z-50 grid w-[min(92vw,720px)] -translate-x-1/2 -translate-y-1/2 gap-4 rounded-lg border bg-background p-5 shadow-lg",
         className
       )}
+      data-slot="dialog-content"
       ref={ref}
+      onClick={(event) => {
+        onClick?.(event);
+        event.stopPropagation();
+      }}
       onPointerDownOutside={(event) => {
         onPointerDownOutside?.(event);
         event.preventDefault();
@@ -40,7 +45,7 @@ export const DialogContent = React.forwardRef<
       {...props}
     >
       {children}
-      <DialogPrimitive.Close className="absolute right-3 top-3 rounded-sm opacity-70 transition-[opacity,transform] duration-200 [@media(hover:hover)]:hover:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:scale-[0.97]">
+      <DialogPrimitive.Close className="absolute right-3 top-3 rounded-sm opacity-70 transition-[opacity,transform] duration-200 [@media(hover:hover)]:hover:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:scale-[0.97] max-md:inline-flex max-md:size-10 max-md:items-center max-md:justify-center">
         <PiX />
         <span className="sr-only">Close</span>
       </DialogPrimitive.Close>

@@ -6,7 +6,7 @@ import * as React from "react";
 import { cn } from "@/lib/cn";
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 rounded-md text-sm font-medium transition-[color,background-color,border-color,opacity,box-shadow] duration-200 ease-out motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
+  "inline-flex items-center justify-center gap-2 rounded-md text-sm font-medium transition-[color,background-color,border-color,opacity,box-shadow] duration-200 ease-out motion-reduce:transition-none focus-visible:outline focus-visible:outline-1 focus-visible:outline-offset-1 focus-visible:outline-ring disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
   {
     variants: {
       variant: {
@@ -24,9 +24,7 @@ const buttonVariants = cva(
         default: "h-[30px] min-h-[30px] px-4 py-1",
         sm: "h-[27px] min-h-[27px] rounded-md px-3 text-xs",
         lg: "h-[33px] min-h-[33px] rounded-md px-5",
-        icon: "size-[30px] min-h-[30px] min-w-[30px]",
-        field: "h-[38px] min-h-[38px] px-4 text-[13px]",
-        fieldIcon: "size-[38px] min-h-[38px] min-w-[38px]"
+        icon: "size-[30px] min-h-[30px] min-w-[30px]"
       }
     },
     defaultVariants: {

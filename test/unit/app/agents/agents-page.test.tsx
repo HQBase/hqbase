@@ -6,6 +6,8 @@ import { AgentsPage } from "@/features/agents/agents-page";
 import { listAgents, rotateAgentCredential, setAgentActive } from "@/features/agents/api";
 import type { ManagedAgent } from "@/features/agents/types";
 import { listOAuthConnections, revokeOAuthConnection } from "@/features/connected-apps/api";
+import { restoreMailbox } from "@/features/mailboxes/api";
+import type { Mailbox } from "@/features/mailboxes/types";
 import { flushHookEffects, renderComponent } from "../render-hook";
 
 const toastMocks = vi.hoisted(() => ({ error: vi.fn(), success: vi.fn() }));
@@ -20,6 +22,9 @@ vi.mock("@/features/agents/api", () => ({
 vi.mock("@/features/connected-apps/api", () => ({
   listOAuthConnections: vi.fn(),
   revokeOAuthConnection: vi.fn()
+}));
+vi.mock("@/features/mailboxes/api", () => ({
+  restoreMailbox: vi.fn()
 }));
 
 const owner = {
@@ -108,6 +113,11 @@ describe("Agents page", () => {
     await flushHookEffects(() => clickButton(document.body, "AI assistant"));
     expect(document.body.textContent).toContain("Connect an AI assistant");
     expect(document.body.textContent).toContain("Server profile");
+    const copyEndpoint = document.body.querySelector<HTMLButtonElement>(
+      '[aria-label="Copy Read, manage & send endpoint"]'
+    );
+    expect(copyEndpoint?.className).toContain("h-[30px] min-h-[30px]");
+    expect(copyEndpoint?.className).toContain("max-sm:h-[38px] max-sm:min-h-[38px]");
     await flushHookEffects(() => clickButton(document.body, "Back"));
     expect(document.body.textContent).toContain("Choose how the software will access HQBase");
     await view.unmount();
@@ -132,8 +142,11 @@ describe("Agents page", () => {
     expect(
       document.body.querySelector<HTMLAnchorElement>('a[href*="connect-a-machine-identity"]')
     ).not.toBeNull();
+    expect(document.body.textContent).not.toContain("Lost the credential?");
 
-    await flushHookEffects(() => clickButton(document.body, "Rotate credential"));
+    await flushHookEffects(() => clickButton(document.body, "Done"));
+    await openAgentMenu(view.container, mailboxAgent.name);
+    await flushHookEffects(() => clickMenuItem("Rotate credential"));
     expect(document.body.textContent).toContain("current credential will stop working immediately");
     await flushHookEffects(() => clickButton(document.body, "Rotate credential"));
     expect(rotateAgentCredential).toHaveBeenCalledWith(mailboxAgent.id);
@@ -153,6 +166,7 @@ describe("Agents page", () => {
     const view = await renderPage();
 
     await openAgentMenu(view.container, provisioner.name);
+    expect(openMenuItems()).toEqual(["Enable", "Setup instructions"]);
     await flushHookEffects(() => clickMenuItem("Enable"));
     expect(setAgentActive).toHaveBeenCalledWith(provisioner.id, true);
     expect(document.body.textContent).toContain("Shown once");
@@ -162,8 +176,8 @@ describe("Agents page", () => {
     await view.unmount();
   });
 
-  it("keeps recovery instructions available for a deleted mailbox", async () => {
-    const deletedAgent = {
+  it("restores a deleted mailbox from the row action", async () => {
+    const deletedAgent: ManagedAgent = {
       ...mailboxAgent,
       isActive: false,
       mailbox: {
@@ -173,19 +187,40 @@ describe("Agents page", () => {
         isDeleted: true
       }
     };
+    const restoredMailbox: Mailbox = {
+      id: "mbx_support",
+      address: "support@example.com",
+      mailDomainId: "dom_example",
+      displayName: "Support",
+      kind: "agent",
+      isActive: true,
+      deletedAt: null,
+      accessLevel: "manager",
+      createdAt: "2026-08-23T12:00:00.000Z",
+      updatedAt: "2026-08-30T12:00:00.000Z"
+    };
+    const onChanged = vi.fn().mockResolvedValue(undefined);
     vi.mocked(listOAuthConnections).mockResolvedValue([]);
     vi.mocked(listAgents).mockResolvedValue([deletedAgent]);
-    const view = await renderPage();
+    vi.mocked(restoreMailbox).mockResolvedValue(restoredMailbox);
+    const view = await renderPage({ onChanged });
 
     expect(view.container.textContent).toContain("Deleted");
     expect(view.container.textContent).not.toContain("Mailbox deleted");
     await openAgentMenu(view.container, deletedAgent.name);
-    expect(document.body.textContent).toContain("Setup instructions");
-    expect(document.body.textContent).not.toContain("Enable");
-    expect(document.body.textContent).not.toContain("Rotate credential");
-    await flushHookEffects(() => clickMenuItem("Setup instructions"));
-    expect(document.body.textContent).toContain("Restore the mailbox first");
+    expect(openMenuItems()).toEqual(["Restore mailbox"]);
+    await flushHookEffects(() => clickMenuItem("Restore mailbox"));
+    expect(restoreMailbox).toHaveBeenCalledWith(deletedAgent.mailbox?.id);
+    expect(onChanged).toHaveBeenCalledOnce();
+    expect(toastMocks.success).toHaveBeenCalledWith(
+      "support@example.com restored. Enable its identity to create a new credential."
+    );
+    expect(view.container.textContent).toContain("Disabled");
+    expect(view.container.textContent).not.toContain("Deleted");
     expect(setAgentActive).not.toHaveBeenCalled();
+
+    await openAgentMenu(view.container, deletedAgent.name);
+    expect(openMenuItems()).toEqual(["Enable", "Setup instructions"]);
     await view.unmount();
   });
 
@@ -195,9 +230,8 @@ describe("Agents page", () => {
     vi.mocked(revokeOAuthConnection).mockResolvedValue();
     const view = await renderPage();
 
-    await flushHookEffects(() =>
-      view.container.querySelector<HTMLButtonElement>('[aria-label="Revoke Mail helper"]')?.click()
-    );
+    await openAgentMenu(view.container, oauthConnection.name);
+    await flushHookEffects(() => clickMenuItem("Revoke connection"));
     expect(document.body.textContent).toContain("Revoke connection?");
     await flushHookEffects(() => clickButton(document.body, "Revoke"));
     expect(revokeOAuthConnection).toHaveBeenCalledWith(oauthConnection.clientId);
@@ -248,4 +282,10 @@ function clickMenuItem(label: string): void {
   Array.from(document.body.querySelectorAll<HTMLElement>('[role="menuitem"]'))
     .find((item) => item.textContent?.includes(label))
     ?.click();
+}
+
+function openMenuItems(): string[] {
+  return Array.from(document.body.querySelectorAll<HTMLElement>('[role="menuitem"]')).map(
+    (item) => item.textContent?.trim() ?? ""
+  );
 }

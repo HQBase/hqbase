@@ -91,8 +91,7 @@ export function DesignPreview(): React.ReactElement {
             ))}
           </nav>
           <div className="absolute inset-x-4 bottom-6 rounded-lg border bg-card p-3 text-xs leading-5 text-muted-foreground">
-            Resize the browser to inspect compact behavior. Add <code>?tweakcn</code> to preview
-            theme variables.
+            Resize the browser to inspect compact behavior.
           </div>
         </aside>
 

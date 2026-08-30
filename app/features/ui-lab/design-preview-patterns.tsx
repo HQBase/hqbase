@@ -4,6 +4,13 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuTrigger
+} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { InputGroup, InputGroupInput } from "@/components/ui/input-group";
 import { Separator } from "@/components/ui/separator";
@@ -75,9 +82,22 @@ function ProductPatterns(): React.ReactElement {
                   <Badge variant="secondary">Active</Badge>
                 </TableCell>
                 <TableCell className="text-right">
-                  <Button aria-label="Actions" size="icon" variant="ghost">
-                    <PiDotsThree />
-                  </Button>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        aria-label="Actions for hello@northstar.example"
+                        size="icon"
+                        variant="ghost"
+                      >
+                        <PiDotsThree />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuGroup>
+                        <DropdownMenuItem>Edit mailbox</DropdownMenuItem>
+                      </DropdownMenuGroup>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </TableCell>
               </TableRow>
             </TableBody>

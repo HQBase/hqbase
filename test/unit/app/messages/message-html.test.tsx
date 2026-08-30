@@ -43,6 +43,10 @@ describe("message HTML view", () => {
     expect(blocked).toContain("overflow-x: auto");
     expect(blocked).toContain("overflow-y: hidden");
     expect(blocked).toContain("-webkit-overflow-scrolling: touch");
+    expect(blocked).toContain("scrollbar-width: thin");
+    expect(blocked).toContain("*::-webkit-scrollbar { width: 6px; height: 6px; }");
+    expect(blocked).toContain("*::-webkit-scrollbar-track");
+    expect(blocked).toContain("*::-webkit-scrollbar-thumb:hover");
     expect(blocked).toContain("margin: 0; padding: 0");
     expect(blocked).not.toContain("min-height: 100%");
     expect(blocked).not.toContain("max-width: 100%");
@@ -169,6 +173,25 @@ describe("message HTML view", () => {
     expect(html).toContain('class="block"');
     expect(html).toContain("Quoted message history: Hello");
     expect(html).toContain("Message content after quote: Hello");
+  });
+
+  it("shows a complete HTML chain without another disclosure", () => {
+    const html = renderToStaticMarkup(
+      <MessageHtmlFrames
+        afterQuote={null}
+        body="<p>Latest reply</p>"
+        bodyHasContent={true}
+        onToggleQuote={null}
+        quote="<p>Earlier message</p>"
+        quoteExpanded={true}
+        subject="Hello"
+      />
+    );
+
+    expect(html).not.toContain("data-quoted-content-control");
+    expect(html).toContain('class="block"');
+    expect(html).toContain("Message body: Hello");
+    expect(html).toContain("Quoted message history: Hello");
   });
 
   it("does not render an empty body frame before quoted history", () => {

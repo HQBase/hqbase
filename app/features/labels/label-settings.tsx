@@ -1,5 +1,5 @@
 import * as React from "react";
-import { PiPencilSimple, PiPlus, PiTrash } from "react-icons/pi";
+import { PiDotsThree, PiPencilSimple, PiPlus, PiTrash } from "react-icons/pi";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -10,9 +10,14 @@ import {
   DialogHeader,
   DialogTitle
 } from "@/components/ui/dialog";
-import { DropdownSelect } from "@/components/ui/dropdown-select";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger
+} from "@/components/ui/dropdown-menu";
 import { Spinner } from "@/components/ui/spinner";
 import {
   Table,
@@ -23,9 +28,10 @@ import {
   TableRow
 } from "@/components/ui/table";
 import { SettingsSection } from "@/features/settings/settings-section";
-import { createLabel, deleteLabel, updateLabel } from "./api";
+import { deleteLabel } from "./api";
 import { LabelColorDot } from "./label-colors";
-import { type LabelColor, labelColors, type MailLabel } from "./types";
+import { LabelEditorDialog } from "./label-editor-dialog";
+import type { MailLabel } from "./types";
 
 export function LabelSettings({
   canManage,
@@ -74,7 +80,7 @@ export function LabelSettings({
             <TableRow className="[@media(hover:hover)]:hover:bg-transparent">
               <TableHead>Label</TableHead>
               <TableHead className="w-40">Color</TableHead>
-              {canManage ? <TableHead className="w-24 text-right">Actions</TableHead> : null}
+              {canManage ? <TableHead className="w-16 text-right">Actions</TableHead> : null}
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -99,27 +105,36 @@ export function LabelSettings({
                 </TableCell>
                 {canManage ? (
                   <TableCell className="text-right">
-                    <span className="inline-flex items-center gap-1">
-                      <Button
-                        aria-label={`Edit ${label.name}`}
-                        size="icon"
-                        type="button"
-                        variant="ghost"
-                        onClick={() => setEditing(label)}
-                      >
-                        <PiPencilSimple aria-hidden="true" />
-                      </Button>
-                      <Button
-                        aria-label={`Delete ${label.name}`}
-                        className="text-destructive"
-                        size="icon"
-                        type="button"
-                        variant="ghost"
-                        onClick={() => setRemoving(label)}
-                      >
-                        <PiTrash aria-hidden="true" />
-                      </Button>
-                    </span>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          aria-label={`Actions for ${label.name}`}
+                          size="icon"
+                          type="button"
+                          variant="ghost"
+                        >
+                          <PiDotsThree aria-hidden="true" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuGroup>
+                          <DropdownMenuItem className="gap-2" onSelect={() => setEditing(label)}>
+                            <PiPencilSimple aria-hidden="true" />
+                            Edit label
+                          </DropdownMenuItem>
+                        </DropdownMenuGroup>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuGroup>
+                          <DropdownMenuItem
+                            className="gap-2 text-destructive"
+                            onSelect={() => setRemoving(label)}
+                          >
+                            <PiTrash aria-hidden="true" />
+                            Delete label
+                          </DropdownMenuItem>
+                        </DropdownMenuGroup>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </TableCell>
                 ) : null}
               </TableRow>
@@ -153,7 +168,6 @@ export function LabelSettings({
           <DialogFooter>
             <Button
               disabled={pending}
-              size="sm"
               type="button"
               variant="ghost"
               onClick={() => setRemoving(null)}
@@ -162,7 +176,6 @@ export function LabelSettings({
             </Button>
             <Button
               disabled={pending}
-              size="sm"
               type="button"
               variant="destructive"
               onClick={() => void remove()}
@@ -174,98 +187,5 @@ export function LabelSettings({
         </DialogContent>
       </Dialog>
     </>
-  );
-}
-
-function LabelEditorDialog({
-  editing,
-  onOpenChange,
-  onSaved
-}: {
-  editing: MailLabel | "new" | null;
-  onOpenChange: (open: boolean) => void;
-  onSaved: () => Promise<void>;
-}): React.ReactElement {
-  const [name, setName] = React.useState("");
-  const [color, setColor] = React.useState<LabelColor>("blue");
-  const [pending, setPending] = React.useState(false);
-
-  React.useEffect(() => {
-    if (!editing) return;
-    setName(editing === "new" ? "" : editing.name);
-    setColor(editing === "new" ? "blue" : editing.color);
-  }, [editing]);
-
-  async function submit(event: React.FormEvent<HTMLFormElement>): Promise<void> {
-    event.preventDefault();
-    const trimmedName = name.trim();
-    if (!trimmedName) return;
-    setPending(true);
-    try {
-      if (editing === "new") await createLabel({ color, name: trimmedName });
-      else if (editing) await updateLabel(editing.id, { color, name: trimmedName });
-      toast.success(editing === "new" ? "Label created." : "Label updated.");
-      await onSaved();
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Label could not be saved.");
-    } finally {
-      setPending(false);
-    }
-  }
-
-  return (
-    <Dialog open={editing !== null} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[min(92vw,460px)]">
-        <DialogHeader>
-          <DialogTitle>{editing === "new" ? "Add label" : "Edit label"}</DialogTitle>
-          <DialogDescription>Choose a shared name and color.</DialogDescription>
-        </DialogHeader>
-        <form className="grid gap-4" onSubmit={(event) => void submit(event)}>
-          <div className="grid gap-1.5">
-            <Label htmlFor="label-name">Name</Label>
-            <Input
-              id="label-name"
-              maxLength={80}
-              required
-              value={name}
-              onChange={(event) => setName(event.target.value)}
-            />
-          </div>
-          <div className="grid gap-1.5">
-            <Label htmlFor="label-color">Color</Label>
-            <DropdownSelect
-              ariaLabel="Label color"
-              id="label-color"
-              options={labelColors.map((option) => ({
-                label: (
-                  <span className="flex items-center gap-2">
-                    <LabelColorDot color={option} />
-                    <span className="capitalize">{option}</span>
-                  </span>
-                ),
-                value: option
-              }))}
-              value={color}
-              onValueChange={(value) => setColor(value as LabelColor)}
-            />
-          </div>
-          <DialogFooter>
-            <Button
-              disabled={pending}
-              size="sm"
-              type="button"
-              variant="ghost"
-              onClick={() => onOpenChange(false)}
-            >
-              Cancel
-            </Button>
-            <Button disabled={pending || !name.trim()} size="sm" type="submit">
-              {pending ? <Spinner aria-hidden="true" /> : null}
-              Save label
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
   );
 }

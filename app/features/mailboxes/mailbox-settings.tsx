@@ -13,8 +13,9 @@ import {
   DialogTrigger
 } from "@/components/ui/dialog";
 import { DropdownSelect } from "@/components/ui/dropdown-select";
-import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
+import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { DomainSuffixInput, hasCompleteDomainSuffix } from "@/features/domains/domain-suffix-input";
 import type { MailDomain } from "@/features/domains/types";
 import { BulkMailboxAccessDialog } from "@/features/mailbox-access/bulk-mailbox-access-dialog";
 import { useMailboxAccessPolicies } from "@/features/mailbox-access/mailbox-access-policies";
@@ -62,6 +63,9 @@ export function MailboxSettings({
   const [pendingMailboxId, setPendingMailboxId] = React.useState<string | null>(null);
   const accessPolicies = useMailboxAccessPolicies(canManage);
   const mailboxDomainNames = mailboxDomains(mailboxes);
+  const availableDomains = domains.filter(
+    (domain) => domain.isEnabled && domain.disconnectedAt === null
+  );
   const activeDomain = mailboxDomainNames.includes(domainFilter) ? domainFilter : "all";
   const visibleMailboxes =
     activeDomain === "all"
@@ -79,6 +83,7 @@ export function MailboxSettings({
 
   async function handleCreate(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!hasCompleteDomainSuffix(address, availableDomains, "@") || !displayName.trim()) return;
     setCreatePending(true);
     try {
       await createMailbox({ address, displayName });
@@ -153,16 +158,22 @@ export function MailboxSettings({
               </DialogHeader>
               <form className="flex flex-col gap-5" onSubmit={(event) => void handleCreate(event)}>
                 <FieldGroup>
-                  <Field>
+                  <Field data-disabled={availableDomains.length === 0}>
                     <FieldLabel htmlFor="new-mailbox-address">Email address</FieldLabel>
-                    <Input
+                    <DomainSuffixInput
+                      domains={availableDomains}
                       id="new-mailbox-address"
-                      placeholder="support@example.com"
+                      placeholder="support"
                       required
-                      type="email"
+                      separator="@"
                       value={address}
-                      onChange={(event) => setAddress(event.target.value)}
+                      onValueChange={setAddress}
                     />
+                    {availableDomains.length === 0 ? (
+                      <FieldDescription>
+                        Enable an email domain before adding a mailbox.
+                      </FieldDescription>
+                    ) : null}
                   </Field>
                   <Field>
                     <FieldLabel htmlFor="new-mailbox-name">Sender name</FieldLabel>
@@ -181,7 +192,14 @@ export function MailboxSettings({
                       Cancel
                     </Button>
                   </DialogClose>
-                  <Button disabled={createPending} type="submit">
+                  <Button
+                    disabled={
+                      createPending ||
+                      !hasCompleteDomainSuffix(address, availableDomains, "@") ||
+                      !displayName.trim()
+                    }
+                    type="submit"
+                  >
                     {createPending ? "Adding mailbox…" : "Add mailbox"}
                   </Button>
                 </DialogFooter>
@@ -208,6 +226,7 @@ export function MailboxSettings({
               { label: "All domains", value: "all" },
               ...mailboxDomainNames.map((domain) => ({ label: domain, value: domain }))
             ]}
+            size="sm"
             value={activeDomain}
             onValueChange={(value) => {
               setDomainFilter(value);

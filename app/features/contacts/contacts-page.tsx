@@ -15,6 +15,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
+import type { MailLabel } from "@/features/labels/types";
 import type { ConversationSummary } from "@/features/messages/types";
 import { listContacts, saveContact } from "./api";
 import { ContactDetailView, ContactRow } from "./contact-views";
@@ -23,18 +24,26 @@ import type { ContactSummary } from "./types";
 const contactPageSize = 100;
 
 type ContactsPageProps = {
+  canCreateLabels?: boolean;
+  canOrganizeConversation?: (mailboxId: string | null) => boolean;
+  labels?: MailLabel[];
   selectedId: string | null;
   onBack: () => void;
   onCompose: (email: string) => void;
   onOpenConversation: (conversation: ConversationSummary) => void;
+  onLabelsChanged?: (() => Promise<void>) | undefined;
   onSelect: (id: string) => void;
 };
 
 export function ContactsPage({
+  canCreateLabels = false,
+  canOrganizeConversation = () => false,
+  labels = [],
   selectedId,
   onBack,
   onCompose,
   onOpenConversation,
+  onLabelsChanged,
   onSelect
 }: ContactsPageProps): React.ReactElement {
   const [contacts, setContacts] = React.useState<ContactSummary[]>([]);
@@ -89,10 +98,14 @@ export function ContactsPage({
   if (selectedId) {
     return (
       <ContactDetailView
+        canCreateLabels={canCreateLabels}
+        canOrganizeConversation={canOrganizeConversation}
         id={selectedId}
+        labels={labels}
         onBack={onBack}
         onCompose={onCompose}
         onOpenConversation={onOpenConversation}
+        onLabelsChanged={onLabelsChanged}
         onRemoved={() => {
           onBack();
           void refresh();
@@ -288,14 +301,13 @@ function CreateContactDialog({
           <DialogFooter>
             <Button
               disabled={pending}
-              size="sm"
               type="button"
               variant="ghost"
               onClick={() => onOpenChange(false)}
             >
               Cancel
             </Button>
-            <Button disabled={pending} size="sm" type="submit">
+            <Button disabled={pending} type="submit">
               {pending ? <Spinner aria-hidden="true" /> : null}
               Save contact
             </Button>

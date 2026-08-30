@@ -3,6 +3,7 @@ import { errorBody, toAppError } from "@worker/lib/errors";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
+  accessibleMessageScope: vi.fn(),
   enforceRateLimit: vi.fn(),
   findMailboxForSending: vi.fn(),
   forwardMessage: vi.fn(),
@@ -23,6 +24,7 @@ vi.mock("@worker/auth/mail-api", () => ({
   requireMailApiPrincipal: mocks.requireMailApiPrincipal
 }));
 vi.mock("@worker/auth/mailbox-access", () => ({
+  accessibleMessageScope: mocks.accessibleMessageScope,
   requireMailboxAccess: mocks.requireMailboxAccess
 }));
 vi.mock("@worker/security/rate-limit", () => ({
@@ -76,6 +78,10 @@ describe("send routes", () => {
       }
     });
     mocks.findMailboxForSending.mockResolvedValue({ id: "mailbox-1" });
+    mocks.accessibleMessageScope.mockResolvedValue({
+      includeUnassigned: false,
+      mailboxIds: ["mailbox-1"]
+    });
     mocks.getAccessibleDraft.mockResolvedValue({
       forwardOfMessageId: null,
       from: "sender@example.com",
@@ -256,7 +262,8 @@ describe("send routes", () => {
       expect.objectContaining({ DB: db }),
       expect.objectContaining({ messageId: "message-1" }),
       "agent-1",
-      noSignature
+      noSignature,
+      { includeUnassigned: false, mailboxIds: ["mailbox-1"] }
     );
     expect(mocks.recordAudit).toHaveBeenCalledWith(
       db,

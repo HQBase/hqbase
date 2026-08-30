@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 
+import type { MessageScope } from "../../auth/mailbox-access";
 import { newId, nowIso } from "../../db/client";
 import { getRows } from "../../db/drizzle";
 import type { WorkerEnv } from "../../lib/env";
@@ -7,7 +8,12 @@ import { AppError } from "../../lib/errors";
 import { findMailboxForSending } from "../mailboxes/queries";
 import type { Mailbox } from "../mailboxes/types";
 import { ensureReplySubject } from "../messages/headers";
-import { getMessageDetail, insertAttachment, insertMessage } from "../messages/queries";
+import {
+  getMessageDetail,
+  insertAttachment,
+  insertMessage,
+  listThreadMessages
+} from "../messages/queries";
 import { createThread, touchThread } from "../messages/threading";
 import type { MessageSummary } from "../messages/types";
 import type { SignatureSnapshot } from "../signatures/types";
@@ -33,7 +39,7 @@ import {
   type StoredOutgoingAttachment,
   totalAttachmentBytes
 } from "./content-attachments";
-import { buildReplyContext } from "./reply-body";
+import { buildReplyChainContext } from "./reply-body";
 import type { ReplyMessageInput, SendMessageInput } from "./validation";
 
 export async function sendNewMessage(
@@ -110,7 +116,8 @@ export async function replyToMessage(
   env: WorkerEnv,
   input: ReplyMessageInput,
   principalId?: string,
-  signature?: SignatureSnapshot
+  signature?: SignatureSnapshot,
+  messageScope?: MessageScope
 ): Promise<MessageSummary> {
   const mailbox = await ensureActiveMailbox(env.DB, input.from);
 
@@ -118,6 +125,11 @@ export async function replyToMessage(
   if (!original) {
     throw new AppError("MESSAGE_NOT_FOUND", "Message not found.", 404);
   }
+  const threadMessages = messageScope
+    ? await listThreadMessages(env.DB, original.threadId, messageScope)
+    : [original];
+  const targetIndex = threadMessages.findIndex((message) => message.id === original.id);
+  const replyChain = targetIndex < 0 ? [original] : threadMessages.slice(0, targetIndex + 1);
 
   const timestamp = nowIso();
   const references = [...original.references, original.messageId].filter(
@@ -143,12 +155,13 @@ export async function replyToMessage(
           original.id,
           original.attachments,
           maxAttachmentBytes - totalAttachmentBytes(baseAttachments),
-          maxAttachmentCount - baseAttachments.length
+          maxAttachmentCount - baseAttachments.length,
+          replyChain.length === 1
         )
       : { html: undefined, inlineAttachments: [] };
   const signatureTextLength = preparedSignature.snapshot?.text.trim().length ?? 0;
-  const context = buildReplyContext(
-    original,
+  const context = buildReplyChainContext(
+    replyChain,
     quoted.html,
     100_000 - input.text.trim().length - signatureTextLength - 4
   );

@@ -107,6 +107,11 @@ describe("contacts page", () => {
     expect(view.container.textContent).toContain("Project timing");
     expect(view.container.textContent).toContain("Can we talk tomorrow?");
     expect(view.container.innerHTML).toContain("max-w-[960px]");
+    const privateHeading = [...view.container.querySelectorAll("h2")].find(
+      (heading) => heading.textContent === "Private contact details"
+    );
+    expect(privateHeading?.closest("section")?.className).not.toContain("rounded-xl");
+    expect(privateHeading?.closest("section")?.className).not.toContain("bg-background");
 
     const newEmail = Array.from(view.container.querySelectorAll("button")).find((button) =>
       button.textContent?.includes("New email")
@@ -114,11 +119,12 @@ describe("contacts page", () => {
     await flushHookEffects(() => newEmail?.click());
     expect(onCompose).toHaveBeenCalledWith("alice@example.com");
 
-    const exchange = Array.from(view.container.querySelectorAll("button")).find((button) =>
-      button.textContent?.includes("Project timing")
+    const exchange = Array.from(view.container.querySelectorAll("a")).find((anchor) =>
+      anchor.textContent?.includes("Project timing")
     );
     expect(exchange?.className).toContain("hover:bg-hover");
     expect(exchange?.className).toContain("sm:py-2");
+    expect(exchange?.className).toContain("sm:grid-cols-[2rem_minmax(7rem,18%)");
     expect(view.container.firstElementChild?.className).toContain("bg-list");
     await flushHookEffects(() => exchange?.click());
     expect(onOpenConversation).toHaveBeenCalledWith(

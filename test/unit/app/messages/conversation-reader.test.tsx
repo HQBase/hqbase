@@ -84,8 +84,8 @@ describe("conversation reader", () => {
     expect(html.indexOf("We can help.")).toBeLessThan(html.lastIndexOf(">Reply<"));
     expect(html.match(/>Reply</g)).toHaveLength(1);
     expect(html.match(/>Forward</g)).toHaveLength(1);
-    expect(html).toContain('data-compose-message-id="msg_1"');
-    expect(html).toContain('data-compose-message-id="msg_2"');
+    expect(html).not.toContain('data-compose-message-id="msg_1"');
+    expect(html.match(/data-compose-message-id="msg_2"/g)).toHaveLength(2);
     expectReaderBackLayout(html);
     expect(html).toContain('aria-label="Archive conversation"');
     expect(html).toContain("Customer Example");

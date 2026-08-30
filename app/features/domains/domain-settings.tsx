@@ -2,7 +2,6 @@ import * as React from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import type { Mailbox } from "@/features/mailboxes/types";
 import { CloudflareAuthorizationDialog } from "@/features/settings/cloudflare-authorization-dialog";
@@ -25,6 +24,11 @@ import {
   type PendingCloudflareOperation,
   readPendingOperation
 } from "./domain-oauth-state";
+import {
+  DomainSuffixInput,
+  hasCompleteDomainSuffix,
+  parseDomainSuffix
+} from "./domain-suffix-input";
 import { DomainTable } from "./domain-table";
 import type { MailDomain } from "./types";
 
@@ -52,6 +56,7 @@ export function DomainSettings({
     React.useState<PendingCloudflareOperation | null>(null);
   const [pendingDomainId, setPendingDomainId] = React.useState<string | null>(null);
   const resumedRef = React.useRef(false);
+  const availablePortalDomains = domains.filter((domain) => domain.zoneId !== null);
 
   const refresh = React.useCallback(
     () =>
@@ -163,7 +168,8 @@ export function DomainSettings({
 
   function portal(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const domain = domains.find((item) => hostname.endsWith(`.${item.name}`));
+    const selected = parseDomainSuffix(hostname, availablePortalDomains, ".").domain;
+    const domain = domains.find((item) => item.id === selected?.id);
     if (!domain?.zoneId) {
       toast.error("The portal must use a connected domain with a Cloudflare zone.");
       return;
@@ -302,16 +308,24 @@ export function DomainSettings({
           <FieldGroup>
             <Field>
               <FieldLabel htmlFor="portal-hostname">Workspace portal</FieldLabel>
-              <Input
+              <DomainSuffixInput
+                domains={availablePortalDomains}
                 id="portal-hostname"
-                placeholder="mail.example.com"
+                placeholder="mail"
                 required
+                separator="."
                 value={hostname}
-                onChange={(event) => setHostname(event.target.value)}
+                onValueChange={setHostname}
               />
             </Field>
           </FieldGroup>
-          <Button className="self-start" disabled={changePending} type="submit">
+          <Button
+            className="self-start"
+            disabled={
+              changePending || !hasCompleteDomainSuffix(hostname, availablePortalDomains, ".")
+            }
+            type="submit"
+          >
             Save
           </Button>
         </form>

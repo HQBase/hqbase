@@ -2,7 +2,6 @@ import type * as React from "react";
 import { PiCheckCircle, PiCircle, PiWarningCircle } from "react-icons/pi";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Checkbox } from "@/components/ui/checkbox";
-import { DropdownSelect } from "@/components/ui/dropdown-select";
 import {
   Field,
   FieldDescription,
@@ -10,7 +9,7 @@ import {
   FieldLabel,
   FieldLabelRow
 } from "@/components/ui/field";
-import { InputGroup, InputGroupInput } from "@/components/ui/input-group";
+import { DomainSuffixInput, parseDomainSuffix } from "@/features/domains/domain-suffix-input";
 import type { DomainErrors } from "./setup-validation";
 import { WizardActions, WizardPanel } from "./setup-wizard-parts";
 import type { CloudflareConfigureResult, CloudflareZone } from "./types";
@@ -104,7 +103,6 @@ export function DomainStep(props: {
       <WorkspaceUrlField
         domainError={props.errors.portalZoneId}
         hostname={props.appHostname}
-        portalZoneId={props.portalZoneId}
         selectedZones={props.selectedZones}
         subdomainError={props.errors.appSubdomain}
         value={props.appSubdomain}
@@ -118,7 +116,6 @@ export function DomainStep(props: {
 function WorkspaceUrlField(props: {
   domainError?: string | undefined;
   hostname: string;
-  portalZoneId: string;
   selectedZones: CloudflareZone[];
   subdomainError?: string | undefined;
   value: string;
@@ -126,6 +123,7 @@ function WorkspaceUrlField(props: {
   onDomainChange: (value: string) => void;
 }) {
   const invalid = Boolean(props.domainError || props.subdomainError);
+  const domains = props.selectedZones.map((zone) => ({ id: zone.id, name: zone.name }));
   return (
     <Field data-invalid={invalid}>
       <FieldLabelRow>
@@ -135,23 +133,20 @@ function WorkspaceUrlField(props: {
           {props.domainError ? <FieldError>{props.domainError}</FieldError> : null}
         </div>
       </FieldLabelRow>
-      <InputGroup data-invalid={invalid}>
-        <InputGroupInput
-          aria-invalid={invalid}
-          autoCapitalize="none"
-          id="workspace-subdomain"
-          value={props.value}
-          onChange={(event) => props.onChange(event.target.value)}
-        />
-        <DropdownSelect
-          ariaLabel="Workspace URL domain"
-          className="h-full min-h-0 w-auto max-w-[65%] shrink-0 rounded-l-none border-0 border-l bg-muted/45 shadow-none focus-visible:ring-0"
-          options={props.selectedZones.map((zone) => ({ label: zone.name, value: zone.id }))}
-          placeholder="Choose domain"
-          value={props.portalZoneId}
-          onValueChange={props.onDomainChange}
-        />
-      </InputGroup>
+      <DomainSuffixInput
+        domains={domains}
+        id="workspace-subdomain"
+        invalid={invalid}
+        placeholder="hqbase"
+        required
+        separator="."
+        value={props.hostname || props.value}
+        onValueChange={(hostname) => {
+          const parsed = parseDomainSuffix(hostname, domains, ".");
+          props.onChange(parsed.prefix);
+          if (parsed.domain) props.onDomainChange(parsed.domain.id);
+        }}
+      />
       <FieldDescription>
         Your webmail UI will be available at {props.hostname || `${props.value}.yourdomain.com`}.
       </FieldDescription>

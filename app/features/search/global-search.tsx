@@ -10,6 +10,7 @@ import {
 } from "react-icons/pi";
 
 import { Input } from "@/components/ui/input";
+import { useDropdownPlacement } from "@/hooks/use-dropdown-placement";
 import { cn } from "@/lib/cn";
 
 import { searchWorkspace } from "./api";
@@ -48,12 +49,14 @@ export function GlobalSearch({
   const [status, setStatus] = React.useState<"error" | "idle" | "loading" | "ready">("idle");
   const listId = React.useId();
   const inputRef = React.useRef<HTMLInputElement>(null);
+  const listRef = React.useRef<HTMLDivElement>(null);
   const requestId = React.useRef(0);
   const rootRef = React.useRef<HTMLDivElement>(null);
   const groups = React.useMemo(() => groupSearchResults(results), [results]);
   const flatResults = React.useMemo(() => groups.flatMap((group) => group.results), [groups]);
   const trimmedQuery = query.trim();
   const listOpen = open && trimmedQuery.length > 0;
+  const placement = useDropdownPlacement(listOpen, inputRef, listRef);
 
   React.useEffect(() => {
     const currentRequest = requestId.current + 1;
@@ -140,10 +143,11 @@ export function GlobalSearch({
         aria-expanded={listOpen}
         aria-label="Search HQBase"
         autoComplete="off"
-        className="h-[30px] border-transparent bg-muted/70 pl-8 pr-9 text-xs shadow-none focus-visible:border-input focus-visible:ring-1"
+        className="border-transparent bg-muted/70 pl-8 pr-9 text-xs shadow-none focus-visible:border-input focus-visible:ring-1"
         maxLength={200}
         placeholder="Search HQBase"
         role="combobox"
+        size="sm"
         spellCheck={false}
         value={query}
         onBlur={(event) => {
@@ -178,9 +182,15 @@ export function GlobalSearch({
       {listOpen ? (
         <div
           aria-busy={status === "loading"}
-          className="absolute inset-x-0 top-10 z-50 max-h-[min(32rem,calc(100dvh-4rem))] touch-pan-y overflow-y-auto rounded-xl border border-divider bg-popover p-1.5 text-popover-foreground shadow-xl"
+          className={cn(
+            "absolute inset-x-0 z-50 touch-pan-y overflow-y-auto rounded-xl border border-divider bg-popover p-1.5 text-popover-foreground shadow-xl",
+            placement.side === "top" ? "bottom-full mb-2" : "top-full mt-2"
+          )}
+          data-side={placement.side}
           id={listId}
+          ref={listRef}
           role="listbox"
+          style={{ maxHeight: Math.min(512, placement.maxHeight) }}
         >
           {groups.length > 0 ? (
             <SearchGroups

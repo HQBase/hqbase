@@ -12,7 +12,6 @@ import {
   DropdownMenuTrigger
 } from "@/components/ui/dropdown-menu";
 import type { CurrentUser } from "@/features/auth/types";
-import type { MailConnectionStatus } from "@/features/events/types";
 import { MailboxFilterLabel } from "@/features/mailboxes/mailbox-filter-label";
 import type { Mailbox } from "@/features/mailboxes/types";
 import type { UnreadCounts } from "@/features/notifications/types";
@@ -25,7 +24,6 @@ type TopBarProps = {
   activeFolder: FolderId;
   activeSettingsTab?: SettingsTabId | undefined;
   canManage?: boolean | undefined;
-  connectionStatus?: MailConnectionStatus | undefined;
   draftCount: number;
   user: CurrentUser;
   mailboxes: Mailbox[];
@@ -48,7 +46,6 @@ export function TopBar({
   activeFolder,
   activeSettingsTab,
   canManage,
-  connectionStatus,
   draftCount,
   user,
   mailboxes,
@@ -89,7 +86,6 @@ export function TopBar({
         activeFolder={activeFolder}
         activeSettingsTab={activeSettingsTab}
         canManage={canManage}
-        connectionStatus={connectionStatus}
         draftCount={draftCount}
         mailboxId={mailboxId}
         mailboxes={mailboxes}

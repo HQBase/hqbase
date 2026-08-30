@@ -1,7 +1,14 @@
 import * as React from "react";
-import { PiEye, PiEyeSlash, PiPlus, PiTrash, PiWarningCircle } from "react-icons/pi";
+import { PiDotsThree, PiEye, PiEyeSlash, PiPlus, PiTrash, PiWarningCircle } from "react-icons/pi";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuTrigger
+} from "@/components/ui/dropdown-menu";
 import { DropdownSelect } from "@/components/ui/dropdown-select";
 import {
   Field,
@@ -20,6 +27,7 @@ import {
   TableHeader,
   TableRow
 } from "@/components/ui/table";
+import { DomainSuffixInput } from "@/features/domains/domain-suffix-input";
 import { LOGIN_EMAIL_HINT } from "@/lib/login-email";
 import { SetupCatchAllSettings } from "./setup-catch-all-settings";
 import type { MailboxDraft, MailboxErrors, OwnerErrors } from "./setup-validation";
@@ -203,13 +211,17 @@ export function MailboxStep({
                   <TableCell className="p-1">
                     <Field className="gap-1" data-invalid={Boolean(error.address)}>
                       {error.address ? <FieldError>{error.address}</FieldError> : null}
-                      <Input
-                        aria-label={`Mailbox ${index + 1} email address`}
-                        aria-invalid={Boolean(error.address)}
-                        className="h-[30px] shadow-none"
-                        type="email"
+                      <DomainSuffixInput
+                        ariaLabel={`Mailbox ${index + 1} email address`}
+                        className="shadow-none"
+                        domains={domains.map((domain) => ({ id: domain, name: domain }))}
+                        id={`setup-mailbox-${index + 1}-address`}
+                        invalid={Boolean(error.address)}
+                        required
+                        separator="@"
+                        size="sm"
                         value={mailbox.address}
-                        onChange={(event) => onUpdate(index, { address: event.target.value })}
+                        onValueChange={(address) => onUpdate(index, { address })}
                       />
                     </Field>
                   </TableCell>
@@ -219,24 +231,39 @@ export function MailboxStep({
                       <Input
                         aria-label={`Mailbox ${index + 1} sender name`}
                         aria-invalid={Boolean(error.displayName)}
-                        className="h-[30px] shadow-none"
+                        className="shadow-none"
                         placeholder="Support"
+                        size="sm"
                         value={mailbox.displayName}
                         onChange={(event) => onUpdate(index, { displayName: event.target.value })}
                       />
                     </Field>
                   </TableCell>
                   <TableCell className="px-1 py-1 text-center">
-                    <Button
-                      aria-label={`Remove mailbox ${index + 1}`}
-                      disabled={mailboxes.length <= 1}
-                      size="icon"
-                      type="button"
-                      variant="ghost"
-                      onClick={() => onRemove(index)}
-                    >
-                      <PiTrash aria-hidden="true" />
-                    </Button>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          aria-label={`Actions for mailbox ${index + 1}`}
+                          disabled={mailboxes.length <= 1}
+                          size="icon"
+                          type="button"
+                          variant="ghost"
+                        >
+                          <PiDotsThree aria-hidden="true" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuGroup>
+                          <DropdownMenuItem
+                            className="gap-2 text-destructive"
+                            onSelect={() => onRemove(index)}
+                          >
+                            <PiTrash aria-hidden="true" />
+                            Remove mailbox
+                          </DropdownMenuItem>
+                        </DropdownMenuGroup>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </TableCell>
                 </TableRow>
               );

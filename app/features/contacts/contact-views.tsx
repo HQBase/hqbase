@@ -3,12 +3,18 @@ import { PiArrowLeft, PiEnvelopeSimple, PiNotePencil, PiTrash } from "react-icon
 import { toast } from "sonner";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
+import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
+import { setConversationLabel } from "@/features/labels/api";
+import type { MailLabel } from "@/features/labels/types";
+import { runConversationAction } from "@/features/messages/api";
+import { groupConversations } from "@/features/messages/conversation-display";
+import { MessageListItem } from "@/features/messages/message-list-item";
 import type { ConversationSummary } from "@/features/messages/types";
-import { formatConversationTimestamp, initials } from "@/lib/format";
+import { initials } from "@/lib/format";
+import { appRoutePath } from "@/lib/routes";
 import { getContact, removeContact, saveContact } from "./api";
 import type { ContactDetailResponse, ContactSummary } from "./types";
 
@@ -40,17 +46,25 @@ export function ContactRow({
 }
 
 export function ContactDetailView({
+  canCreateLabels = false,
+  canOrganizeConversation = () => false,
   id,
+  labels = [],
   onBack,
   onCompose,
   onOpenConversation,
+  onLabelsChanged,
   onRemoved,
   onSaved
 }: {
+  canCreateLabels?: boolean;
+  canOrganizeConversation?: (mailboxId: string | null) => boolean;
   id: string;
+  labels?: MailLabel[];
   onBack: () => void;
   onCompose: (email: string) => void;
   onOpenConversation: (conversation: ConversationSummary) => void;
+  onLabelsChanged?: (() => Promise<void>) | undefined;
   onRemoved: () => void;
   onSaved: () => void;
 }): React.ReactElement {
@@ -148,6 +162,49 @@ export function ContactDetailView({
     }
   }
 
+  async function toggleLabel(
+    conversation: ConversationSummary,
+    label: MailLabel,
+    assigned: boolean
+  ): Promise<void> {
+    const result = await setConversationLabel(conversation.id, label.id, assigned);
+    setDetail((current) =>
+      current
+        ? {
+            ...current,
+            conversations: current.conversations.map((entry) =>
+              entry.threadId === result.threadId ? { ...entry, labels: result.labels } : entry
+            )
+          }
+        : current
+    );
+  }
+
+  async function toggleStar(conversation: ConversationSummary): Promise<void> {
+    const action = conversation.isStarred ? "unstar" : "star";
+    try {
+      const result = await runConversationAction(conversation.id, action, conversation.folder);
+      setDetail((current) =>
+        current
+          ? {
+              ...current,
+              conversations: current.conversations.map((entry) =>
+                entry.threadId === result.threadId
+                  ? {
+                      ...entry,
+                      isStarred: action === "star",
+                      starredAt: action === "star" ? new Date().toISOString() : null
+                    }
+                  : entry
+              )
+            }
+          : current
+      );
+    } catch {
+      toast.error("The conversation could not be updated. Try again.");
+    }
+  }
+
   return (
     <div className="flex h-full flex-col bg-list">
       <header className="flex h-12 shrink-0 items-center border-b border-divider bg-toolbar">
@@ -176,7 +233,7 @@ export function ContactDetailView({
             </span>
           </div>
         ) : (
-          <div className="mx-auto w-full max-w-[960px] space-y-6 px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
+          <div className="mx-auto flex w-full max-w-[960px] flex-col gap-6 px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
             <div className="flex flex-wrap items-center gap-4">
               <ContactAvatar className="size-14" contact={detail.contact} />
               <div className="min-w-0 flex-1">
@@ -190,14 +247,14 @@ export function ContactDetailView({
                 New email
               </Button>
             </div>
-            <section className="rounded-xl border bg-background p-4 sm:p-5">
+            <section>
               <div className="flex items-center gap-2">
                 <PiNotePencil aria-hidden="true" className="text-muted-foreground" />
                 <h2 className="text-sm font-medium">Private contact details</h2>
               </div>
-              <div className="mt-4 grid gap-4">
-                <div className="grid gap-1.5">
-                  <Label htmlFor="contact-name">Name</Label>
+              <FieldGroup className="mt-4 gap-4">
+                <Field>
+                  <FieldLabel htmlFor="contact-name">Name</FieldLabel>
                   <Input
                     id="contact-name"
                     maxLength={200}
@@ -205,9 +262,9 @@ export function ContactDetailView({
                     value={name}
                     onChange={(event) => setName(event.target.value)}
                   />
-                </div>
-                <div className="grid gap-1.5">
-                  <Label htmlFor="contact-notes">Notes</Label>
+                </Field>
+                <Field>
+                  <FieldLabel htmlFor="contact-notes">Notes</FieldLabel>
                   <Textarea
                     id="contact-notes"
                     maxLength={10_000}
@@ -215,7 +272,7 @@ export function ContactDetailView({
                     value={notes}
                     onChange={(event) => setNotes(event.target.value)}
                   />
-                </div>
+                </Field>
                 <div className="flex flex-wrap items-center gap-2">
                   <Button disabled={pending !== null} size="sm" type="button" onClick={save}>
                     {pending === "save" ? <Spinner aria-hidden="true" /> : null}
@@ -238,7 +295,7 @@ export function ContactDetailView({
                     </Button>
                   ) : null}
                 </div>
-              </div>
+              </FieldGroup>
             </section>
             <section>
               <h2 className="text-sm font-medium">Email exchanges</h2>
@@ -247,13 +304,39 @@ export function ContactDetailView({
                   No accessible email exchanges with this address.
                 </p>
               ) : (
-                <div className="mt-3 flex flex-col gap-0.5">
-                  {detail.conversations.map((conversation) => (
-                    <ExchangeRow
-                      conversation={conversation}
-                      key={conversation.threadId}
-                      onOpen={onOpenConversation}
-                    />
+                <div className="mt-3">
+                  {groupConversations(detail.conversations).map((group) => (
+                    <section aria-labelledby={`contact-exchange-${group.key}`} key={group.key}>
+                      <h3
+                        className="px-3 pb-1.5 pt-4 text-[13px] font-medium text-foreground sm:px-0"
+                        id={`contact-exchange-${group.key}`}
+                      >
+                        {group.label}
+                      </h3>
+                      <div className="flex flex-col gap-0.5">
+                        {group.conversations.map((conversation) => (
+                          <MessageListItem
+                            canCreateLabels={canCreateLabels}
+                            canOrganizeLabels={canOrganizeConversation(conversation.mailboxId)}
+                            conversation={conversation}
+                            href={appRoutePath({
+                              kind: "mail",
+                              folder: conversation.folder,
+                              messageId: conversation.id
+                            })}
+                            isActive={false}
+                            key={conversation.threadId}
+                            labels={labels}
+                            onLabelsChanged={onLabelsChanged}
+                            onSelect={onOpenConversation}
+                            onToggleLabel={(label, assigned) =>
+                              toggleLabel(conversation, label, assigned)
+                            }
+                            onToggleStar={(entry) => void toggleStar(entry)}
+                          />
+                        ))}
+                      </div>
+                    </section>
                   ))}
                 </div>
               )}
@@ -276,31 +359,6 @@ export function ContactDetailView({
         )}
       </div>
     </div>
-  );
-}
-
-function ExchangeRow({
-  conversation,
-  onOpen
-}: {
-  conversation: ConversationSummary;
-  onOpen: (conversation: ConversationSummary) => void;
-}): React.ReactElement {
-  const timestamp = conversation.receivedAt ?? conversation.sentAt ?? conversation.createdAt;
-  return (
-    <button
-      className="grid min-h-16 w-full grid-cols-[minmax(0,1fr)_auto] gap-x-3 rounded-xl px-3 py-3 text-left transition-colors [@media(hover:hover)]:hover:bg-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring sm:py-2"
-      type="button"
-      onClick={() => onOpen(conversation)}
-    >
-      <span className="truncate text-sm font-medium">{conversation.subject || "(no subject)"}</span>
-      <span className="text-[11px] text-muted-foreground">
-        {formatConversationTimestamp(timestamp)}
-      </span>
-      <span className="col-span-2 truncate text-xs text-muted-foreground">
-        {conversation.snippet}
-      </span>
-    </button>
   );
 }
 

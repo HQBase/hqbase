@@ -55,6 +55,7 @@ export function ComposeDialog({
   open,
   presentation = "window",
   threadContext,
+  threadMessages = [],
   windowSlot = 0,
   onDetach,
   onDraftReady,
@@ -336,6 +337,9 @@ export function ComposeDialog({
       threadContext={threadContext}
       to={to}
       replyMessage={mode === "reply" ? message : null}
+      replyMessages={
+        mode === "reply" && message ? (threadMessages.length > 0 ? threadMessages : [message]) : []
+      }
       onDiscard={() => void discard()}
       onEditorChange={(nextHtml, nextText) => {
         removeUnreferencedInlineAttachments(nextHtml);

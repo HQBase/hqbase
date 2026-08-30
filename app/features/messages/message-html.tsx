@@ -14,9 +14,13 @@ export { splitQuotedText } from "./message-html-content";
 
 type MessageHtmlProps = {
   message: MessageDetail;
+  quoteMode?: "expanded" | "hidden" | "interactive";
 };
 
-export function MessageHtml({ message }: MessageHtmlProps): React.ReactElement {
+export function MessageHtml({
+  message,
+  quoteMode = "interactive"
+}: MessageHtmlProps): React.ReactElement {
   const { theme } = useTheme();
   const [html, setHtml] = React.useState<Awaited<ReturnType<typeof getMessageHtml>> | null>(null);
   const [loadRemoteImages, setLoadRemoteImages] = React.useState(false);
@@ -82,7 +86,7 @@ export function MessageHtml({ message }: MessageHtmlProps): React.ReactElement {
     [html, loadRemoteImages, theme]
   );
   const bodyHasContent = React.useMemo(() => hasMessageHtmlContent(html?.html ?? ""), [html?.html]);
-  const quoteVisible = quoteExpanded || !bodyHasContent;
+  const quoteVisible = quoteMode === "expanded" || quoteExpanded || !bodyHasContent;
   const showRemoteImagesAlert = Boolean(
     html && !loadRemoteImages && hasVisibleRemoteImages(html, quoteVisible)
   );
@@ -118,7 +122,7 @@ export function MessageHtml({ message }: MessageHtmlProps): React.ReactElement {
   if (!rendered && !renderedQuote && !renderedAfterQuote) {
     return (
       <>
-        <PlainTextMessage message={message} />
+        <PlainTextMessage message={message} quoteMode={quoteMode} />
         {error && <p className="mt-3 text-xs text-destructive">{error}</p>}
       </>
     );
@@ -141,9 +145,11 @@ export function MessageHtml({ message }: MessageHtmlProps): React.ReactElement {
         afterQuote={renderedAfterQuote}
         body={rendered}
         bodyHasContent={bodyHasContent}
-        onToggleQuote={() => setQuoteExpanded((expanded) => !expanded)}
+        onToggleQuote={
+          quoteMode === "interactive" ? () => setQuoteExpanded((expanded) => !expanded) : null
+        }
         quote={renderedQuote}
-        quoteExpanded={quoteExpanded}
+        quoteExpanded={quoteVisible}
         subject={message.subject}
       />
     </div>
@@ -176,12 +182,11 @@ export function MessageHtmlFrames({
   afterQuote: string | null;
   body: string | null;
   bodyHasContent: boolean;
-  onToggleQuote: () => void;
+  onToggleQuote: (() => void) | null;
   quote: string | null;
   quoteExpanded: boolean;
   subject: string;
 }): React.ReactElement {
-  const showQuoteControl = Boolean(bodyHasContent && quote);
   const showQuote = quoteExpanded || !bodyHasContent;
 
   return (
@@ -191,7 +196,7 @@ export function MessageHtmlFrames({
       ) : null}
       {quote ? (
         <>
-          {showQuoteControl ? (
+          {bodyHasContent && onToggleQuote ? (
             <QuotedContentDivider expanded={quoteExpanded} onToggle={onToggleQuote} />
           ) : null}
           <div
@@ -348,9 +353,13 @@ export function RemoteImagesAlert({
   );
 }
 
-export function PlainTextMessage({ message }: MessageHtmlProps): React.ReactElement {
+export function PlainTextMessage({
+  message,
+  quoteMode = "interactive"
+}: MessageHtmlProps): React.ReactElement {
   const [expanded, setExpanded] = React.useState(false);
   const content = splitQuotedText(message.textBody || message.snippet);
+  const quoteVisible = quoteMode === "expanded" || expanded;
   return (
     <div className="flex flex-col gap-4">
       {content.body ? (
@@ -360,10 +369,15 @@ export function PlainTextMessage({ message }: MessageHtmlProps): React.ReactElem
       ) : null}
       {content.quote ? (
         <>
-          <QuotedContentDivider expanded={expanded} onToggle={() => setExpanded((open) => !open)} />
+          {quoteMode === "interactive" ? (
+            <QuotedContentDivider
+              expanded={expanded}
+              onToggle={() => setExpanded((open) => !open)}
+            />
+          ) : null}
           <div
-            aria-hidden={!expanded}
-            className={expanded ? "block" : "hidden print:block"}
+            aria-hidden={!quoteVisible}
+            className={quoteVisible ? "block" : "hidden print:block"}
             data-quoted-content-frame
           >
             <pre className="whitespace-pre-wrap break-words border-l border-border pl-[1ex] font-[Arial,Helvetica,sans-serif] text-[small] leading-[1.5] text-muted-foreground">
