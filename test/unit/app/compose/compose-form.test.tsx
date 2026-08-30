@@ -37,6 +37,7 @@ describe("compose form", () => {
         presentation="window"
         ready
         replyMessage={null}
+        replyMessages={[]}
         sendDisabled={false}
         signature={{
           mode: "selected",

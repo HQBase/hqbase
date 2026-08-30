@@ -23,6 +23,7 @@ export type ComposeDialogProps = {
   open: boolean;
   presentation?: "window" | "thread";
   threadContext?: React.ReactNode;
+  threadMessages?: MessageDetail[];
   windowSlot?: number;
   onDetach?: (() => void) | undefined;
   onDraftReady?: ((draftId: string) => void) | undefined;

@@ -1,3 +1,4 @@
+import { splitQuotedText } from "../../../shared/message-quote";
 import type { MessageDetail } from "../messages/types";
 import { assembleMessageBody } from "./body";
 
@@ -49,6 +50,62 @@ export function buildReplyContext(
     text,
     html: quoteHtml(attribution, richQuoteHtml ?? plainTextHtml(quoted))
   };
+}
+
+export function buildReplyChainContext(
+  messages: ReplySource[],
+  richLatestHtml?: string,
+  maxTextLength = maxQuotedCharacters
+): { html: string; text: string } {
+  const oldest = messages[0];
+  const latest = messages.at(-1);
+  if (!oldest || !latest) throw new Error("A reply chain needs at least one message.");
+
+  let nestedText = messageText(oldest);
+  let nestedHtml =
+    messages.length === 1 && richLatestHtml ? richLatestHtml : plainTextHtml(nestedText);
+  for (let index = 1; index < messages.length; index += 1) {
+    const current = messages[index];
+    const previous = messages[index - 1];
+    if (!current || !previous) continue;
+    const currentText = authoredMessageText(current);
+    const attribution = replyAttribution(previous);
+    nestedText = joinText(currentText, `${attribution}\n${quotePlainText(nestedText)}`);
+    nestedHtml = joinHtml(
+      index === messages.length - 1 && richLatestHtml ? richLatestHtml : plainTextHtml(currentText),
+      quoteHtml(attribution, nestedHtml)
+    );
+  }
+
+  return buildReplyContext(
+    { ...latest, snippet: nestedText, textBody: nestedText },
+    nestedHtml,
+    maxTextLength
+  );
+}
+
+function messageText(message: ReplySource): string {
+  return (message.textBody || message.snippet).replace(/\r\n?/g, "\n").trim();
+}
+
+function authoredMessageText(message: ReplySource): string {
+  const source = messageText(message);
+  const parts = splitQuotedText(source);
+  return joinText(parts.body, parts.afterQuote ?? "") || source;
+}
+
+function joinText(...parts: string[]): string {
+  return parts.filter((part) => part.trim()).join("\n\n");
+}
+
+function joinHtml(...parts: string[]): string {
+  return parts.filter(Boolean).join("<br><br>");
+}
+
+function replyAttribution(message: ReplySource): string {
+  return `On ${formatTimestamp(
+    message.receivedAt ?? message.sentAt ?? message.createdAt
+  )}, ${senderLabel(message)} wrote:`;
 }
 
 function senderLabel(message: Pick<ReplySource, "fromAddress" | "fromName">): string {

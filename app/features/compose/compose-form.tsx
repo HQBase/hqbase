@@ -31,6 +31,7 @@ type ComposeFormProps = {
   presentation: "window" | "thread";
   ready: boolean;
   replyMessage: MessageDetail | null;
+  replyMessages: MessageDetail[];
   sendDisabled: boolean;
   signatureDisabled: boolean;
   signature: SignatureSnapshot;
@@ -108,7 +109,9 @@ export function ComposeForm(props: ComposeFormProps): React.ReactElement {
               onSelectionChange={props.onSetSignature}
             />
           </div>
-          {props.replyMessage ? <ReplyQuotePreview message={props.replyMessage} /> : null}
+          {props.replyMessage ? (
+            <ReplyQuotePreview messages={props.replyMessages} target={props.replyMessage} />
+          ) : null}
           <AttachmentList attachments={props.attachments} onRemove={props.onRemoveAttachment} />
           <footer
             className={cn(

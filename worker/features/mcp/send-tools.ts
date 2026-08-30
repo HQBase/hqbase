@@ -1,7 +1,7 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 
-import { requireMailboxAccess } from "../../auth/mailbox-access";
+import { accessibleMessageScope, requireMailboxAccess } from "../../auth/mailbox-access";
 import type { WorkerEnv } from "../../lib/env";
 import { AppError } from "../../lib/errors";
 import { parseWith } from "../../lib/validation";
@@ -120,7 +120,19 @@ export function registerSendTools(
           draft
         );
         await requireDraftAttachmentIdsAccess(env, principal, parsed.attachmentIds);
-        const message = await replyToMessage(env, parsed, principal.userId, signature);
+        const messageScope = await accessibleMessageScope(
+          env.DB,
+          principal.userId,
+          principal.role,
+          "agent"
+        );
+        const message = await replyToMessage(
+          env,
+          parsed,
+          principal.userId,
+          signature,
+          messageScope
+        );
         scheduleSentMailEvents(env, schedule, {
           draftId: parsed.draftId,
           mailboxId,

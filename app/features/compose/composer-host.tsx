@@ -294,6 +294,7 @@ export function ComposerHost({
                   <ConversationMessages compact messages={session.messages} />
                 ) : undefined
               }
+              threadMessages={session.messages}
               windowSlot={Math.max(
                 0,
                 windowSessions.length -

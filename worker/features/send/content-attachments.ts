@@ -8,6 +8,7 @@ import { draftAttachmentObjects } from "../drafts/attachment-lookups";
 import { sanitizeQuotedMessageHtml } from "../messages/html-sanitizer";
 import { isSafeInlineImage } from "../messages/inline-media";
 import { getMessageHtmlKey } from "../messages/queries";
+import { splitQuotedHtml } from "../messages/quote-classifier";
 import type { StoredAttachment } from "../messages/types";
 import { parseSignatureDataImage } from "../signatures/content";
 import type { SignatureSnapshot } from "../signatures/types";
@@ -207,13 +208,18 @@ export async function loadQuotedMessageHtml(
   messageId: string,
   attachments: StoredAttachment[],
   availableBytes: number,
-  availableCount: number
+  availableCount: number,
+  includeQuotedHistory = true
 ): Promise<{ html?: string; inlineAttachments: StoredOutgoingAttachment[] }> {
   const htmlKey = await getMessageHtmlKey(env.DB, messageId);
   if (!htmlKey) return { inlineAttachments: [] };
   const htmlObject = await env.MAIL_OBJECTS.get(htmlKey);
   if (!htmlObject) return { inlineAttachments: [] };
-  const sourceHtml = await htmlObject.text();
+  const storedHtml = await htmlObject.text();
+  const parts = includeQuotedHistory ? null : splitQuotedHtml(storedHtml);
+  const sourceHtml = parts
+    ? [parts.body, parts.afterQuote].filter((part): part is string => Boolean(part)).join("<br>")
+    : storedHtml;
   const candidates = attachments.filter(
     (attachment) => attachment.contentId && isSafeInlineImage(attachment.contentType)
   );

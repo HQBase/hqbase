@@ -14,12 +14,12 @@ export { splitQuotedText } from "./message-html-content";
 
 type MessageHtmlProps = {
   message: MessageDetail;
-  showQuotedHistory?: boolean;
+  quoteMode?: "expanded" | "hidden" | "interactive";
 };
 
 export function MessageHtml({
   message,
-  showQuotedHistory = false
+  quoteMode = "interactive"
 }: MessageHtmlProps): React.ReactElement {
   const { theme } = useTheme();
   const [html, setHtml] = React.useState<Awaited<ReturnType<typeof getMessageHtml>> | null>(null);
@@ -86,7 +86,7 @@ export function MessageHtml({
     [html, loadRemoteImages, theme]
   );
   const bodyHasContent = React.useMemo(() => hasMessageHtmlContent(html?.html ?? ""), [html?.html]);
-  const quoteVisible = showQuotedHistory || quoteExpanded || !bodyHasContent;
+  const quoteVisible = quoteMode === "expanded" || quoteExpanded || !bodyHasContent;
   const showRemoteImagesAlert = Boolean(
     html && !loadRemoteImages && hasVisibleRemoteImages(html, quoteVisible)
   );
@@ -122,7 +122,7 @@ export function MessageHtml({
   if (!rendered && !renderedQuote && !renderedAfterQuote) {
     return (
       <>
-        <PlainTextMessage message={message} showQuotedHistory={showQuotedHistory} />
+        <PlainTextMessage message={message} quoteMode={quoteMode} />
         {error && <p className="mt-3 text-xs text-destructive">{error}</p>}
       </>
     );
@@ -145,9 +145,11 @@ export function MessageHtml({
         afterQuote={renderedAfterQuote}
         body={rendered}
         bodyHasContent={bodyHasContent}
-        onToggleQuote={showQuotedHistory ? null : () => setQuoteExpanded((expanded) => !expanded)}
+        onToggleQuote={
+          quoteMode === "interactive" ? () => setQuoteExpanded((expanded) => !expanded) : null
+        }
         quote={renderedQuote}
-        quoteExpanded={showQuotedHistory || quoteExpanded}
+        quoteExpanded={quoteVisible}
         subject={message.subject}
       />
     </div>
@@ -353,11 +355,11 @@ export function RemoteImagesAlert({
 
 export function PlainTextMessage({
   message,
-  showQuotedHistory = false
+  quoteMode = "interactive"
 }: MessageHtmlProps): React.ReactElement {
   const [expanded, setExpanded] = React.useState(false);
   const content = splitQuotedText(message.textBody || message.snippet);
-  const quoteVisible = showQuotedHistory || expanded;
+  const quoteVisible = quoteMode === "expanded" || expanded;
   return (
     <div className="flex flex-col gap-4">
       {content.body ? (
@@ -367,7 +369,7 @@ export function PlainTextMessage({
       ) : null}
       {content.quote ? (
         <>
-          {!showQuotedHistory ? (
+          {quoteMode === "interactive" ? (
             <QuotedContentDivider
               expanded={expanded}
               onToggle={() => setExpanded((open) => !open)}

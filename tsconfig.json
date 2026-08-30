@@ -28,6 +28,7 @@
   },
   "include": [
     "app",
+    "shared",
     "worker",
     "test",
     "worker-configuration.d.ts",
