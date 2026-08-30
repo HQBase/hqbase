@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   error: vi.fn(),
@@ -49,6 +49,7 @@ const customerLabel: MailLabel = {
 };
 
 beforeEach(() => vi.clearAllMocks());
+afterEach(() => document.body.replaceChildren());
 
 describe("conversation action feedback", () => {
   it("keeps thread labels in the responsive reader controls", async () => {
@@ -319,6 +320,42 @@ describe("conversation action feedback", () => {
 
     await flushHookEffects(() => resolveAction?.());
     expect(mocks.success).toHaveBeenCalledWith("Conversation archived.");
+    expect(mocks.error).not.toHaveBeenCalled();
+    await view.unmount();
+  });
+
+  it("reports success for an exact-message action", async () => {
+    const onMessageAction = vi.fn().mockResolvedValue(undefined);
+    const view = await renderComponent(
+      <MessageDetail
+        defaultFromMailboxId="mbx_1"
+        mailboxes={[]}
+        messages={[message]}
+        selectedId={message.id}
+        onAction={() => undefined}
+        onBack={() => undefined}
+        onMessageAction={onMessageAction}
+        onRefresh={() => undefined}
+        onSent={() => undefined}
+      />
+    );
+    document.body.appendChild(view.container);
+
+    const trigger = view.container.querySelector<HTMLButtonElement>(
+      '[data-message-actions-id="msg_1"]'
+    );
+    await flushHookEffects(() => {
+      trigger?.dispatchEvent(
+        new PointerEvent("pointerdown", { bubbles: true, button: 0, pointerType: "mouse" })
+      );
+      trigger?.click();
+    });
+    await flushHookEffects(() =>
+      document.body.querySelector<HTMLElement>('[data-message-action="archive"]')?.click()
+    );
+
+    expect(onMessageAction).toHaveBeenCalledWith(message, "archive");
+    expect(mocks.success).toHaveBeenCalledWith("Message archived.");
     expect(mocks.error).not.toHaveBeenCalled();
     await view.unmount();
   });

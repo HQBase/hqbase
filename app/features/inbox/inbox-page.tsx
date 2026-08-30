@@ -6,7 +6,7 @@ import { setConversationLabel } from "@/features/labels/api";
 import { LabelFilter } from "@/features/labels/label-filter";
 import type { MailLabel } from "@/features/labels/types";
 import type { Mailbox } from "@/features/mailboxes/types";
-import { getMessageThread, runConversationAction } from "@/features/messages/api";
+import { getMessageThread, runConversationAction, runMessageAction } from "@/features/messages/api";
 import { MailListHeader } from "@/features/messages/mail-list-layout";
 import { MessageDetail } from "@/features/messages/message-detail";
 import { MessageList } from "@/features/messages/message-list";
@@ -236,6 +236,11 @@ export function InboxPage({
             selectedId={readerSelectedId}
             showBack
             onAction={handleAction}
+            onMessageAction={async (message, action) => {
+              await runMessageAction(message.id, action);
+              await onRefresh();
+              if (selectedId) await loadThread(selectedId);
+            }}
             onBack={() => onMessageRouteChange(activeFolder, null)}
             {...(onDraftsChange ? { onDraftsChange } : {})}
             onRefresh={async () => {

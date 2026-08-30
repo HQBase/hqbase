@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { ConversationMessages } from "@/features/messages/conversation-messages";
 import type { MessageDetail } from "@/features/messages/types";
@@ -50,15 +50,26 @@ const secondMessage: MessageDetail = {
   createdAt: "2026-07-27T14:05:00.000Z"
 };
 
-describe("conversation message actions", () => {
-  it("replies to and forwards the latest message", async () => {
-    const onCompose = vi.fn();
-    const view = await renderComponent(
-      <ConversationMessages messages={[firstMessage, secondMessage]} onCompose={onCompose} />
-    );
+afterEach(() => {
+  document.body.replaceChildren();
+  vi.restoreAllMocks();
+});
 
-    const reply = view.container.querySelector<HTMLButtonElement>(
-      '[data-compose-action="reply"][data-compose-message-id="msg_2"]'
+describe("conversation message actions", () => {
+  it("targets every expanded message for compose and folder actions", async () => {
+    const onCompose = vi.fn();
+    const onMessageAction = vi.fn().mockResolvedValue(undefined);
+    const view = await renderComponent(
+      <ConversationMessages
+        messages={[firstMessage, secondMessage]}
+        onCompose={onCompose}
+        onMessageAction={onMessageAction}
+      />
+    );
+    document.body.appendChild(view.container);
+
+    const firstReply = view.container.querySelector<HTMLButtonElement>(
+      '[data-compose-action="reply"][data-compose-message-id="msg_1"]'
     );
     const lastForward = view.container.querySelector<HTMLButtonElement>(
       '[data-compose-action="forward"][data-compose-message-id="msg_2"]'
@@ -69,11 +80,59 @@ describe("conversation message actions", () => {
     expect(
       view.container.querySelector<HTMLElement>('[data-thread-message-id="msg_2"]')?.className
     ).toContain("pt-5");
-    await flushHookEffects(() => reply?.click());
+    expect(firstReply?.className).toContain("h-8");
+    expect(lastForward?.className).toContain("h-9");
+    await flushHookEffects(() => firstReply?.click());
     await flushHookEffects(() => lastForward?.click());
 
-    expect(onCompose).toHaveBeenNthCalledWith(1, secondMessage, "reply");
+    expect(onCompose).toHaveBeenNthCalledWith(1, firstMessage, "reply");
     expect(onCompose).toHaveBeenNthCalledWith(2, secondMessage, "forward");
+
+    const messageActions = view.container.querySelector<HTMLButtonElement>(
+      '[data-message-actions-id="msg_1"]'
+    );
+    await flushHookEffects(() => {
+      messageActions?.dispatchEvent(
+        new PointerEvent("pointerdown", { bubbles: true, button: 0, pointerType: "mouse" })
+      );
+      messageActions?.click();
+    });
+    const menu = document.body.querySelector<HTMLElement>('[data-message-actions-menu="msg_1"]');
+    expect(menu?.textContent).toContain("Archive message");
+    expect(menu?.textContent).toContain("Move message to Trash");
+    await flushHookEffects(() =>
+      menu?.querySelector<HTMLElement>('[data-message-action="archive"]')?.click()
+    );
+    expect(onMessageAction).toHaveBeenCalledWith(firstMessage, "archive");
+
+    await view.unmount();
+  });
+
+  it("offers Restore instead of Archive or Trash for one trashed message", async () => {
+    const trashedMessage = { ...firstMessage, folder: "trash" as const };
+    const onMessageAction = vi.fn().mockResolvedValue(undefined);
+    const view = await renderComponent(
+      <ConversationMessages messages={[trashedMessage]} onMessageAction={onMessageAction} />
+    );
+    document.body.appendChild(view.container);
+
+    const trigger = view.container.querySelector<HTMLButtonElement>(
+      '[data-message-actions-id="msg_1"]'
+    );
+    await flushHookEffects(() => {
+      trigger?.dispatchEvent(
+        new PointerEvent("pointerdown", { bubbles: true, button: 0, pointerType: "mouse" })
+      );
+      trigger?.click();
+    });
+    const menu = document.body.querySelector<HTMLElement>('[data-message-actions-menu="msg_1"]');
+    expect(menu?.textContent).toContain("Restore message");
+    expect(menu?.textContent).not.toContain("Archive message");
+    expect(menu?.textContent).not.toContain("Move message to Trash");
+    await flushHookEffects(() =>
+      menu?.querySelector<HTMLElement>('[data-message-action="restore"]')?.click()
+    );
+    expect(onMessageAction).toHaveBeenCalledWith(trashedMessage, "restore");
 
     await view.unmount();
   });

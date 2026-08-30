@@ -66,7 +66,7 @@ const conversation: ConversationSummary = {
 };
 
 describe("conversation reader", () => {
-  it("renders Reply and Forward under the last message", () => {
+  it("renders Reply and Forward under every expanded message", () => {
     const html = renderToStaticMarkup(
       <MessageDetail
         defaultFromMailboxId="mbx_1"
@@ -82,9 +82,9 @@ describe("conversation reader", () => {
 
     expect(html.indexOf("I cannot sign in.")).toBeLessThan(html.indexOf("We can help."));
     expect(html.indexOf("We can help.")).toBeLessThan(html.lastIndexOf(">Reply<"));
-    expect(html.match(/>Reply</g)).toHaveLength(1);
-    expect(html.match(/>Forward</g)).toHaveLength(1);
-    expect(html).not.toContain('data-compose-message-id="msg_1"');
+    expect(html.match(/>Reply</g)).toHaveLength(2);
+    expect(html.match(/>Forward</g)).toHaveLength(2);
+    expect(html.match(/data-compose-message-id="msg_1"/g)).toHaveLength(2);
     expect(html.match(/data-compose-message-id="msg_2"/g)).toHaveLength(2);
     expectReaderBackLayout(html);
     expect(html).toContain('aria-label="Archive conversation"');

@@ -44,6 +44,11 @@ export type ConversationAction =
   | "trash"
   | "restore";
 
+export type MessageFolderAction = Extract<
+  ConversationAction,
+  "archive" | "unarchive" | "trash" | "restore"
+>;
+
 export type MessageDetail = MessageSummary & {
   cc: string[];
   bcc: string[];

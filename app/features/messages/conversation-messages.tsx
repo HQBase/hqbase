@@ -1,34 +1,50 @@
 import * as React from "react";
 import {
+  PiArchive,
   PiArrowBendUpLeft,
   PiArrowBendUpRight,
+  PiArrowCounterClockwise,
   PiArrowDownBold,
   PiArrowUpBold,
-  PiDownloadSimple
+  PiDotsThree,
+  PiDownloadSimple,
+  PiTrash
 } from "react-icons/pi";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuTrigger
+} from "@/components/ui/dropdown-menu";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/cn";
 import { formatDateTime } from "@/lib/format";
 import { MessageHtml, PlainTextMessage } from "./message-html";
-import type { MessageDetail } from "./types";
+import type { MessageDetail, MessageFolderAction } from "./types";
 
 export function ConversationMessages({
   compact = false,
   messages,
-  onCompose
+  onCompose,
+  onMessageAction
 }: {
   compact?: boolean;
   messages: MessageDetail[];
   onCompose?: (message: MessageDetail, mode: "reply" | "forward") => void;
+  onMessageAction?:
+    | ((message: MessageDetail, action: MessageFolderAction) => Promise<void> | void)
+    | undefined;
 }): React.ReactElement {
   const hiddenCount = Math.max(0, messages.length - 2);
   const threadId = messages[0]?.threadId ?? null;
   const [expandedThreadId, setExpandedThreadId] = React.useState<string | null>(null);
   const previousThreadId = React.useRef(threadId);
   const showMiddle = threadId !== null && expandedThreadId === threadId;
+  const [pendingMessageId, setPendingMessageId] = React.useState<string | null>(null);
   React.useEffect(() => {
     if (previousThreadId.current === threadId) return;
     previousThreadId.current = threadId;
@@ -123,39 +139,139 @@ export function ConversationMessages({
             </>
           ) : null}
         </div>
-        {onCompose && isLast ? (
+        {onCompose || onMessageAction ? (
           <footer className="mt-5 flex flex-wrap items-center gap-2">
-            <Button
-              aria-label={`Reply to message from ${message.fromAddress}`}
-              className="h-9 min-w-24 rounded-full px-4"
-              data-compose-action="reply"
-              data-compose-message-id={message.id}
-              onClick={() => onCompose(message, "reply")}
-              size="sm"
-              type="button"
-              variant="outline"
-            >
-              <PiArrowBendUpLeft />
-              Reply
-            </Button>
-            <Button
-              aria-label={`Forward message from ${message.fromAddress}`}
-              className="h-9 min-w-24 rounded-full px-4"
-              data-compose-action="forward"
-              data-compose-message-id={message.id}
-              onClick={() => onCompose(message, "forward")}
-              size="sm"
-              type="button"
-              variant="outline"
-            >
-              <PiArrowBendUpRight />
-              Forward
-            </Button>
+            {onCompose ? (
+              <>
+                <Button
+                  aria-label={`Reply to message from ${message.fromAddress}`}
+                  className={cn(
+                    "rounded-full",
+                    isLast ? "h-9 min-w-24 px-4" : "h-8 min-w-0 px-3 text-xs"
+                  )}
+                  data-compose-action="reply"
+                  data-compose-message-id={message.id}
+                  onClick={() => onCompose(message, "reply")}
+                  size="sm"
+                  type="button"
+                  variant="outline"
+                >
+                  <PiArrowBendUpLeft />
+                  Reply
+                </Button>
+                <Button
+                  aria-label={`Forward message from ${message.fromAddress}`}
+                  className={cn(
+                    "rounded-full",
+                    isLast ? "h-9 min-w-24 px-4" : "h-8 min-w-0 px-3 text-xs"
+                  )}
+                  data-compose-action="forward"
+                  data-compose-message-id={message.id}
+                  onClick={() => onCompose(message, "forward")}
+                  size="sm"
+                  type="button"
+                  variant="outline"
+                >
+                  <PiArrowBendUpRight />
+                  Forward
+                </Button>
+              </>
+            ) : null}
+            {onMessageAction ? (
+              <MessageActions
+                isLast={isLast}
+                message={message}
+                pending={pendingMessageId !== null}
+                onAction={async (action) => {
+                  setPendingMessageId(message.id);
+                  try {
+                    await onMessageAction(message, action);
+                  } finally {
+                    setPendingMessageId(null);
+                  }
+                }}
+              />
+            ) : null}
           </footer>
         ) : null}
       </article>
     );
   }
+}
+
+function MessageActions({
+  isLast,
+  message,
+  pending,
+  onAction
+}: {
+  isLast: boolean;
+  message: MessageDetail;
+  pending: boolean;
+  onAction: (action: MessageFolderAction) => Promise<void> | void;
+}): React.ReactElement {
+  const restoreAction = message.folder === "trash" ? "restore" : "unarchive";
+  const restoreLabel = message.folder === "trash" ? "Restore message" : "Unarchive message";
+  return (
+    <DropdownMenu modal={false}>
+      <DropdownMenuTrigger asChild>
+        <Button
+          aria-label={`More actions for message from ${message.fromAddress}`}
+          className={cn(
+            "rounded-full",
+            isLast ? "size-9 min-h-9 min-w-9" : "size-8 min-h-8 min-w-8"
+          )}
+          data-message-actions-id={message.id}
+          disabled={pending}
+          size="icon"
+          type="button"
+          variant="outline"
+        >
+          <PiDotsThree aria-hidden="true" className="pointer-events-none" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent
+        align="start"
+        className="w-52 p-1 text-sm"
+        data-message-actions-menu={message.id}
+      >
+        <DropdownMenuGroup>
+          {message.folder === "archived" || message.folder === "trash" ? (
+            <DropdownMenuItem
+              className="min-h-10 gap-2"
+              data-message-action={restoreAction}
+              data-message-id={message.id}
+              onSelect={() => void onAction(restoreAction)}
+            >
+              <PiArrowCounterClockwise aria-hidden="true" className="size-4" />
+              {restoreLabel}
+            </DropdownMenuItem>
+          ) : (
+            <DropdownMenuItem
+              className="min-h-10 gap-2"
+              data-message-action="archive"
+              data-message-id={message.id}
+              onSelect={() => void onAction("archive")}
+            >
+              <PiArchive aria-hidden="true" className="size-4" />
+              Archive message
+            </DropdownMenuItem>
+          )}
+          {message.folder !== "trash" ? (
+            <DropdownMenuItem
+              className="min-h-10 gap-2"
+              data-message-action="trash"
+              data-message-id={message.id}
+              onSelect={() => void onAction("trash")}
+            >
+              <PiTrash aria-hidden="true" className="size-4" />
+              Move message to Trash
+            </DropdownMenuItem>
+          ) : null}
+        </DropdownMenuGroup>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
 }
 
 function ThreadMessagesDivider({

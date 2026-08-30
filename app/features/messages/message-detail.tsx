@@ -28,7 +28,7 @@ import { cn } from "@/lib/cn";
 import type { MailFolderId } from "@/lib/routes";
 import { ConversationMessages } from "./conversation-messages";
 import { IconButton, MessageReaderStatus } from "./message-reader-primitives";
-import type { MessageDetail as MessageDetailType } from "./types";
+import type { MessageDetail as MessageDetailType, MessageFolderAction } from "./types";
 
 type MessageDetailProps = {
   activeFolder?: MailFolderId;
@@ -47,6 +47,9 @@ type MessageDetailProps = {
   onBack: () => void;
   onDraftsChange?: () => void;
   onLabelsChanged?: (() => Promise<void>) | undefined;
+  onMessageAction?:
+    | ((message: MessageDetailType, action: MessageFolderAction) => Promise<void> | void)
+    | undefined;
   onRefresh: () => Promise<void> | void;
   onSent: () => void;
   onToggleLabel?: (label: MailLabel, assigned: boolean) => Promise<void> | void;
@@ -76,6 +79,7 @@ export function MessageDetail({
   onAction,
   onBack,
   onLabelsChanged,
+  onMessageAction,
   onRefresh,
   onSent,
   onToggleLabel
@@ -111,6 +115,18 @@ export function MessageDetail({
       if (successMessage) toast.success(successMessage);
     } catch {
       toast.error("The conversation could not be updated. Try again.");
+    }
+  }
+  async function applyMessageAction(
+    message: MessageDetailType,
+    action: MessageFolderAction
+  ): Promise<void> {
+    if (!onMessageAction) return;
+    try {
+      await onMessageAction(message, action);
+      toast.success(messageActionSuccess(action));
+    } catch {
+      toast.error("The message could not be updated. Try again.");
     }
   }
   function renderReaderLabels(placement: "desktop" | "mobile"): React.ReactElement | null {
@@ -320,6 +336,7 @@ export function MessageDetail({
         {renderReaderLabels("mobile")}
         <ConversationMessages
           messages={messages}
+          {...(onMessageAction ? { onMessageAction: applyMessageAction } : {})}
           onCompose={(message, mode) => {
             const folder = activeFolder ?? message.folder;
             const messageId = routeMessageId ?? selectedId ?? message.id;
@@ -341,6 +358,13 @@ export function MessageDetail({
       </PullToRefresh>
     </article>
   );
+}
+
+function messageActionSuccess(action: MessageFolderAction): string {
+  if (action === "archive") return "Message archived.";
+  if (action === "unarchive") return "Message unarchived.";
+  if (action === "trash") return "Message moved to Trash.";
+  return "Message restored.";
 }
 
 function mergeMessageLabels(messages: MessageDetailType[]): MailLabel[] {
