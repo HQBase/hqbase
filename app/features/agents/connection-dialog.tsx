@@ -70,7 +70,7 @@ export function AgentSkillDetails({
             <Button
               aria-label="Copy Agent Skill URL"
               onClick={() => void copyUrl()}
-              size="sm"
+              size="field"
               type="button"
               variant="outline"
             >
@@ -81,7 +81,7 @@ export function AgentSkillDetails({
               )}
               {copied ? "Copied" : "Copy URL"}
             </Button>
-            <Button asChild size="sm" variant="outline">
+            <Button asChild size="field" variant="outline">
               <a download="SKILL.md" href={skillUrl}>
                 <PiDownload aria-hidden="true" data-icon="inline-start" />
                 Download Skill

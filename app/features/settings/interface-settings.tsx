@@ -9,7 +9,7 @@ export function InterfaceSettings(): React.ReactElement {
   const isDark = theme === "dark";
 
   return (
-    <SettingsSection description="Appearance preferences for this browser" title="Interface">
+    <SettingsSection description="Appearance preferences for this browser" title="Appearance">
       <div className="divide-y border-y text-sm">
         <div className="flex items-center justify-between gap-6 py-4">
           <div>

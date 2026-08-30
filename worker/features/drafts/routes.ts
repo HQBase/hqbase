@@ -5,6 +5,7 @@ import { AppError } from "../../lib/errors";
 import { readJson } from "../../lib/json";
 import { parseWith } from "../../lib/validation";
 import { ignoreMailEventFailure, publishUserMailEvent } from "../events/service";
+import { requireLabel, setDraftLabel } from "../labels/queries";
 import { isSafeInlineImage, normalizedContentType } from "../messages/inline-media";
 import { resolveDraftSignature } from "../signatures/service";
 import { getAccessibleDraft, listAccessibleDraftPage, requireDraftAccess } from "./access";
@@ -22,9 +23,16 @@ import { draftSchema } from "./validation";
 export const draftRoutes = new Hono<HonoApp>();
 draftRoutes.get("/", async (c) => {
   const auth = await requireMailApiPrincipal(c.env, c.req.raw, "mail:send");
+  const labelId = c.req.query("labelId");
+  const labelIds = [
+    ...new Set([...(labelId === undefined ? [] : [labelId]), ...(c.req.queries("labelIds") ?? [])])
+  ];
+  await Promise.all(labelIds.map((id) => requireLabel(c.env.DB, id)));
   const page = await listAccessibleDraftPage(c.env, draftPrincipal(auth), {
     cursor: c.req.query("cursor"),
-    limit: parseDraftLimit(c.req.query("limit"), defaultDraftLimit, maxDraftLimit)
+    labelIds,
+    limit: parseDraftLimit(c.req.query("limit"), defaultDraftLimit, maxDraftLimit),
+    search: c.req.query("search")
   });
   const response = c.json(page.drafts);
   if (page.nextCursor) {
@@ -34,11 +42,11 @@ draftRoutes.get("/", async (c) => {
 });
 draftRoutes.get("/changes", async (c) => {
   const auth = await requireMailApiPrincipal(c.env, c.req.raw, "mail:send");
-  for (const name of ["mailboxId", "folder", "search", "updatedSince"]) {
+  for (const name of ["mailboxId", "folder", "labelId", "labelIds", "search", "updatedSince"]) {
     if (c.req.query(name) !== undefined) {
       throw new AppError(
         "INVALID_DRAFT_CHANGE_FILTER",
-        "The draft changes feed does not accept mailbox, folder, search, or timestamp filters.",
+        "The draft changes feed does not accept mailbox, folder, label, search, or timestamp filters.",
         400
       );
     }
@@ -83,6 +91,46 @@ draftRoutes.patch("/:id", async (c) => {
   });
   scheduleDraftEvent(c, auth.principal.id);
   return c.json(draft);
+});
+draftRoutes.put("/:id/labels/:labelId", async (c) => {
+  const auth = await requireMailApiPrincipal(c.env, c.req.raw, "mail:send");
+  await Promise.all([
+    getAccessibleDraft(c.env, draftPrincipal(auth), c.req.param("id")),
+    requireLabel(c.env.DB, c.req.param("labelId"))
+  ]);
+  const result = await setDraftLabel(c.env.DB, {
+    assigned: true,
+    draftId: c.req.param("id"),
+    labelId: c.req.param("labelId"),
+    principalId: auth.principal.id
+  });
+  scheduleDraftEvent(c, auth.principal.id);
+  return c.json({
+    ...result,
+    assigned: true,
+    draftId: c.req.param("id"),
+    labelId: c.req.param("labelId")
+  });
+});
+draftRoutes.delete("/:id/labels/:labelId", async (c) => {
+  const auth = await requireMailApiPrincipal(c.env, c.req.raw, "mail:send");
+  await Promise.all([
+    getAccessibleDraft(c.env, draftPrincipal(auth), c.req.param("id")),
+    requireLabel(c.env.DB, c.req.param("labelId"))
+  ]);
+  const result = await setDraftLabel(c.env.DB, {
+    assigned: false,
+    draftId: c.req.param("id"),
+    labelId: c.req.param("labelId"),
+    principalId: auth.principal.id
+  });
+  scheduleDraftEvent(c, auth.principal.id);
+  return c.json({
+    ...result,
+    assigned: false,
+    draftId: c.req.param("id"),
+    labelId: c.req.param("labelId")
+  });
 });
 draftRoutes.delete("/:id", async (c) => {
   const auth = await requireMailApiPrincipal(c.env, c.req.raw, "mail:send");
@@ -180,6 +228,11 @@ function nextDraftPageUrl(requestUrl: string, cursor: string): string {
   const preserved = new URLSearchParams();
   const limit = url.searchParams.get("limit");
   if (limit !== null) preserved.set("limit", limit);
+  const labelId = url.searchParams.get("labelId");
+  if (labelId !== null) preserved.set("labelId", labelId);
+  for (const id of url.searchParams.getAll("labelIds")) preserved.append("labelIds", id);
+  const search = url.searchParams.get("search");
+  if (search !== null) preserved.set("search", search);
   preserved.set("cursor", cursor);
   url.search = preserved.toString();
   return url.toString();

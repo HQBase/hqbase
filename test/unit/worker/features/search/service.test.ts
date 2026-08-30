@@ -19,10 +19,10 @@ describe("global search destinations", () => {
       expect.objectContaining({ id: "inbox" })
     ]);
     expect(searchDestinations("oauth", "member", 5)).toEqual([
-      expect.objectContaining({ id: "connected-apps", path: "/agents/connections" })
+      expect.objectContaining({ id: "agents", label: "Agents", path: "/agents" })
     ]);
     expect(searchDestinations("provision", "admin", 5)).toEqual([
-      expect.objectContaining({ id: "provisioning-keys", path: "/agents/provisioning" })
+      expect.objectContaining({ id: "agents", label: "Agents", path: "/agents" })
     ]);
   });
 });

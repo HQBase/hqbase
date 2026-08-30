@@ -135,9 +135,9 @@ describe("settings presentation", () => {
       />
     );
 
-    expect(html).toContain("Add user");
+    expect(html).toContain("Add person");
     expect(html).toContain('class="relative w-full overflow-auto rounded-lg border"');
-    expect(html).toContain("No users yet.");
+    expect(html).toContain("No people yet.");
     expect(html).toContain("Login email");
     expect(html).toContain('aria-label="About workspace roles"');
     expect(html).not.toContain("new-user-email");
@@ -313,6 +313,7 @@ describe("settings presentation", () => {
     expect(html).toContain(">Readiness<");
     expect(html).toContain(">Unknown-address mail<");
     expect(html).toContain(">Active<");
+    expect(html).toContain(">Actions<");
     expect(html).toContain("example.com");
     expect(html).toContain("Portal");
     expect(html).toContain("Send needs attention");
@@ -393,7 +394,7 @@ describe("settings presentation", () => {
     expect(html).toContain("Catch-all for example.com");
   });
 
-  it("replaces General and Upgrade with Debug as the final tab", () => {
+  it("combines appearance and notifications in Preferences", () => {
     const user = {
       id: "user-1",
       name: "Avery Stone",
@@ -404,7 +405,7 @@ describe("settings presentation", () => {
     };
     const html = renderToStaticMarkup(
       <SettingsPage
-        activeTab="mailboxes"
+        activeTab="preferences"
         canManage
         currentUser={user as never}
         defaultFromMailboxId={null}
@@ -422,10 +423,12 @@ describe("settings presentation", () => {
       />
     );
 
-    expect(html).not.toContain(">General<");
-    expect(html).not.toContain(">Upgrade<");
-    expect(html).not.toContain('value="access"');
-    expect(html).toContain(">Mailboxes<");
+    expect(html).toContain(">Appearance<");
+    expect(html).toContain(">Notifications<");
+    expect(html).toContain("Dark mode");
+    expect(html).toContain("This device");
+    expect(html).not.toContain(">Interface<");
+    expect(html).not.toContain(">Debug<");
     expect(html).not.toContain('role="tablist"');
   });
 });

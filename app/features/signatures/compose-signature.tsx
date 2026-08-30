@@ -117,7 +117,7 @@ export function ComposeSignature({
         <span className="text-xs text-muted-foreground">Signature</span>
         <DropdownSelect
           ariaLabel="Signature"
-          className="h-11 min-h-11 w-auto max-w-full border-0 bg-transparent px-2 shadow-none [@media(hover:hover)]:hover:bg-muted/60 sm:h-9 sm:min-h-9"
+          className="h-[42px] min-h-[42px] w-auto max-w-full border-0 bg-transparent px-2 shadow-none [@media(hover:hover)]:hover:bg-muted/60 sm:h-[34px] sm:min-h-[34px]"
           disabled={disabled || pending || loading}
           options={options}
           value={value}

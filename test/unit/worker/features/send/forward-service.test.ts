@@ -254,7 +254,8 @@ describe("forward service", () => {
       signature: { mode: "none", id: null, name: "", html: "", text: "" },
       version: 1,
       updatedAt: original.createdAt,
-      attachments: []
+      attachments: [],
+      labels: []
     });
     get.mockResolvedValue({
       arrayBuffer: async () => new TextEncoder().encode("original").buffer

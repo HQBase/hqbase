@@ -4,6 +4,7 @@ import { newId, nowIso } from "../../db/client";
 import { createDatabase, getRow, getRows } from "../../db/drizzle";
 import { draftAttachments, drafts } from "../../db/schema";
 import { AppError } from "../../lib/errors";
+import { labelsForDraftIds } from "../labels/queries";
 import { emptySignatureSnapshot } from "../signatures/service";
 import type { SignatureSelection, SignatureSnapshot } from "../signatures/types";
 import type { Draft, DraftAttachment } from "./types";
@@ -65,9 +66,17 @@ async function attachments(db: D1Database, draftId: string) {
   );
 }
 async function mapDraft(db: D1Database, row: DraftRow): Promise<Draft> {
-  return mapDraftRow(row, (await attachments(db, row.id)).map(mapAttachment));
+  const [draftAttachments, assigned] = await Promise.all([
+    attachments(db, row.id),
+    labelsForDraftIds(db, [row.id])
+  ]);
+  return mapDraftRow(row, draftAttachments.map(mapAttachment), assigned.get(row.id) ?? []);
 }
-export function mapDraftRow(row: DraftRow, draftAttachments: DraftAttachment[]): Draft {
+export function mapDraftRow(
+  row: DraftRow,
+  draftAttachments: DraftAttachment[],
+  labels: Draft["labels"]
+): Draft {
   return {
     id: row.id,
     mailboxId: row.mailbox_id,
@@ -89,7 +98,8 @@ export function mapDraftRow(row: DraftRow, draftAttachments: DraftAttachment[]):
     },
     version: row.version,
     updatedAt: row.updated_at,
-    attachments: draftAttachments
+    attachments: draftAttachments,
+    labels
   };
 }
 export async function getDraft(

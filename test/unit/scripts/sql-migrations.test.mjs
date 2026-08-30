@@ -40,11 +40,13 @@ const expectedMigrationNames = [
   "0024_draft_inline_images.sql",
   "0025_activate_catch_all_policy.sql",
   "0026_domain_disconnect.sql",
-  "0027_message_attachment_disposition.sql"
+  "0027_message_attachment_disposition.sql",
+  "0028_draft_labels.sql"
 ];
 const expectedAfterDeployMigrationNames = [
   "0001_remove_mailbox_alias_storage.sql",
-  "0002_finalize_agent_principals.sql"
+  "0002_finalize_agent_principals.sql",
+  "0003_finalize_draft_labels.sql"
 ];
 const oneAddressMigrationSource = readFileSync(
   resolve(migrationsDirectory, "0016_one_address_per_mailbox.sql"),
@@ -419,7 +421,7 @@ describe("SQL migration contract", () => {
     const tables = database
       .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'")
       .all();
-    expect(tables).toHaveLength(47);
+    expect(tables).toHaveLength(48);
     expect(tables.map((table) => table.name)).not.toContain("mailbox_addresses");
 
     const mailboxColumns = database.prepare("PRAGMA table_info(mailboxes)").all();
@@ -436,6 +438,9 @@ describe("SQL migration contract", () => {
     expect(draftColumns.map((column) => column.name)).not.toContain("user_id");
     const draftAttachmentColumns = database.prepare("PRAGMA table_info(draft_attachments)").all();
     expect(draftAttachmentColumns.map((column) => column.name)).toContain("content_id");
+    expect(database.prepare("PRAGMA foreign_key_list(draft_labels)").all()).toEqual(
+      expect.arrayContaining([expect.objectContaining({ table: "drafts" })])
+    );
     const messageAttachmentColumns = database
       .prepare("PRAGMA table_info(message_attachments)")
       .all();
@@ -552,6 +557,18 @@ describe("SQL migration contract", () => {
     expect(
       applyMigration(database, migrationNamed(migrations, "0025_activate_catch_all_policy.sql"))
     ).toBe(true);
+    expect(applyMigration(database, migrationNamed(migrations, "0026_domain_disconnect.sql"))).toBe(
+      true
+    );
+    expect(
+      applyMigration(
+        database,
+        migrationNamed(migrations, "0027_message_attachment_disposition.sql")
+      )
+    ).toBe(true);
+    expect(applyMigration(database, migrationNamed(migrations, "0028_draft_labels.sql"))).toBe(
+      true
+    );
     database
       .prepare("UPDATE draft_attachments SET content_id = ? WHERE id = 'att_upgrade'")
       .run("att_upgrade@hqbase.invalid");
@@ -576,6 +593,11 @@ describe("SQL migration contract", () => {
         message_id, label_id, assigned_by_principal_id, created_at
       ) VALUES (
         'msg_upgrade', 'lbl_upgrade', 'usr_upgrade', '2026-08-23T12:02:00.000Z'
+      );
+      INSERT INTO draft_labels (
+        draft_id, label_id, assigned_by_principal_id, created_at
+      ) VALUES (
+        'drf_upgrade', 'lbl_upgrade', 'usr_upgrade', '2026-08-23T12:02:00.000Z'
       );
     `);
 
@@ -703,7 +725,7 @@ describe("SQL migration contract", () => {
            WHERE draft_id = 'drf_upgrade' AND principal_id = 'usr_upgrade' AND kind = 'upsert'`
         )
         .get()
-    ).toEqual({ count: 1 });
+    ).toEqual({ count: 2 });
     expect(
       database
         .prepare(
@@ -773,6 +795,18 @@ describe("SQL migration contract", () => {
         )
         .get()
     ).toEqual({ name: "Upgrade label", color: "blue" });
+    expect(
+      database
+        .prepare(
+          `SELECT draft_id, label_id, assigned_by_principal_id
+           FROM draft_labels WHERE draft_id = 'drf_upgrade'`
+        )
+        .get()
+    ).toEqual({
+      draft_id: "drf_upgrade",
+      label_id: "lbl_upgrade",
+      assigned_by_principal_id: "usr_upgrade"
+    });
 
     expect(applyMigration(database, migrationNamed(migrations, "0018_mailbox_lifecycle.sql"))).toBe(
       false
@@ -785,11 +819,11 @@ describe("SQL migration contract", () => {
       )
     ).toBe(false);
     expect(database.prepare("SELECT count(*) AS count FROM d1_migrations").get()).toEqual({
-      count: 25
+      count: 28
     });
     expect(
       database.prepare("SELECT count(*) AS count FROM d1_migrations_after_deploy").get()
-    ).toEqual({ count: 2 });
+    ).toEqual({ count: 3 });
   });
 
   it("closes deleted agent mailboxes before and after principal finalization", async () => {

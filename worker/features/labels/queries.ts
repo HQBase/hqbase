@@ -125,6 +125,26 @@ export async function labelsForMessageIds(
   return groupedLabels(rows, "message_id");
 }
 
+export async function labelsForDraftIds(
+  db: D1Database,
+  draftIds: readonly string[]
+): Promise<Map<string, MailLabel[]>> {
+  if (draftIds.length === 0) return new Map();
+  const rows = await getRows<LabelRow & { draft_id: string }>(
+    db,
+    sql`SELECT assignment.draft_id, label.id, label.name, label.color,
+          label.created_at, label.updated_at
+        FROM draft_labels assignment
+        JOIN labels label ON label.id = assignment.label_id
+        WHERE assignment.draft_id IN (${sql.join(
+          draftIds.map((id) => sql`${id}`),
+          sql`, `
+        )})
+        ORDER BY label.name COLLATE NOCASE ASC, label.id ASC`
+  );
+  return groupedLabels(rows, "draft_id");
+}
+
 export async function labelsForThreadIds(
   db: D1Database,
   threadIds: readonly string[],
@@ -206,6 +226,38 @@ export async function setMessageLabel(
     eventTargets: target
       ? [{ isUnassigned: target.is_unassigned === 1, mailboxId: target.mailbox_id }]
       : []
+  };
+}
+
+export async function setDraftLabel(
+  db: D1Database,
+  input: { assigned: boolean; draftId: string; labelId: string; principalId: string }
+): Promise<{ affected: number; labels: MailLabel[] }> {
+  const mutation = input.assigned
+    ? db
+        .prepare(
+          `INSERT OR IGNORE INTO draft_labels
+           (draft_id, label_id, assigned_by_principal_id, created_at)
+           SELECT id, ?, ?, ? FROM drafts WHERE id = ? AND principal_id = ?
+           RETURNING draft_id`
+        )
+        .bind(input.labelId, input.principalId, nowIso(), input.draftId, input.principalId)
+    : db
+        .prepare(
+          `DELETE FROM draft_labels
+           WHERE draft_id = ? AND label_id = ?
+             AND EXISTS (
+               SELECT 1 FROM drafts
+               WHERE id = draft_labels.draft_id AND principal_id = ?
+             )
+           RETURNING draft_id`
+        )
+        .bind(input.draftId, input.labelId, input.principalId);
+  const result = await mutation.all<{ draft_id: string }>();
+  const assigned = await labelsForDraftIds(db, [input.draftId]);
+  return {
+    affected: result.results.length,
+    labels: assigned.get(input.draftId) ?? []
   };
 }
 

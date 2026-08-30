@@ -184,10 +184,10 @@ export function MailboxStep({
         <Table aria-label="Mailboxes" className="table-fixed">
           <TableHeader className="bg-muted/35">
             <TableRow className="[@media(hover:hover)]:hover:bg-transparent">
-              <TableHead className="h-8 w-10 px-2 text-center text-xs">#</TableHead>
-              <TableHead className="h-8 px-2 text-xs">Email address</TableHead>
-              <TableHead className="h-8 w-[34%] px-2 text-xs">Sender name</TableHead>
-              <TableHead className="h-8 w-10 px-1">
+              <TableHead className="w-10 px-2 text-center">#</TableHead>
+              <TableHead className="px-2">Email address</TableHead>
+              <TableHead className="w-[34%] px-2">Sender name</TableHead>
+              <TableHead className="w-10 px-1">
                 <span className="sr-only">Actions</span>
               </TableHead>
             </TableRow>
@@ -197,39 +197,38 @@ export function MailboxStep({
               const error = errors.rows[index] ?? {};
               return (
                 <TableRow key={index}>
-                  <TableCell className="px-2 py-1.5 text-center text-xs text-muted-foreground">
+                  <TableCell className="px-2 py-1 text-center text-xs text-muted-foreground">
                     {index + 1}
                   </TableCell>
-                  <TableCell className="p-1.5">
+                  <TableCell className="p-1">
                     <Field className="gap-1" data-invalid={Boolean(error.address)}>
                       {error.address ? <FieldError>{error.address}</FieldError> : null}
                       <Input
                         aria-label={`Mailbox ${index + 1} email address`}
                         aria-invalid={Boolean(error.address)}
-                        className="h-8 shadow-none"
+                        className="h-[30px] shadow-none"
                         type="email"
                         value={mailbox.address}
                         onChange={(event) => onUpdate(index, { address: event.target.value })}
                       />
                     </Field>
                   </TableCell>
-                  <TableCell className="p-1.5">
+                  <TableCell className="p-1">
                     <Field className="gap-1" data-invalid={Boolean(error.displayName)}>
                       {error.displayName ? <FieldError>{error.displayName}</FieldError> : null}
                       <Input
                         aria-label={`Mailbox ${index + 1} sender name`}
                         aria-invalid={Boolean(error.displayName)}
-                        className="h-8 shadow-none"
+                        className="h-[30px] shadow-none"
                         placeholder="Support"
                         value={mailbox.displayName}
                         onChange={(event) => onUpdate(index, { displayName: event.target.value })}
                       />
                     </Field>
                   </TableCell>
-                  <TableCell className="px-1 py-1.5 text-center">
+                  <TableCell className="px-1 py-1 text-center">
                     <Button
                       aria-label={`Remove mailbox ${index + 1}`}
-                      className="size-10 min-h-10 min-w-10"
                       disabled={mailboxes.length <= 1}
                       size="icon"
                       type="button"

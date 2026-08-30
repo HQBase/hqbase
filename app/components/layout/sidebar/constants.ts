@@ -2,18 +2,15 @@ import {
   PiAddressBook,
   PiArchive,
   PiArrowsClockwise,
-  PiBell,
-  PiBug,
   PiEnvelopeSimple,
   PiGear,
   PiGlobe,
-  PiKey,
   PiNotePencil,
-  PiPalette,
   PiPaperPlaneTilt,
   PiPlug,
   PiRobot,
   PiSignature,
+  PiSlidersHorizontal,
   PiStar,
   PiTag,
   PiTrash,
@@ -21,7 +18,7 @@ import {
   PiUsers,
   PiWarning
 } from "react-icons/pi";
-import type { AgentTabId, SettingsTabId } from "@/lib/routes";
+import type { SettingsTabId } from "@/lib/routes";
 
 export const icons = {
   inbox: PiTray,
@@ -49,38 +46,22 @@ export const settingsTabIcons: Record<
   React.ComponentType<{ className?: string }>
 > = {
   mailboxes: PiEnvelopeSimple,
-  users: PiUsers,
   domains: PiGlobe,
-  notifications: PiBell,
-  interface: PiPalette,
+  users: PiUsers,
   labels: PiTag,
   signatures: PiSignature,
-  updates: PiArrowsClockwise,
-  debug: PiBug
+  preferences: PiSlidersHorizontal,
+  updates: PiArrowsClockwise
 };
 
 export const settingsTabLabels: Record<SettingsTabId, string> = {
   mailboxes: "Mailboxes",
-  users: "Users",
   domains: "Domains",
-  notifications: "Notifications",
-  interface: "Interface",
+  users: "People",
   labels: "Labels",
   signatures: "Signatures",
-  updates: "Updates",
-  debug: "Debug"
+  preferences: "Preferences",
+  updates: "Updates"
 };
 
-export const agentTabIcons: Record<AgentTabId, React.ComponentType<{ className?: string }>> = {
-  connections: PiPlug,
-  mailboxes: PiRobot,
-  provisioning: PiKey
-};
-
-export const agentTabLabels: Record<AgentTabId, string> = {
-  connections: "Connected apps",
-  mailboxes: "Mailbox agents",
-  provisioning: "Provisioning keys"
-};
-
-export { PiAddressBook, PiNotePencil };
+export { PiAddressBook, PiNotePencil, PiPlug };

@@ -279,6 +279,78 @@ describe("labels", () => {
     ).toEqual({ count: 0 });
   });
 
+  it("keeps draft labels private, filterable, journaled, and cascade-deleted", async () => {
+    const create = (subject: string) =>
+      sessionFetch("/api/v2/drafts", memberCookie, {
+        body: JSON.stringify({
+          mailboxId: "mbx_labels_allowed",
+          from: "allowed@labels.example",
+          subject
+        }),
+        headers: { "content-type": "application/json" },
+        method: "POST"
+      });
+    const labeledResponse = await create("Draft label target");
+    const plainResponse = await create("Draft without label");
+    expect(labeledResponse.status, await labeledResponse.clone().text()).toBe(201);
+    expect(plainResponse.status, await plainResponse.clone().text()).toBe(201);
+    const labeledDraft = (await labeledResponse.json()) as { id: string };
+    const plainDraft = (await plainResponse.json()) as { id: string };
+
+    const assigned = await sessionFetch(
+      `/api/v2/drafts/${labeledDraft.id}/labels/${priorityLabelId}`,
+      memberCookie,
+      { method: "PUT" }
+    );
+    expect(assigned.status, await assigned.clone().text()).toBe(200);
+    await expect(assigned.json()).resolves.toMatchObject({
+      affected: 1,
+      assigned: true,
+      draftId: labeledDraft.id,
+      labels: [expect.objectContaining({ id: priorityLabelId, name: "Priority" })]
+    });
+
+    const privateRead = await sessionFetch(`/api/v2/drafts/${labeledDraft.id}`, ownerCookie);
+    expect(privateRead.status).toBe(404);
+    const privateMutation = await sessionFetch(
+      `/api/v2/drafts/${labeledDraft.id}/labels/${priorityLabelId}`,
+      ownerCookie,
+      { method: "DELETE" }
+    );
+    expect(privateMutation.status).toBe(404);
+
+    const filtered = await sessionFetch(
+      `/api/v2/drafts?labelIds=${priorityLabelId}&search=Draft%20label`,
+      memberCookie
+    );
+    expect(filtered.status, await filtered.clone().text()).toBe(200);
+    await expect(filtered.json()).resolves.toEqual([
+      expect.objectContaining({
+        id: labeledDraft.id,
+        labels: [expect.objectContaining({ id: priorityLabelId })]
+      })
+    ]);
+    expect(
+      await env.DB.prepare(
+        `SELECT COUNT(*) AS count FROM draft_changes
+         WHERE draft_id = ? AND principal_id = ? AND kind = 'upsert'`
+      )
+        .bind(labeledDraft.id, memberId)
+        .first()
+    ).toEqual({ count: 2 });
+
+    const discarded = await sessionFetch(`/api/v2/drafts/${labeledDraft.id}`, memberCookie, {
+      method: "DELETE"
+    });
+    expect(discarded.status).toBe(204);
+    expect(
+      await env.DB.prepare("SELECT COUNT(*) AS count FROM draft_labels WHERE draft_id = ?")
+        .bind(labeledDraft.id)
+        .first()
+    ).toEqual({ count: 0 });
+    await sessionFetch(`/api/v2/drafts/${plainDraft.id}`, memberCookie, { method: "DELETE" });
+  });
+
   it("deletes assignments with a label without deleting mail", async () => {
     await sessionFetch(`/api/v2/messages/msg_labels_allowed/labels/${labelId}`, memberCookie, {
       method: "PUT"

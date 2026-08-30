@@ -71,27 +71,30 @@ export function MailboxDetailsSheet({
           <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
             Mailbox details
           </p>
-          <SheetTitle className="mt-1 truncate text-lg font-semibold">
+          <SheetTitle className="mt-1 truncate text-base font-semibold">
             {mailbox?.address ?? "Mailbox"}
           </SheetTitle>
-          <SheetDescription className="mt-1 text-sm text-muted-foreground">
+          <SheetDescription className="mt-1 text-xs text-muted-foreground">
             {mailbox?.displayName ?? "Shared workspace mailbox"}
           </SheetDescription>
         </header>
 
-        <div className="space-y-7 px-5 py-6 sm:px-6">
+        <div className="space-y-6 px-5 py-5 sm:px-6">
           {canManage && mailbox ? (
             <section aria-labelledby="mailbox-sender-heading">
-              <h3 className="font-medium" id="mailbox-sender-heading">
+              <h3 className="text-sm font-medium" id="mailbox-sender-heading">
                 Sender name
               </h3>
-              <p className="mt-1 text-sm text-muted-foreground">
+              <p className="mt-1 text-xs text-muted-foreground">
                 Recipients see {senderName.trim() || mailbox.displayName} &lt;{mailbox.address}&gt;.
               </p>
-              <form className="mt-4 flex items-end gap-2" onSubmit={saveSenderName}>
+              <form className="mt-3 flex items-end gap-2" onSubmit={saveSenderName}>
                 <div className="min-w-0 flex-1 space-y-1.5">
-                  <Label htmlFor="mailbox-sender-name">Sender name</Label>
+                  <Label className="text-xs" htmlFor="mailbox-sender-name">
+                    Sender name
+                  </Label>
                   <Input
+                    className="text-[13px]"
                     id="mailbox-sender-name"
                     maxLength={80}
                     required
@@ -105,7 +108,7 @@ export function MailboxDetailsSheet({
                     !senderName.trim() ||
                     senderName.trim() === mailbox.displayName
                   }
-                  size="sm"
+                  size="field"
                   type="submit"
                 >
                   {senderNamePending ? <Spinner aria-hidden="true" /> : null}
@@ -118,10 +121,10 @@ export function MailboxDetailsSheet({
           <section aria-labelledby="mailbox-access-heading">
             <div className="flex items-start justify-between gap-4">
               <div>
-                <h3 className="font-medium" id="mailbox-access-heading">
+                <h3 className="text-sm font-medium" id="mailbox-access-heading">
                   People with access
                 </h3>
-                <p className="mt-1 text-sm text-muted-foreground">
+                <p className="mt-1 text-xs text-muted-foreground">
                   Owners always have Manager access. Everyone else needs an explicit grant.
                 </p>
               </div>
@@ -138,11 +141,11 @@ export function MailboxDetailsSheet({
               ) : null}
             </div>
 
-            <div className="mt-4 divide-y rounded-md border">
+            <div className="mt-3 divide-y rounded-md border">
               {people.map((person) => (
-                <div className="flex items-center justify-between gap-3 px-3 py-3" key={person.id}>
+                <div className="flex items-center justify-between gap-3 px-3 py-2" key={person.id}>
                   <div className="min-w-0">
-                    <p className="truncate text-sm font-medium">{person.name}</p>
+                    <p className="truncate text-[13px] font-medium">{person.name}</p>
                     {person.email ? (
                       <p className="mt-0.5 truncate text-xs text-muted-foreground">
                         {person.email}
@@ -155,8 +158,8 @@ export function MailboxDetailsSheet({
                 </div>
               ))}
               {!canManage && mailbox?.accessLevel ? (
-                <div className="flex items-center justify-between gap-3 px-3 py-3">
-                  <p className="text-sm font-medium">Your access</p>
+                <div className="flex items-center justify-between gap-3 px-3 py-2">
+                  <p className="text-[13px] font-medium">Your access</p>
                   <Badge variant="secondary">{formatAccessLevel(mailbox.accessLevel)}</Badge>
                 </div>
               ) : null}
@@ -165,14 +168,15 @@ export function MailboxDetailsSheet({
 
           {canManage && mailbox ? (
             <section className="border-t pt-5" aria-labelledby="delete-mailbox-heading">
-              <h3 className="font-medium" id="delete-mailbox-heading">
+              <h3 className="text-sm font-medium" id="delete-mailbox-heading">
                 Delete mailbox
               </h3>
-              <p className="mt-1 text-sm text-muted-foreground">
+              <p className="mt-1 text-xs text-muted-foreground">
                 Hide this mailbox and stop new mail without deleting its history.
               </p>
               <Button
                 className="mt-4"
+                size="sm"
                 type="button"
                 variant="destructive"
                 onClick={() => onDelete(mailbox)}

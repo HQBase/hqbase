@@ -2,6 +2,7 @@ import { type SQL, sql } from "drizzle-orm";
 
 import { getRows } from "../../db/drizzle";
 import { AppError } from "../../lib/errors";
+import { labelsForDraftIds } from "../labels/queries";
 import { decodeKeysetCursor, encodeKeysetCursor } from "../messages/keyset-cursor";
 import { literalContains } from "../messages/search";
 import { attachmentsForDrafts, type DraftRow, mapAttachment, mapDraftRow } from "./queries";
@@ -28,6 +29,7 @@ export async function listDraftPage(
   input: {
     cursor?: string | undefined;
     limit?: number | undefined;
+    labelIds?: readonly string[] | undefined;
     search?: string | undefined;
   } = {}
 ): Promise<DraftPage> {
@@ -40,6 +42,12 @@ export async function listDraftPage(
       OR ${literalContains(sql`cc_json`, input.search)}
       OR ${literalContains(sql`bcc_json`, input.search)}
       OR ${literalContains(sql`text_body`, input.search)}
+    )`);
+  }
+  for (const labelId of input.labelIds ?? []) {
+    where.push(sql`EXISTS (
+      SELECT 1 FROM draft_labels assignment
+      WHERE assignment.draft_id = drafts.id AND assignment.label_id = ${labelId}
     )`);
   }
   const cursor = input.cursor ? decodeDraftCursor(input.cursor) : null;
@@ -97,15 +105,18 @@ export async function getDraftsByIds(
 }
 
 async function mapDraftRows(db: D1Database, rows: DraftRow[]): Promise<Draft[]> {
-  const attachmentRows = await attachmentsForDrafts(
-    db,
-    rows.map((row) => row.id)
-  );
+  const draftIds = rows.map((row) => row.id);
+  const [attachmentRows, labelsByDraft] = await Promise.all([
+    attachmentsForDrafts(db, draftIds),
+    labelsForDraftIds(db, draftIds)
+  ]);
   const attachmentsByDraft = new Map<string, DraftAttachment[]>();
   for (const row of attachmentRows) {
     const values = attachmentsByDraft.get(row.draft_id) ?? [];
     values.push(mapAttachment(row));
     attachmentsByDraft.set(row.draft_id, values);
   }
-  return rows.map((row) => mapDraftRow(row, attachmentsByDraft.get(row.id) ?? []));
+  return rows.map((row) =>
+    mapDraftRow(row, attachmentsByDraft.get(row.id) ?? [], labelsByDraft.get(row.id) ?? [])
+  );
 }

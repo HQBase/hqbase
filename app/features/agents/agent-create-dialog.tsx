@@ -1,17 +1,14 @@
 import * as React from "react";
-import { PiPlus, PiWarning } from "react-icons/pi";
+import { PiArrowLeft, PiWarning } from "react-icons/pi";
 import { toast } from "sonner";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
-  Dialog,
   DialogClose,
-  DialogContent,
   DialogDescription,
   DialogFooter,
   DialogHeader,
-  DialogTitle,
-  DialogTrigger
+  DialogTitle
 } from "@/components/ui/dialog";
 import { DropdownSelect } from "@/components/ui/dropdown-select";
 import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field";
@@ -30,52 +27,17 @@ const newMailboxValue = "__new_mailbox__";
 
 export type AgentDomainOption = { id: string; name: string; isEnabled: boolean };
 
-export function AgentCreateDialog({
-  domains,
-  mailboxes,
-  profile,
-  onCreated
-}: {
-  domains: AgentDomainOption[];
-  mailboxes: Mailbox[];
-  profile: AgentProfile;
-  onCreated: (result: AgentCredentialResult) => void;
-}): React.ReactElement {
-  const [open, setOpen] = React.useState(false);
-  const createLabel = profile === "mailbox" ? "Create mailbox agent" : "Create provisioning key";
-
-  return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button size="sm" type="button">
-          <PiPlus data-icon="inline-start" />
-          {createLabel}
-        </Button>
-      </DialogTrigger>
-      <DialogContent className="w-[min(94vw,600px)]">
-        <AgentCreateForm
-          domains={domains}
-          mailboxes={mailboxes}
-          profile={profile}
-          onCreated={(result) => {
-            setOpen(false);
-            onCreated(result);
-          }}
-        />
-      </DialogContent>
-    </Dialog>
-  );
-}
-
 export function AgentCreateForm({
   domains,
   mailboxes,
   profile,
+  onBack,
   onCreated
 }: {
   domains: AgentDomainOption[];
   mailboxes: Mailbox[];
   profile: AgentProfile;
+  onBack?: () => void;
   onCreated: (result: AgentCredentialResult) => void;
 }): React.ReactElement {
   const enabledDomains = domains.filter((domain) => domain.isEnabled);
@@ -283,11 +245,18 @@ export function AgentCreateForm({
         )}
 
         <DialogFooter>
-          <DialogClose asChild>
-            <Button type="button" variant="outline">
-              Cancel
+          {onBack ? (
+            <Button disabled={pending} type="button" variant="outline" onClick={onBack}>
+              <PiArrowLeft data-icon="inline-start" />
+              Back
             </Button>
-          </DialogClose>
+          ) : (
+            <DialogClose asChild>
+              <Button type="button" variant="outline">
+                Cancel
+              </Button>
+            </DialogClose>
+          )}
           <Button disabled={pending || !canSubmit} type="submit">
             {pending ? <Spinner data-icon="inline-start" /> : null}
             {pending ? "Creating…" : "Create"}

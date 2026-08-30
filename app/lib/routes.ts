@@ -19,28 +19,23 @@ const folders = [
 
 export const settingsTabs = [
   "mailboxes",
-  "users",
   "domains",
-  "notifications",
-  "interface",
+  "users",
   "labels",
   "signatures",
-  "updates",
-  "debug"
+  "preferences",
+  "updates"
 ] as const;
-
-export const agentTabs = ["connections", "mailboxes", "provisioning"] as const;
 
 export type MailFolderId = (typeof mailFolders)[number]["id"];
 export type FolderId = (typeof folders)[number]["id"];
 export type SettingsTabId = (typeof settingsTabs)[number];
-export type AgentTabId = (typeof agentTabs)[number];
 
 export type AppRoute =
   | { kind: "mail"; folder: MailFolderId; messageId: string | null }
   | { kind: "drafts"; draftId: string | null }
   | { kind: "contacts"; contactId: string | null }
-  | { kind: "agents"; tab: AgentTabId }
+  | { kind: "agents" }
   | { kind: "settings"; tab: SettingsTabId };
 
 const publicAuthenticationPaths = new Set(["/forgot-password", "/reset-password", "/set-password"]);
@@ -51,31 +46,30 @@ export function isPublicAuthenticationPath(pathname: string): boolean {
 
 const legacySettingsTabs: Record<string, SettingsTabId> = {
   access: "mailboxes",
-  domains: "domains",
-  general: "debug",
-  updates: "updates"
+  debug: "mailboxes",
+  general: "mailboxes",
+  interface: "preferences",
+  notifications: "preferences"
 };
 
 export function readAppRoute(input: string | URL): AppRoute {
   const url = input instanceof URL ? input : new URL(input, "https://hqbase.local");
   const legacySettings = url.searchParams.get("settings");
   if (legacySettings) {
-    if (legacySettings === "mcp") return { kind: "agents", tab: "connections" };
-    if (legacySettings === "agents") return { kind: "agents", tab: "mailboxes" };
+    if (legacySettings === "mcp" || legacySettings === "agents") return { kind: "agents" };
     const tab = readSettingsTab(legacySettings) ?? legacySettingsTabs[legacySettings];
     if (tab) return { kind: "settings", tab };
   }
 
   const segments = url.pathname.split("/").filter(Boolean);
   if (segments[0] === "settings") {
-    if (segments[1] === "mcp") return { kind: "agents", tab: "connections" };
-    if (segments[1] === "agents") return { kind: "agents", tab: "mailboxes" };
+    if (segments[1] === "mcp" || segments[1] === "agents") return { kind: "agents" };
     const tab = readSettingsTab(segments[1]) ?? legacySettingsTabs[segments[1] ?? ""];
     return { kind: "settings", tab: tab ?? "mailboxes" };
   }
 
   if (segments[0] === "agents") {
-    return { kind: "agents", tab: readAgentTab(segments[1]) ?? "connections" };
+    return { kind: "agents" };
   }
 
   if (segments[0] === "contacts") {
@@ -122,7 +116,7 @@ export function readAppRoute(input: string | URL): AppRoute {
 
 export function appRoutePath(route: AppRoute): string {
   if (route.kind === "settings") return `/settings/${route.tab}`;
-  if (route.kind === "agents") return `/agents/${route.tab}`;
+  if (route.kind === "agents") return "/agents";
   if (route.kind === "contacts") {
     return route.contactId ? `/contacts/${encodeURIComponent(route.contactId)}` : "/contacts";
   }
@@ -139,10 +133,6 @@ function isSettingsTabId(value: string): value is SettingsTabId {
   return settingsTabs.includes(value as SettingsTabId);
 }
 
-function isAgentTabId(value: string): value is AgentTabId {
-  return agentTabs.includes(value as AgentTabId);
-}
-
 function readMailFolder(segment: string | undefined): MailFolderId | null {
   if (!segment) return null;
   if (segment === "catchall" || segment === "catch-all") return "catchall";
@@ -151,10 +141,6 @@ function readMailFolder(segment: string | undefined): MailFolderId | null {
 
 function readSettingsTab(segment: string | undefined): SettingsTabId | null {
   return segment && isSettingsTabId(segment) ? segment : null;
-}
-
-function readAgentTab(segment: string | undefined): AgentTabId | null {
-  return segment && isAgentTabId(segment) ? segment : null;
 }
 
 function decodePathSegment(segment: string): string | null {

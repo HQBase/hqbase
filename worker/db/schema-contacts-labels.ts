@@ -11,7 +11,7 @@ import {
 
 import { users } from "./schema-auth";
 import { principals } from "./schema-core";
-import { messages } from "./schema-messages";
+import { drafts, messages } from "./schema-messages";
 
 const nocaseText = customType<{ data: string; driverData: string }>({
   dataType: () => "text COLLATE NOCASE"
@@ -79,5 +79,25 @@ export const messageLabels = sqliteTable(
   (table) => [
     primaryKey({ columns: [table.messageId, table.labelId] }),
     index("message_labels_label_message_idx").on(table.labelId, table.messageId)
+  ]
+);
+
+export const draftLabels = sqliteTable(
+  "draft_labels",
+  {
+    draftId: text("draft_id")
+      .notNull()
+      .references(() => drafts.id, { onDelete: "cascade" }),
+    labelId: text("label_id")
+      .notNull()
+      .references(() => labels.id, { onDelete: "cascade" }),
+    assignedByPrincipalId: text("assigned_by_principal_id").references(() => principals.id, {
+      onDelete: "set null"
+    }),
+    createdAt: text("created_at").notNull()
+  },
+  (table) => [
+    primaryKey({ columns: [table.draftId, table.labelId] }),
+    index("draft_labels_label_draft_idx").on(table.labelId, table.draftId)
   ]
 );

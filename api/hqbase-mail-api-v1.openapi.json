@@ -1853,6 +1853,41 @@
               "maxLength": 512
             },
             "description": "Opaque cursor from the previous page. Read it from the Link header and send it unchanged."
+          },
+          {
+            "in": "query",
+            "name": "search",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            },
+            "description": "Literal draft search across sender, recipients, subject, and plain text."
+          },
+          {
+            "in": "query",
+            "name": "labelId",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 100
+            },
+            "description": "Require one assigned draft label."
+          },
+          {
+            "in": "query",
+            "name": "labelIds",
+            "required": false,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "maxLength": 100
+              }
+            },
+            "style": "form",
+            "explode": true,
+            "description": "Repeat to require every selected draft label."
           }
         ]
       },
@@ -3057,6 +3092,144 @@
           }
         ]
       }
+    },
+    "/api/v1/drafts/{id}/labels/{labelId}": {
+      "put": {
+        "summary": "Add a label to a draft",
+        "description": "Adds one existing label on a caller-owned private draft.",
+        "security": [
+          {
+            "oauth2": ["mail:send"]
+          },
+          {
+            "cookieSession": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Draft label assignment state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LabelAssignmentResult"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The caller cannot access this draft",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The draft or label was not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "tags": ["Labels"],
+        "operationId": "addDraftLabel",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100
+            }
+          },
+          {
+            "in": "path",
+            "name": "labelId",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100
+            }
+          }
+        ]
+      },
+      "delete": {
+        "summary": "Remove a label from a draft",
+        "description": "Removes one existing label on a caller-owned private draft.",
+        "security": [
+          {
+            "oauth2": ["mail:send"]
+          },
+          {
+            "cookieSession": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Draft label assignment state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LabelAssignmentResult"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The caller cannot access this draft",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The draft or label was not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "tags": ["Labels"],
+        "operationId": "removeDraftLabel",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100
+            }
+          },
+          {
+            "in": "path",
+            "name": "labelId",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100
+            }
+          }
+        ]
+      }
     }
   },
   "components": {
@@ -3263,6 +3436,9 @@
             "items": {
               "$ref": "#/components/schemas/Label"
             }
+          },
+          "draftId": {
+            "type": "string"
           }
         }
       },
@@ -3849,7 +4025,7 @@
           },
           {
             "type": "object",
-            "required": ["id", "version", "updatedAt", "attachments", "signature"],
+            "required": ["id", "version", "updatedAt", "attachments", "signature", "labels"],
             "properties": {
               "id": {
                 "type": "string"
@@ -3869,6 +4045,12 @@
               },
               "signature": {
                 "$ref": "#/components/schemas/SignatureSnapshot"
+              },
+              "labels": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/Label"
+                }
               }
             }
           }

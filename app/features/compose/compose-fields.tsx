@@ -1,4 +1,6 @@
-import type * as React from "react";
+import * as React from "react";
+import { PiCaretDown, PiCaretUp } from "react-icons/pi";
+import { Button } from "@/components/ui/button";
 import { DropdownSelect } from "@/components/ui/dropdown-select";
 import { Input } from "@/components/ui/input";
 import type { ComposeMode } from "./compose-state";
@@ -20,6 +22,16 @@ export function ComposeFields(props: {
   setBcc: (value: string) => void;
   setSubject: (value: string) => void;
 }) {
+  const hasOptionalRecipients = Boolean(props.cc.trim() || props.bcc.trim());
+  const [showOptionalRecipients, setShowOptionalRecipients] = React.useState(
+    () => hasOptionalRecipients
+  );
+  const optionalRecipientsId = React.useId();
+
+  React.useEffect(() => {
+    if (hasOptionalRecipients) setShowOptionalRecipients(true);
+  }, [hasOptionalRecipients]);
+
   return (
     <div className="flex flex-col px-5">
       <Row label="From">
@@ -37,7 +49,31 @@ export function ComposeFields(props: {
           onValueChange={props.setFrom}
         />
       </Row>
-      <Row label="To">
+      <Row
+        label={
+          <>
+            To
+            {!hasOptionalRecipients ? (
+              <Button
+                aria-controls={optionalRecipientsId}
+                aria-expanded={showOptionalRecipients}
+                aria-label={showOptionalRecipients ? "Hide Cc and Bcc" : "Show Cc and Bcc"}
+                className="size-7 min-h-7 min-w-7 shrink-0 rounded-full p-0 text-muted-foreground"
+                size="sm"
+                type="button"
+                variant="ghost"
+                onClick={() => setShowOptionalRecipients((visible) => !visible)}
+              >
+                {showOptionalRecipients ? (
+                  <PiCaretUp aria-hidden="true" />
+                ) : (
+                  <PiCaretDown aria-hidden="true" />
+                )}
+              </Button>
+            ) : null}
+          </>
+        }
+      >
         <RecipientField
           autoFocus={props.mode !== "reply"}
           label="To"
@@ -46,16 +82,21 @@ export function ComposeFields(props: {
           onChange={props.setTo}
         />
       </Row>
-      <div className="grid grid-cols-1 border-b sm:grid-cols-2 sm:divide-x">
-        <Row label="Cc" border={false}>
-          <RecipientField label="Cc" value={props.cc} onChange={props.setCc} />
-        </Row>
-        <div className="sm:pl-4">
-          <Row label="Bcc" border={false}>
-            <RecipientField label="Bcc" value={props.bcc} onChange={props.setBcc} />
+      {showOptionalRecipients ? (
+        <div
+          className="grid grid-cols-1 border-b sm:grid-cols-2 sm:divide-x"
+          id={optionalRecipientsId}
+        >
+          <Row label="Cc" border={false}>
+            <RecipientField label="Cc" value={props.cc} onChange={props.setCc} />
           </Row>
+          <div className="sm:pl-4">
+            <Row label="Bcc" border={false}>
+              <RecipientField label="Bcc" value={props.bcc} onChange={props.setBcc} />
+            </Row>
+          </div>
         </div>
-      </div>
+      ) : null}
       {props.mode !== "reply" ? (
         <Row label="Subject">
           <Input
@@ -74,14 +115,14 @@ function Row({
   children,
   border = true
 }: {
-  label: string;
+  label: React.ReactNode;
   children: React.ReactNode;
   border?: boolean;
 }) {
   return (
     <div className={`grid grid-cols-[3rem_minmax(0,1fr)] items-center ${border ? "border-b" : ""}`}>
-      <span className="text-xs text-muted-foreground">{label}</span>
-      <div className="[&_input]:h-10 [&_input]:rounded-none [&_input]:border-0 [&_input]:bg-transparent [&_input]:px-0 [&_input]:shadow-none [&_input]:focus-visible:ring-0">
+      <div className="flex items-center gap-0.5 text-xs text-muted-foreground">{label}</div>
+      <div className="[&_input]:h-[38px] [&_input]:rounded-none [&_input]:border-0 [&_input]:bg-transparent [&_input]:px-0 [&_input]:shadow-none [&_input]:focus-visible:ring-0">
         {children}
       </div>
     </div>

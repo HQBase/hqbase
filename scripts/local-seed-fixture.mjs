@@ -1,5 +1,6 @@
 import { buildBulkSeedLines } from "./local-seed-bulk.mjs";
 import { buildDraftSeedLines } from "./local-seed-drafts.mjs";
+import { buildLabelSeedLines } from "./local-seed-labels.mjs";
 import { buildCuratedMessageLines } from "./local-seed-messages.mjs";
 import { buildThreadSeedLines } from "./local-seed-threads.mjs";
 import { buildSeedTimeline } from "./local-seed-timeline.mjs";
@@ -13,5 +14,6 @@ export function buildSeedSql(passwordHash, seedDate = new Date()) {
   lines.push(...buildCuratedMessageLines(timeline));
   lines.push(...buildDraftSeedLines(timeline));
   lines.push(...buildBulkSeedLines(seedDate, timeline));
+  lines.push(...buildLabelSeedLines(timeline));
   return `${lines.join("\n")}\n`;
 }

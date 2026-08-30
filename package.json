@@ -11,6 +11,7 @@
   "scripts": {
     "dev": "node scripts/dev.mjs",
     "dev:vite": "vite --host 127.0.0.1 --port 5173",
+    "dev:ui": "vite --host 127.0.0.1 --port 5173 --open /__ui/design",
     "dev:setup-ui": "vite --host 127.0.0.1 --port 5173 --open /__ui/setup?state=loading",
     "build": "vite build && node scripts/build-pwa.mjs && node scripts/check-setup-preview-boundary.mjs",
     "deploy": "node scripts/release/deploy.mjs",

@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { signIn } from "./api";
 import { authenticationPath, safeAuthenticationReturnPath } from "./password-recovery";
+import { ProductAttribution } from "./password-shell";
 
 type LoginPageProps = {
   onLogin: () => void;
@@ -63,7 +64,7 @@ export function LoginPage({ onLogin }: LoginPageProps): React.ReactElement {
               Login email
               <Input
                 autoComplete="email"
-                className="h-10 bg-background shadow-none focus-visible:ring-1"
+                className="bg-background shadow-none focus-visible:ring-1"
                 id="login-email"
                 onChange={(event) => setEmail(event.target.value)}
                 required
@@ -83,7 +84,7 @@ export function LoginPage({ onLogin }: LoginPageProps): React.ReactElement {
               </div>
               <Input
                 autoComplete="current-password"
-                className="h-10 bg-background shadow-none focus-visible:ring-1"
+                className="bg-background shadow-none focus-visible:ring-1"
                 id="login-password"
                 onChange={(event) => setPassword(event.target.value)}
                 required
@@ -101,7 +102,7 @@ export function LoginPage({ onLogin }: LoginPageProps): React.ReactElement {
             </Button>
           </form>
         </section>
-        <p className="mt-4 text-center text-[11px] text-tertiary">Self-hosted on Cloudflare</p>
+        <ProductAttribution />
       </div>
     </main>
   );

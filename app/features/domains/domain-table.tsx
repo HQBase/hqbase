@@ -70,13 +70,14 @@ export function DomainTable({
           <TableHead>Domain</TableHead>
           <TableHead className="hidden w-44 sm:table-cell">Readiness</TableHead>
           <TableHead className="hidden min-w-64 sm:table-cell">Unknown-address mail</TableHead>
-          <TableHead className="w-24">Active</TableHead>
+          <TableHead className="w-20">Active</TableHead>
+          <TableHead className="w-16 text-right">Actions</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
         {domains.length === 0 ? (
           <TableRow>
-            <TableCell className="h-24 text-center text-muted-foreground" colSpan={4}>
+            <TableCell className="h-24 text-center text-muted-foreground" colSpan={5}>
               No domains connected.
             </TableCell>
           </TableRow>
@@ -92,7 +93,7 @@ export function DomainTable({
           );
           return (
             <TableRow key={domain.id}>
-              <TableCell className="min-w-48 py-3">
+              <TableCell className="min-w-48">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="font-medium">{domain.name}</span>
                   {isPortalDomain(domain.name, portalHostname) ? (
@@ -143,21 +144,21 @@ export function DomainTable({
                 />
               </TableCell>
               <TableCell>
-                <div className="flex items-center gap-1">
-                  <Switch
-                    aria-label={`${domain.name} active in HQBase`}
-                    checked={domain.isEnabled}
-                    disabled={pending || domain.disconnectedAt !== null}
-                    onCheckedChange={(isEnabled) => onToggle(domain, isEnabled)}
-                  />
-                  <DomainActions
-                    disabled={pending}
-                    domain={domain}
-                    onDisconnect={onDisconnect}
-                    onForget={onForget}
-                    onReconnect={onReconnect}
-                  />
-                </div>
+                <Switch
+                  aria-label={`${domain.name} active in HQBase`}
+                  checked={domain.isEnabled}
+                  disabled={pending || domain.disconnectedAt !== null}
+                  onCheckedChange={(isEnabled) => onToggle(domain, isEnabled)}
+                />
+              </TableCell>
+              <TableCell className="text-right">
+                <DomainActions
+                  disabled={pending}
+                  domain={domain}
+                  onDisconnect={onDisconnect}
+                  onForget={onForget}
+                  onReconnect={onReconnect}
+                />
               </TableCell>
             </TableRow>
           );
@@ -248,7 +249,7 @@ function CatchAllSelect({
   return (
     <DropdownSelect
       ariaLabel={`${domain.name} unknown-address mail`}
-      className="max-w-sm shadow-none"
+      className="h-[30px] min-h-[30px] max-w-sm px-2.5 text-[13px] shadow-none"
       disabled={disabled}
       options={options}
       value={value}
@@ -285,7 +286,7 @@ function DomainReadiness({
               <Button
                 aria-label={`${domain.name} readiness: ${summary.label}. ${details}`}
                 className={cn(
-                  "h-8 min-h-8 justify-start px-2 font-normal",
+                  "h-[30px] min-h-[30px] justify-start px-2 font-normal",
                   summary.tone === "ready" && "text-emerald-700 dark:text-emerald-300",
                   summary.tone === "attention" && "text-destructive",
                   (summary.tone === "checking" || summary.tone === "inactive") &&

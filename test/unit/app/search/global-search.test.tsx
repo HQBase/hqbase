@@ -47,6 +47,7 @@ describe("global search", () => {
       <SearchHost onSelect={onSelect} onSubmit={() => undefined} />
     );
     const input = requiredInput(view.container);
+    expect(input.className).toContain("h-[30px]");
 
     await setInput(input, "old");
     await flushHookEffects(() => vi.advanceTimersByTime(200));

@@ -89,20 +89,25 @@ export function ComposeForm(props: ComposeFormProps): React.ReactElement {
             setBcc={props.onSetBcc}
             setSubject={props.onSetSubject}
           />
-          <RichEmailEditor
-            contained={props.presentation === "window"}
-            html={props.html}
-            onFiles={props.onFiles}
-            onImages={props.onImages}
-            onChange={props.onEditorChange}
-          />
-          <ComposeSignature
-            disabled={props.isPending || props.signatureDisabled}
-            from={props.from}
-            signature={props.signature}
-            onManage={props.onManageSignatures}
-            onSelectionChange={props.onSetSignature}
-          />
+          <div
+            className={cn(props.presentation === "window" && "min-h-0 flex-1 overflow-auto")}
+            data-compose-scroll-area
+          >
+            <RichEmailEditor
+              contained={false}
+              html={props.html}
+              onFiles={props.onFiles}
+              onImages={props.onImages}
+              onChange={props.onEditorChange}
+            />
+            <ComposeSignature
+              disabled={props.isPending || props.signatureDisabled}
+              from={props.from}
+              signature={props.signature}
+              onManage={props.onManageSignatures}
+              onSelectionChange={props.onSetSignature}
+            />
+          </div>
           {props.replyMessage ? <ReplyQuotePreview message={props.replyMessage} /> : null}
           <AttachmentList attachments={props.attachments} onRemove={props.onRemoveAttachment} />
           <footer

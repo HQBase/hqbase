@@ -53,12 +53,16 @@ const mcpConnectionDetails = readFileSync(
   new URL("../../../../app/features/mcp/connection-dialog.tsx", import.meta.url),
   "utf8"
 );
-const connectedAppsPage = readFileSync(
-  new URL("../../../../app/features/connected-apps/connected-apps-page.tsx", import.meta.url),
+const connectionsTable = readFileSync(
+  new URL("../../../../app/features/agents/connections-table.tsx", import.meta.url),
   "utf8"
 );
 const agentsPage = readFileSync(
   new URL("../../../../app/features/agents/agents-page.tsx", import.meta.url),
+  "utf8"
+);
+const addConnectionDialog = readFileSync(
+  new URL("../../../../app/features/agents/add-connection-dialog.tsx", import.meta.url),
   "utf8"
 );
 const threadComposeSurface = readFileSync(
@@ -101,27 +105,28 @@ describe("mobile application shell", () => {
     expect(composeForm).toContain("pb-[max(1rem,env(safe-area-inset-bottom))]");
   });
 
-  it("keeps delegated connections separate from machine identities", () => {
+  it("uses one responsive Agents list with contextual setup", () => {
     expect(agentConnectionDetails).toContain("export function AgentSkillDetails");
     expect(agentConnectionDetails).not.toContain('aria-label="Connection method"');
     expect(mcpConnectionDetails).toContain("text-base sm:text-xs");
     expect(mcpConnectionDetails).toContain('value="read-only"');
     expect(mcpConnectionDetails).toContain('value="mail-actions"');
-    expect(connectedAppsPage).toContain('value="mcp"');
-    expect(connectedAppsPage).toContain('value="skill"');
-    expect(connectedAppsPage).toContain('value="connections"');
-    expect(connectedAppsPage).toContain("/mcp/full");
-    expect(connectedAppsPage).toContain("/skills/hqbase-mail/SKILL.md");
-    expect(connectedAppsPage).toContain("Your connections");
-    expect(agentsPage).toContain('profile="mailbox"');
-    expect(agentsPage).toContain('profile="provisioner"');
+    expect(agentsPage).toContain("All connections");
+    expect(agentsPage).toContain("Add connection");
+    expect(addConnectionDialog).toContain("Use the Mail API skill instead");
+    expect(addConnectionDialog).toContain('onSelect("mailbox")');
+    expect(addConnectionDialog).toContain('onSelect("provisioner")');
+    expect(connectionsTable).toContain('className="block sm:table"');
+    expect(connectionsTable).toContain("Setup instructions");
+    expect(connectionsTable).toContain('status="Authorized"');
+    expect(connectionsTable).toContain('agent.isActive ? "Enabled" : "Disabled"');
   });
 
   it("removes agent connections from Settings", () => {
     expect(settingsPage).not.toContain("McpSettings");
     expect(settingsPage).not.toContain("AgentSettings");
-    expect(appShell).toContain("activeAgentTab");
-    expect(mobileNavigation).toContain("onAgentTabChange");
+    expect(appShell).not.toContain("activeAgentTab");
+    expect(mobileNavigation).not.toContain("onAgentTabChange");
   });
 
   it("uses a compact desktop mailbox dropdown with agent mailboxes last", () => {

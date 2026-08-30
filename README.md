@@ -115,6 +115,17 @@ pnpm dev:setup-ui
 
 Open `http://127.0.0.1:5173/__ui/setup`.
 
+### Review the visual system
+
+To inspect the shared components, interactive states, product patterns, and local screen routes:
+
+```sh
+pnpm dev:ui
+```
+
+Open `http://127.0.0.1:5173/__ui/design`. The gallery uses deterministic presentation fixtures
+and does not call product APIs.
+
 ## Verify changes
 
 Run the full local quality gate:

@@ -159,7 +159,7 @@ export function UserLifecycleDialog({
       onClose();
       onChanged();
     } catch (nextError) {
-      setError(nextError instanceof Error ? nextError.message : "The user could not be changed.");
+      setError(nextError instanceof Error ? nextError.message : "The person could not be changed.");
     } finally {
       onPendingChange(false);
     }
@@ -220,7 +220,7 @@ export function UserLifecycleDialog({
         ) : (
           <>
             <DialogHeader>
-              <DialogTitle>{verb === "remove" ? "Remove user?" : "Restore user?"}</DialogTitle>
+              <DialogTitle>{verb === "remove" ? "Remove person?" : "Restore person?"}</DialogTitle>
               <DialogDescription>
                 {verb === "remove" ? (
                   <>
@@ -255,8 +255,8 @@ export function UserLifecycleDialog({
                 {authentication === "checking"
                   ? "Checking sign-in…"
                   : verb === "remove"
-                    ? "Remove user"
-                    : "Restore user"}
+                    ? "Remove person"
+                    : "Restore person"}
               </Button>
             </DialogFooter>
           </>

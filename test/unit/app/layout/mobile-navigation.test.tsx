@@ -9,11 +9,10 @@ afterEach(() => {
 });
 
 describe("mobile navigation", () => {
-  it("lets an admin open agent management", async () => {
-    const onAgentTabChange = vi.fn();
+  it("opens the single Agents destination", async () => {
+    const onFolderChange = vi.fn();
     const view = await renderComponent(
       <MobileNavigation
-        activeAgentTab="connections"
         activeFolder="agents"
         canManage
         draftCount={0}
@@ -28,8 +27,7 @@ describe("mobile navigation", () => {
           passwordSetupRequired: false,
           role: "admin"
         }}
-        onAgentTabChange={onAgentTabChange}
-        onFolderChange={() => undefined}
+        onFolderChange={onFolderChange}
         onMailboxChange={() => undefined}
         onSignedOut={() => undefined}
       />
@@ -39,11 +37,11 @@ describe("mobile navigation", () => {
     await flushHookEffects(() =>
       view.container.querySelector<HTMLButtonElement>('[aria-label="Open navigation"]')?.click()
     );
-    const agents = document.body.querySelector<HTMLAnchorElement>('a[href="/agents/mailboxes"]');
+    const agents = document.body.querySelector<HTMLAnchorElement>('a[href="/agents"]');
     expect(agents).not.toBeNull();
 
     await flushHookEffects(() => agents?.click());
-    expect(onAgentTabChange).toHaveBeenCalledWith("mailboxes");
+    expect(onFolderChange).toHaveBeenCalledWith("agents");
     await view.unmount();
   });
 
@@ -100,10 +98,9 @@ describe("mobile navigation", () => {
     await view.unmount();
   });
 
-  it("shows personal connections but hides machine management from workspace members", async () => {
+  it("shows one Agents destination to workspace members", async () => {
     const view = await renderComponent(
       <MobileNavigation
-        activeAgentTab="connections"
         activeFolder="agents"
         canManage={false}
         draftCount={0}
@@ -118,7 +115,6 @@ describe("mobile navigation", () => {
           passwordSetupRequired: false,
           role: "member"
         }}
-        onAgentTabChange={() => undefined}
         onFolderChange={() => undefined}
         onMailboxChange={() => undefined}
         onSignedOut={() => undefined}
@@ -129,9 +125,9 @@ describe("mobile navigation", () => {
     await flushHookEffects(() =>
       view.container.querySelector<HTMLButtonElement>('[aria-label="Open navigation"]')?.click()
     );
-    expect(document.body.querySelector('a[href="/agents/connections"]')).not.toBeNull();
+    expect(document.body.querySelector('a[href="/agents"]')).not.toBeNull();
+    expect(document.body.textContent).toContain("All connections");
     expect(document.body.querySelector('a[href="/agents/mailboxes"]')).toBeNull();
-    expect(document.body.querySelector('a[href="/agents/provisioning"]')).toBeNull();
     await view.unmount();
   });
 
@@ -150,6 +146,18 @@ describe("mobile navigation", () => {
             displayName: "Support",
             id: "mailbox-1",
             isActive: true,
+            kind: "human",
+            mailDomainId: "domain-1",
+            updatedAt: "2026-08-24T12:00:00.000Z"
+          },
+          {
+            accessLevel: "manager",
+            address: "archive@example.com",
+            createdAt: "2026-08-24T12:00:00.000Z",
+            deletedAt: null,
+            displayName: "Archive",
+            id: "mailbox-disabled",
+            isActive: false,
             kind: "human",
             mailDomainId: "domain-1",
             updatedAt: "2026-08-24T12:00:00.000Z"
@@ -187,6 +195,11 @@ describe("mobile navigation", () => {
 
     expect(document.body.textContent).toContain("support@example.com");
     expect(document.body.textContent).not.toContain("support@example.com (4)");
+    const disabledMailbox = Array.from(
+      document.body.querySelectorAll<HTMLElement>('[role="menuitemradio"]')
+    ).find((item) => item.textContent?.includes("archive@example.com"));
+    expect(disabledMailbox?.textContent).toContain("Disabled");
+    expect(disabledMailbox?.getAttribute("data-disabled")).toBeNull();
     await view.unmount();
   });
 

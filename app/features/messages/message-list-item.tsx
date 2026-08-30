@@ -7,6 +7,7 @@ import type { MailLabel } from "@/features/labels/types";
 import { cn } from "@/lib/cn";
 import { formatConversationTimestamp } from "@/lib/format";
 import { conversationActivityTimestamp, correspondentLabel } from "./conversation-display";
+import { mailListRowClassName } from "./mail-list-layout";
 import type { ConversationSummary } from "./types";
 
 type MessageListItemProps = {
@@ -44,12 +45,7 @@ export function MessageListItem({
 
   return (
     <a
-      className={cn(
-        "group grid w-full grid-cols-[2.5rem_minmax(0,1fr)_4rem] items-start gap-x-3 rounded-xl px-3 py-3 text-left text-[14px] leading-5 [--message-row-surface:var(--surface-list)] transition-colors focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring sm:grid-cols-[2rem_minmax(7rem,18%)_1rem_minmax(0,1fr)_1.75rem_4rem] sm:items-center sm:gap-x-1.5 sm:py-2 sm:text-[13px]",
-        isActive
-          ? "bg-selected [--message-row-surface:var(--surface-selected)] [@media(hover:hover)]:hover:bg-selected"
-          : "[@media(hover:hover)]:hover:bg-hover [@media(hover:hover)]:hover:[--message-row-surface:var(--surface-hover)]"
-      )}
+      className={mailListRowClassName(isActive)}
       href={href}
       onClick={(event) => {
         if (

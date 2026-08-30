@@ -56,7 +56,7 @@ export function DropdownSelect({
           aria-label={ariaLabel}
           aria-required={required || undefined}
           className={cn(
-            "h-9 min-h-9 w-full justify-between overflow-hidden px-3 font-normal shadow-sm",
+            "h-[34px] min-h-[34px] w-full justify-between overflow-hidden rounded-[calc(var(--radius)+2px)] px-3 font-normal shadow-sm",
             className
           )}
           disabled={disabled}
@@ -64,7 +64,9 @@ export function DropdownSelect({
           type="button"
           variant="outline"
         >
-          <span className="min-w-0 truncate text-left">{selected?.label ?? placeholder}</span>
+          <span className="min-w-0 flex-1 truncate text-left">
+            {selected?.label ?? placeholder}
+          </span>
           <PiCaretDown aria-hidden="true" className="size-3.5 text-muted-foreground" />
         </Button>
       </DropdownMenuTrigger>
@@ -80,7 +82,7 @@ export function DropdownSelect({
               key={option.value}
               value={option.value}
             >
-              <span className="min-w-0 truncate">{option.label}</span>
+              <span className="min-w-0 flex-1 truncate">{option.label}</span>
             </DropdownMenuRadioItem>
           ))}
         </DropdownMenuRadioGroup>

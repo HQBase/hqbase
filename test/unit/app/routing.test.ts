@@ -1,12 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  type AppRoute,
-  agentTabs,
-  appRoutePath,
-  mailFolders,
-  readAppRoute,
-  settingsTabs
-} from "@/lib/routes";
+import { type AppRoute, appRoutePath, mailFolders, readAppRoute, settingsTabs } from "@/lib/routes";
 
 describe("application routing", () => {
   it("gives every mail folder a canonical route", () => {
@@ -49,23 +42,33 @@ describe("application routing", () => {
     expect(readAppRoute(appRoutePath(route))).toEqual(route);
   });
 
-  it("gives every Agents page a canonical route", () => {
-    for (const tab of agentTabs) {
-      const path = `/agents/${tab}`;
-      expect(readAppRoute(path)).toEqual({ kind: "agents", tab });
-      expect(appRoutePath(readAppRoute(path))).toBe(path);
+  it("normalizes every Agents alias to one canonical route", () => {
+    for (const path of [
+      "/agents",
+      "/agents/connections",
+      "/agents/mailboxes",
+      "/agents/provisioning",
+      "/settings/mcp",
+      "/settings/agents"
+    ]) {
+      expect(readAppRoute(path)).toEqual({ kind: "agents" });
+      expect(appRoutePath(readAppRoute(path))).toBe("/agents");
     }
-    expect(readAppRoute("/settings/mcp")).toEqual({ kind: "agents", tab: "connections" });
-    expect(readAppRoute("/settings/agents")).toEqual({ kind: "agents", tab: "mailboxes" });
   });
 
-  it("keeps OAuth return aliases and the retired General tab compatible", () => {
+  it("keeps OAuth return aliases and retired Settings pages compatible", () => {
     expect(readAppRoute("/?cloudflare=connected&settings=domains")).toEqual({
       kind: "settings",
       tab: "domains"
     });
     expect(readAppRoute("/?settings=updates")).toEqual({ kind: "settings", tab: "updates" });
-    expect(readAppRoute("/settings/general")).toEqual({ kind: "settings", tab: "debug" });
+    for (const path of ["/settings/debug", "/settings/general"]) {
+      expect(readAppRoute(path)).toEqual({ kind: "settings", tab: "mailboxes" });
+    }
+    for (const path of ["/settings/interface", "/settings/notifications"]) {
+      expect(readAppRoute(path)).toEqual({ kind: "settings", tab: "preferences" });
+      expect(appRoutePath(readAppRoute(path))).toBe("/settings/preferences");
+    }
     expect(readAppRoute("/catchall")).toEqual({
       kind: "mail",
       folder: "catchall",

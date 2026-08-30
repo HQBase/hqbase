@@ -86,7 +86,7 @@ describe("conversation reader", () => {
     expect(html.match(/>Forward</g)).toHaveLength(1);
     expect(html).toContain('data-compose-message-id="msg_1"');
     expect(html).toContain('data-compose-message-id="msg_2"');
-    expect(html).toContain('aria-label="Back to messages"');
+    expectReaderBackLayout(html);
     expect(html).toContain('aria-label="Archive conversation"');
     expect(html).toContain("Customer Example");
     expect(html).toContain("customer@example.com · to support@example.com");
@@ -183,7 +183,8 @@ describe("conversation reader", () => {
     expect(listHtml).toContain('data-mobile-view="message-list"');
     expect(conversationHtml).not.toContain('data-mobile-view="message-list"');
     expect(conversationHtml).toContain("bg-reader");
-    expect(conversationHtml).toContain('aria-label="Back to messages"');
+    expectReaderBackLayout(conversationHtml);
+    expect(conversationHtml).toContain("Loading conversation…");
     expect(listHtml).toContain("Pull to refresh");
   });
 
@@ -220,7 +221,7 @@ describe("conversation reader", () => {
     expect(html).toContain("Load more conversations");
     expect(html.match(/max-w-\[960px\]/gu)).toHaveLength(2);
     expect(html).not.toContain("max-w-[1200px]");
-    const header = html.match(/<div[^>]*data-inbox-header-layout[^>]*>/u)?.[0];
+    const header = html.match(/<div[^>]*data-mail-list-header-layout[^>]*>/u)?.[0];
     expect(header).toContain(
       "sm:grid-cols-[2rem_minmax(7rem,18%)_1rem_minmax(0,1fr)_1.75rem_4rem]"
     );
@@ -500,3 +501,12 @@ describe("conversation reader", () => {
     expect(html).toContain("report.pdf");
   });
 });
+
+function expectReaderBackLayout(html: string): void {
+  expect(html).toContain('class="shrink-0 border-b border-divider bg-toolbar px-3 sm:px-5"');
+  expect(html).toContain('class="relative flex h-11 items-center gap-2 py-2"');
+  const button = html.match(/<button[^>]*aria-label="Back to messages"[^>]*>/u)?.[0];
+  expect(button).toContain("size-10 min-h-10 min-w-10 shrink-0 bg-transparent text-tertiary");
+  const icon = html.match(/<svg[^>]*class="[^"]*pointer-events-none size-3\.5[^"]*"/u)?.[0];
+  expect(icon).toBeDefined();
+}

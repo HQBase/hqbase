@@ -1,3 +1,4 @@
+import type { MailLabel } from "@/features/labels/types";
 import type { SignatureSelection, SignatureSnapshot } from "@/features/signatures/types";
 
 export type DraftAttachment = {
@@ -24,13 +25,22 @@ export type Draft = {
   version: number;
   updatedAt: string;
   attachments: DraftAttachment[];
+  labels: MailLabel[];
 };
 
 export type DraftInput = Omit<
   Draft,
-  "id" | "version" | "updatedAt" | "attachments" | "signature"
+  "id" | "version" | "updatedAt" | "attachments" | "labels" | "signature"
 > & {
   id?: string;
   signature?: SignatureSelection;
   version?: number;
+};
+
+export type DraftLabelMutationResult = {
+  affected: number;
+  assigned: boolean;
+  draftId: string;
+  labelId: string;
+  labels: MailLabel[];
 };

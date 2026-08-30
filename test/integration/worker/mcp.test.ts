@@ -505,6 +505,19 @@ describe("HQBase MCP server", () => {
       signature: { id: "sig_mcp_default", mode: "automatic" },
       version: 1
     });
+    await expect(
+      callTool(
+        "add_label",
+        { draftId: created.id, labelId: "lbl_mcp_customer", target: "draft" },
+        fullToken,
+        "/mcp/full"
+      )
+    ).resolves.toMatchObject({
+      affected: 1,
+      assigned: true,
+      draftId: created.id,
+      labels: [expect.objectContaining({ id: "lbl_mcp_customer" })]
+    });
 
     const attachment = (await callTool(
       "add_draft_attachment",
@@ -563,6 +576,7 @@ describe("HQBase MCP server", () => {
       callTool("get_draft", { draftId: created.id }, fullToken, "/mcp/full")
     ).resolves.toMatchObject({
       id: created.id,
+      labels: [expect.objectContaining({ id: "lbl_mcp_customer" })],
       signature: { id: null, mode: "none" }
     });
     await env.DB.prepare(

@@ -110,6 +110,18 @@
     --text-tertiary: 240 3% 50%;
   }
 
+  html[data-tweakcn-preview] {
+    --surface-rail: var(--background);
+    --surface-sidebar: var(--sidebar, var(--card));
+    --surface-toolbar: var(--card);
+    --surface-list: var(--background);
+    --surface-reader: var(--background);
+    --surface-selected: var(--sidebar-accent, var(--accent));
+    --surface-hover: var(--muted);
+    --divider-subtle: var(--border);
+    --text-tertiary: var(--muted-foreground);
+  }
+
   html {
     background-color: hsl(var(--background));
     overscroll-behavior: none;

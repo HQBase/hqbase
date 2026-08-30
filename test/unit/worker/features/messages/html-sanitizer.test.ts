@@ -62,6 +62,7 @@ describe("email HTML sanitizer", () => {
         <iframe src="https://evil.example"></iframe><object data="https://evil.example"></object>
         <a href="javascript:alert(1)" onclick="alert(1)">unsafe</a>
         <a href="https://example.com/path">safe</a>
+        <a href="#details">details</a>
         <p style="background-image:url(https://evil.example/pixel); color: red">Text</p>`,
       messageId: "msg-1"
     });
@@ -72,7 +73,12 @@ describe("email HTML sanitizer", () => {
     expect(result.html).not.toContain("javascript:");
     expect(result.html).not.toContain("onclick");
     expect(result.html).toContain('href="https://example.com/path"');
-    expect(result.html).toContain('target="_blank"');
+    expect(result.html).toContain(
+      '<a href="https://example.com/path" rel="noopener noreferrer" target="_blank">safe</a>'
+    );
+    expect(result.html).toContain(
+      '<a href="#details" rel="noopener noreferrer" target="_blank">details</a>'
+    );
     expect(result.html).toContain("color:red");
   });
 
@@ -423,6 +429,7 @@ describe("email HTML sanitizer", () => {
     const result = sanitizeQuotedMessageHtml({
       attachments: [attachment],
       html: `<script>alert(1)</script><table style="width: 100%; position: fixed"><tbody><tr><td><strong>Rich reply</strong></td></tr></tbody></table>
+        <a href="mailto:pat@example.com">Email Pat</a>
         <img src="cid:signature-logo@example.com" onerror="alert(1)">
         <img src="https://images.example.com/banner.png">
         <img src="cid:missing@example.com">`
@@ -431,6 +438,9 @@ describe("email HTML sanitizer", () => {
     expect(result.html).toContain("<table");
     expect(result.html).toContain("<strong>Rich reply</strong>");
     expect(result.html).toContain('src="cid:signature-logo@example.com"');
+    expect(result.html).toContain(
+      '<a href="mailto:pat@example.com" rel="noopener noreferrer" target="_blank">Email Pat</a>'
+    );
     expect(result.html).toContain('src="https://images.example.com/banner.png"');
     expect(result.html).not.toContain("position");
     expect(result.html).not.toContain("onerror");
