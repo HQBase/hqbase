@@ -48,32 +48,34 @@ export function ComposeFields(props: {
           onValueChange={props.setFrom}
         />
       </Row>
-      <Row label="To">
-        <div className="flex min-w-0 items-center gap-1">
-          <div className="min-w-0 flex-1">
-            <RecipientField
-              autoFocus={props.mode !== "reply"}
-              label="To"
-              required
-              value={props.to}
-              onChange={props.setTo}
-            />
-          </div>
-          {!showOptionalRecipients ? (
-            <Button
-              aria-controls={optionalRecipientsId}
-              aria-expanded="false"
-              aria-label="Show Cc and Bcc"
-              className="size-7 min-h-7 min-w-7 shrink-0 rounded-full p-0 text-muted-foreground"
-              size="sm"
-              type="button"
-              variant="ghost"
-              onClick={() => setShowOptionalRecipients(true)}
-            >
-              <PiCaretDown aria-hidden="true" />
-            </Button>
-          ) : null}
-        </div>
+      <Row
+        label={
+          <>
+            To
+            {!showOptionalRecipients ? (
+              <Button
+                aria-controls={optionalRecipientsId}
+                aria-expanded="false"
+                aria-label="Show Cc and Bcc"
+                className="size-7 min-h-7 min-w-7 shrink-0 rounded-full p-0 text-muted-foreground"
+                size="sm"
+                type="button"
+                variant="ghost"
+                onClick={() => setShowOptionalRecipients(true)}
+              >
+                <PiCaretDown aria-hidden="true" />
+              </Button>
+            ) : null}
+          </>
+        }
+      >
+        <RecipientField
+          autoFocus={props.mode !== "reply"}
+          label="To"
+          required
+          value={props.to}
+          onChange={props.setTo}
+        />
       </Row>
       {showOptionalRecipients ? (
         <div
@@ -108,13 +110,13 @@ function Row({
   children,
   border = true
 }: {
-  label: string;
+  label: React.ReactNode;
   children: React.ReactNode;
   border?: boolean;
 }) {
   return (
     <div className={`grid grid-cols-[3rem_minmax(0,1fr)] items-center ${border ? "border-b" : ""}`}>
-      <span className="text-xs text-muted-foreground">{label}</span>
+      <div className="flex items-center gap-0.5 text-xs text-muted-foreground">{label}</div>
       <div className="[&_input]:h-[38px] [&_input]:rounded-none [&_input]:border-0 [&_input]:bg-transparent [&_input]:px-0 [&_input]:shadow-none [&_input]:focus-visible:ring-0">
         {children}
       </div>

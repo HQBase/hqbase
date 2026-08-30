@@ -37,7 +37,7 @@ describe("compose fields", () => {
     for (const [cc, bcc] of [
       ["team@example.net", ""],
       ["", "audit@example.net"]
-    ]) {
+    ] as const) {
       const html = renderToStaticMarkup(
         <ComposeFields
           bcc={bcc}
