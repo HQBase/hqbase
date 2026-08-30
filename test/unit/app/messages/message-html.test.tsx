@@ -175,6 +175,25 @@ describe("message HTML view", () => {
     expect(html).toContain("Message content after quote: Hello");
   });
 
+  it("shows a complete HTML chain without another disclosure", () => {
+    const html = renderToStaticMarkup(
+      <MessageHtmlFrames
+        afterQuote={null}
+        body="<p>Latest reply</p>"
+        bodyHasContent={true}
+        onToggleQuote={null}
+        quote="<p>Earlier message</p>"
+        quoteExpanded={true}
+        subject="Hello"
+      />
+    );
+
+    expect(html).not.toContain("data-quoted-content-control");
+    expect(html).toContain('class="block"');
+    expect(html).toContain("Message body: Hello");
+    expect(html).toContain("Quoted message history: Hello");
+  });
+
   it("does not render an empty body frame before quoted history", () => {
     const html = renderToStaticMarkup(
       <MessageHtmlFrames

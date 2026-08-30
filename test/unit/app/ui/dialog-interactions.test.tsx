@@ -67,6 +67,7 @@ function DialogWithOpenDropdown({
   onPointerDownOutside: OutsideHandler;
 }): React.ReactElement {
   const [selectOpen, setSelectOpen] = React.useState(true);
+  const [value, setValue] = React.useState("first");
   return (
     <Dialog defaultOpen>
       <DialogContent onPointerDownOutside={onPointerDownOutside}>
@@ -78,11 +79,12 @@ function DialogWithOpenDropdown({
             { label: "First", value: "first" },
             { label: "Second", value: "second" }
           ]}
-          value="first"
+          value={value}
           onOpenChange={setSelectOpen}
-          onValueChange={() => undefined}
+          onValueChange={setValue}
         />
         <output data-select-state>{selectOpen ? "open" : "closed"}</output>
+        <output data-selected-value>{value}</output>
       </DialogContent>
     </Dialog>
   );
@@ -115,6 +117,34 @@ describe("dialog interactions", () => {
     expect(document.body.querySelector("[data-select-state]")?.textContent).toBe("closed");
     expect(outside).toHaveBeenCalledOnce();
     expect(document.body.querySelector('[role="dialog"]')?.getAttribute("data-state")).toBe("open");
+    await view.unmount();
+  });
+
+  it("does not send a nested dropdown choice through to a linked row", async () => {
+    const navigate = vi.fn();
+    const outside = vi.fn();
+    const view = await renderComponent(
+      <a
+        href="/thread"
+        onClick={(event) => {
+          event.preventDefault();
+          navigate();
+        }}
+      >
+        <DialogWithOpenDropdown onPointerDownOutside={outside} />
+      </a>
+    );
+    await settleOutsideListeners();
+    const second = [...document.body.querySelectorAll<HTMLElement>('[role="menuitemradio"]')].find(
+      (item) => item.textContent?.includes("Second")
+    );
+
+    expect(second).toBeDefined();
+    await flushHookEffects(() => pointerClick(second as HTMLElement));
+
+    expect(navigate).not.toHaveBeenCalled();
+    expect(document.body.querySelector('[role="dialog"]')?.getAttribute("data-state")).toBe("open");
+    expect(document.body.querySelector("[data-selected-value]")?.textContent).toBe("second");
     await view.unmount();
   });
 

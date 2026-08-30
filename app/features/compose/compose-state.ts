@@ -219,9 +219,12 @@ export function composeContextLabel(
   if (mode === "new" || !message) return null;
   const timestamp = message.receivedAt ?? message.sentAt ?? message.createdAt;
   const action = mode === "reply" ? "Replying to" : "Forwarding message from";
-  const sender = message.fromName
-    ? `${message.fromName} <${message.fromAddress}>`
-    : message.fromAddress;
+  const sender =
+    mode === "reply" && message.direction === "outbound"
+      ? replyRecipients(message).join(", ") || message.fromAddress
+      : message.fromName
+        ? `${message.fromName} <${message.fromAddress}>`
+        : message.fromAddress;
   return `${action} ${sender} · ${formatDateTime(timestamp)}`;
 }
 

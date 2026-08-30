@@ -24,7 +24,7 @@ DialogOverlay.displayName = DialogPrimitive.Overlay.displayName;
 export const DialogContent = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content>
->(({ className, children, onPointerDownOutside, ...props }, ref) => (
+>(({ className, children, onClick, onPointerDownOutside, ...props }, ref) => (
   <DialogPortal>
     <DialogOverlay />
     <DialogPrimitive.Content
@@ -34,6 +34,10 @@ export const DialogContent = React.forwardRef<
       )}
       data-slot="dialog-content"
       ref={ref}
+      onClick={(event) => {
+        onClick?.(event);
+        event.stopPropagation();
+      }}
       onPointerDownOutside={(event) => {
         onPointerDownOutside?.(event);
         event.preventDefault();

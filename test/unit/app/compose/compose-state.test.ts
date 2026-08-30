@@ -164,17 +164,19 @@ describe("composer state", () => {
       "Forwarding message from Sender Example <sender@example.com> ·"
     );
     expect(composeContextLabel("new", inboundMessage)).toBeNull();
-    expect(
-      replyRecipients({
-        ...inboundMessage,
-        direction: "outbound",
-        folder: "sent",
-        fromAddress: "support@example.com",
-        to: ["SUPPORT@example.com", "customer@example.com"],
-        receivedAt: null,
-        sentAt: "2026-07-27T14:05:00.000Z"
-      })
-    ).toEqual(["customer@example.com"]);
+    const outboundMessage = {
+      ...inboundMessage,
+      direction: "outbound" as const,
+      folder: "sent" as const,
+      fromAddress: "support@example.com",
+      to: ["SUPPORT@example.com", "customer@example.com"],
+      receivedAt: null,
+      sentAt: "2026-07-27T14:05:00.000Z"
+    };
+    expect(replyRecipients(outboundMessage)).toEqual(["customer@example.com"]);
+    expect(composeContextLabel("reply", outboundMessage)).toContain(
+      "Replying to customer@example.com ·"
+    );
     expect(
       replyRecipients({
         ...inboundMessage,

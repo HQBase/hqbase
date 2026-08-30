@@ -14,11 +14,14 @@ export function ReplyQuotePreview({ message }: { message: MessageDetail }): Reac
     <div className="border-t px-5 py-2" data-reply-quote-preview>
       <QuotedContentDivider expanded={expanded} onToggle={() => setExpanded((value) => !value)} />
       {expanded ? (
-        <div className="mt-3 text-muted-foreground" data-reply-quote-content>
+        <div
+          className="mt-3 border-l border-border pl-3 text-muted-foreground"
+          data-reply-quote-content
+        >
           {message.htmlAvailable ? (
-            <MessageHtml message={message} />
+            <MessageHtml message={message} showQuotedHistory />
           ) : (
-            <PlainTextMessage message={message} />
+            <PlainTextMessage message={message} showQuotedHistory />
           )}
         </div>
       ) : null}
