@@ -76,10 +76,12 @@ export function InboxPage({
   const [detailError, setDetailError] = React.useState<string | null>(null);
   const [detailLoading, setDetailLoading] = React.useState(false);
   const threadLoadRequestRef = React.useRef(0);
-  const threadContextRef = React.useRef("");
-  threadContextRef.current = `${activeFolder}:${selectedId ?? ""}`;
+  const committedThreadContextRef = React.useRef({ activeFolder, selectedId });
   const onRefreshRef = React.useRef(onRefresh);
   const onMessageRouteChangeRef = React.useRef(onMessageRouteChange);
+  React.useLayoutEffect(() => {
+    committedThreadContextRef.current = { activeFolder, selectedId };
+  }, [activeFolder, selectedId]);
   React.useEffect(() => {
     onRefreshRef.current = onRefresh;
   }, [onRefresh]);
@@ -90,9 +92,12 @@ export function InboxPage({
   const loadThread = React.useCallback(
     async (messageId: string) => {
       const requestId = ++threadLoadRequestRef.current;
-      const context = threadContextRef.current;
+      const context = committedThreadContextRef.current;
       const messages = visibleThreadMessages(await getMessageThread(messageId), activeFolder);
-      if (requestId !== threadLoadRequestRef.current || context !== threadContextRef.current) {
+      if (
+        requestId !== threadLoadRequestRef.current ||
+        context !== committedThreadContextRef.current
+      ) {
         return null;
       }
       setThread(messages);

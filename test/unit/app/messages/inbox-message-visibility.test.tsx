@@ -181,7 +181,7 @@ describe("Inbox message visibility", () => {
     await view.unmount();
   });
 
-  it("ignores a stale refresh after another thread opens", async () => {
+  it("keeps the committed thread current across suspended and completed navigation", async () => {
     const secondThreadMessage = {
       ...firstMessage,
       id: "msg_other",
@@ -190,14 +190,27 @@ describe("Inbox message visibility", () => {
       textBody: "Other conversation body"
     };
     let delayFirstThread = false;
-    let resolveFirstThread: ((messages: MessageDetailType[]) => void) | undefined;
+    const pendingFirstThreadLoads: Array<(messages: MessageDetailType[]) => void> = [];
+    let navigationReleased = false;
+    let releaseNavigation: (() => void) | undefined;
+    const navigation = new Promise<void>((resolve) => {
+      releaseNavigation = () => {
+        navigationReleased = true;
+        resolve();
+      };
+    });
     mocks.getMessageThread.mockImplementation((messageId: string) => {
       if (messageId === secondThreadMessage.id) return Promise.resolve([secondThreadMessage]);
       if (!delayFirstThread) return Promise.resolve([firstMessage]);
       return new Promise<MessageDetailType[]>((resolve) => {
-        resolveFirstThread = resolve;
+        pendingFirstThreadLoads.push(resolve);
       });
     });
+
+    function SuspendNavigation({ active }: { active: boolean }) {
+      if (active && !navigationReleased) throw navigation;
+      return null;
+    }
 
     function Harness() {
       const [selectedId, setSelectedId] = React.useState<string | null>(firstMessage.id);
@@ -205,34 +218,37 @@ describe("Inbox message visibility", () => {
         <>
           <button
             data-select-other
-            onClick={() => setSelectedId(secondThreadMessage.id)}
+            onClick={() => React.startTransition(() => setSelectedId(secondThreadMessage.id))}
             type="button"
           >
             Select other
           </button>
-          <InboxPage
-            activeFolder="inbox"
-            conversations={[
-              {
-                ...firstMessage,
-                isStarred: false,
-                messageCount: 1,
-                unreadCount: 0
-              }
-            ]}
-            defaultFromMailboxId="mbx_1"
-            hasMore={false}
-            isLoadingMore={false}
-            loadMoreError={null}
-            mailboxes={[]}
-            selectedId={selectedId}
-            totalCount={1}
-            onConversationAction={() => undefined}
-            onLoadMore={() => undefined}
-            onMessageRouteChange={(_folder, messageId) => setSelectedId(messageId)}
-            onRefresh={() => undefined}
-            onSelect={() => undefined}
-          />
+          <React.Suspense fallback={null}>
+            <InboxPage
+              activeFolder="inbox"
+              conversations={[
+                {
+                  ...firstMessage,
+                  isStarred: false,
+                  messageCount: 1,
+                  unreadCount: 0
+                }
+              ]}
+              defaultFromMailboxId="mbx_1"
+              hasMore={false}
+              isLoadingMore={false}
+              loadMoreError={null}
+              mailboxes={[]}
+              selectedId={selectedId}
+              totalCount={1}
+              onConversationAction={() => undefined}
+              onLoadMore={() => undefined}
+              onMessageRouteChange={(_folder, messageId) => setSelectedId(messageId)}
+              onRefresh={() => undefined}
+              onSelect={() => undefined}
+            />
+            <SuspendNavigation active={selectedId === secondThreadMessage.id} />
+          </React.Suspense>
         </>
       );
     }
@@ -246,9 +262,18 @@ describe("Inbox message visibility", () => {
     await flushHookEffects(() =>
       view.container.querySelector<HTMLButtonElement>("[data-select-other]")?.click()
     );
+    expect(visibleMessageIds(view.container)).toBe(firstMessage.id);
+
+    await flushHookEffects(() => pendingFirstThreadLoads.shift()?.([firstMessage, sentMessage]));
+    expect(visibleMessageIds(view.container)).toBe(`${firstMessage.id},${sentMessage.id}`);
+
+    await flushHookEffects(() =>
+      view.container.querySelector<HTMLButtonElement>("[data-refresh-thread]")?.click()
+    );
+    await flushHookEffects(() => releaseNavigation?.());
     expect(visibleMessageIds(view.container)).toBe(secondThreadMessage.id);
 
-    await flushHookEffects(() => resolveFirstThread?.([firstMessage]));
+    await flushHookEffects(() => pendingFirstThreadLoads.shift()?.([firstMessage, sentMessage]));
     expect(visibleMessageIds(view.container)).toBe(secondThreadMessage.id);
     await view.unmount();
   });

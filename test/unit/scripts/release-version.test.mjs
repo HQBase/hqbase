@@ -22,6 +22,13 @@ describe("stable release version", () => {
     );
   });
 
+  it("rejects leading zeros in every numeric part", () => {
+    expect(assertStableReleaseVersion("0.0.0")).toBe("0.0.0");
+    expect(() => assertStableReleaseVersion("01.2.3")).toThrow("must be a stable semantic version");
+    expect(() => assertStableReleaseVersion("1.02.3")).toThrow("must be a stable semantic version");
+    expect(() => assertStableReleaseVersion("1.2.03")).toThrow("must be a stable semantic version");
+  });
+
   it("guards both release entry points", () => {
     expect(packageSource).toContain("assertStableReleaseVersion(version)");
     expect(workflowSource).toContain(

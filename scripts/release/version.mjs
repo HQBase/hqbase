@@ -1,4 +1,4 @@
-const stableVersionPattern = /^\d+\.\d+\.\d+$/;
+const stableVersionPattern = /^(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)$/;
 
 export function assertStableReleaseVersion(value, label = "Release version") {
   if (!stableVersionPattern.test(value)) {
