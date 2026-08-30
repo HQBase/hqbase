@@ -21,7 +21,9 @@ type MessageListProps = {
   onSelect: (conversation: ConversationSummary) => void;
   onToggleStar: (conversation: ConversationSummary) => void;
   labels?: MailLabel[];
+  canCreateLabels?: boolean;
   canOrganizeConversation?: (mailboxId: string | null) => boolean;
+  onLabelsChanged?: (() => Promise<void>) | undefined;
   onToggleLabel?: (
     conversation: ConversationSummary,
     label: MailLabel,
@@ -41,7 +43,9 @@ export function MessageList({
   onSelect,
   onToggleStar,
   labels = [],
+  canCreateLabels = false,
   canOrganizeConversation = () => false,
+  onLabelsChanged,
   onToggleLabel = () => undefined
 }: MessageListProps): React.ReactElement {
   const scrollContainerRef = React.useRef<HTMLDivElement>(null);
@@ -96,7 +100,9 @@ export function MessageList({
                     isActive={conversation.threadId === selectedThreadId}
                     key={conversation.threadId}
                     labels={labels}
+                    canCreateLabels={canCreateLabels}
                     canOrganizeLabels={canOrganizeConversation(conversation.mailboxId)}
+                    onLabelsChanged={onLabelsChanged}
                     onSelect={onSelect}
                     onToggleLabel={(label, assigned) =>
                       onToggleLabel(conversation, label, assigned)

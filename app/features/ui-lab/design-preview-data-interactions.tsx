@@ -27,6 +27,7 @@ import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
@@ -111,9 +112,18 @@ function DataPreview(): React.ReactElement {
                   <Badge variant={status === "Active" ? "secondary" : "outline"}>{status}</Badge>
                 </TableCell>
                 <TableCell className="text-right">
-                  <Button aria-label="Mailbox actions" size="icon" variant="ghost">
-                    <PiDotsThree />
-                  </Button>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button aria-label={`Actions for ${address}`} size="icon" variant="ghost">
+                        <PiDotsThree />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuGroup>
+                        <DropdownMenuItem>Edit mailbox</DropdownMenuItem>
+                      </DropdownMenuGroup>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </TableCell>
               </TableRow>
             ))}
@@ -214,19 +224,23 @@ function NavigationPreview(): React.ReactElement {
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start">
-            <DropdownMenuLabel>Mailbox actions</DropdownMenuLabel>
-            <DropdownMenuItem>Edit mailbox</DropdownMenuItem>
-            <DropdownMenuCheckboxItem
-              checked={notifications}
-              onCheckedChange={(value) => setNotifications(value === true)}
-            >
-              Notifications
-            </DropdownMenuCheckboxItem>
+            <DropdownMenuGroup>
+              <DropdownMenuLabel>Mailbox actions</DropdownMenuLabel>
+              <DropdownMenuItem>Edit mailbox</DropdownMenuItem>
+              <DropdownMenuCheckboxItem
+                checked={notifications}
+                onCheckedChange={(value) => setNotifications(value === true)}
+              >
+                Notifications
+              </DropdownMenuCheckboxItem>
+            </DropdownMenuGroup>
             <DropdownMenuSeparator />
-            <DropdownMenuItem className="text-destructive">
-              <PiTrash className="mr-2" />
-              Delete mailbox
-            </DropdownMenuItem>
+            <DropdownMenuGroup>
+              <DropdownMenuItem className="gap-2 text-destructive">
+                <PiTrash />
+                Delete mailbox
+              </DropdownMenuItem>
+            </DropdownMenuGroup>
           </DropdownMenuContent>
         </DropdownMenu>
       </Specimen>

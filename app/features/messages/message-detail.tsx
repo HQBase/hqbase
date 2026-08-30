@@ -27,6 +27,7 @@ import type { Mailbox } from "@/features/mailboxes/types";
 import { cn } from "@/lib/cn";
 import type { MailFolderId } from "@/lib/routes";
 import { ConversationMessages } from "./conversation-messages";
+import { IconButton, MessageReaderStatus } from "./message-reader-primitives";
 import type { MessageDetail as MessageDetailType } from "./types";
 
 type MessageDetailProps = {
@@ -34,6 +35,7 @@ type MessageDetailProps = {
   defaultFromMailboxId: string | null;
   error?: string | null;
   isLoading?: boolean;
+  canCreateLabels?: boolean;
   canOrganizeLabels?: boolean;
   labels?: MailLabel[];
   mailboxes: Mailbox[];
@@ -44,6 +46,7 @@ type MessageDetailProps = {
   onAction: (action: MessageAction) => Promise<void> | void;
   onBack: () => void;
   onDraftsChange?: () => void;
+  onLabelsChanged?: (() => Promise<void>) | undefined;
   onRefresh: () => Promise<void> | void;
   onSent: () => void;
   onToggleLabel?: (label: MailLabel, assigned: boolean) => Promise<void> | void;
@@ -63,6 +66,7 @@ export function MessageDetail({
   activeFolder,
   error = null,
   isLoading = false,
+  canCreateLabels = false,
   canOrganizeLabels = false,
   labels = [],
   messages,
@@ -71,6 +75,7 @@ export function MessageDetail({
   showBack = true,
   onAction,
   onBack,
+  onLabelsChanged,
   onRefresh,
   onSent,
   onToggleLabel
@@ -116,13 +121,14 @@ export function MessageDetail({
     const controlClassName = desktop
       ? "h-10 min-h-10 max-w-full flex-row-reverse gap-1.5 overflow-hidden rounded-md bg-transparent px-2 py-0 shadow-none [&_svg]:-translate-y-px [@media(hover:hover)]:hover:text-foreground"
       : "max-w-full flex-row-reverse gap-1.5 overflow-hidden bg-muted/40 px-1 [&_svg]:-translate-y-px [@media(hover:hover)]:hover:bg-muted/60";
-    if (labels.length === 0 && assignedLabels.length === 0) return null;
+    if (labels.length === 0 && assignedLabels.length === 0 && !canCreateLabels) return null;
     return (
       <div className={wrapperClassName} data-reader-labels={placement}>
-        {labels.length > 0 && onToggleLabel && canOrganizeLabels ? (
+        {(labels.length > 0 || canCreateLabels) && onToggleLabel && canOrganizeLabels ? (
           <LabelMenu
             align="end"
             assigned={assignedLabels}
+            canCreateLabels={canCreateLabels}
             canOrganizeLabels={canOrganizeLabels}
             className={cn(
               controlClassName,
@@ -131,6 +137,7 @@ export function MessageDetail({
             compactAssignedLabels={false}
             emptyAssignedText="Add label"
             labels={labels}
+            onLabelsChanged={onLabelsChanged}
             onToggle={onToggleLabel}
             showAssignedLabels
             showTagIcon
@@ -342,57 +349,4 @@ function mergeMessageLabels(messages: MessageDetailType[]): MailLabel[] {
     for (const label of message.labels ?? []) byId.set(label.id, label);
   }
   return [...byId.values()].sort((left, right) => left.name.localeCompare(right.name));
-}
-
-function MessageReaderStatus({
-  description,
-  label
-}: {
-  description?: string;
-  label: string;
-}): React.ReactElement {
-  return (
-    <div className="flex h-full flex-col items-center justify-center gap-3 p-8 text-center text-muted-foreground">
-      <div className="flex size-9 items-center justify-center rounded-md border bg-card">
-        <PiEnvelopeOpen aria-hidden="true" className="pointer-events-none size-4" />
-      </div>
-      <div className="grid max-w-sm gap-1">
-        <span className="text-xs">{label}</span>
-        {description ? <span className="text-xs text-muted-foreground">{description}</span> : null}
-      </div>
-    </div>
-  );
-}
-
-function IconButton({
-  active = false,
-  activeClassName = "",
-  children,
-  className,
-  label,
-  onClick
-}: {
-  active?: boolean;
-  activeClassName?: string;
-  children: React.ReactNode;
-  className?: string;
-  label: string;
-  onClick: () => void;
-}): React.ReactElement {
-  const base =
-    "size-10 min-h-10 min-w-10 text-muted-foreground [@media(hover:hover)]:hover:text-foreground";
-  return (
-    <Button
-      aria-label={label}
-      aria-pressed={active || undefined}
-      className={cn(base, className, active && activeClassName)}
-      onClick={onClick}
-      size="icon"
-      title={label}
-      type="button"
-      variant="ghost"
-    >
-      {children}
-    </Button>
-  );
 }

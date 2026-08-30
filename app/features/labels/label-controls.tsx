@@ -1,5 +1,5 @@
 import * as React from "react";
-import { PiDotsThree, PiTag } from "react-icons/pi";
+import { PiDotsThree, PiPlus, PiTag } from "react-icons/pi";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -7,114 +7,47 @@ import {
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuGroup,
+  DropdownMenuItem,
   DropdownMenuLabel,
+  DropdownMenuSeparator,
   DropdownMenuTrigger
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/cn";
 import { LabelColorDot, labelPillColorClass } from "./label-colors";
+import { LabelEditorDialog } from "./label-editor-dialog";
 import type { MailLabel } from "./types";
-
-export function LabelFilter({
-  labels,
-  values,
-  onChange
-}: {
-  labels: MailLabel[];
-  values: readonly string[];
-  onChange: (labelIds: string[]) => void;
-}): React.ReactElement | null {
-  if (labels.length === 0) return null;
-  const selectedIds = new Set(values);
-  const selectedLabels = labels.filter((label) => selectedIds.has(label.id));
-
-  function toggle(labelId: string, selected: boolean): void {
-    const next = new Set(values);
-    if (selected) next.add(labelId);
-    else next.delete(labelId);
-    onChange(labels.filter((label) => next.has(label.id)).map((label) => label.id));
-  }
-
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button
-          aria-label={
-            values.length === 0
-              ? "Filter by labels"
-              : `Filter by labels: ${selectedLabels.map((label) => label.name).join(", ")}`
-          }
-          className="h-7 min-h-7 max-w-[min(14rem,50vw)] gap-1 rounded-full bg-muted/50 px-2 text-[11px] font-normal text-muted-foreground shadow-none"
-          size="sm"
-          type="button"
-          variant="ghost"
-        >
-          <PiTag aria-hidden="true" className="size-[11px] shrink-0" data-label-filter-icon="tag" />
-          {selectedLabels.length > 0 ? (
-            <LabelStack compact labels={selectedLabels} />
-          ) : (
-            <span>Labels</span>
-          )}
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="w-52 p-1 text-xs">
-        <DropdownMenuLabel className="px-2 py-1 text-[10px] text-muted-foreground">
-          Filter by every selected label
-        </DropdownMenuLabel>
-        <DropdownMenuCheckboxItem
-          checked={values.length === 0}
-          className="min-h-7 py-1 text-xs"
-          onCheckedChange={(checked) => {
-            if (checked) onChange([]);
-          }}
-          onSelect={(event) => event.preventDefault()}
-        >
-          All labels
-        </DropdownMenuCheckboxItem>
-        {labels.map((label) => (
-          <DropdownMenuCheckboxItem
-            checked={selectedIds.has(label.id)}
-            className="min-h-7 py-1 text-xs"
-            key={label.id}
-            onCheckedChange={(checked) => toggle(label.id, checked === true)}
-            onSelect={(event) => event.preventDefault()}
-          >
-            <span className="flex min-w-0 items-center gap-2">
-              <LabelColorDot color={label.color} />
-              <span className="truncate">{label.name}</span>
-            </span>
-          </DropdownMenuCheckboxItem>
-        ))}
-      </DropdownMenuContent>
-    </DropdownMenu>
-  );
-}
 
 export function LabelMenu({
   align = "end",
   assigned,
+  canCreateLabels = false,
   canOrganizeLabels = true,
   className,
   compactAssignedLabels = true,
   disabled = false,
   emptyAssignedText,
   labels,
+  onLabelsChanged,
   onToggle,
   showAssignedLabels = false,
   showTagIcon = false
 }: {
   align?: "start" | "center" | "end";
   assigned: MailLabel[];
+  canCreateLabels?: boolean;
   canOrganizeLabels?: boolean;
   className?: string;
   compactAssignedLabels?: boolean;
   disabled?: boolean;
   emptyAssignedText?: string;
   labels: MailLabel[];
+  onLabelsChanged?: (() => Promise<void>) | undefined;
   onToggle: (label: MailLabel, assigned: boolean) => Promise<void> | void;
   showAssignedLabels?: boolean;
   showTagIcon?: boolean;
 }): React.ReactElement {
   const { pendingId, toggle } = useLabelToggle(onToggle);
+  const [creating, setCreating] = React.useState(false);
   const [optimisticAssigned, updateOptimisticAssigned] = React.useOptimistic(
     assigned,
     (
@@ -142,91 +75,121 @@ export function LabelMenu({
     });
   }
 
+  async function created(label: MailLabel): Promise<void> {
+    setCreating(false);
+    await toggle(label, true);
+    await onLabelsChanged?.();
+  }
+
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button
-          aria-label={triggerLabel}
-          className={cn(
-            "relative text-muted-foreground [&_svg]:size-3.5",
-            showAssignedLabels
-              ? "h-auto min-h-0 w-fit min-w-0 gap-0.5 rounded-full p-0.5"
-              : "size-10 min-h-10 min-w-10 sm:size-8 sm:min-h-8 sm:min-w-8",
-            className
-          )}
-          aria-busy={pendingId !== null}
-          data-message-labels={showAssignedLabels ? "desktop" : undefined}
-          disabled={disabled || !canOrganizeLabels || labels.length === 0}
-          size="icon"
-          title={
-            labels.length === 0
-              ? "Create a label in Settings first"
-              : canOrganizeLabels
-                ? "Labels"
-                : "You need Handle access to change labels"
-          }
-          type="button"
-          variant="ghost"
-          onClick={(event) => {
-            event.preventDefault();
-            event.stopPropagation();
-          }}
+    <>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button
+            aria-label={triggerLabel}
+            className={cn(
+              "relative text-muted-foreground [&_svg]:size-3.5",
+              showAssignedLabels
+                ? "h-auto min-h-0 w-fit min-w-0 gap-0.5 rounded-full p-0.5"
+                : "size-10 min-h-10 min-w-10 sm:size-8 sm:min-h-8 sm:min-w-8",
+              className
+            )}
+            aria-busy={pendingId !== null}
+            data-message-labels={showAssignedLabels ? "desktop" : undefined}
+            disabled={disabled || !canOrganizeLabels || (labels.length === 0 && !canCreateLabels)}
+            size="icon"
+            title={
+              labels.length === 0 && !canCreateLabels
+                ? "Create a label in Settings first"
+                : canOrganizeLabels
+                  ? "Labels"
+                  : "You need Handle access to change labels"
+            }
+            type="button"
+            variant="ghost"
+            onClick={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
+            }}
+          >
+            {showAssignedLabels && optimisticAssigned.length > 0 ? (
+              <LabelStack compact={compactAssignedLabels} labels={optimisticAssigned} />
+            ) : showAssignedLabels && emptyAssignedText ? (
+              <span
+                className={cn(
+                  "shrink-0 leading-4",
+                  compactAssignedLabels ? "text-[9px]" : "text-[10px]"
+                )}
+              >
+                {emptyAssignedText}
+              </span>
+            ) : null}
+            {showTagIcon ? (
+              <PiTag
+                aria-hidden="true"
+                className="pointer-events-none"
+                data-label-menu-icon="tag"
+              />
+            ) : (
+              <PiDotsThree
+                aria-hidden="true"
+                className="pointer-events-none"
+                data-label-menu-icon="more"
+              />
+            )}
+            {optimisticAssigned.length > 0 && !showTagIcon ? (
+              <span
+                aria-hidden="true"
+                className="pointer-events-none absolute bottom-1 flex -space-x-0.5"
+              >
+                {optimisticAssigned.slice(0, 3).map((label) => (
+                  <span
+                    className={cn("size-1.5 rounded-full", labelPillColorClass(label.color))}
+                    key={label.id}
+                  />
+                ))}
+              </span>
+            ) : null}
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent
+          align={align}
+          className="w-52 p-1 text-xs"
+          onClick={(event) => event.stopPropagation()}
         >
-          {showAssignedLabels && optimisticAssigned.length > 0 ? (
-            <LabelStack compact={compactAssignedLabels} labels={optimisticAssigned} />
-          ) : showAssignedLabels && emptyAssignedText ? (
-            <span
-              className={cn(
-                "shrink-0 leading-4",
-                compactAssignedLabels ? "text-[9px]" : "text-[10px]"
-              )}
-            >
-              {emptyAssignedText}
-            </span>
+          <DropdownMenuGroup>
+            <DropdownMenuLabel className="px-2 py-1 text-[10px] text-muted-foreground">
+              {labels.length === 0 ? "No labels yet" : "Labels"}
+            </DropdownMenuLabel>
+            {labels.length > 0 ? (
+              <LabelMenuItems
+                assigned={optimisticAssigned}
+                disabled={!canOrganizeLabels}
+                labels={labels}
+                pendingId={pendingId}
+                onToggle={toggleOptimistically}
+              />
+            ) : null}
+          </DropdownMenuGroup>
+          {canCreateLabels ? (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuGroup>
+                <DropdownMenuItem className="gap-2" onSelect={() => setCreating(true)}>
+                  <PiPlus aria-hidden="true" />
+                  Create label
+                </DropdownMenuItem>
+              </DropdownMenuGroup>
+            </>
           ) : null}
-          {showTagIcon ? (
-            <PiTag aria-hidden="true" className="pointer-events-none" data-label-menu-icon="tag" />
-          ) : (
-            <PiDotsThree
-              aria-hidden="true"
-              className="pointer-events-none"
-              data-label-menu-icon="more"
-            />
-          )}
-          {optimisticAssigned.length > 0 && !showTagIcon ? (
-            <span
-              aria-hidden="true"
-              className="pointer-events-none absolute bottom-1 flex -space-x-0.5"
-            >
-              {optimisticAssigned.slice(0, 3).map((label) => (
-                <span
-                  className={cn("size-1.5 rounded-full", labelPillColorClass(label.color))}
-                  key={label.id}
-                />
-              ))}
-            </span>
-          ) : null}
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent
-        align={align}
-        className="w-52 p-1 text-xs"
-        onClick={(event) => event.stopPropagation()}
-      >
-        <DropdownMenuLabel className="px-2 py-1 text-[10px] text-muted-foreground">
-          Labels
-        </DropdownMenuLabel>
-        <DropdownMenuGroup>
-          <LabelMenuItems
-            assigned={optimisticAssigned}
-            disabled={!canOrganizeLabels}
-            labels={labels}
-            pendingId={pendingId}
-            onToggle={toggleOptimistically}
-          />
-        </DropdownMenuGroup>
-      </DropdownMenuContent>
-    </DropdownMenu>
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <LabelEditorDialog
+        editing={creating ? "new" : null}
+        onOpenChange={(open) => !open && setCreating(false)}
+        onSaved={created}
+      />
+    </>
   );
 }
 

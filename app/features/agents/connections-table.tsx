@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger
@@ -144,17 +145,30 @@ function OAuthRow({
         <StatusBadge status="Authorized" />
       </TableCell>
       <TableCell className="flex items-center justify-end px-1.5 text-right sm:table-cell sm:px-3">
-        <Button
-          aria-label={`Revoke ${connection.name}`}
-          className="text-muted-foreground hover:text-destructive"
-          disabled={pending}
-          size="icon"
-          type="button"
-          variant="ghost"
-          onClick={() => onRevoke(connection)}
-        >
-          <PiTrash />
-        </Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              aria-label={`Actions for ${connection.name}`}
+              disabled={pending}
+              size="icon"
+              type="button"
+              variant="ghost"
+            >
+              <PiDotsThree aria-hidden="true" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuGroup>
+              <DropdownMenuItem
+                className="gap-2 text-destructive"
+                onSelect={() => onRevoke(connection)}
+              >
+                <PiTrash aria-hidden="true" />
+                Revoke connection
+              </DropdownMenuItem>
+            </DropdownMenuGroup>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </TableCell>
     </TableRow>
   );
@@ -209,31 +223,36 @@ function MachineRow({
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuItem className="gap-2" onSelect={() => onSetup(agent)}>
-              <PiFileText />
-              Setup instructions
-            </DropdownMenuItem>
-            {!mailboxDeleted ? <DropdownMenuSeparator /> : null}
-            {!mailboxDeleted && agent.isActive ? (
-              <>
-                <DropdownMenuItem className="gap-2" onSelect={() => onRotate(agent)}>
-                  <PiArrowClockwise />
-                  Rotate credential
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  className="gap-2 text-destructive"
-                  onSelect={() => onDisable(agent)}
-                >
-                  <PiPause />
-                  Disable
-                </DropdownMenuItem>
-              </>
-            ) : null}
-            {!mailboxDeleted && !agent.isActive ? (
-              <DropdownMenuItem className="gap-2" onSelect={() => onEnable(agent)}>
-                <PiPlay />
-                Enable
+            <DropdownMenuGroup>
+              <DropdownMenuItem className="gap-2" onSelect={() => onSetup(agent)}>
+                <PiFileText />
+                Setup instructions
               </DropdownMenuItem>
+            </DropdownMenuGroup>
+            {!mailboxDeleted ? <DropdownMenuSeparator /> : null}
+            {!mailboxDeleted ? (
+              <DropdownMenuGroup>
+                {agent.isActive ? (
+                  <>
+                    <DropdownMenuItem className="gap-2" onSelect={() => onRotate(agent)}>
+                      <PiArrowClockwise />
+                      Rotate credential
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      className="gap-2 text-destructive"
+                      onSelect={() => onDisable(agent)}
+                    >
+                      <PiPause />
+                      Disable
+                    </DropdownMenuItem>
+                  </>
+                ) : (
+                  <DropdownMenuItem className="gap-2" onSelect={() => onEnable(agent)}>
+                    <PiPlay />
+                    Enable
+                  </DropdownMenuItem>
+                )}
+              </DropdownMenuGroup>
             ) : null}
           </DropdownMenuContent>
         </DropdownMenu>

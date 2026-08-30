@@ -35,19 +35,34 @@ DropdownMenuCheckboxItem.displayName = DropdownMenuPrimitive.CheckboxItem.displa
 export const DropdownMenuContent = React.forwardRef<
   React.ElementRef<typeof DropdownMenuPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.Content>
->(({ className, sideOffset = 6, ...props }, ref) => (
-  <DropdownMenuPrimitive.Portal>
-    <DropdownMenuPrimitive.Content
-      className={cn(
-        "relative z-[2147483647] min-w-44 rounded-md border bg-popover p-1 text-popover-foreground shadow-md",
-        className
-      )}
-      ref={ref}
-      sideOffset={sideOffset}
-      {...props}
-    />
-  </DropdownMenuPrimitive.Portal>
-));
+>(
+  (
+    {
+      avoidCollisions = true,
+      className,
+      collisionPadding = 8,
+      side = "bottom",
+      sideOffset = 6,
+      ...props
+    },
+    ref
+  ) => (
+    <DropdownMenuPrimitive.Portal>
+      <DropdownMenuPrimitive.Content
+        avoidCollisions={avoidCollisions}
+        className={cn(
+          "relative z-[2147483647] max-h-[var(--radix-dropdown-menu-content-available-height)] max-w-[var(--radix-dropdown-menu-content-available-width)] min-w-44 overflow-y-auto rounded-md border bg-popover p-1 text-popover-foreground shadow-md",
+          className
+        )}
+        collisionPadding={collisionPadding}
+        ref={ref}
+        side={side}
+        sideOffset={sideOffset}
+        {...props}
+      />
+    </DropdownMenuPrimitive.Portal>
+  )
+);
 DropdownMenuContent.displayName = DropdownMenuPrimitive.Content.displayName;
 
 export const DropdownMenuItem = React.forwardRef<

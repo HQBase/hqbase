@@ -72,7 +72,7 @@ export function DropdownSelect({
       </DropdownMenuTrigger>
       <DropdownMenuContent
         align="start"
-        className="max-h-80 min-w-[var(--radix-dropdown-menu-trigger-width)] max-w-[min(24rem,calc(100vw-2rem))] overflow-y-auto"
+        className="max-h-[min(20rem,var(--radix-dropdown-menu-content-available-height))] min-w-[var(--radix-dropdown-menu-trigger-width)] max-w-[min(24rem,calc(100vw-2rem))] overflow-y-auto"
       >
         <DropdownMenuRadioGroup value={value} onValueChange={onValueChange}>
           {options.map((option) => (

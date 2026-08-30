@@ -84,12 +84,20 @@ export function WorkspacePages({
   );
   const draftsChanged = () => void draftState.refresh().catch(() => undefined);
   const sent = () => void mailSync.refresh().catch(() => undefined);
+  const canManageWorkspace = user.role === "owner" || user.role === "admin";
+  const canOrganizeConversation = (mailboxId: string | null) =>
+    user.role === "owner" ||
+    contentMailboxes.some(
+      (mailbox) =>
+        mailbox.id === mailboxId &&
+        (mailbox.accessLevel === "agent" || mailbox.accessLevel === "manager")
+    );
 
   return (
     <>
       {activeFolder === "agents" ? (
         <AgentsPage
-          canManage={user.role === "owner" || user.role === "admin"}
+          canManage={canManageWorkspace}
           domains={setup.domains}
           mailboxes={mailboxes}
           user={user}
@@ -97,6 +105,9 @@ export function WorkspacePages({
         />
       ) : activeFolder === "contacts" ? (
         <ContactsPage
+          canCreateLabels={canManageWorkspace}
+          canOrganizeConversation={canOrganizeConversation}
+          labels={labels}
           selectedId={selectedContactId}
           onBack={() => navigate({ kind: "contacts", contactId: null })}
           onCompose={onCompose}
@@ -107,12 +118,13 @@ export function WorkspacePages({
               messageId: conversation.id
             })
           }
+          onLabelsChanged={onLabelsChanged}
           onSelect={(contactId) => navigate({ kind: "contacts", contactId })}
         />
       ) : activeFolder === "settings" ? (
         <SettingsPage
           activeTab={settingsTab}
-          canManage={user.role === "owner" || user.role === "admin"}
+          canManage={canManageWorkspace}
           currentUser={user}
           defaultFromMailboxId={user.defaultFromMailboxId}
           deletedMailboxes={deletedMailboxes}
@@ -149,6 +161,7 @@ export function WorkspacePages({
         </React.Suspense>
       ) : activeFolder === "drafts" ? (
         <DraftsPage
+          canCreateLabels={canManageWorkspace}
           drafts={draftState.drafts}
           isLoading={draftState.isLoading}
           labelIds={labelIds}
@@ -158,6 +171,7 @@ export function WorkspacePages({
           selectedId={selectedDraftId}
           onBack={() => navigate({ kind: "drafts", draftId: null })}
           onLabelChange={onLabelChange}
+          onLabelsChanged={onLabelsChanged}
           onSelect={(draftId) => navigate({ kind: "drafts", draftId })}
           onToggleLabel={async (draftId, label, assigned) => {
             const result = await setDraftLabel(draftId, label.id, assigned);
@@ -177,18 +191,13 @@ export function WorkspacePages({
           mailboxes={contentMailboxes}
           selectedId={selectedId}
           totalCount={mailSync.totalCount}
-          canOrganizeConversation={(mailboxId) =>
-            user.role === "owner" ||
-            contentMailboxes.some(
-              (mailbox) =>
-                mailbox.id === mailboxId &&
-                (mailbox.accessLevel === "agent" || mailbox.accessLevel === "manager")
-            )
-          }
+          canCreateLabels={canManageWorkspace}
+          canOrganizeConversation={canOrganizeConversation}
           onConversationAction={mailSync.applyConversationAction}
           onConversationLabelsChange={mailSync.applyConversationLabels}
           onDraftsChange={draftsChanged}
           onLabelChange={onLabelChange}
+          onLabelsChanged={onLabelsChanged}
           onLoadMore={() => void mailSync.loadMore()}
           onMessageRouteChange={(folder, messageId) =>
             navigate({ kind: "mail", folder, messageId })

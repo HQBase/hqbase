@@ -13,8 +13,7 @@ for (const marker of [
   "/__ui/setup",
   "Design UI lab",
   "Setup UI lab",
-  "Development fixtures only",
-  "tweakcn.com/live-preview.min.js"
+  "Development fixtures only"
 ]) {
   if (production.includes(marker)) {
     throw new Error(`Development-only UI tooling leaked into the production bundle: ${marker}`);

@@ -195,9 +195,8 @@ describe("Agents page", () => {
     vi.mocked(revokeOAuthConnection).mockResolvedValue();
     const view = await renderPage();
 
-    await flushHookEffects(() =>
-      view.container.querySelector<HTMLButtonElement>('[aria-label="Revoke Mail helper"]')?.click()
-    );
+    await openAgentMenu(view.container, oauthConnection.name);
+    await flushHookEffects(() => clickMenuItem("Revoke connection"));
     expect(document.body.textContent).toContain("Revoke connection?");
     await flushHookEffects(() => clickButton(document.body, "Revoke"));
     expect(revokeOAuthConnection).toHaveBeenCalledWith(oauthConnection.clientId);

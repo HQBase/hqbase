@@ -1,7 +1,14 @@
 import * as React from "react";
-import { PiEye, PiEyeSlash, PiPlus, PiTrash, PiWarningCircle } from "react-icons/pi";
+import { PiDotsThree, PiEye, PiEyeSlash, PiPlus, PiTrash, PiWarningCircle } from "react-icons/pi";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuTrigger
+} from "@/components/ui/dropdown-menu";
 import { DropdownSelect } from "@/components/ui/dropdown-select";
 import {
   Field,
@@ -227,16 +234,30 @@ export function MailboxStep({
                     </Field>
                   </TableCell>
                   <TableCell className="px-1 py-1 text-center">
-                    <Button
-                      aria-label={`Remove mailbox ${index + 1}`}
-                      disabled={mailboxes.length <= 1}
-                      size="icon"
-                      type="button"
-                      variant="ghost"
-                      onClick={() => onRemove(index)}
-                    >
-                      <PiTrash aria-hidden="true" />
-                    </Button>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          aria-label={`Actions for mailbox ${index + 1}`}
+                          disabled={mailboxes.length <= 1}
+                          size="icon"
+                          type="button"
+                          variant="ghost"
+                        >
+                          <PiDotsThree aria-hidden="true" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuGroup>
+                          <DropdownMenuItem
+                            className="gap-2 text-destructive"
+                            onSelect={() => onRemove(index)}
+                          >
+                            <PiTrash aria-hidden="true" />
+                            Remove mailbox
+                          </DropdownMenuItem>
+                        </DropdownMenuGroup>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </TableCell>
                 </TableRow>
               );

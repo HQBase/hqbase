@@ -117,14 +117,13 @@ describe("signature settings", () => {
       view.container.querySelector<HTMLElement>('[data-slot="table-container"]')?.className
     ).toContain("rounded-lg border");
     const row = view.container
-      .querySelector<HTMLButtonElement>('[aria-label="Edit Personal"]')
+      .querySelector<HTMLButtonElement>('[aria-label="Actions for Personal"]')
       ?.closest("tr");
     expect(row?.textContent).toContain("Personal");
     expect(row?.textContent).toContain("Default");
 
-    await flushHookEffects(() =>
-      view.container.querySelector<HTMLButtonElement>('[aria-label="Edit Personal"]')?.click()
-    );
+    await openActionsMenu(view.container, "Personal");
+    await flushHookEffects(() => findMenuItem("Edit signature").click());
     await flushHookEffects(() => {
       setInput(document.body, "#signature-name", "Main");
       setTextarea(document.body, '[aria-label="Signature content"]', "<p>Alex B.</p>");
@@ -136,9 +135,8 @@ describe("signature settings", () => {
       isDefault: true
     });
 
-    await flushHookEffects(() =>
-      view.container.querySelector<HTMLButtonElement>('[aria-label="Delete Personal"]')?.click()
-    );
+    await openActionsMenu(view.container, "Personal");
+    await flushHookEffects(() => findMenuItem("Delete signature").click());
     expect(document.body.textContent).toContain("Saved drafts keep their current copy");
     await flushHookEffects(() => findButton(document.body, "Delete signature").click());
     expect(deleteSignature).toHaveBeenCalledWith(signature.id);
@@ -170,6 +168,27 @@ async function openScopeMenu(): Promise<void> {
       })
     )
   );
+}
+
+async function openActionsMenu(container: HTMLElement, name: string): Promise<void> {
+  await flushHookEffects(() =>
+    container.querySelector<HTMLButtonElement>(`[aria-label="Actions for ${name}"]`)?.dispatchEvent(
+      new PointerEvent("pointerdown", {
+        bubbles: true,
+        button: 0,
+        ctrlKey: false,
+        pointerType: "mouse"
+      })
+    )
+  );
+}
+
+function findMenuItem(label: string): HTMLElement {
+  const item = Array.from(document.body.querySelectorAll<HTMLElement>('[role="menuitem"]')).find(
+    (entry) => entry.textContent?.includes(label)
+  );
+  if (!item) throw new Error(`Expected menu item ${label}`);
+  return item;
 }
 
 function findButton(container: HTMLElement, label: string): HTMLButtonElement {

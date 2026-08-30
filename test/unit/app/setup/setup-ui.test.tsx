@@ -150,6 +150,8 @@ describe("setup UI", () => {
     expect(html).toContain("privacy@fieldnotes.example");
     expect(html).toContain("h-[30px]");
     expect(html).toContain("Add mailbox");
+    expect(html).toContain('aria-label="Actions for mailbox 1"');
+    expect(html).not.toContain('aria-label="Remove mailbox 1"');
     expect(html).toContain("Default From mailbox");
     expect(html).toContain("Mail to unknown addresses");
     expect(html).toContain("Deliver to a mailbox");

@@ -3,10 +3,19 @@ import * as React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { LabelBadges, LabelFilter, LabelMenu, LabelStack } from "@/features/labels/label-controls";
+import { LabelBadges, LabelMenu, LabelStack } from "@/features/labels/label-controls";
+import { LabelFilter } from "@/features/labels/label-filter";
 import { LabelSettings } from "@/features/labels/label-settings";
 import type { MailLabel } from "@/features/labels/types";
 import { flushHookEffects, renderComponent } from "../render-hook";
+
+const apiMocks = vi.hoisted(() => ({
+  createLabel: vi.fn(),
+  deleteLabel: vi.fn(),
+  updateLabel: vi.fn()
+}));
+
+vi.mock("@/features/labels/api", () => apiMocks);
 
 const label: MailLabel = {
   color: "blue",
@@ -26,6 +35,7 @@ const importantLabel: MailLabel = { ...label, id: "label-important", name: "Impo
 
 afterEach(() => {
   document.body.replaceChildren();
+  vi.clearAllMocks();
 });
 
 describe("label controls", () => {
@@ -163,6 +173,51 @@ describe("label controls", () => {
     await view.unmount();
   });
 
+  it("lets an owner create a label from an empty assignment menu", async () => {
+    const createdLabel = { ...label, id: "label-created", name: "Created here" };
+    apiMocks.createLabel.mockResolvedValue(createdLabel);
+    const onLabelsChanged = vi.fn().mockResolvedValue(undefined);
+    const onToggle = vi.fn().mockResolvedValue(undefined);
+    const view = await renderComponent(
+      <LabelMenu
+        assigned={[]}
+        canCreateLabels
+        labels={[]}
+        onLabelsChanged={onLabelsChanged}
+        onToggle={onToggle}
+      />
+    );
+    const trigger = view.container.querySelector<HTMLButtonElement>('[aria-label="Labels"]');
+    expect(trigger?.disabled).toBe(false);
+    await flushHookEffects(() => {
+      trigger?.dispatchEvent(
+        new PointerEvent("pointerdown", { bubbles: true, button: 0, pointerType: "mouse" })
+      );
+      trigger?.click();
+    });
+
+    const create = [...document.body.querySelectorAll<HTMLElement>('[role="menuitem"]')].find(
+      (item) => item.textContent?.includes("Create label")
+    );
+    expect(create).not.toBeNull();
+    await flushHookEffects(() => create?.click());
+    expect(document.body.textContent).toContain("Choose a shared name and color.");
+    const name = document.body.querySelector<HTMLInputElement>("#label-name");
+    expect(name).not.toBeNull();
+    if (name) {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set?.call(
+        name,
+        "Created here"
+      );
+      name.dispatchEvent(new Event("input", { bubbles: true }));
+    }
+    await flushHookEffects(() => document.body.querySelector("form")?.requestSubmit());
+    expect(apiMocks.createLabel).toHaveBeenCalledWith({ color: "blue", name: "Created here" });
+    expect(onToggle).toHaveBeenCalledWith(createdLabel, true);
+    expect(onLabelsChanged).toHaveBeenCalledOnce();
+    await view.unmount();
+  });
+
   it("updates assignments optimistically without fading the trigger", async () => {
     let rejectToggle: (reason: Error) => void = () => undefined;
     const pendingToggle = new Promise<void>((_resolve, reject) => {
@@ -249,8 +304,9 @@ describe("label controls", () => {
 
     expect(html).toContain("Shared organization for people and mail agents");
     expect(html).toContain("Add label");
-    expect(html).toContain('aria-label="Edit Customer"');
-    expect(html).toContain('aria-label="Delete Customer"');
+    expect(html).toContain('aria-label="Actions for Customer"');
+    expect(html).not.toContain('aria-label="Edit Customer"');
+    expect(html).not.toContain('aria-label="Delete Customer"');
     expect(html).toContain('data-slot="table"');
     expect(html).toContain("rounded-lg border");
     expect(html).toContain(">Label</th>");
