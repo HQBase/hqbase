@@ -47,7 +47,7 @@ export function CatchAllPolicyControl({
   ];
 
   return (
-    <fieldset className="space-y-1.5" disabled={disabled}>
+    <fieldset className="min-w-0 space-y-1.5" disabled={disabled}>
       <legend className="sr-only">Unknown address policy</legend>
       {options.map((option) => {
         const id = `${idPrefix}-${option.policy}`;
