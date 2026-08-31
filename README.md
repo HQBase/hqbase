@@ -19,8 +19,7 @@
   <a href="https://hqbase.io/">Website</a> &middot;
   <a href="https://hqbase.io/docs/">Documentation</a> &middot;
   <a href="https://github.com/HQBase/hqbase/releases">Releases</a> &middot;
-  <a href="https://hqbase.io/docs/maintainers/contributing/">Contributing</a> &middot;
-  <a href="https://x.com/berman_to">X</a>
+  <a href="https://hqbase.io/docs/maintainers/contributing/">Contributing</a>
 </p>
 
 <p align="center">
@@ -35,6 +34,9 @@
   </a>
   <a href="https://discord.gg/U67PB663nf">
     <img src="https://img.shields.io/badge/Discord-Join%20the%20community-5865F2?logo=discord&amp;logoColor=white" alt="Join the HQBase Discord">
+  </a>
+  <a href="https://x.com/berman_to">
+    <img src="https://img.shields.io/badge/X-Follow-000000?logo=x&amp;logoColor=white" alt="Follow @berman_to on X">
   </a>
 </p>
 
