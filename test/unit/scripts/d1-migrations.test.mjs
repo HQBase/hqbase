@@ -84,6 +84,25 @@ describe("two-phase D1 migrations", () => {
     }
   });
 
+  it("skips an absent after-deploy phase in an older release", () => {
+    const workspace = createWorkspace();
+    const temporaryConfig = resolve(workspace, ".wrangler-after-deploy-legacy-release.jsonc");
+    const run = vi.fn();
+    try {
+      rmSync(resolve(workspace, "migrations-after-deploy"), { recursive: true });
+      applyMigrationPhase(workspace, "after-deploy", {
+        target: "remote",
+        randomUUID: () => "legacy-release",
+        run
+      });
+
+      expect(run).not.toHaveBeenCalled();
+      expect(existsSync(temporaryConfig)).toBe(false);
+    } finally {
+      rmSync(workspace, { recursive: true, force: true });
+    }
+  });
+
   it("runs both local phases in order and refuses a remote CLI target", () => {
     const workspace = createWorkspace();
     const commands = [];

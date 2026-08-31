@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { randomUUID } from "node:crypto";
-import { readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, relative, resolve } from "node:path";
 
 import { run } from "./release/command.mjs";
@@ -23,15 +23,13 @@ export function applyMigrationPhase(cwd, phase, options = {}) {
     runMigrations(cwd, configFile, target, options.run);
     return;
   }
-
   const config = JSON.parse(readFileSync(configFile, "utf8"));
   const database = config.d1_databases?.find(({ binding }) => binding === "DB");
   if (!database) throw new Error("wrangler.jsonc has no DB binding.");
+  const migrationDirectory = resolve(cwd, afterDeployDirectory);
+  if (!existsSync(migrationDirectory)) return;
 
-  database.migrations_dir = relative(
-    dirname(configFile),
-    resolve(cwd, afterDeployDirectory)
-  ).replaceAll("\\", "/");
+  database.migrations_dir = relative(dirname(configFile), migrationDirectory).replaceAll("\\", "/");
   database.migrations_table = afterDeployTable;
   delete database.migrations_pattern;
 
