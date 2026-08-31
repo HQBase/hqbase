@@ -41,4 +41,18 @@ describe("staging Mail API path", () => {
     expect(bootstrapStep).toContain("HQBASE_STAGING_MAIL_API_BASE_PATH: /api");
     expect(bootstrapStep).toContain("run: pnpm test:e2e:staging:lifecycle");
   });
+
+  it("skips candidate-only mailbox agent checks during N-1 bootstrap", () => {
+    const agentTestStart = lifecycleSpec.indexOf(
+      'test("a mailbox agent stays inside its assigned mailbox and revokes cleanly"'
+    );
+    const nextTest = lifecycleSpec.indexOf('\ntest("candidate mail experience', agentTestStart);
+    const agentTest = lifecycleSpec.slice(agentTestStart, nextTest);
+
+    expect(agentTestStart).toBeGreaterThan(-1);
+    expect(nextTest).toBeGreaterThan(agentTestStart);
+    expect(agentTest).toContain('HQBASE_STAGING_MAIL_API_BASE_PATH ?? "/api/v2"');
+    expect(agentTest).toContain('=== "/api"');
+    expect(agentTest.indexOf("test.skip(")).toBeLessThan(agentTest.indexOf("request.post("));
+  });
 });

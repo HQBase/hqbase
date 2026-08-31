@@ -255,6 +255,11 @@ test("Track 1 enforces read-only mailbox access and exposes operator diagnostics
 test("a mailbox agent stays inside its assigned mailbox and revokes cleanly", async ({
   request
 }) => {
+  test.skip(
+    (process.env.HQBASE_STAGING_MAIL_API_BASE_PATH ?? "/api/v2") === "/api",
+    "The N-1 bootstrap predates mailbox agents."
+  );
+
   const login = await request.post("/api/auth/sign-in/email", {
     data: { email, password, rememberMe: false },
     headers: { origin: stagingUrl }
