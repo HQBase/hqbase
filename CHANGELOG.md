@@ -1,42 +1,33 @@
 # Changelog
 
-## Unreleased
+## 1.3.0
 
 ### New
 
-- Add managed email signatures with personal, mailbox, and domain defaults, automatic selection,
-  per-draft snapshots, composer preview, and Mail API and MCP support.
-- Add contacts with private notes, complete accessible mail history, and recipient suggestions in
-  To, Cc, and Bcc fields.
-- Add shared labels with management, per-conversation assignment, folder-wide filtering, and Mail
-  API and MCP operations for people and agents.
-- Show live results from mail, contacts, drafts, and destinations while a user types in global
-  search. Pressing Enter still applies the search to Inbox.
-- Show the signed release changelog before a user installs an available update.
-- Add mailbox agents with explicit mailbox access and revocable credentials, plus provisioner
-  agents that can create and deprovision dedicated mailbox agents within a domain and quota.
-- Let owners and admins delete a mailbox without deleting its mail, then restore it later. Deleting
-  a mailbox disables its linked agents and revokes their credentials.
+- Add contacts and shared labels. Save private notes, review all accessible mail with a contact,
+  use recipient suggestions, create labels from Inbox, and label or filter conversations and
+  drafts.
+- Add managed signatures and rich images. Set personal, mailbox, or domain signature defaults,
+  preview them while writing, insert and resize inline images, and forward images with original
+  attachments.
+- Add dedicated mailbox agents with revocable credentials. Provisioners can create and remove
+  dedicated mailbox agents within an approved domain and quota.
+- Add global search and live mail refresh. Find mail, contacts, drafts, and app pages as you type,
+  and see new mail and label changes without reloading.
+- Add message-level actions. Reply to, forward, archive, restore, or move one message to Trash
+  without changing the rest of its conversation.
+- Add safer administration. Delete and restore mailboxes without deleting mail, remove and restore
+  people while revoking old access, choose how each domain handles unknown addresses, and move
+  HQBase to a new app domain.
 
 ### Changed
 
-- Show sender, subject, message preview, time, star, and labels in the smallest Inbox layout.
-- Let users move and resize the desktop composer, keep it at the bottom right by default, and use
-  smaller controls and more subtle recipient-field outlines throughout the app.
-- Replace standard select fields with consistent dropdown controls, while keeping the compact
-  header mailbox selector distinct and removing message counts from its menu.
-- Give every mailbox one email address. Existing additional addresses become separate mailboxes
-  with the same access and retention settings. An address that could not both send and receive
-  becomes a disabled mailbox.
-- Add Mail API v2 as the default for new clients and the direct one-address mailbox model. Keep
-  Mail API v1 paths, OAuth grants, tokens, discovery, and response schemas available for existing
-  clients. V1 represents each separate mailbox with one primary item in its compatibility
-  `addresses` list.
-
-### Fixed
-
-- Validate incomplete recipient addresses when the user leaves the field instead of repeatedly
-  reporting an error while the user types.
+- Give each mailbox one email address and make Mail API v2 the default for new clients. It supports
+  draft sync, labels, signatures, and live events. Mail API v1 remains available for existing
+  clients.
+- Improve Inbox and composer layouts with compact responsive controls, composer windows that stay
+  open while you navigate and can be moved or resized, full visible reply history, safer
+  remote-image controls, and release notes before updates.
 
 ## 1.2.0
 
