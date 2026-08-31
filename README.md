@@ -35,6 +35,9 @@
   <a href="https://discord.gg/U67PB663nf">
     <img src="https://img.shields.io/badge/Discord-Join%20the%20community-5865F2?logo=discord&amp;logoColor=white" alt="Join the HQBase Discord">
   </a>
+  <a href="https://x.com/berman_to">
+    <img src="https://img.shields.io/badge/X-Follow-000000?logo=x&amp;logoColor=white" alt="Follow @berman_to on X">
+  </a>
 </p>
 
 <p align="center">
