@@ -19,7 +19,8 @@
   <a href="https://hqbase.io/">Website</a> &middot;
   <a href="https://hqbase.io/docs/">Documentation</a> &middot;
   <a href="https://github.com/HQBase/hqbase/releases">Releases</a> &middot;
-  <a href="https://hqbase.io/docs/maintainers/contributing/">Contributing</a>
+  <a href="https://hqbase.io/docs/maintainers/contributing/">Contributing</a> &middot;
+  <a href="https://x.com/berman_to">X</a>
 </p>
 
 <p align="center">
