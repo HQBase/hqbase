@@ -156,6 +156,7 @@ describe("setup UI", () => {
     expect(html).toContain("Default From mailbox");
     expect(html).toContain("Mail to unknown addresses");
     expect(html).toContain("Deliver to a mailbox");
+    expect(html).toContain('class="min-w-0 space-y-1.5"');
     expect(html).toContain('aria-label="Catch-all mailbox"');
     expect(html).toContain("Replies use the mailbox that received");
     expect(html).not.toContain("Add shared addresses");
