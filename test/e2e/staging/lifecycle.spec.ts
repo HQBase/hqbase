@@ -344,11 +344,13 @@ test("candidate mail experience contracts work together", async ({ request }) =>
   if (!primaryMailbox) throw new Error(`Staging mailbox ${sender} was not found.`);
   const domainsResponse = await request.get("/api/domains");
   expect(domainsResponse.ok(), await domainsResponse.text()).toBeTruthy();
+  const expectedPrimaryCatchAll = process.env.PREVIOUS_TAG
+    ? { catchAllMailboxId: null, catchAllPolicy: "unassigned" }
+    : { catchAllMailboxId: primaryMailbox.id, catchAllPolicy: "mailbox" };
   expect(await domainsResponse.json()).toEqual(
     expect.arrayContaining([
       expect.objectContaining({
-        catchAllMailboxId: primaryMailbox.id,
-        catchAllPolicy: "mailbox",
+        ...expectedPrimaryCatchAll,
         id: primaryMailbox.mailDomainId
       })
     ])
