@@ -103,7 +103,7 @@ export function UpdateSettings({
       ) : null}
       {applyError ? (
         <Alert variant="destructive">
-          <AlertTitle>Update authorization unavailable</AlertTitle>
+          <AlertTitle>Update could not start</AlertTitle>
           <AlertDescription>{applyError}</AlertDescription>
         </Alert>
       ) : null}

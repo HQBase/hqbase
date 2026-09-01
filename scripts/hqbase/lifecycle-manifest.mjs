@@ -1,6 +1,7 @@
 const accountIdPattern = /^[0-9a-f]{32}$/i;
 const d1IdPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const queueIdPattern = /^[0-9a-f]{32}$/i;
+const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const ownershipStates = new Set(["unclaimed", "creating", "created", "reused", "removed"]);
 const placeholderD1Id = "00000000-0000-0000-0000-000000000000";
 
@@ -42,6 +43,9 @@ export function assertCurrentManifest(manifest, options = {}) {
     } else if (resource.id !== null) {
       throw new Error(`Refusing to continue: an unowned queue must have a null "${path}.id".`);
     }
+  }
+  if (manifest.releaseGate !== undefined) {
+    assertReleaseGate(manifest.releaseGate);
   }
 }
 
@@ -104,6 +108,16 @@ export function assertUnambiguousManifest(manifest, options = {}) {
       );
     }
   }
+  for (const [path, resource] of [
+    ["releaseGate.candidateManifest", manifest.releaseGate?.candidateManifest],
+    ["releaseGate.workersBuild", manifest.releaseGate?.workersBuild]
+  ]) {
+    if (resource && resource.ownership !== "removed") {
+      throw new Error(
+        `Refusing to continue: manifest field "${path}.ownership" is "${resource.ownership}", so the signed-release staging gate still owns a Cloudflare resource. Reconcile the gate before any other lifecycle command.`
+      );
+    }
+  }
 }
 
 export function assertD1Id(id) {
@@ -142,5 +156,125 @@ function assertQueueId(id, path) {
     throw new Error(
       `Refusing to continue: manifest field "${path}.id" must be a 32-character queue ID.`
     );
+  }
+}
+
+function assertReleaseGate(gate) {
+  const candidate = gate?.candidateManifest;
+  const build = gate?.workersBuild;
+  assertOwnership(candidate, "releaseGate.candidateManifest");
+  assertOwnership(build, "releaseGate.workersBuild");
+  assertNonEmptyString(candidate?.name, "releaseGate.candidateManifest.name");
+  assertNonEmptyString(candidate?.path, "releaseGate.candidateManifest.path");
+  assertNonEmptyString(candidate?.url, "releaseGate.candidateManifest.url");
+  if (!/^[a-f0-9]{64}$/.test(candidate?.sha256 ?? "")) {
+    throw new Error(
+      'Refusing to continue: manifest field "releaseGate.candidateManifest.sha256" must be a SHA-256 digest.'
+    );
+  }
+  if (candidate?.workerTag !== null && !accountIdPattern.test(candidate?.workerTag ?? "")) {
+    throw new Error(
+      'Refusing to continue: manifest field "releaseGate.candidateManifest.workerTag" must be null or a 32-character Worker tag.'
+    );
+  }
+  if (candidate.ownership === "created" && candidate.workerTag === null) {
+    throw new Error(
+      'Refusing to continue: a created release-gate manifest Worker must record "releaseGate.candidateManifest.workerTag".'
+    );
+  }
+  let candidateUrl;
+  try {
+    candidateUrl = new URL(candidate.url);
+  } catch {
+    throw new Error(
+      'Refusing to continue: manifest field "releaseGate.candidateManifest.url" must be a valid URL.'
+    );
+  }
+  if (candidateUrl.protocol !== "https:" || candidateUrl.pathname !== candidate.path) {
+    throw new Error(
+      "Refusing to continue: the release-gate manifest URL must be HTTPS and match its recorded path."
+    );
+  }
+
+  assertNonEmptyString(build?.triggerName, "releaseGate.workersBuild.triggerName");
+  if (!accountIdPattern.test(build?.workerTag ?? "")) {
+    throw new Error(
+      'Refusing to continue: manifest field "releaseGate.workersBuild.workerTag" must be a 32-character Worker tag.'
+    );
+  }
+  for (const field of ["repoConnectionUuid", "buildTokenUuid"]) {
+    if (!uuidPattern.test(build?.[field] ?? "")) {
+      throw new Error(
+        `Refusing to continue: manifest field "releaseGate.workersBuild.${field}" must be a UUID.`
+      );
+    }
+  }
+  for (const field of ["triggerUuid", "buildUuid"]) {
+    if (build?.[field] !== null && !uuidPattern.test(build?.[field] ?? "")) {
+      throw new Error(
+        `Refusing to continue: manifest field "releaseGate.workersBuild.${field}" must be null or a UUID.`
+      );
+    }
+  }
+  if (build.ownership === "created" && build.triggerUuid === null) {
+    throw new Error(
+      'Refusing to continue: a created release-gate trigger must record "releaseGate.workersBuild.triggerUuid".'
+    );
+  }
+  for (const [field, expected] of [
+    ["branch", "main"],
+    ["buildCommand", "sleep 600"],
+    ["initialDeployCommand", "pnpm deploy"],
+    ["rootDirectory", "/"]
+  ]) {
+    if (build?.[field] !== expected) {
+      throw new Error(
+        `Refusing to continue: manifest field "releaseGate.workersBuild.${field}" must be "${expected}".`
+      );
+    }
+  }
+  if (
+    !Array.isArray(build?.pathIncludes) ||
+    build.pathIncludes.length !== 1 ||
+    build.pathIncludes[0] !== ".hqbase-release-gate-never"
+  ) {
+    throw new Error(
+      'Refusing to continue: manifest field "releaseGate.workersBuild.pathIncludes" must record the release-gate path.'
+    );
+  }
+  if (
+    build?.buildOutcome !== null &&
+    build.buildOutcome !== "cancelled" &&
+    build.buildOutcome !== "terminated"
+  ) {
+    throw new Error(
+      'Refusing to continue: manifest field "releaseGate.workersBuild.buildOutcome" must be null or a cancellation outcome.'
+    );
+  }
+  if ((build?.stoppedOn === null) !== (build?.buildOutcome === null)) {
+    throw new Error(
+      "Refusing to continue: the release-gate build outcome and stop time must be recorded together."
+    );
+  }
+  if (build?.dispatchStartedAt !== null && !Number.isFinite(Date.parse(build.dispatchStartedAt))) {
+    throw new Error(
+      'Refusing to continue: manifest field "releaseGate.workersBuild.dispatchStartedAt" must be null or an ISO date.'
+    );
+  }
+  if (build?.buildUuid !== null && build?.dispatchStartedAt === null) {
+    throw new Error(
+      "Refusing to continue: a release-gate build UUID requires its recorded dispatch start time."
+    );
+  }
+  if (build?.stoppedOn !== null && !Number.isFinite(Date.parse(build.stoppedOn))) {
+    throw new Error(
+      'Refusing to continue: manifest field "releaseGate.workersBuild.stoppedOn" must be an ISO date.'
+    );
+  }
+}
+
+function assertNonEmptyString(value, path) {
+  if (typeof value !== "string" || value.trim() === "") {
+    throw new Error(`Refusing to continue: manifest field "${path}" must be a non-empty string.`);
   }
 }

@@ -29,6 +29,8 @@ jobs:
       GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
       - uses: pnpm/action-setup@v6
         with:
           version: 11.7.0
@@ -145,6 +147,8 @@ jobs:
       HQBASE_STAGING_OWNER_EMAIL: ${{ secrets.HQBASE_E2E_OWNER_EMAIL }}
       HQBASE_STAGING_OWNER_PASSWORD: ${{ secrets.HQBASE_E2E_OWNER_PASSWORD }}
       HQBASE_STAGING_OAUTH_CLIENT_ID: ${{ vars.HQBASE_E2E_OAUTH_CLIENT_ID }}
+      HQBASE_E2E_REPO_CONNECTION_UUID: ${{ vars.HQBASE_E2E_REPO_CONNECTION_UUID }}
+      HQBASE_E2E_BUILD_TOKEN_UUID: ${{ vars.HQBASE_E2E_BUILD_TOKEN_UUID }}
       HQBASE_STAGING_SENDER: hello@${{ secrets.HQBASE_E2E_EMAIL_DOMAIN }}
       HQBASE_STAGING_URL: https://${{ secrets.HQBASE_E2E_APP_HOSTNAME }}
       # This frozen bootstrap is independent of the active-release compatibility floor.
@@ -260,6 +264,8 @@ jobs:
           --auth-url "$HQBASE_STAGING_URL"
           --client-id "$HQBASE_STAGING_OAUTH_CLIENT_ID"
           --skip-deploy
+      - name: Prepare the deployed update-action release gate
+        run: node scripts/release/staging-update-gate.mjs prepare
       - name: Reproduce the legacy Worker configuration
         run: |
           config="$GITHUB_WORKSPACE/.hqbase/deployments/$DEPLOYMENT_NAME/wrangler.jsonc"
@@ -328,6 +334,10 @@ jobs:
             --command "SELECT (SELECT COUNT(*) FROM \"user\") AS user_count, (SELECT COUNT(*) FROM mailboxes) AS mailbox_count, (SELECT value_json FROM app_settings WHERE key = 'release-updater-bridge-probe') AS probe")"
           jq -c '.[0].results[0]' <<<"$snapshot" > /tmp/hqbase-pre-repair-data.json
           pnpm test:e2e:staging:event-socket
+      - name: Exercise the deployed update action without deployment
+        env:
+          HQBASE_E2E_UPDATE_API_TOKEN: ${{ secrets.HQBASE_E2E_UPDATE_API_TOKEN }}
+        run: node scripts/release/staging-update-gate.mjs probe
       - name: Finish the candidate through its canonical signed bootstrap
         run: |
           config="$GITHUB_WORKSPACE/.hqbase/deployments/$DEPLOYMENT_NAME/wrangler.jsonc"
@@ -423,6 +433,10 @@ jobs:
           git diff --quiet
           git diff --cached --quiet
           test -z "$(git ls-files --others --exclude-standard)"
+      - name: Reconcile deployed update-action gate resources
+        if: always()
+        id: reconcile_update_gate
+        run: node scripts/release/staging-update-gate.mjs cleanup
       - name: Reconcile disposable Worker lifecycle record
         if: always()
         id: reconcile_worker
@@ -488,6 +502,7 @@ jobs:
       - name: Destroy disposable resources
         if: >-
           always() &&
+          steps.reconcile_update_gate.outcome == 'success' &&
           steps.reconcile_worker.outcome == 'success' &&
           steps.reconcile_worker.outputs.manifest_present == 'true'
         run: pnpm hqbase destroy --name "$DEPLOYMENT_NAME" --scope all --yes
@@ -604,6 +619,7 @@ jobs:
             import { readFileSync, statSync } from "node:fs";
             const version = process.env.HQBASE_RELEASE_VERSION;
             const config = JSON.parse(readFileSync("config/product.json", "utf8"));
+            const packageJson = JSON.parse(readFileSync("package.json", "utf8"));
             const envelope = JSON.parse(readFileSync("/tmp/stable.json", "utf8"));
             const versionEnvelope = JSON.parse(readFileSync("/tmp/version-manifest.json", "utf8"));
             if (versionEnvelope.payload !== envelope.payload ||
@@ -623,9 +639,21 @@ jobs:
               throw new Error("Published stable manifest identity is invalid.");
             }
             const expectedArtifactUrl = `https://github.com/HQBase/hqbase/releases/download/v${version}/hqbase-${version}.tar.gz`;
-            const expectedUpdaterUrl = `https://raw.githubusercontent.com/HQBase/hqbase/${process.env.RELEASE_COMMIT}/scripts/release/bootstrap.mjs`;
+            const configuredUpdaterCommit = packageJson.hqbaseRelease?.updaterCommit;
+            const updaterCommitVersion = packageJson.hqbaseRelease?.updaterCommitVersion;
+            if (Boolean(configuredUpdaterCommit) !== Boolean(updaterCommitVersion) ||
+                (configuredUpdaterCommit && updaterCommitVersion !== version)) {
+              throw new Error("Committed release updater override is not approved for this version.");
+            }
+            const updaterCommit = configuredUpdaterCommit ?? process.env.RELEASE_COMMIT;
+            if (!/^[a-f0-9]{40}$/.test(updaterCommit)) {
+              throw new Error("Committed release updater commit is invalid.");
+            }
+            const expectedUpdaterUrl = `https://raw.githubusercontent.com/HQBase/hqbase/${updaterCommit}/scripts/release/bootstrap.mjs`;
+            const immutableUpdaterUrl = /^https:\/\/raw\.githubusercontent\.com\/HQBase\/hqbase\/[a-f0-9]{40}\/scripts\/release\/bootstrap\.mjs$/;
             if (manifest.artifact.url !== expectedArtifactUrl ||
                 manifest.updater?.protocol !== 2 ||
+                !immutableUpdaterUrl.test(manifest.updater.sourceUrl) ||
                 manifest.updater.sourceUrl !== expectedUpdaterUrl) {
               throw new Error("Published stable manifest sources are invalid.");
             }

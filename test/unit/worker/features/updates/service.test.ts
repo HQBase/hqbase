@@ -9,6 +9,7 @@ import {
   getUpdateStatus,
   isManagedDeployCommand,
   managedDeployCommand,
+  managedUpdaterLoader,
   triggerUpdate
 } from "@worker/features/updates/service";
 import type { WorkerEnv } from "@worker/lib/env";
@@ -94,7 +95,10 @@ describe("HQBase updates", () => {
         String(input).endsWith("/environment_variables") && init?.method === "PATCH"
     );
     expect(pinRequests.map(([, init]) => init?.body)).toEqual([
-      JSON.stringify({ HQBASE_EXPECTED_RELEASE_VERSION: { is_secret: false, value: "0.1.0" } })
+      JSON.stringify({
+        HQBASE_UPDATER_LOADER: { is_secret: false, value: managedUpdaterLoader(updater) },
+        HQBASE_EXPECTED_RELEASE_VERSION: { is_secret: false, value: "0.1.0" }
+      })
     ]);
     expect(fetcher.mock.calls.some(([, init]) => init?.method === "DELETE")).toBe(false);
     const commandRequests = fetcher.mock.calls.filter(
@@ -102,7 +106,7 @@ describe("HQBase updates", () => {
         String(input).endsWith("/builds/triggers/trigger") && init?.method === "PATCH"
     );
     expect(commandRequests.map(([, init]) => init?.body)).toEqual([
-      JSON.stringify({ deploy_command: managedDeployCommand(updater) })
+      JSON.stringify({ deploy_command: managedDeployCommand() })
     ]);
   });
   it("offers and starts an authorized repair for the already active signed release", async () => {
@@ -135,16 +139,21 @@ describe("HQBase updates", () => {
     });
   });
   it("accepts only the exact canonical updater command", () => {
-    const command = managedDeployCommand(updater);
-    const previousReleaseCommand = managedDeployCommand({
+    const command = managedDeployCommand();
+    const loader = managedUpdaterLoader(updater);
+    const previousReleaseCommand = `node --input-type=module --eval '${managedUpdaterLoader({
       ...updater,
       sha256: "c".repeat(64)
-    });
+    })}'`;
     expect(isManagedDeployCommand(command)).toBe(true);
+    expect(command).toBe('node --input-type=module --eval "$HQBASE_UPDATER_LOADER"');
+    expect(Buffer.byteLength(loader)).toBeLessThan(5_000);
     expect(isManagedDeployCommand(previousReleaseCommand)).toBe(true);
     expect(isManagedDeployCommand(`${command} && pnpm deploy`)).toBe(false);
     expect(
-      isManagedDeployCommand(command.replace("HQBase updater verification failed.", "skip"))
+      isManagedDeployCommand(
+        previousReleaseCommand.replace("HQBase updater verification failed.", "skip")
+      )
     ).toBe(false);
   });
   it("rejects an overlapping update before it can replace the shared release pin", async () => {
@@ -240,7 +249,10 @@ describe("HQBase updates", () => {
           String(input).endsWith("/environment_variables") && init?.method === "PATCH"
       );
       expect(pinRequests.map(([, init]) => init?.body)).toEqual([
-        JSON.stringify({ HQBASE_EXPECTED_RELEASE_VERSION: { is_secret: false, value: "0.1.0" } }),
+        JSON.stringify({
+          HQBASE_UPDATER_LOADER: { is_secret: false, value: managedUpdaterLoader(updater) },
+          HQBASE_EXPECTED_RELEASE_VERSION: { is_secret: false, value: "0.1.0" }
+        }),
         JSON.stringify({ HQBASE_EXPECTED_RELEASE_VERSION: { is_secret: false, value: "0.0.8" } })
       ]);
     } finally {
@@ -325,7 +337,28 @@ describe("HQBase updates", () => {
         "0.1.0",
         fetcher as typeof fetch
       )
-    ).rejects.toThrow("plain build variable");
+    ).rejects.toThrow("plain Workers Builds variables");
+    expect(
+      fetcher.mock.calls.some(
+        ([input, init]) => String(input).endsWith("/builds") && init?.method === "POST"
+      )
+    ).toBe(false);
+  });
+  it("rejects a secret updater loader", async () => {
+    const fetcher = cloudflareUpdateFetcher({
+      variables: {
+        HQBASE_UPDATER_LOADER: { is_secret: true }
+      }
+    });
+
+    await expect(
+      triggerUpdate(
+        updateEnvironment(),
+        "temporary-token-that-is-long-enough",
+        "0.1.0",
+        fetcher as typeof fetch
+      )
+    ).rejects.toThrow("plain Workers Builds variables");
     expect(
       fetcher.mock.calls.some(
         ([input, init]) => String(input).endsWith("/builds") && init?.method === "POST"
@@ -359,6 +392,60 @@ describe("HQBase updates", () => {
       )
     ).rejects.toThrow("changed after you reviewed it");
   });
+  it("reports and rolls back a rejected build-command change without exposing the body", async () => {
+    const fetcher = cloudflareUpdateFetcher({ commandFails: true });
+
+    await expect(
+      triggerUpdate(
+        updateEnvironment(),
+        "temporary-token-that-is-long-enough",
+        "0.1.0",
+        fetcher as typeof fetch
+      )
+    ).rejects.toMatchObject({
+      code: "UPDATE_CLOUDFLARE_ERROR",
+      message:
+        "Cloudflare rejected the request to set the Workers Builds deploy command (HTTP 400, code 1000, request command-ray)."
+    });
+    expect(
+      fetcher.mock.calls.some(
+        ([input, init]) => String(input).endsWith("/builds") && init?.method === "POST"
+      )
+    ).toBe(false);
+    expect(
+      fetcher.mock.calls.some(
+        ([input, init]) =>
+          String(input).endsWith("/environment_variables/HQBASE_UPDATER_LOADER") &&
+          init?.method === "DELETE"
+      )
+    ).toBe(true);
+  });
+  it("does not change the command or start a build when variables are rejected", async () => {
+    const fetcher = cloudflareUpdateFetcher({ variablesFail: true });
+
+    await expect(
+      triggerUpdate(
+        updateEnvironment(),
+        "temporary-token-that-is-long-enough",
+        "0.1.0",
+        fetcher as typeof fetch
+      )
+    ).rejects.toMatchObject({
+      code: "UPDATE_CLOUDFLARE_ERROR",
+      message: "Cloudflare rejected the request to set the updater variables (HTTP 400, code 1002)."
+    });
+    expect(
+      fetcher.mock.calls.some(
+        ([input, init]) =>
+          String(input).endsWith("/builds/triggers/trigger") && init?.method === "PATCH"
+      )
+    ).toBe(false);
+    expect(
+      fetcher.mock.calls.some(
+        ([input, init]) => String(input).endsWith("/builds") && init?.method === "POST"
+      )
+    ).toBe(false);
+  });
   it("restores the previous release pin when the build does not start", async () => {
     const fetcher = cloudflareUpdateFetcher({
       buildFails: true,
@@ -374,14 +461,17 @@ describe("HQBase updates", () => {
         "0.1.0",
         fetcher as typeof fetch
       )
-    ).rejects.toThrow("Build could not start");
+    ).rejects.toThrow("start the Workers Build");
 
     const pinRequests = fetcher.mock.calls.filter(
       ([input, init]) =>
         String(input).endsWith("/environment_variables") && init?.method === "PATCH"
     );
     expect(pinRequests.map(([, init]) => init?.body)).toEqual([
-      JSON.stringify({ HQBASE_EXPECTED_RELEASE_VERSION: { is_secret: false, value: "0.1.0" } }),
+      JSON.stringify({
+        HQBASE_UPDATER_LOADER: { is_secret: false, value: managedUpdaterLoader(updater) },
+        HQBASE_EXPECTED_RELEASE_VERSION: { is_secret: false, value: "0.1.0" }
+      }),
       JSON.stringify({ HQBASE_EXPECTED_RELEASE_VERSION: { is_secret: false, value: "0.0.8" } })
     ]);
     const commandRequests = fetcher.mock.calls.filter(
@@ -389,7 +479,7 @@ describe("HQBase updates", () => {
         String(input).endsWith("/builds/triggers/trigger") && init?.method === "PATCH"
     );
     expect(commandRequests.map(([, init]) => init?.body)).toEqual([
-      JSON.stringify({ deploy_command: managedDeployCommand(updater) }),
+      JSON.stringify({ deploy_command: managedDeployCommand() }),
       JSON.stringify({ deploy_command: "pnpm deploy" })
     ]);
   });
@@ -403,7 +493,7 @@ describe("HQBase updates", () => {
         "0.1.0",
         fetcher as typeof fetch
       )
-    ).rejects.toThrow("Build could not start");
+    ).rejects.toThrow("start the Workers Build");
     expect(
       fetcher.mock.calls.some(
         ([input, init]) =>
@@ -411,6 +501,89 @@ describe("HQBase updates", () => {
           init?.method === "DELETE"
       )
     ).toBe(true);
+    expect(
+      fetcher.mock.calls.some(
+        ([input, init]) =>
+          String(input).endsWith("/environment_variables/HQBASE_UPDATER_LOADER") &&
+          init?.method === "DELETE"
+      )
+    ).toBe(true);
+  });
+  it("restores the previous updater loader when the build is rejected", async () => {
+    const fetcher = cloudflareUpdateFetcher({
+      buildFails: true,
+      variables: {
+        HQBASE_EXPECTED_RELEASE_VERSION: { is_secret: false, value: "0.0.8" },
+        HQBASE_UPDATER_LOADER: { is_secret: false, value: "previous-loader" }
+      }
+    });
+
+    await expect(
+      triggerUpdate(
+        updateEnvironment(),
+        "temporary-token-that-is-long-enough",
+        "0.1.0",
+        fetcher as typeof fetch
+      )
+    ).rejects.toThrow("start the Workers Build");
+    const variableBodies = fetcher.mock.calls
+      .filter(
+        ([input, init]) =>
+          String(input).endsWith("/environment_variables") && init?.method === "PATCH"
+      )
+      .map(([, init]) => init?.body);
+    expect(variableBodies).toContain(
+      JSON.stringify({
+        HQBASE_UPDATER_LOADER: { is_secret: false, value: "previous-loader" }
+      })
+    );
+  });
+  it("reconciles a build that Cloudflare accepted before the response failed", async () => {
+    const fetcher = cloudflareUpdateFetcher({ ambiguousBuild: "accepted" });
+
+    await expect(
+      triggerUpdate(
+        updateEnvironment(),
+        "temporary-token-that-is-long-enough",
+        "0.1.0",
+        fetcher as typeof fetch
+      )
+    ).resolves.toEqual({ buildId: "reconciled-build", status: "queued" });
+    expect(fetcher.mock.calls.some(([, init]) => init?.method === "DELETE")).toBe(false);
+  });
+  it("keeps verified configuration when build acceptance cannot be determined", async () => {
+    const fetcher = cloudflareUpdateFetcher({ ambiguousBuild: "unknown" });
+
+    await expect(
+      triggerUpdate(
+        updateEnvironment(),
+        "temporary-token-that-is-long-enough",
+        "0.1.0",
+        fetcher as typeof fetch
+      )
+    ).rejects.toMatchObject({ code: "UPDATE_BUILD_STATUS_UNKNOWN", status: 502 });
+    expect(fetcher.mock.calls.some(([, init]) => init?.method === "DELETE")).toBe(false);
+    expect(
+      fetcher.mock.calls.filter(
+        ([input, init]) =>
+          String(input).endsWith("/builds/triggers/trigger") && init?.method === "PATCH"
+      )
+    ).toHaveLength(1);
+  });
+  it("does not reconcile a build with a different updater loader", async () => {
+    const fetcher = cloudflareUpdateFetcher({
+      ambiguousBuild: "accepted",
+      reconciledLoader: "different-loader"
+    });
+
+    await expect(
+      triggerUpdate(
+        updateEnvironment(),
+        "temporary-token-that-is-long-enough",
+        "0.1.0",
+        fetcher as typeof fetch
+      )
+    ).rejects.toMatchObject({ code: "UPDATE_BUILD_STATUS_UNKNOWN", status: 502 });
   });
   it("reports an incomplete build-configuration rollback", async () => {
     const fetcher = cloudflareUpdateFetcher({
@@ -434,7 +607,8 @@ describe("HQBase updates", () => {
         String(input).endsWith("/builds/triggers/trigger") && init?.method === "PATCH"
     );
     expect(commandRequests.map(([, init]) => init?.body)).toEqual([
-      JSON.stringify({ deploy_command: managedDeployCommand(updater) })
+      JSON.stringify({ deploy_command: managedDeployCommand() }),
+      JSON.stringify({ deploy_command: "pnpm deploy" })
     ]);
   });
 });
@@ -575,16 +749,23 @@ function migrationQueryResult(
 
 function cloudflareUpdateFetcher(
   options: {
+    ambiguousBuild?: "accepted" | "unknown";
     beforeFirstPin?: () => Promise<void>;
     branchIncludes?: string[];
     buildFails?: boolean;
+    commandFails?: boolean;
     deployCommand?: string;
     rollbackFails?: boolean;
     rootDirectory?: string;
+    reconciledLoader?: string;
     variables?: Record<string, { is_secret: boolean; value?: string | null }>;
+    variablesFail?: boolean;
   } = {}
 ) {
-  let pinPatches = 0;
+  let commandPatches = 0;
+  let deployCommand = options.deployCommand ?? "pnpm deploy";
+  let variablePatches = 0;
+  const variables = structuredClone(options.variables ?? {});
   return vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input);
     if (url.includes("github.com/HQBase/hqbase/releases")) return Response.json(envelope);
@@ -604,35 +785,98 @@ function cloudflareUpdateFetcher(
           {
             id: "trigger",
             branch_includes: options.branchIncludes ?? ["main"],
-            deploy_command: options.deployCommand ?? "pnpm deploy",
+            deploy_command: deployCommand,
             root_directory: options.rootDirectory ?? "/"
           }
         ]
       });
     }
-    if (url.endsWith("/environment_variables")) {
-      if (init?.method === "PATCH") pinPatches += 1;
-      if (pinPatches === 1) await options.beforeFirstPin?.();
-      if (options.rollbackFails && pinPatches > 1) {
-        return Response.json(
-          { success: false, errors: [{ message: "Pin rollback failed." }] },
-          { status: 502 }
+    if (url.endsWith("/builds/triggers/trigger")) {
+      if (init?.method === "PATCH") {
+        commandPatches += 1;
+        if (options.commandFails && commandPatches === 1) {
+          return Response.json(
+            { success: false, errors: [{ code: 1000, message: "Invalid request body" }] },
+            { headers: { "cf-ray": "command-ray" }, status: 400 }
+          );
+        }
+        if (options.rollbackFails && commandPatches > 1) {
+          return Response.json(
+            { success: false, errors: [{ code: 1001, message: "Rollback failed" }] },
+            { status: 502 }
+          );
+        }
+        deployCommand = String(
+          (JSON.parse(String(init.body)) as { deploy_command: string }).deploy_command
         );
       }
-      return Response.json({
-        success: true,
-        result: init?.method === "PATCH" ? {} : (options.variables ?? {})
-      });
+      return Response.json({ success: true, result: { deploy_command: deployCommand } });
+    }
+    if (url.includes("/environment_variables/") && init?.method === "DELETE") {
+      delete variables[decodeURIComponent(url.slice(url.lastIndexOf("/") + 1))];
+      return Response.json({ success: true, result: null });
+    }
+    if (url.endsWith("/environment_variables")) {
+      if (init?.method === "PATCH") {
+        variablePatches += 1;
+        if (variablePatches === 1) await options.beforeFirstPin?.();
+        if (options.variablesFail && variablePatches === 1) {
+          return Response.json(
+            { success: false, errors: [{ code: 1002, message: "Variables failed" }] },
+            { status: 400 }
+          );
+        }
+        Object.assign(
+          variables,
+          JSON.parse(String(init.body)) as Record<
+            string,
+            { is_secret: boolean; value?: string | null }
+          >
+        );
+      }
+      return Response.json({ success: true, result: structuredClone(variables) });
     }
     if (url.endsWith("/builds") && options.buildFails) {
       return Response.json(
-        { success: false, errors: [{ message: "Build could not start." }] },
-        { status: 502 }
+        { success: false, errors: [{ code: 1003, message: "Build could not start." }] },
+        { headers: { "cf-ray": "build-ray" }, status: 400 }
       );
     }
-    return Response.json({
-      success: true,
-      result: { build_uuid: "build-id", status: "queued" }
-    });
+    if (url.endsWith("/builds") && init?.method === "POST") {
+      if (options.ambiguousBuild) throw new TypeError("socket closed after request upload");
+      return Response.json({
+        success: true,
+        result: { build_uuid: "build-id", status: "queued" }
+      });
+    }
+    if (url.includes("/builds/builds/latest?")) {
+      return Response.json({
+        success: true,
+        result: {
+          builds:
+            options.ambiguousBuild === "accepted"
+              ? {
+                  "worker-tag": {
+                    build_trigger_metadata: {
+                      branch: "main",
+                      build_trigger_source: "api",
+                      deploy_command: managedDeployCommand(),
+                      environment_variables: {
+                        HQBASE_EXPECTED_RELEASE_VERSION: "0.1.0",
+                        HQBASE_UPDATER_LOADER:
+                          options.reconciledLoader ?? managedUpdaterLoader(updater)
+                      }
+                    },
+                    build_uuid: "reconciled-build",
+                    created_on: new Date().toISOString(),
+                    status: "queued",
+                    trigger: { trigger_uuid: "trigger" }
+                  }
+                }
+              : {}
+        }
+      });
+    }
+    throw new Error(`Unexpected Cloudflare request: ${init?.method ?? "GET"} ${url}`);
   });
 }

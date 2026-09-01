@@ -204,17 +204,23 @@ describe("signed release bootstrap", () => {
   });
 
   it("packages bootstrap bytes from the exact Git commit named by signed metadata", () => {
-    const sourceCommitPlaceholder = ["$", "{sourceCommit}"].join("");
+    const updaterCommitPlaceholder = ["$", "{updaterCommit}"].join("");
     const source = readFileSync(
       new URL("../../../scripts/release/package.mjs", import.meta.url),
       "utf8"
     );
     expect(source).toContain(
-      `["show", \`${sourceCommitPlaceholder}:scripts/release/bootstrap.mjs\`]`
+      `["show", \`${updaterCommitPlaceholder}:scripts/release/bootstrap.mjs\`]`
     );
     expect(source).toContain(
-      `https://raw.githubusercontent.com/HQBase/hqbase/${sourceCommitPlaceholder}/scripts/release/bootstrap.mjs`
+      `https://raw.githubusercontent.com/HQBase/hqbase/${updaterCommitPlaceholder}/scripts/release/bootstrap.mjs`
     );
+    expect(source).toContain(
+      "const configuredUpdaterCommit = packageJson.hqbaseRelease?.updaterCommit"
+    );
+    expect(source).toContain("updaterCommitVersion !== version");
+    expect(source).toContain("if (!/^[a-f0-9]{40}$/.test(updaterCommit))");
+    expect(source).toContain("Release updater commit is not available in the checkout.");
     expect(source).toContain('createHash("sha256").update(updaterBytes).digest("hex")');
     expect(source).toContain("size: updaterBytes.length");
   });

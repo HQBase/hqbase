@@ -4,13 +4,31 @@ import type { WorkerEnv } from "../../lib/env";
 import { AppError } from "../../lib/errors";
 import { hqbaseProductConfig } from "../../lib/product-config";
 import { withUpdateBuildLock } from "./build-lock";
-import { cloudflare } from "./cloudflare";
+import {
+  assertManagedTrigger,
+  type BuildConfiguration,
+  type BuildVariable,
+  buildVariableEquals,
+  expectedReleaseVariable,
+  forceSourceDeployVariable,
+  isManagedDeployCommand,
+  isRestorableBuildVariable,
+  managedDeployCommand,
+  managedUpdaterLoader,
+  reconcileAcceptedBuild,
+  restoreOrThrow,
+  setBuildDeployCommand,
+  setBuildUpdaterVariables,
+  startBuild,
+  updaterLoaderVariable,
+  verifyBuildConfiguration
+} from "./build-trigger";
+import { cloudflare, isAmbiguousCloudflareOperation } from "./cloudflare";
 import { inspectManagedMigrationState, type ManagedMigrationState } from "./migration-state";
 import type { ReleaseManifest, UpdateStatus } from "./types";
 
-const expectedReleaseVariable = "HQBASE_EXPECTED_RELEASE_VERSION";
-const forceSourceDeployVariable = "HQBASE_FORCE_SOURCE_DEPLOY";
-const legacyManagedDeployCommands = new Set(["pnpm deploy", "pnpm run deploy"]);
+export { isManagedDeployCommand, managedDeployCommand, managedUpdaterLoader };
+
 const envelopeSchema = z.object({ payload: z.string().min(1), signature: z.string().min(1) });
 const manifestSchema = z.object({
   format: z.literal("hqbase-release-v1"),
@@ -124,7 +142,8 @@ export async function triggerUpdate(
   const zones = await cloudflare<{ result: Array<{ name: string; account: { id: string } }> }>(
     "https://api.cloudflare.com/client/v4/zones?per_page=50",
     { headers },
-    fetcher
+    fetcher,
+    "read_zones"
   );
   const zone = zones.result
     .filter((candidate) => domain === candidate.name || domain.endsWith(`.${candidate.name}`))
@@ -139,7 +158,8 @@ export async function triggerUpdate(
   const scripts = await cloudflare<{ result: Array<{ id: string; tag?: string }> }>(
     `https://api.cloudflare.com/client/v4/accounts/${accountId}/workers/scripts`,
     { headers },
-    fetcher
+    fetcher,
+    "read_workers"
   );
   const script = scripts.result.find(
     (candidate) => candidate.id === (env.HQBASE_WORKER_NAME ?? "hqbase")
@@ -150,6 +170,8 @@ export async function triggerUpdate(
       "The production Worker build could not be found.",
       404
     );
+  const scriptTag = script.tag;
+  const triggersUrl = `https://api.cloudflare.com/client/v4/accounts/${accountId}/builds/workers/${scriptTag}/triggers`;
   const triggers = await cloudflare<{
     result: Array<{
       id?: string;
@@ -158,11 +180,7 @@ export async function triggerUpdate(
       deploy_command?: string | null;
       root_directory?: string | null;
     }>;
-  }>(
-    `https://api.cloudflare.com/client/v4/accounts/${accountId}/builds/workers/${script.tag}/triggers`,
-    { headers },
-    fetcher
-  );
+  }>(triggersUrl, { headers }, fetcher, "read_build_triggers");
   const trigger = triggers.result.find((item) => item.branch_includes?.includes("main"));
   if (!trigger)
     throw new AppError(
@@ -182,8 +200,8 @@ export async function triggerUpdate(
     const triggerUrl = `https://api.cloudflare.com/client/v4/accounts/${accountId}/builds/triggers/${triggerId}`;
     const variablesUrl = `https://api.cloudflare.com/client/v4/accounts/${accountId}/builds/triggers/${triggerId}/environment_variables`;
     const variables = await cloudflare<{
-      result: Record<string, { is_secret: boolean; value?: string | null }>;
-    }>(variablesUrl, { headers }, fetcher);
+      result: Record<string, BuildVariable>;
+    }>(variablesUrl, { headers }, fetcher, "read_build_variables");
     const sourceDeploy = variables.result[forceSourceDeployVariable];
     if (sourceDeploy?.is_secret || sourceDeploy?.value?.trim() === "1") {
       throw new AppError(
@@ -193,141 +211,98 @@ export async function triggerUpdate(
       );
     }
     const previousPin = variables.result[expectedReleaseVariable];
-    if (previousPin?.is_secret) {
+    const previousLoader = variables.result[updaterLoaderVariable];
+    if (!isRestorableBuildVariable(previousPin) || !isRestorableBuildVariable(previousLoader)) {
       throw new AppError(
         "UPDATE_TRIGGER_UNMANAGED",
-        "Signed updates require HQBASE_EXPECTED_RELEASE_VERSION to be a plain build variable.",
+        "Signed updates require the updater loader and release version to be plain Workers Builds variables.",
         409
       );
     }
     const previousDeployCommand = trigger.deploy_command?.trim() ?? "";
-    const nextDeployCommand = managedDeployCommand(update.release.updater);
-    let deployCommandChanged = false;
+    const previousConfiguration: BuildConfiguration = {
+      deployCommand: previousDeployCommand,
+      variables: structuredClone(variables.result)
+    };
+    const nextConfiguration = {
+      deployCommand: managedDeployCommand(),
+      loader: managedUpdaterLoader(update.release.updater),
+      version: expectedVersion
+    };
     try {
-      if (previousDeployCommand !== nextDeployCommand) {
-        await setBuildDeployCommand(triggerUrl, nextDeployCommand, headers, fetcher);
-        deployCommandChanged = true;
+      if (
+        !buildVariableEquals(previousLoader, nextConfiguration.loader) ||
+        !buildVariableEquals(previousPin, nextConfiguration.version)
+      ) {
+        await setBuildUpdaterVariables(
+          variablesUrl,
+          nextConfiguration.loader,
+          nextConfiguration.version,
+          headers,
+          fetcher
+        );
       }
-      await setBuildVersionPin(variablesUrl, expectedVersion, headers, fetcher);
-      const build = await cloudflare<{
-        result: { build_uuid?: string; id?: string; status?: string };
-      }>(
-        `https://api.cloudflare.com/client/v4/accounts/${accountId}/builds/triggers/${triggerId}/builds`,
-        { method: "POST", headers, body: JSON.stringify({ branch: "main" }) },
+      if (previousDeployCommand !== nextConfiguration.deployCommand) {
+        await setBuildDeployCommand(triggerUrl, nextConfiguration.deployCommand, headers, fetcher);
+      }
+      await verifyBuildConfiguration(
+        triggersUrl,
+        triggerId,
+        variablesUrl,
+        nextConfiguration,
+        headers,
         fetcher
       );
-      const buildId = build.result.build_uuid ?? build.result.id;
-      if (!buildId)
-        throw new AppError(
-          "UPDATE_TRIGGER_FAILED",
-          "Cloudflare did not return a build identifier.",
-          502
-        );
-      return { buildId, status: build.result.status ?? "queued" };
     } catch (error) {
-      let rollbackFailed = false;
-      let releasePinRestored = false;
-      try {
-        await restoreBuildVersionPin(variablesUrl, previousPin, headers, fetcher);
-        releasePinRestored = true;
-      } catch {
-        rollbackFailed = true;
-      }
-      if (deployCommandChanged && releasePinRestored) {
-        try {
-          await setBuildDeployCommand(triggerUrl, previousDeployCommand, headers, fetcher);
-        } catch {
-          rollbackFailed = true;
-        }
-      }
-      if (rollbackFailed) {
+      await restoreOrThrow(
+        triggerUrl,
+        triggersUrl,
+        triggerId,
+        variablesUrl,
+        previousConfiguration,
+        headers,
+        fetcher
+      );
+      throw error;
+    }
+
+    const dispatchStartedAt = Date.now();
+    try {
+      return await startBuild(accountId, triggerId, headers, fetcher);
+    } catch (error) {
+      if (
+        isAmbiguousCloudflareOperation(error, "start_build") ||
+        (error instanceof AppError && error.code === "UPDATE_BUILD_STATUS_UNKNOWN")
+      ) {
+        const accepted = await reconcileAcceptedBuild(
+          accountId,
+          scriptTag,
+          triggerId,
+          expectedVersion,
+          nextConfiguration.loader,
+          dispatchStartedAt,
+          headers,
+          fetcher
+        );
+        if (accepted) return accepted;
         throw new AppError(
-          "UPDATE_TRIGGER_ROLLBACK_FAILED",
-          "The build did not start, and HQBase could not restore the previous Cloudflare build configuration. Review the production Workers Builds trigger before trying again.",
+          "UPDATE_BUILD_STATUS_UNKNOWN",
+          "Cloudflare did not confirm whether the Workers Build started. The verified update configuration remains in place. Check the production Workers Builds history before you try again.",
           502
         );
       }
+      await restoreOrThrow(
+        triggerUrl,
+        triggersUrl,
+        triggerId,
+        variablesUrl,
+        previousConfiguration,
+        headers,
+        fetcher
+      );
       throw error;
     }
   });
-}
-
-function assertManagedTrigger(trigger: {
-  deploy_command?: string | null;
-  root_directory?: string | null;
-}): void {
-  const command = trigger.deploy_command?.trim() ?? "";
-  const root = trigger.root_directory?.trim() ?? "";
-  if (!isManagedDeployCommand(command) || !["", "/", ".", "./"].includes(root)) {
-    throw new AppError(
-      "UPDATE_TRIGGER_UNMANAGED",
-      "Signed updates require a repository-root Workers Builds trigger that uses the HQBase updater. Use the custom-source deployment process instead.",
-      409
-    );
-  }
-}
-
-export function managedDeployCommand(updater: NonNullable<ReleaseManifest["updater"]>): string {
-  const { sha256, size, sourceUrl } = updater;
-  return `node --input-type=module --eval 'const u="${sourceUrl}";const h="${sha256}";const n=${size};const r=await fetch(u);if(!r.ok)throw new Error("HQBase updater download failed.");const b=Buffer.from(await r.arrayBuffer());const {createHash}=await import("node:crypto");if(b.length!==n||createHash("sha256").update(b).digest("hex")!==h)throw new Error("HQBase updater verification failed.");await import("data:text/javascript;base64,"+b.toString("base64"));'`;
-}
-
-export function isManagedDeployCommand(command: string): boolean {
-  if (legacyManagedDeployCommands.has(command.trim().replace(/\s+/g, " "))) return true;
-  const match = command.match(
-    /^node --input-type=module --eval 'const u="(https:\/\/raw\.githubusercontent\.com\/HQBase\/hqbase\/[a-f0-9]{40}\/scripts\/release\/bootstrap\.mjs)";const h="([a-f0-9]{64})";const n=([1-9]\d*);/
-  );
-  if (!match) return false;
-  const sourceUrl = match[1];
-  const sha256 = match[2];
-  const size = match[3];
-  if (!sourceUrl || !sha256 || !size) return false;
-  return command === managedDeployCommand({ protocol: 2, sha256, size: Number(size), sourceUrl });
-}
-
-async function setBuildDeployCommand(
-  url: string,
-  deployCommand: string,
-  headers: Record<string, string>,
-  fetcher: typeof fetch
-): Promise<void> {
-  await cloudflare(
-    url,
-    { method: "PATCH", headers, body: JSON.stringify({ deploy_command: deployCommand }) },
-    fetcher
-  );
-}
-
-async function setBuildVersionPin(
-  url: string,
-  version: string,
-  headers: Record<string, string>,
-  fetcher: typeof fetch
-): Promise<void> {
-  await cloudflare(
-    url,
-    {
-      method: "PATCH",
-      headers,
-      body: JSON.stringify({
-        [expectedReleaseVariable]: { is_secret: false, value: version }
-      })
-    },
-    fetcher
-  );
-}
-
-async function restoreBuildVersionPin(
-  url: string,
-  previous: { is_secret: boolean; value?: string | null } | undefined,
-  headers: Record<string, string>,
-  fetcher: typeof fetch
-): Promise<void> {
-  if (typeof previous?.value === "string") {
-    await setBuildVersionPin(url, previous.value, headers, fetcher);
-    return;
-  }
-  await cloudflare(`${url}/${expectedReleaseVariable}`, { method: "DELETE", headers }, fetcher);
 }
 
 async function verifyEnvelope(
