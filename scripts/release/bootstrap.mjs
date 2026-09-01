@@ -3,7 +3,7 @@ import { spawnSync } from "node:child_process";
 import { createHash, createPublicKey, verify } from "node:crypto";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { resolve } from "node:path";
+import { resolve, win32 } from "node:path";
 
 const publicKey = "MCowBQYDK2VwAyEARmCVvXVUDzwewmIDAVez9Uyv2K+7ylU6+YhR5iN2WTc=";
 const stableVersion = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/;
@@ -51,7 +51,12 @@ export async function bootstrap(options = {}) {
     writeFileSync(archive, bytes);
     writeFileSync(verifiedManifest, `${JSON.stringify(envelope)}\n`);
     const run = options.run ?? runCommand;
-    run("tar", ["-xzf", archive, "-C", source], { cwd: workspace });
+    const platform = options.platform ?? process.platform;
+    const extractor =
+      platform === "win32"
+        ? win32.resolve(process.env.SystemRoot || "C:\\Windows", "System32", "tar.exe")
+        : "tar";
+    run(extractor, ["-xzf", archive, "-C", source], { cwd: workspace });
     const candidateEnvironment = {
       ...process.env,
       CI: process.env.CI ?? "true",
@@ -59,7 +64,7 @@ export async function bootstrap(options = {}) {
       HQBASE_RELEASE_ARTIFACT_FILE: archive,
       HQBASE_RELEASE_MANIFEST_FILE: verifiedManifest
     };
-    if ((options.platform ?? process.platform) === "win32") {
+    if (platform === "win32") {
       // The extracted updater uses cross-spawn for safe Windows argv handling. Install its frozen
       // dependencies first through a fixed cmd.exe command, before that module is imported.
       run(
@@ -75,7 +80,7 @@ export async function bootstrap(options = {}) {
         "--config",
         resolve(
           options.configFile ??
-            (managedDataUrl ? null : process.env.HQBASE_UPDATER_CONFIG_FILE) ??
+            (managedDataUrl ? null : process.env.HQBASE_UPDATER_CONFIG_FILE?.trim() || null) ??
             resolve(process.cwd(), "wrangler.jsonc")
         )
       ],

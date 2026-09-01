@@ -146,6 +146,7 @@ jobs:
       HQBASE_STAGING_OAUTH_CLIENT_ID: ${{ vars.HQBASE_E2E_OAUTH_CLIENT_ID }}
       HQBASE_STAGING_SENDER: hello@${{ secrets.HQBASE_E2E_EMAIL_DOMAIN }}
       HQBASE_STAGING_URL: https://${{ secrets.HQBASE_E2E_APP_HOSTNAME }}
+      # This frozen bootstrap is independent of the active-release compatibility floor.
       OLDEST_UPDATER_TAG: v1.0.0
       DEPLOYMENT_NAME: release-${{ github.run_id }}
     steps:

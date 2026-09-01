@@ -234,7 +234,7 @@ export function classifyAfterDeployState({
   return {
     phase: `S${appliedCount}`,
     pendingUpdate,
-    repairRequired: appliedCount < afterDeployMigrations.length
+    repairRequired: appliedCount < afterDeployMigrations.length || pendingUpdate !== null
   };
 }
 

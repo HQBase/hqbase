@@ -44,6 +44,18 @@ describe("after-deploy state inspection", () => {
         repairRequired: index + 1 < afterDeploy.length
       });
     }
+    expect(
+      classify(database, normal, true, [
+        {
+          checkpoint_bookmark: "bookmark-before-repair",
+          from_version: "1.3.2",
+          id: "repair-update",
+          state: "started",
+          to_version: "1.3.3",
+          worker_version: "worker-before-repair"
+        }
+      ])
+    ).toMatchObject({ phase: "S3", repairRequired: true });
   });
 
   it("fails closed when a ledger is incomplete, out of order, or unlike the live schema", async () => {
@@ -139,7 +151,7 @@ function applyMigration(database, migration, table) {
   }
 }
 
-function classify(database, normal, hasAfterDeployLedger) {
+function classify(database, normal, hasAfterDeployLedger, pendingUpdates = []) {
   return classifyAfterDeployState({
     appliedAfterDeployMigrations: hasAfterDeployLedger
       ? database
@@ -153,6 +165,7 @@ function classify(database, normal, hasAfterDeployLedger) {
       .prepare("SELECT name FROM d1_migrations ORDER BY id")
       .all()
       .map(({ name }) => name),
+    pendingUpdates,
     schemaItems: inspectSchema(database)
   });
 }

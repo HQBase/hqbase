@@ -2,13 +2,15 @@ import { createHash, generateKeyPairSync, sign } from "node:crypto";
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { bootstrap, verifyBootstrapManifest } from "../../../scripts/release/bootstrap.mjs";
 import { verifyManifest } from "../../../scripts/release/manifest.mjs";
 
 const version = "1.3.3";
 const sourceCommit = "a".repeat(40);
+
+afterEach(() => vi.unstubAllEnvs());
 
 function signedRelease(artifact = Buffer.from("signed release")) {
   const { privateKey, publicKey } = generateKeyPairSync("ed25519");
@@ -53,8 +55,10 @@ describe("signed release bootstrap", () => {
     const release = signedRelease();
     const urls = [];
     let deployedConfig;
+    vi.stubEnv("HQBASE_UPDATER_CONFIG_FILE", "  ");
     await bootstrap({
       expectedVersion: version,
+      platform: "linux",
       publicKeyBase64: release.publicKeyBase64,
       fetcher: async (url) => {
         urls.push(String(url));
@@ -113,6 +117,7 @@ describe("signed release bootstrap", () => {
   it("installs frozen dependencies before importing the extracted updater on Windows", async () => {
     const release = signedRelease();
     const commands = [];
+    vi.stubEnv("SystemRoot", "C:\\Windows");
 
     await bootstrap({
       expectedVersion: version,
@@ -127,7 +132,7 @@ describe("signed release bootstrap", () => {
     });
 
     expect(commands.map(({ command }) => command)).toEqual([
-      "tar",
+      "C:\\Windows\\System32\\tar.exe",
       "C:\\Windows\\System32\\cmd.exe",
       process.execPath
     ]);
