@@ -227,6 +227,7 @@ jobs:
           else
             echo "HQBASE_STAGING_PREVIOUS_HAS_CATCH_ALL_POLICY=0" >> "$GITHUB_ENV"
           fi
+          WORKERS_CI=1 \
           HQBASE_AUTH_SECRET="$HQBASE_STAGING_AUTH_SECRET" \
           HQBASE_EXPECTED_RELEASE_VERSION="$previous_version" \
           HQBASE_RELEASE_ARTIFACT_FILE="$previous_archive" \
@@ -271,6 +272,7 @@ jobs:
           jq -e 'has("durable_objects") == false and has("migrations") == false' "$config"
       - name: Apply the exact signed candidate
         run: |
+          WORKERS_CI=1 \
           HQBASE_AUTH_SECRET="$HQBASE_STAGING_AUTH_SECRET" \
           HQBASE_EXPECTED_RELEASE_VERSION="$CANDIDATE_VERSION" \
           HQBASE_RELEASE_ARTIFACT_FILE="$GITHUB_WORKSPACE/release/hqbase-${CANDIDATE_VERSION}.tar.gz" \
