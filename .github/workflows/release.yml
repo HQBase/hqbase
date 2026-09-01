@@ -194,12 +194,18 @@ jobs:
             --dir /tmp/hqbase-previous
           previous_version="${PREVIOUS_TAG#v}"
           previous_archive="/tmp/hqbase-previous/hqbase-${previous_version}.tar.gz"
+          previous_source="/tmp/hqbase-previous/source"
+          mkdir -p "$previous_source"
+          tar -xzf "$previous_archive" -C "$previous_source"
+          pnpm --dir "$previous_source" install --frozen-lockfile
+          previous_updater="$previous_source/scripts/release/deploy.mjs"
+          echo "HQBASE_PREVIOUS_UPDATER=$previous_updater" >> "$GITHUB_ENV"
           config=".hqbase/deployments/$DEPLOYMENT_NAME/wrangler.jsonc"
           HQBASE_AUTH_SECRET="$HQBASE_STAGING_AUTH_SECRET" \
           HQBASE_EXPECTED_RELEASE_VERSION="$previous_version" \
           HQBASE_RELEASE_ARTIFACT_FILE="$previous_archive" \
           HQBASE_RELEASE_MANIFEST_FILE="/tmp/hqbase-previous/stable.json" \
-            node scripts/release/deploy.mjs --config "$config"
+            node "$previous_updater" --config "$GITHUB_WORKSPACE/$config"
       - name: Wait for the previous stable release
         if: needs.candidate.outputs.previous_tag != ''
         run: |
@@ -228,11 +234,12 @@ jobs:
             --client-id "$HQBASE_STAGING_OAUTH_CLIENT_ID" \
             --skip-deploy
           config=".hqbase/deployments/$DEPLOYMENT_NAME/wrangler.jsonc"
+          updater="${HQBASE_PREVIOUS_UPDATER:-$GITHUB_WORKSPACE/scripts/release/deploy.mjs}"
           HQBASE_AUTH_SECRET="$HQBASE_STAGING_AUTH_SECRET" \
           HQBASE_EXPECTED_RELEASE_VERSION="$CANDIDATE_VERSION" \
-          HQBASE_RELEASE_ARTIFACT_FILE="release/hqbase-${CANDIDATE_VERSION}.tar.gz" \
-          HQBASE_RELEASE_MANIFEST_FILE="release/stable.json" \
-            node scripts/release/deploy.mjs --config "$config"
+          HQBASE_RELEASE_ARTIFACT_FILE="$GITHUB_WORKSPACE/release/hqbase-${CANDIDATE_VERSION}.tar.gz" \
+          HQBASE_RELEASE_MANIFEST_FILE="$GITHUB_WORKSPACE/release/stable.json" \
+            node "$updater" --config "$GITHUB_WORKSPACE/$config"
       - name: Wait for the signed candidate
         run: |
           for attempt in $(seq 1 150); do
@@ -257,6 +264,20 @@ jobs:
             --command "SELECT installed_version FROM release_state WHERE singleton = 1")"
           jq -e --arg version "$CANDIDATE_VERSION" \
             '.[0].results[0].installed_version == $version' <<<"$result"
+      - name: Verify active Worker bindings
+        run: |
+          config=".hqbase/deployments/$DEPLOYMENT_NAME/wrangler.jsonc"
+          status="$(pnpm exec wrangler deployments status \
+            --name hqbase-e2e-staging --json --config "$config")"
+          version_id="$(jq -er '.versions[] | select(.percentage == 100) | .version_id' \
+            <<<"$status")"
+          version="$(pnpm exec wrangler versions view "$version_id" \
+            --name hqbase-e2e-staging --json --config "$config")"
+          jq -e '
+            [.resources.bindings[].name] as $names |
+            (["DB", "MAIL_OBJECTS", "HQBASE_JOBS", "MAIL_SENDER", "MAIL_EVENTS"] - $names) |
+            length == 0
+          ' <<<"$version"
       - name: Verify PWA, app shell, access, and operator lifecycle
         run: pnpm test:e2e:staging
       - name: Exercise populated remote backup and restore

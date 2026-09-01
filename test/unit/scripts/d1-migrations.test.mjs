@@ -248,7 +248,7 @@ describe("two-phase D1 migrations", () => {
     expectOrder(update, [
       'applyMigrationPhase(source, "normal"',
       '"deploy",\n        "--keep-vars"',
-      '"deployments",\n        "status"',
+      "assertRequiredActiveBindings(inspectActiveRelease(source, config.name))",
       'applyMigrationPhase(source, "after-deploy"',
       "recovery.cleanupComplete = true",
       "UPDATE release_state SET installed_version"

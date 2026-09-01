@@ -7,7 +7,7 @@ import { resolve } from "node:path";
 import { applyMigrationPhase } from "../d1-migrations.mjs";
 import { recordWorkerDeployedForConfig } from "../hqbase/manifest.mjs";
 import { windowsSystem32Executable } from "../windows-system32.mjs";
-import { inspectActiveRelease } from "./active-version.mjs";
+import { assertRequiredActiveBindings, inspectActiveRelease } from "./active-version.mjs";
 import { capture, run } from "./command.mjs";
 import {
   compareVersions,
@@ -94,6 +94,7 @@ export async function deploy(options = {}) {
     if (!activeRelease) {
       applyMigrationPhase(source, "normal", { target: "remote" });
       deploySource(source, { releaseTag });
+      assertRequiredActiveBindings(inspectActiveRelease(source, config.name));
       recordWorkerDeployed();
       applyMigrationPhase(source, "after-deploy", { target: "remote" });
       executeSql(
@@ -113,6 +114,9 @@ export async function deploy(options = {}) {
       );
     }
     if (activeRelease.version === manifest.version && activeRelease.tag === releaseTag) {
+      if (activeRelease.missingBindings.length > 0) {
+        deployConfiguration(source, config.name, releaseTag);
+      }
       completeActiveReleaseRetry(source, manifest, recordWorkerDeployed);
       console.log(`HQBase ${manifest.version} is already the active signed release.`);
       return;
@@ -165,22 +169,8 @@ export async function deploy(options = {}) {
       ],
       source
     );
+    assertRequiredActiveBindings(inspectActiveRelease(source, config.name));
     recordWorkerDeployed();
-    capture(
-      "pnpm",
-      [
-        "exec",
-        "wrangler",
-        "deployments",
-        "status",
-        "--name",
-        config.name,
-        "--json",
-        "--config",
-        "wrangler.jsonc"
-      ],
-      source
-    );
     applyMigrationPhase(source, "after-deploy", { target: "remote" });
     recovery.cleanupComplete = true;
     executeSql(
@@ -242,7 +232,7 @@ export function deployConfiguration(source, workerName, releaseTag, options = {}
       "Refusing to continue: Cloudflare does not report a new active version for the configuration deployment."
     );
   }
-  return after;
+  return assertRequiredActiveBindings(after);
 }
 
 export function completeActiveReleaseRetry(source, manifest, recordWorkerDeployed, options = {}) {

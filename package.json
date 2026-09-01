@@ -1,6 +1,6 @@
 {
   "name": "hqbase",
-  "version": "1.3.0",
+  "version": "1.3.1",
   "private": true,
   "license": "AGPL-3.0-only",
   "type": "module",
@@ -13,7 +13,7 @@
     "dev:vite": "vite --host 127.0.0.1 --port 5173",
     "dev:ui": "vite --host 127.0.0.1 --port 5173 --open /__ui/design",
     "dev:setup-ui": "vite --host 127.0.0.1 --port 5173 --open /__ui/setup?state=loading",
-    "build": "vite build && node scripts/build-pwa.mjs && node scripts/check-setup-preview-boundary.mjs",
+    "build": "node scripts/release/prepare-worker-config.mjs && vite build && node scripts/build-pwa.mjs && node scripts/check-setup-preview-boundary.mjs",
     "deploy": "node scripts/release/deploy.mjs",
     "db:reset:local": "wrangler d1 execute DB --local --yes --file scripts/hqbase/reset-d1.sql && node scripts/d1-migrations.mjs --local",
     "db:migrate:local": "node scripts/d1-migrations.mjs --local",

@@ -1,5 +1,7 @@
 import { attemptRun, capture as captureRun, emitCommandOutput } from "./command.mjs";
 
+const requiredActiveBindings = ["DB", "MAIL_OBJECTS", "HQBASE_JOBS", "MAIL_SENDER", "MAIL_EVENTS"];
+
 export function inspectActiveRelease(cwd, workerName, options = {}) {
   const attempt = options.attempt ?? attemptRun;
   const capture = options.capture ?? captureRun;
@@ -61,11 +63,29 @@ export function parseActiveRelease(deployment, version) {
   return {
     versionId,
     version: binding.text,
+    missingBindings: missingRequiredActiveBindings(version),
     tag:
       typeof version?.annotations?.["workers/tag"] === "string"
         ? version.annotations["workers/tag"]
         : null
   };
+}
+
+export function assertRequiredActiveBindings(activeRelease) {
+  if (!activeRelease || activeRelease.missingBindings.length > 0) {
+    const missing = activeRelease?.missingBindings.join(", ") || requiredActiveBindings.join(", ");
+    throw new Error(`The active HQBase Worker is missing required bindings: ${missing}.`);
+  }
+  return activeRelease;
+}
+
+export function missingRequiredActiveBindings(version) {
+  const names = new Set(
+    (Array.isArray(version?.resources?.bindings) ? version.resources.bindings : [])
+      .map((binding) => binding?.name)
+      .filter((name) => typeof name === "string")
+  );
+  return requiredActiveBindings.filter((name) => !names.has(name));
 }
 
 export function isDeployButtonBootstrap(deployment, version) {

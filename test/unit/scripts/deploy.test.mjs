@@ -5,6 +5,7 @@ import { dirname, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { configPath } from "../../../scripts/hqbase/manifest.mjs";
 import {
+  assertRequiredActiveBindings,
   inspectActiveRelease,
   isDeployButtonBootstrap,
   parseActiveRelease
@@ -23,6 +24,10 @@ import {
   verifyManifest,
   workerNameFromConfig
 } from "../../../scripts/release/deploy.mjs";
+import {
+  assertRequiredWorkerConfig,
+  prepareRequiredWorkerConfig
+} from "../../../scripts/release/prepare-worker-config.mjs";
 import { foreignTrustees } from "../../../scripts/secure-directory.mjs";
 
 describe("HQBase release deployment", () => {
@@ -51,8 +56,8 @@ describe("HQBase release deployment", () => {
   it("verifies that a configuration deployment produced a new active version", () => {
     const commands = [];
     const versions = [
-      { versionId: "version-1", version: "1.2.3", tag: "hqbase:1.2.3" },
-      { versionId: "version-2", version: "1.2.3", tag: "hqbase:1.2.3" }
+      { missingBindings: [], versionId: "version-1", version: "1.2.3", tag: "hqbase:1.2.3" },
+      { missingBindings: [], versionId: "version-2", version: "1.2.3", tag: "hqbase:1.2.3" }
     ];
     const inspect = () => versions.shift() ?? versions[0];
 
@@ -67,7 +72,12 @@ describe("HQBase release deployment", () => {
     expect(commands[0]).toContain("--strict");
     expect(commands[0]).toContain("--tag hqbase:1.2.3");
 
-    const unchanged = { versionId: "version-1", version: "1.2.3", tag: "hqbase:1.2.3" };
+    const unchanged = {
+      missingBindings: [],
+      versionId: "version-1",
+      version: "1.2.3",
+      tag: "hqbase:1.2.3"
+    };
     expect(() =>
       deployConfiguration("/source", "hqbase-qa", "hqbase:1.2.3", {
         inspect: () => unchanged,
@@ -190,6 +200,31 @@ describe("HQBase release deployment", () => {
     expect(candidate.durable_objects).toEqual(releaseConfig.durable_objects);
     expect(candidate.migrations).toEqual(releaseConfig.migrations);
   });
+  it("repairs the required realtime configuration left out by an older updater", () => {
+    const staleConfig = {
+      assets: { binding: "ASSETS", directory: "./dist" },
+      d1_databases: [{ binding: "DB", database_id: "database-id" }],
+      durable_objects: {
+        bindings: [{ name: "CUSTOMER_EVENTS", class_name: "CustomerEvents" }]
+      },
+      migrations: [{ tag: "customer-events-v1", new_sqlite_classes: ["CustomerEvents"] }],
+      queues: { producers: [{ binding: "HQBASE_JOBS", queue: "jobs" }] },
+      r2_buckets: [{ binding: "MAIL_OBJECTS", bucket_name: "mail" }],
+      send_email: [{ name: "MAIL_SENDER" }]
+    };
+
+    const prepared = prepareRequiredWorkerConfig(staleConfig);
+
+    expect(prepared.durable_objects.bindings).toEqual([
+      { name: "CUSTOMER_EVENTS", class_name: "CustomerEvents" },
+      { name: "MAIL_EVENTS", class_name: "MailEvents" }
+    ]);
+    expect(prepared.migrations).toEqual([
+      { tag: "customer-events-v1", new_sqlite_classes: ["CustomerEvents"] },
+      { tag: "mail-events-v1", new_sqlite_classes: ["MailEvents"] }
+    ]);
+    expect(() => assertRequiredWorkerConfig(prepared)).not.toThrow();
+  });
   it("creates an immutable active-version tag from the signed HQBase artifact", () => {
     expect(hqbaseReleaseTag("0.1.5", "a".repeat(64))).toBe(`hqbase:0.1.5:${"a".repeat(64)}`);
     expect(() => hqbaseReleaseTag("0.1.5", "not-a-digest")).toThrow("identity");
@@ -209,6 +244,7 @@ describe("HQBase release deployment", () => {
     ).toEqual({
       versionId: "active-version",
       version: "0.1.14",
+      missingBindings: ["DB", "MAIL_OBJECTS", "HQBASE_JOBS", "MAIL_SENDER", "MAIL_EVENTS"],
       tag: `hqbase:0.1.14:${"a".repeat(64)}`
     });
     expect(() =>
@@ -217,6 +253,16 @@ describe("HQBase release deployment", () => {
         { id: "one", resources: { bindings: [] } }
       )
     ).toThrow("one active 100-percent version");
+  });
+  it("rejects an active release that Cloudflare reports without a required binding", () => {
+    expect(() =>
+      assertRequiredActiveBindings({
+        missingBindings: ["MAIL_EVENTS"],
+        versionId: "broken-version",
+        version: "1.3.0",
+        tag: "hqbase:1.3.0"
+      })
+    ).toThrow("MAIL_EVENTS");
   });
   it("distinguishes a fresh Worker from an existing active release", () => {
     expect(
