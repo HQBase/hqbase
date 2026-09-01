@@ -263,6 +263,12 @@ describe("staging workflow lifecycle record", () => {
   });
 
   it("gates publication on the deployed update action and exact cleanup", () => {
+    const waitPrevious = releaseWorkflow.indexOf(
+      "      - name: Wait for the previous stable release"
+    );
+    const recordPrevious = releaseWorkflow.indexOf(
+      "      - name: Record the previous stable Worker deployment"
+    );
     const prepare = releaseWorkflow.indexOf(
       "      - name: Prepare the deployed update-action release gate"
     );
@@ -281,7 +287,9 @@ describe("staging workflow lifecycle record", () => {
     );
     const upload = releaseWorkflow.indexOf("      - name: Upload non-secret deployment record");
 
-    expect(prepare).toBeGreaterThan(-1);
+    expect(waitPrevious).toBeGreaterThan(-1);
+    expect(recordPrevious).toBeGreaterThan(waitPrevious);
+    expect(prepare).toBeGreaterThan(recordPrevious);
     expect(candidate).toBeGreaterThan(prepare);
     expect(stale).toBeGreaterThan(candidate);
     expect(probe).toBeGreaterThan(stale);
@@ -295,6 +303,9 @@ describe("staging workflow lifecycle record", () => {
     expect(releaseWorkflow).toContain("staging-update-gate.mjs probe");
     expect(releaseWorkflow).toContain("staging-update-gate.mjs cleanup");
     expect(releaseWorkflow).toContain("steps.reconcile_update_gate.outcome == 'success'");
+    expect(releaseWorkflow.slice(recordPrevious, prepare)).toContain(
+      "recordWorkerDeployedForConfig"
+    );
   });
 
   it("keeps the customer source checkout unchanged", () => {
