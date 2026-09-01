@@ -35,14 +35,36 @@ export async function handleMailEventRoute(
     const topics: MailEventTopic[] = ["messages", "mailboxes", "labels"];
     if (principal.scopes.has("mail:send")) topics.push("drafts");
 
+    if (!env.MAIL_EVENTS) {
+      logEventServiceFailure("EVENT_BINDING_MISSING", requestId);
+      return eventError(
+        "EVENT_SERVICE_UNAVAILABLE",
+        "The event service is unavailable. Continue with HTTP synchronization.",
+        503,
+        { "x-request-id": requestId }
+      );
+    }
+
     const headers = new Headers({ upgrade: "websocket" });
     headers.set(mailEventInternalHeaders.requestId, requestId);
     headers.set(mailEventInternalHeaders.topics, topics.join(","));
     headers.set(mailEventInternalHeaders.user, principal.principal.id);
-    const response = await env.MAIL_EVENTS.getByName(workspaceHubName).fetch(
-      new Request(request.url, { headers })
-    );
+    let response: Response;
+    try {
+      response = await env.MAIL_EVENTS.getByName(workspaceHubName).fetch(
+        new Request(request.url, { headers })
+      );
+    } catch {
+      logEventServiceFailure("EVENT_SERVICE_REQUEST_FAILED", requestId);
+      return eventError(
+        "EVENT_SERVICE_UNAVAILABLE",
+        "The event service is unavailable. Continue with HTTP synchronization.",
+        503,
+        { "x-request-id": requestId }
+      );
+    }
     if (response.status !== 101) {
+      logEventServiceFailure("EVENT_UPGRADE_REJECTED", requestId);
       return eventError("EVENT_CONNECTION_FAILED", "The event connection failed.", 503, {
         "x-request-id": requestId
       });
@@ -56,6 +78,10 @@ export async function handleMailEventRoute(
     }
     return eventError(appError.code, appError.message, appError.status, headers);
   }
+}
+
+function logEventServiceFailure(code: string, requestId: string): void {
+  console.error(JSON.stringify({ code, event: "mail_event_service_failure", requestId }));
 }
 
 function validateSessionOrigin(

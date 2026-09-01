@@ -20,6 +20,7 @@ type CapturedComposeProps = {
 
 const mocks = vi.hoisted(() => ({
   captured: null as CapturedComposeProps | null,
+  createDraft: vi.fn(),
   deleteDraftAttachment: vi.fn(),
   initializeAutosave: vi.fn(),
   listDrafts: vi.fn(),
@@ -31,7 +32,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("@/features/drafts/api", () => ({
-  createDraft: vi.fn(),
+  createDraft: mocks.createDraft,
   deleteDraft: vi.fn(),
   deleteDraftAttachment: mocks.deleteDraftAttachment,
   listDrafts: mocks.listDrafts,
@@ -97,6 +98,7 @@ const mailbox = {
 describe("compose signature send ordering", () => {
   beforeEach(() => {
     mocks.captured = null;
+    mocks.createDraft.mockReset().mockResolvedValue(draft);
     mocks.initializeAutosave.mockReset();
     mocks.listDrafts.mockReset().mockResolvedValue([draft]);
     mocks.resetAutosave.mockReset();
@@ -191,6 +193,44 @@ describe("compose signature send ordering", () => {
     const html = "<p>First &lt;line&gt; &amp; next<br>Second</p>";
     expect(mocks.captured?.html).toBe(html);
     expect(mocks.initializeAutosave).toHaveBeenCalledWith({ ...textOnlyDraft, html });
+    await view.unmount();
+  });
+
+  it("keeps one new draft and unsaved input through a mailbox refresh", async () => {
+    const newDraft = {
+      ...draft,
+      id: "draft-new-message",
+      subject: "",
+      text: "",
+      html: "<p></p>"
+    };
+    mocks.listDrafts.mockResolvedValue([]);
+    mocks.createDraft.mockResolvedValue(newDraft);
+    const props = {
+      draftId: null,
+      mailboxes: [mailbox],
+      open: true,
+      onOpenChange: () => undefined,
+      onSent: () => undefined
+    };
+    const view = await renderComponent(<ComposeDialog {...props} />);
+    await flushHookEffects();
+    await flushHookEffects();
+
+    await flushHookEffects(() =>
+      mocks.captured?.onEditorChange("<p>Unsaved words</p>", "Unsaved words")
+    );
+    await view.rerender(
+      <ComposeDialog
+        {...props}
+        mailboxes={[{ ...mailbox, displayName: "Support team", updatedAt: "2026-08-31" }]}
+      />
+    );
+    await flushHookEffects();
+
+    expect(mocks.listDrafts).toHaveBeenCalledOnce();
+    expect(mocks.createDraft).toHaveBeenCalledOnce();
+    expect(mocks.captured?.html).toBe("<p>Unsaved words</p>");
     await view.unmount();
   });
 
