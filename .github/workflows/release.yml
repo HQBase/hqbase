@@ -7,7 +7,8 @@ permissions:
   contents: read
 
 concurrency:
-  group: hqbase-release
+  group: hqbase-staging-resources
+  queue: max
   cancel-in-progress: false
 
 jobs:
@@ -422,21 +423,16 @@ jobs:
           git diff --quiet
           git diff --cached --quiet
           test -z "$(git ls-files --others --exclude-standard)"
-      - name: Upload non-secret deployment record
+      - name: Reconcile disposable Worker lifecycle record
         if: always()
-        uses: actions/upload-artifact@v6
-        with:
-          name: hqbase-release-staging-manifest-${{ github.run_id }}
-          path: .hqbase/deployments/release-${{ github.run_id }}/manifest.json
-          if-no-files-found: warn
-          retention-days: 30
-      - name: Remove an empty disposable Worker service
-        if: always()
+        id: reconcile_worker
         run: |
           manifest=".hqbase/deployments/$DEPLOYMENT_NAME/manifest.json"
           if test ! -f "$manifest"; then
+            echo "manifest_present=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
+          echo "manifest_present=true" >> "$GITHUB_OUTPUT"
           worker_name="$(jq -er '.worker.name' "$manifest")"
           worker_deployed="$(jq -r '.worker.deployed' "$manifest")"
           test "$worker_name" = "$STAGING_WORKER_NAME"
@@ -446,20 +442,54 @@ jobs:
             *) printf '%s\n' "Invalid Worker deployment state." >&2; exit 1 ;;
           esac
           config=".hqbase/deployments/$DEPLOYMENT_NAME/wrangler.jsonc"
-          if output="$(NO_COLOR=1 pnpm exec wrangler delete "$worker_name" \
-            --force --config "$config" 2>&1)"; then
-            printf '%s\n' "$output"
+          if output="$(NO_COLOR=1 pnpm exec wrangler deployments status \
+            --name "$worker_name" --json --config "$config" 2>&1)"; then
+            CONFIG_FILE="$config" WORKER_NAME="$worker_name" node --input-type=module -e '
+              import { recordWorkerDeployedForConfig } from "./scripts/hqbase/manifest.mjs";
+              const manifest = recordWorkerDeployedForConfig(
+                process.env.CONFIG_FILE,
+                process.env.WORKER_NAME
+              );
+              if (manifest?.worker?.deployed !== true) {
+                throw new Error("The active staging Worker was not recorded.");
+              }
+            '
             exit 0
           fi
-          if grep -Eq '^Worker ".+" not found\.$' <<<"$output" ||
+          if grep -Fxq "The Worker $worker_name has no deployments." <<<"$output"; then
+            if delete_output="$(NO_COLOR=1 pnpm exec wrangler delete "$worker_name" \
+              --force --config "$config" 2>&1)"; then
+              printf '%s\n' "$delete_output"
+              exit 0
+            fi
+            if grep -Fxq "Worker \"$worker_name\" not found." <<<"$delete_output" ||
+               grep -Fq 'This Worker does not exist on your account.' <<<"$delete_output" ||
+               grep -Eq 'code.*(10007|10090)' <<<"$delete_output"; then
+              exit 0
+            fi
+            printf '%s\n' "$delete_output" >&2
+            exit 1
+          fi
+          if grep -Fxq "Worker \"$worker_name\" not found." <<<"$output" ||
              grep -Fq 'This Worker does not exist on your account.' <<<"$output" ||
              grep -Eq 'code.*(10007|10090)' <<<"$output"; then
             exit 0
           fi
           printf '%s\n' "$output" >&2
           exit 1
-      - name: Destroy disposable resources
+      - name: Upload non-secret deployment record
         if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: hqbase-release-staging-manifest-${{ github.run_id }}
+          path: .hqbase/deployments/release-${{ github.run_id }}/manifest.json
+          if-no-files-found: warn
+          retention-days: 30
+      - name: Destroy disposable resources
+        if: >-
+          always() &&
+          steps.reconcile_worker.outcome == 'success' &&
+          steps.reconcile_worker.outputs.manifest_present == 'true'
         run: pnpm hqbase destroy --name "$DEPLOYMENT_NAME" --scope all --yes
 
   publish:
