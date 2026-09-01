@@ -116,11 +116,12 @@ describe("staging workflow lifecycle record", () => {
 
   it("runs the previous updater against its own deployment root", () => {
     expect(releaseWorkflow).toContain(
-      'ln -s "$GITHUB_WORKSPACE/.hqbase" "$previous_source/.hqbase"'
+      'previous_deployment="$previous_source/.hqbase/deployments/$DEPLOYMENT_NAME"'
     );
     expect(releaseWorkflow).toContain(
-      'previous_config="$previous_source/.hqbase/deployments/$DEPLOYMENT_NAME/wrangler.jsonc"'
+      'ln -s "$GITHUB_WORKSPACE/.hqbase/deployments/$DEPLOYMENT_NAME" "$previous_deployment"'
     );
+    expect(releaseWorkflow).toContain('previous_config="$previous_deployment/wrangler.jsonc"');
     expect(releaseWorkflow).toContain('node "$previous_updater" --config "$previous_config"');
     expect(releaseWorkflow).toContain(
       `config="\${HQBASE_PREVIOUS_CONFIG:-$GITHUB_WORKSPACE/.hqbase/deployments/$DEPLOYMENT_NAME/wrangler.jsonc}"`
