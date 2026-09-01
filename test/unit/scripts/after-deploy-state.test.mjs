@@ -5,8 +5,10 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import {
   afterDeploySchemaSql,
+  afterDeploySchemaSqlStatements,
   classifyAfterDeployState,
-  parseD1Rows
+  parseD1Rows,
+  queryRemoteD1
 } from "../../../scripts/release/after-deploy-state.mjs";
 
 const migrationsDirectory = resolve(import.meta.dirname, "../../../migrations");
@@ -111,7 +113,70 @@ describe("after-deploy state inspection", () => {
     expect(
       parseD1Rows(JSON.stringify({ result: [{ results: [{ item: "table:drafts" }] }] }))
     ).toEqual([{ item: "table:drafts" }]);
+    expect(
+      parseD1Rows(
+        JSON.stringify([
+          { results: [{ item: "table:drafts" }] },
+          { results: [{ item: "column:drafts.id" }] }
+        ])
+      )
+    ).toEqual([{ item: "table:drafts" }, { item: "column:drafts.id" }]);
+    expect(() => parseD1Rows(JSON.stringify([{ results: [], success: false }]))).toThrow(
+      "failed D1 inspection statement"
+    );
     expect(() => parseD1Rows("{}")).toThrow("no D1 inspection results");
+  });
+
+  it("keeps remote schema inspection within the D1 compound-select limit", () => {
+    expect(afterDeploySchemaSqlStatements).toHaveLength(2);
+    for (const statement of afterDeploySchemaSqlStatements) {
+      expect(statement.split(/\b(?:UNION(?:\s+ALL)?|INTERSECT|EXCEPT)\b/i)).toHaveLength(5);
+    }
+    expect(afterDeploySchemaSql).toBe(afterDeploySchemaSqlStatements.join(";\n"));
+  });
+
+  it("sends both schema statements in one remote command and surfaces a failure", () => {
+    const attempts = [];
+    expect(
+      queryRemoteD1("/source", afterDeploySchemaSql, {
+        attempt(command, args, cwd) {
+          attempts.push({ args, command, cwd });
+          return {
+            status: 0,
+            stderr: "",
+            stdout: JSON.stringify([
+              { results: [{ item: "table:drafts" }] },
+              { results: [{ item: "column:drafts.id" }] }
+            ])
+          };
+        }
+      })
+    ).toEqual([{ item: "table:drafts" }, { item: "column:drafts.id" }]);
+    expect(attempts).toHaveLength(1);
+    expect(attempts[0]).toMatchObject({ command: "pnpm", cwd: "/source" });
+    expect(attempts[0].args[attempts[0].args.indexOf("--command") + 1]).toBe(afterDeploySchemaSql);
+
+    const captures = [];
+    expect(
+      queryRemoteD1("/source", "SELECT 1", {
+        capture(command, args, cwd) {
+          captures.push({ args, command, cwd });
+          return JSON.stringify([{ results: [{ item: "table:drafts" }] }]);
+        }
+      })
+    ).toEqual([{ item: "table:drafts" }]);
+    expect(captures).toHaveLength(1);
+
+    let emitted;
+    expect(() =>
+      queryRemoteD1("/source", "SELECT 1", {
+        attempt: () => ({ status: 1, stderr: "D1 error 7500", stdout: "" }),
+        emit: (result) => {
+          emitted = result;
+        }
+      })
+    ).toThrow("wrangler d1 inspection exited with status 1");
+    expect(emitted?.stderr).toBe("D1 error 7500");
   });
 });
 
@@ -171,8 +236,10 @@ function classify(database, normal, hasAfterDeployLedger, pendingUpdates = []) {
 }
 
 function inspectSchema(database) {
-  return database
-    .prepare(afterDeploySchemaSql)
-    .all()
-    .map(({ item }) => item);
+  return afterDeploySchemaSqlStatements.flatMap((statement) =>
+    database
+      .prepare(statement)
+      .all()
+      .map(({ item }) => item)
+  );
 }

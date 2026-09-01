@@ -1,7 +1,7 @@
 import { readdirSync } from "node:fs";
 import { resolve } from "node:path";
 
-import { capture } from "./command.mjs";
+import { attemptRun, emitCommandOutput } from "./command.mjs";
 
 const afterDeployMigrations = [
   "0001_remove_mailbox_alias_storage.sql",
@@ -104,52 +104,66 @@ const inspectedTriggers = [
   ...principalTransitionTriggers
 ];
 
-export const afterDeploySchemaSql = `
-SELECT 'table:' || name AS item
-FROM sqlite_master
-WHERE type = 'table' AND name IN (${sqlList(inspectedTables)})
-UNION ALL
-SELECT 'trigger:' || name AS item
-FROM sqlite_master
-WHERE type = 'trigger' AND name IN (${sqlList(inspectedTriggers)})
-UNION ALL
-SELECT 'column:messages.' || name AS item
-FROM pragma_table_info('messages')
-WHERE name IN ('mailbox_id', 'delivered_to_address', 'delivered_to_address_id', 'sent_from_address_id')
-UNION ALL
-SELECT 'column:mailbox_grants.' || name AS item
-FROM pragma_table_info('mailbox_grants')
-WHERE name IN ('mailbox_id', 'user_id', 'principal_id', 'created_by', 'created_by_principal_id')
-UNION ALL
-SELECT 'column:drafts.' || name AS item
-FROM pragma_table_info('drafts')
-WHERE name IN ('id', 'user_id', 'principal_id')
-UNION ALL
-SELECT 'column:draft_changes.' || name AS item
-FROM pragma_table_info('draft_changes')
-WHERE name IN ('sequence', 'draft_id', 'user_id', 'principal_id')
-UNION ALL
-SELECT 'column:draft_labels.' || name AS item
-FROM pragma_table_info('draft_labels')
-WHERE name IN ('draft_id', 'label_id', 'assigned_by_principal_id')
-UNION ALL
-SELECT 'foreign-key:mailbox_grants.' || "from" || '->' || "table" || '.' || "to" || ':' || "on_delete" AS item
-FROM pragma_foreign_key_list('mailbox_grants')
-WHERE "from" IN ('mailbox_id', 'user_id', 'principal_id', 'created_by', 'created_by_principal_id')
-UNION ALL
-SELECT 'foreign-key:drafts.' || "from" || '->' || "table" || '.' || "to" || ':' || "on_delete" AS item
-FROM pragma_foreign_key_list('drafts')
-WHERE "from" IN ('user_id', 'principal_id')
-UNION ALL
-SELECT 'foreign-key:draft_labels.' || "from" || '->' || "table" || '.' || "to" || ':' || "on_delete" AS item
-FROM pragma_foreign_key_list('draft_labels')
-WHERE "from" = 'draft_id'
-ORDER BY item
-`.trim();
+// Remote D1 rejects a compound SELECT with more than five terms. One Wrangler command keeps both
+// statements in the same D1 batch while parseD1Rows combines their result sets.
+export const afterDeploySchemaSqlStatements = [
+  `
+  SELECT 'table:' || name AS item
+  FROM sqlite_master
+  WHERE type = 'table' AND name IN (${sqlList(inspectedTables)})
+  UNION ALL
+  SELECT 'trigger:' || name AS item
+  FROM sqlite_master
+  WHERE type = 'trigger' AND name IN (${sqlList(inspectedTriggers)})
+  UNION ALL
+  SELECT 'column:messages.' || name AS item
+  FROM pragma_table_info('messages')
+  WHERE name IN ('mailbox_id', 'delivered_to_address', 'delivered_to_address_id', 'sent_from_address_id')
+  UNION ALL
+  SELECT 'column:mailbox_grants.' || name AS item
+  FROM pragma_table_info('mailbox_grants')
+  WHERE name IN ('mailbox_id', 'user_id', 'principal_id', 'created_by', 'created_by_principal_id')
+  UNION ALL
+  SELECT 'column:drafts.' || name AS item
+  FROM pragma_table_info('drafts')
+  WHERE name IN ('id', 'user_id', 'principal_id')
+  ORDER BY item
+  `.trim(),
+  `
+  SELECT 'column:draft_changes.' || name AS item
+  FROM pragma_table_info('draft_changes')
+  WHERE name IN ('sequence', 'draft_id', 'user_id', 'principal_id')
+  UNION ALL
+  SELECT 'column:draft_labels.' || name AS item
+  FROM pragma_table_info('draft_labels')
+  WHERE name IN ('draft_id', 'label_id', 'assigned_by_principal_id')
+  UNION ALL
+  SELECT 'foreign-key:mailbox_grants.' || "from" || '->' || "table" || '.' || "to" || ':' || "on_delete" AS item
+  FROM pragma_foreign_key_list('mailbox_grants')
+  WHERE "from" IN ('mailbox_id', 'user_id', 'principal_id', 'created_by', 'created_by_principal_id')
+  UNION ALL
+  SELECT 'foreign-key:drafts.' || "from" || '->' || "table" || '.' || "to" || ':' || "on_delete" AS item
+  FROM pragma_foreign_key_list('drafts')
+  WHERE "from" IN ('user_id', 'principal_id')
+  UNION ALL
+  SELECT 'foreign-key:draft_labels.' || "from" || '->' || "table" || '.' || "to" || ':' || "on_delete" AS item
+  FROM pragma_foreign_key_list('draft_labels')
+  WHERE "from" = 'draft_id'
+  ORDER BY item
+  `.trim()
+];
+
+export const afterDeploySchemaSql = afterDeploySchemaSqlStatements.join(";\n");
 
 export function inspectRemoteAfterDeployState(source, version, options = {}) {
   const query =
-    options.query ?? ((sql) => queryRemoteD1(source, sql, { capture: options.capture ?? capture }));
+    options.query ??
+    ((sql) =>
+      queryRemoteD1(source, sql, {
+        attempt: options.attempt ?? attemptRun,
+        capture: options.capture,
+        emit: options.emit ?? emitCommandOutput
+      }));
   const expectedNormalMigrations = migrationNames(resolve(source, "migrations"));
   const packagedAfterDeployMigrations = migrationNames(resolve(source, "migrations-after-deploy"));
   if (!sameList(packagedAfterDeployMigrations, afterDeployMigrations)) {
@@ -239,24 +253,30 @@ export function classifyAfterDeployState({
 }
 
 export function queryRemoteD1(source, sql, options = {}) {
-  const output = (options.capture ?? capture)(
-    "pnpm",
-    [
-      "exec",
-      "wrangler",
-      "d1",
-      "execute",
-      "DB",
-      "--remote",
-      "--json",
-      "--command",
-      sql,
-      "--config",
-      "wrangler.jsonc"
-    ],
-    source
-  );
-  return parseD1Rows(output);
+  const args = [
+    "exec",
+    "wrangler",
+    "d1",
+    "execute",
+    "DB",
+    "--remote",
+    "--json",
+    "--command",
+    sql,
+    "--config",
+    "wrangler.jsonc"
+  ];
+  if (options.capture) return parseD1Rows(options.capture("pnpm", args, source));
+
+  const result = (options.attempt ?? attemptRun)("pnpm", args, source);
+  if (result.error || result.status !== 0) {
+    (options.emit ?? emitCommandOutput)(result);
+    throw (
+      result.error ??
+      new Error(`wrangler d1 inspection exited with status ${result.status ?? "signal"}.`)
+    );
+  }
+  return parseD1Rows(result.stdout);
 }
 
 export function parseD1Rows(output) {
@@ -266,9 +286,12 @@ export function parseD1Rows(output) {
   } catch {
     throw new Error("Wrangler returned invalid D1 inspection JSON.");
   }
-  const rows = findResultRows(parsed);
-  if (!rows) throw new Error("Wrangler returned no D1 inspection results.");
-  return rows;
+  const inspection = findResultSets(parsed);
+  if (inspection.failed) throw new Error("Wrangler reported a failed D1 inspection statement.");
+  if (inspection.resultSets.length === 0) {
+    throw new Error("Wrangler returned no D1 inspection results.");
+  }
+  return inspection.resultSets.flat();
 }
 
 function expectedSchemaItems(appliedCount, hasAfterDeployLedger) {
@@ -323,14 +346,17 @@ function sameSet(left, right) {
   return left.size === right.size && [...left].every((value) => right.has(value));
 }
 
-function findResultRows(value) {
-  if (!value || typeof value !== "object") return null;
-  if (Array.isArray(value.results)) return value.results;
-  for (const child of Array.isArray(value) ? value : Object.values(value)) {
-    const rows = findResultRows(child);
-    if (rows) return rows;
+function findResultSets(value, inspection = { failed: false, resultSets: [] }) {
+  if (!value || typeof value !== "object") return inspection;
+  if (!Array.isArray(value) && value.success === false) inspection.failed = true;
+  if (!Array.isArray(value) && Array.isArray(value.results)) {
+    inspection.resultSets.push(value.results);
+    return inspection;
   }
-  return null;
+  for (const child of Array.isArray(value) ? value : Object.values(value)) {
+    findResultSets(child, inspection);
+  }
+  return inspection;
 }
 
 function inconsistentState(detail) {
