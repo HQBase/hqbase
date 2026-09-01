@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.3.2
+
+### Fixed
+
+- Restore every release-managed Worker-first asset route when an older installation updates. The
+  connections page now receives JSON from the Management API instead of the app HTML shell.
+- Reject an invalid successful API response with a clear error, and verify the authenticated agent
+  list route during signed-release staging.
+
 ## 1.3.1
 
 ### Fixed

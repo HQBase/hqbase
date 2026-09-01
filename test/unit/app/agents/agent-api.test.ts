@@ -37,6 +37,15 @@ describe("agent management API", () => {
     });
   });
 
+  it("rejects an app shell returned for the management API", async () => {
+    const fetchMock = vi
+      .fn<typeof fetch>()
+      .mockResolvedValue(new Response("<!doctype html>", { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(listAgents()).rejects.toThrow("The server returned an invalid response.");
+  });
+
   it("creates mailbox agents with an exact mailbox request", async () => {
     const result = { agent, credential: "hqb_agent_secret" };
     const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(Response.json(result));

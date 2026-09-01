@@ -19,6 +19,7 @@ export async function apiGetPage<T>(
       typeof data === "object" && data && "error" in data ? data.error.message : "Request failed.";
     throw new Error(message);
   }
+  if (data === null) throw new Error("The server returned an invalid response.");
   return { data: data as T, nextPageUrl: nextPageUrl(response.headers.get("link")) };
 }
 
@@ -169,6 +170,9 @@ async function apiRequest<T>(path: string, init: RequestInit): Promise<T> {
     const message =
       typeof data === "object" && data && "error" in data ? data.error.message : "Request failed.";
     throw new Error(message);
+  }
+  if (data === null && response.status !== 204) {
+    throw new Error("The server returned an invalid response.");
   }
 
   return data as T;
