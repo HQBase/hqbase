@@ -114,6 +114,20 @@ describe("staging workflow lifecycle record", () => {
     expect(waitStep).toContain("candidate=$CANDIDATE_VERSION&attempt=$attempt");
   });
 
+  it("runs the previous updater against its own deployment root", () => {
+    expect(releaseWorkflow).toContain(
+      'ln -s "$GITHUB_WORKSPACE/.hqbase" "$previous_source/.hqbase"'
+    );
+    expect(releaseWorkflow).toContain(
+      'previous_config="$previous_source/.hqbase/deployments/$DEPLOYMENT_NAME/wrangler.jsonc"'
+    );
+    expect(releaseWorkflow).toContain('node "$previous_updater" --config "$previous_config"');
+    expect(releaseWorkflow).toContain(
+      `config="\${HQBASE_PREVIOUS_CONFIG:-$GITHUB_WORKSPACE/.hqbase/deployments/$DEPLOYMENT_NAME/wrangler.jsonc}"`
+    );
+    expect(releaseWorkflow).toContain('node "$updater" --config "$config"');
+  });
+
   it("moves the Deploy Button source before publication and verifies the exact commit", () => {
     const readSource = releaseWorkflow.indexOf("Read current Deploy Button source");
     const verifyTag = releaseWorkflow.indexOf("Verify any existing release tag source");
