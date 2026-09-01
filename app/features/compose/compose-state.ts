@@ -3,11 +3,20 @@ import { z } from "zod";
 import type { Draft } from "@/features/drafts/types";
 import type { Mailbox } from "@/features/mailboxes/types";
 import type { MessageDetail } from "@/features/messages/types";
+import type { SignatureSnapshot } from "@/features/signatures/types";
 import { formatDateTime } from "@/lib/format";
 import type { SendingIdentity } from "./compose-fields";
 
 export type ComposeMode = "new" | "reply" | "forward";
 export type DraftSaveState = "saved" | "saving" | "local" | "error";
+
+export const emptyAutomaticSignature: SignatureSnapshot = {
+  mode: "automatic",
+  id: null,
+  name: "",
+  html: "",
+  text: ""
+};
 
 export type ComposeDialogProps = {
   defaultFromMailboxId?: string | null;
@@ -34,6 +43,29 @@ export type ComposeDialogProps = {
   onReturnToThread?: (() => void) | undefined;
   onSent: () => void;
 };
+
+export function composeInitializationKey(
+  mode: ComposeMode,
+  ...target: Array<string | null>
+): string {
+  return JSON.stringify([mode, ...target]);
+}
+
+export function beginComposeInitialization(
+  open: boolean,
+  key: string,
+  state: { current: string | null },
+  startSession: () => number
+): number | null {
+  if (!open) {
+    if (state.current !== null) startSession();
+    state.current = null;
+    return null;
+  }
+  if (state.current === key) return null;
+  state.current = key;
+  return startSession();
+}
 
 export function findDraftForComposer(
   drafts: Draft[],

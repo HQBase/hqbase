@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.3.1
+
+### Fixed
+
+- Restore and validate the live-event Durable Object binding when an older supported updater builds
+  this release, and stop an update if Cloudflare does not report all required bindings on the active
+  Worker.
+- Keep an open composer and its unsaved input stable during event reconnection, mailbox refresh, and
+  fallback synchronization. A new composer no longer creates duplicate empty drafts during these
+  refreshes.
+- Return a safe service-unavailable response when live events are not configured or cannot connect.
+  The app continues through the HTTP synchronization journals, and Worker logs contain only a safe
+  diagnostic code and request ID.
+- Test signed release candidates with the previous stable updater and verify the active bindings and
+  authenticated event WebSocket before publication.
+
 ## 1.3.0
 
 ### New

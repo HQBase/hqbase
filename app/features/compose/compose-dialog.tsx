@@ -3,20 +3,22 @@ import { toast } from "sonner";
 
 import { createDraft, deleteDraft, listDrafts } from "@/features/drafts/api";
 import type { Draft } from "@/features/drafts/types";
-import type { SignatureSnapshot } from "@/features/signatures/types";
 import { playNotificationSound } from "@/lib/notification-sounds";
 
 import { replyToMessage, sendMessage } from "./api";
 import { ComposeForm } from "./compose-form";
 import {
+  beginComposeInitialization,
   type ComposeDialogProps,
   composeContextLabel,
+  composeInitializationKey,
   composeTitle,
   type DraftSaveState,
   defaultSendingIdentity,
   draftEditorHtml,
   draftRecoveryKey,
   draftStatus,
+  emptyAutomaticSignature,
   findDraftForComposer,
   forwardedMessage,
   hasInvalidRecipients,
@@ -32,15 +34,9 @@ import {
 import { ComposeSurface } from "./compose-surface";
 import { referencedInlineAttachmentIds } from "./email-images";
 import { useComposeAttachments } from "./use-compose-attachments";
+import { useComposeFrom } from "./use-compose-from";
 import { useDraftAutosave } from "./use-draft-autosave";
 
-const emptyAutomaticSignature: SignatureSnapshot = {
-  mode: "automatic",
-  id: null,
-  name: "",
-  html: "",
-  text: ""
-};
 export function ComposeDialog({
   defaultFromMailboxId = null,
   dockIndex = 0,
@@ -80,9 +76,9 @@ export function ComposeDialog({
   const [html, setHtml] = React.useState("<p></p>");
   const [text, setText] = React.useState("");
   const [isPending, setIsPending] = React.useState(false);
-  const [isSignaturePending, setIsSignaturePending] = React.useState(false);
   const [saveState, setSaveState] = React.useState<DraftSaveState>("saved");
   const initialized = React.useRef(false);
+  const initializationKeyRef = React.useRef<string | null>(null);
   const generationRef = React.useRef(0);
   const draftRef = React.useRef<Draft | null>(null);
   const htmlRef = React.useRef(html);
@@ -95,6 +91,14 @@ export function ComposeDialog({
   const formId = React.useId();
   const replyToMessageId = mode === "reply" ? (message?.id ?? null) : null;
   const forwardOfMessageId = mode === "forward" ? (message?.id ?? null) : null;
+  const initializationKey = composeInitializationKey(
+    mode,
+    draftId,
+    replyToMessageId,
+    forwardOfMessageId,
+    initialTo,
+    defaultFromMailboxId
+  );
   const contextLabel = composeContextLabel(mode, message);
   const recoveryKey = draft ? draftRecoveryKey(draft.id) : "";
   const { initializeAutosave, resetAutosave, saveFrom, saveSignature } = useDraftAutosave({
@@ -115,6 +119,11 @@ export function ComposeDialog({
     setDraft,
     setSaveState
   });
+  const { changeFrom, isSignaturePending, setIsSignaturePending } = useComposeFrom(
+    from,
+    setFrom,
+    saveFrom
+  );
   draftRef.current = draft;
   htmlRef.current = html;
   const {
@@ -130,8 +139,13 @@ export function ComposeDialog({
   } = useComposeAttachments({ draftRef, generationRef, htmlRef });
 
   React.useEffect(() => {
-    const generation = startSession();
-    if (!open) return;
+    const generation = beginComposeInitialization(
+      open,
+      initializationKey,
+      initializationKeyRef,
+      startSession
+    );
+    if (generation === null) return;
     initialized.current = false;
     void (async () => {
       try {
@@ -206,12 +220,14 @@ export function ComposeDialog({
         initialized.current = true;
       } catch (error) {
         if (generation !== generationRef.current) return;
+        initializationKeyRef.current = null;
         toast.error(error instanceof Error ? error.message : "Draft could not be opened.");
         if (draftId) onOpenChangeRef.current(false);
       }
     })();
   }, [
     open,
+    initializationKey,
     message,
     mode,
     identities,
@@ -275,21 +291,6 @@ export function ComposeDialog({
       toast.error(error instanceof Error ? error.message : "Sending failed.");
     } finally {
       setIsPending(false);
-    }
-  }
-
-  async function changeFrom(nextFrom: string): Promise<void> {
-    if (nextFrom === from) return;
-    const previousFrom = from;
-    setFrom(nextFrom);
-    setIsSignaturePending(true);
-    try {
-      await saveFrom(nextFrom);
-    } catch (error) {
-      setFrom(previousFrom);
-      toast.error(error instanceof Error ? error.message : "From address could not be changed.");
-    } finally {
-      setIsSignaturePending(false);
     }
   }
 

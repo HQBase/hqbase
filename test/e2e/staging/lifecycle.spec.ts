@@ -113,6 +113,10 @@ test("HQBase web lifecycle remains healthy", async ({ page, request }) => {
     name: /^(?:Compose|New email)$/
   });
   const loginEmail = page.getByLabel("Email");
+  const eventSocket = page.waitForEvent("websocket", {
+    predicate: (socket) => new URL(socket.url()).pathname === "/api/v2/events",
+    timeout: 60_000
+  });
   try {
     await page.goto("/", { waitUntil: "domcontentloaded" });
     await expect(
@@ -137,6 +141,7 @@ test("HQBase web lifecycle remains healthy", async ({ page, request }) => {
     await page.getByRole("button", { name: "Continue" }).click();
   }
   await expect(primaryEmailAction).toBeVisible({ timeout: 60_000 });
+  await expect(eventSocket).resolves.toBeDefined();
   const expectedUpdate = process.env.HQBASE_STAGING_EXPECT_UPDATE_VERSION;
   if (expectedUpdate) {
     await expect
