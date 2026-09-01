@@ -34,6 +34,14 @@ function markCreated(value, completed) {
 
 function cloudflareRunner(overrides = {}) {
   const calls = [];
+  const readAttempts = new Map();
+  const failTransientRead = (key) => {
+    const attempt = (readAttempts.get(key) ?? 0) + 1;
+    readAttempts.set(key, attempt);
+    if (attempt <= (overrides.transientReadFailures?.[key] ?? 0)) {
+      throw new Error(`Transient ${key} identity read ${attempt}`);
+    }
+  };
   const runCommand = (_command, args) => {
     const wranglerArgs = args.slice(2);
     calls.push(wranglerArgs);
@@ -43,6 +51,7 @@ function cloudflareRunner(overrides = {}) {
       return `database_id = "${d1Id}"`;
     }
     if (operation === "d1 list") {
+      failTransientRead("d1");
       return JSON.stringify(
         [{ name: overrides.d1Name ?? "hqbase-recovery", uuid: d1Id }].filter(
           () => !overrides.missingD1
@@ -53,6 +62,7 @@ function cloudflareRunner(overrides = {}) {
       return "";
     }
     if (wranglerArgs.slice(0, 3).join(" ") === "r2 bucket info") {
+      failTransientRead("r2");
       return JSON.stringify({ name: overrides.r2Name ?? "hqbase-recovery-mail" });
     }
     if (operation === "queues create") {
@@ -60,6 +70,8 @@ function cloudflareRunner(overrides = {}) {
     }
     if (operation === "queues info") {
       const name = wranglerArgs[2];
+      const key = name.endsWith("-dlq") ? "queue.deadLetter" : "queue.primary";
+      failTransientRead(key);
       const expectedId = name.endsWith("-dlq") ? deadLetterQueueId : primaryQueueId;
       const id = overrides.queueId ?? expectedId;
       return `Queue Name: ${overrides.queueName ?? name}\nQueue ID: ${id}\n`;
@@ -67,6 +79,10 @@ function cloudflareRunner(overrides = {}) {
     throw new Error(`Unexpected Wrangler operation: ${wranglerArgs.join(" ")}`);
   };
   return { calls, runCommand };
+}
+
+function startsWith(actual, expected) {
+  return expected.every((value, index) => actual[index] === value);
 }
 
 describe("operator resource recovery", () => {
@@ -117,6 +133,100 @@ describe("operator resource recovery", () => {
       id: deadLetterQueueId,
       ownership: "created"
     });
+  });
+
+  it.each([
+    {
+      create: ["d1", "create", "hqbase-recovery"],
+      key: "d1",
+      read: ["d1", "list"],
+      resource: (current) => current.d1
+    },
+    {
+      create: ["r2", "bucket", "create", "hqbase-recovery-mail"],
+      key: "r2",
+      read: ["r2", "bucket", "info", "hqbase-recovery-mail"],
+      resource: (current) => current.r2
+    },
+    {
+      create: ["queues", "create", "hqbase-recovery-jobs"],
+      key: "queue.primary",
+      read: ["queues", "info", "hqbase-recovery-jobs"],
+      resource: (current) => current.queue.primary
+    },
+    {
+      create: ["queues", "create", "hqbase-recovery-jobs-dlq"],
+      key: "queue.deadLetter",
+      read: ["queues", "info", "hqbase-recovery-jobs-dlq"],
+      resource: (current) => current.queue.deadLetter
+    }
+  ])("retries a transient $key identity read without repeating its create", (testCase) => {
+    const current = manifest();
+    const cloudflare = cloudflareRunner({
+      transientReadFailures: { [testCase.key]: 1 }
+    });
+    const checkpoints = [];
+    const sleeps = [];
+
+    provisionResources(current, {
+      checkpoint: (next) => checkpoints.push(structuredClone(next)),
+      postCreateReadDelaysMs: [10, 20],
+      runCommand: cloudflare.runCommand,
+      sleep: (delayMs) => sleeps.push(delayMs)
+    });
+
+    expect(cloudflare.calls.filter((args) => startsWith(args, testCase.create))).toHaveLength(1);
+    expect(cloudflare.calls.filter((args) => startsWith(args, testCase.read))).toHaveLength(2);
+    expect(sleeps).toEqual([10]);
+    expect(testCase.resource(current).ownership).toBe("created");
+    const states = checkpoints.map((entry) => testCase.resource(entry).ownership);
+    const creating = states.indexOf("creating");
+    expect(states.slice(creating, creating + 2)).toEqual(["creating", "created"]);
+  });
+
+  it("keeps a Queue create ambiguous when bounded identity reads do not converge", () => {
+    const current = markCreated(manifest(), 2);
+    const cloudflare = cloudflareRunner({
+      transientReadFailures: { "queue.primary": 3 }
+    });
+    const sleeps = [];
+    let failure;
+
+    try {
+      provisionResources(current, {
+        postCreateReadDelaysMs: [10, 20],
+        runCommand: cloudflare.runCommand,
+        sleep: (delayMs) => sleeps.push(delayMs)
+      });
+    } catch (error) {
+      failure = error;
+    }
+
+    expect(failure).toBeInstanceOf(Error);
+    expect(failure.message).toMatch(/Queue "hqbase-recovery-jobs"/);
+    expect(failure.message).toMatch(/3 checks and 0.03 seconds/);
+    expect(failure.cause).toEqual(new Error("Transient queue.primary identity read 3"));
+    expect(sleeps).toEqual([10, 20]);
+    expect(current.queue.primary).toEqual({
+      name: "hqbase-recovery-jobs",
+      id: null,
+      ownership: "creating"
+    });
+    expect(
+      cloudflare.calls.filter((args) =>
+        startsWith(args, ["queues", "create", "hqbase-recovery-jobs"])
+      )
+    ).toHaveLength(1);
+    expect(
+      cloudflare.calls.filter((args) =>
+        startsWith(args, ["queues", "info", "hqbase-recovery-jobs"])
+      )
+    ).toHaveLength(3);
+    expect(
+      cloudflare.calls.some((args) =>
+        startsWith(args, ["queues", "create", "hqbase-recovery-jobs-dlq"])
+      )
+    ).toBe(false);
   });
 
   it("fails closed instead of adopting an ambiguous create result", () => {
