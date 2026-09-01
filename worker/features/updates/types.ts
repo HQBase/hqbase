@@ -9,6 +9,7 @@ export type ReleaseManifest = {
   notes: string[];
   notesUrl: string;
   artifact: { url: string; sha256: string; size: number };
+  updater: { protocol: 2; sourceUrl: string; sha256: string; size: number };
   keyId: string;
 };
 
@@ -20,5 +21,6 @@ export type UpdateStatus = {
   checkedAt: string;
   available: boolean;
   compatible: boolean;
+  repairRequired: boolean;
   release: ReleaseManifest;
 };

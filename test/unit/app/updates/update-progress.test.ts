@@ -27,12 +27,14 @@ describe("update progress", () => {
   });
 
   it("retains and announces an accepted build", () => {
-    expect(beginUpdateProgress("build-123", 1_000)).toEqual({
+    expect(beginUpdateProgress("build-123", "update", 1_000)).toEqual({
       buildId: "build-123",
+      kind: "update",
       startedAt: 1_000
     });
     expect(readUpdateProgress(2_000)).toEqual({
       buildId: "build-123",
+      kind: "update",
       startedAt: 1_000
     });
     expect(dispatchEvent).toHaveBeenCalledOnce();
@@ -40,8 +42,21 @@ describe("update progress", () => {
   });
 
   it("expires a stale build marker", () => {
-    beginUpdateProgress("build-123", 1_000);
+    beginUpdateProgress("build-123", "update", 1_000);
     expect(readUpdateProgress(31 * 60 * 1_000)).toBeNull();
     expect(values.size).toBe(0);
+  });
+
+  it("reads an older progress marker as an update", () => {
+    values.set(
+      "hqbase:update-progress",
+      JSON.stringify({ buildId: "build-123", startedAt: 1_000 })
+    );
+
+    expect(readUpdateProgress(2_000)).toEqual({
+      buildId: "build-123",
+      kind: "update",
+      startedAt: 1_000
+    });
   });
 });

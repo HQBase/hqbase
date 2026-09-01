@@ -5,11 +5,12 @@ import { AppError } from "../../lib/errors";
 import { hqbaseProductConfig } from "../../lib/product-config";
 import { withUpdateBuildLock } from "./build-lock";
 import { cloudflare } from "./cloudflare";
+import { inspectManagedMigrationState, type ManagedMigrationState } from "./migration-state";
 import type { ReleaseManifest, UpdateStatus } from "./types";
 
 const expectedReleaseVariable = "HQBASE_EXPECTED_RELEASE_VERSION";
 const forceSourceDeployVariable = "HQBASE_FORCE_SOURCE_DEPLOY";
-const managedDeployCommands = new Set(["pnpm deploy", "pnpm run deploy"]);
+const legacyManagedDeployCommands = new Set(["pnpm deploy", "pnpm run deploy"]);
 const envelopeSchema = z.object({ payload: z.string().min(1), signature: z.string().min(1) });
 const manifestSchema = z.object({
   format: z.literal("hqbase-release-v1"),
@@ -25,6 +26,16 @@ const manifestSchema = z.object({
     url: z.string().url(),
     sha256: z.string().regex(/^[a-f0-9]{64}$/),
     size: z.number().int().nonnegative()
+  }),
+  updater: z.object({
+    protocol: z.literal(2),
+    sourceUrl: z
+      .string()
+      .regex(
+        /^https:\/\/raw\.githubusercontent\.com\/HQBase\/hqbase\/[a-f0-9]{40}\/scripts\/release\/bootstrap\.mjs$/
+      ),
+    sha256: z.string().regex(/^[a-f0-9]{64}$/),
+    size: z.number().int().positive()
   }),
   keyId: z.literal("hqbase-release-2026-01")
 });
@@ -49,14 +60,33 @@ export async function getUpdateStatus(
   )
     throw new AppError("UPDATE_SIGNATURE_INVALID", "Release signature verification failed.", 503);
   const release = manifestSchema.parse(JSON.parse(decodeBase64Url(envelope.payload)));
+  const releaseComparison = compareVersions(release.version, installedVersion);
+  let migrationState: ManagedMigrationState | null = null;
+  if (releaseComparison === 0) {
+    try {
+      migrationState = await inspectManagedMigrationState(
+        env.DB,
+        release.version,
+        release.schemaVersion
+      );
+    } catch {
+      throw new AppError(
+        "UPDATE_SCHEMA_INCONSISTENT",
+        "HQBase cannot verify this installation's database migration state. Run the signed deployment diagnostic before updating.",
+        503
+      );
+    }
+  }
+  const repairRequired = migrationState?.repairRequired ?? false;
   return {
     product: "hqbase",
     installedVersion,
     installedSchemaVersion: 3,
     channel: "stable",
     checkedAt: new Date().toISOString(),
-    available: compareVersions(release.version, installedVersion) > 0,
+    available: releaseComparison > 0 || repairRequired,
     compatible: compareVersions(installedVersion, release.minVersion) >= 0,
+    repairRequired,
     release: release as ReleaseManifest
   };
 }
@@ -149,6 +179,7 @@ export async function triggerUpdate(
       502
     );
   return withUpdateBuildLock(env.DB, triggerId, async () => {
+    const triggerUrl = `https://api.cloudflare.com/client/v4/accounts/${accountId}/builds/triggers/${triggerId}`;
     const variablesUrl = `https://api.cloudflare.com/client/v4/accounts/${accountId}/builds/triggers/${triggerId}/environment_variables`;
     const variables = await cloudflare<{
       result: Record<string, { is_secret: boolean; value?: string | null }>;
@@ -169,7 +200,14 @@ export async function triggerUpdate(
         409
       );
     }
+    const previousDeployCommand = trigger.deploy_command?.trim() ?? "";
+    const nextDeployCommand = managedDeployCommand(update.release.updater);
+    let deployCommandChanged = false;
     try {
+      if (previousDeployCommand !== nextDeployCommand) {
+        await setBuildDeployCommand(triggerUrl, nextDeployCommand, headers, fetcher);
+        deployCommandChanged = true;
+      }
       await setBuildVersionPin(variablesUrl, expectedVersion, headers, fetcher);
       const build = await cloudflare<{
         result: { build_uuid?: string; id?: string; status?: string };
@@ -187,9 +225,28 @@ export async function triggerUpdate(
         );
       return { buildId, status: build.result.status ?? "queued" };
     } catch (error) {
-      await restoreBuildVersionPin(variablesUrl, previousPin, headers, fetcher).catch(
-        () => undefined
-      );
+      let rollbackFailed = false;
+      let releasePinRestored = false;
+      try {
+        await restoreBuildVersionPin(variablesUrl, previousPin, headers, fetcher);
+        releasePinRestored = true;
+      } catch {
+        rollbackFailed = true;
+      }
+      if (deployCommandChanged && releasePinRestored) {
+        try {
+          await setBuildDeployCommand(triggerUrl, previousDeployCommand, headers, fetcher);
+        } catch {
+          rollbackFailed = true;
+        }
+      }
+      if (rollbackFailed) {
+        throw new AppError(
+          "UPDATE_TRIGGER_ROLLBACK_FAILED",
+          "The build did not start, and HQBase could not restore the previous Cloudflare build configuration. Review the production Workers Builds trigger before trying again.",
+          502
+        );
+      }
       throw error;
     }
   });
@@ -199,15 +256,46 @@ function assertManagedTrigger(trigger: {
   deploy_command?: string | null;
   root_directory?: string | null;
 }): void {
-  const command = trigger.deploy_command?.trim().replace(/\s+/g, " ") ?? "";
+  const command = trigger.deploy_command?.trim() ?? "";
   const root = trigger.root_directory?.trim() ?? "";
-  if (!managedDeployCommands.has(command) || !["", "/", ".", "./"].includes(root)) {
+  if (!isManagedDeployCommand(command) || !["", "/", ".", "./"].includes(root)) {
     throw new AppError(
       "UPDATE_TRIGGER_UNMANAGED",
-      "Signed updates require a repository-root Workers Builds trigger that runs pnpm deploy. Use the custom-source deployment process instead.",
+      "Signed updates require a repository-root Workers Builds trigger that uses the HQBase updater. Use the custom-source deployment process instead.",
       409
     );
   }
+}
+
+export function managedDeployCommand(updater: NonNullable<ReleaseManifest["updater"]>): string {
+  const { sha256, size, sourceUrl } = updater;
+  return `node --input-type=module --eval 'const u="${sourceUrl}";const h="${sha256}";const n=${size};const r=await fetch(u);if(!r.ok)throw new Error("HQBase updater download failed.");const b=Buffer.from(await r.arrayBuffer());const {createHash}=await import("node:crypto");if(b.length!==n||createHash("sha256").update(b).digest("hex")!==h)throw new Error("HQBase updater verification failed.");await import("data:text/javascript;base64,"+b.toString("base64"));'`;
+}
+
+export function isManagedDeployCommand(command: string): boolean {
+  if (legacyManagedDeployCommands.has(command.trim().replace(/\s+/g, " "))) return true;
+  const match = command.match(
+    /^node --input-type=module --eval 'const u="(https:\/\/raw\.githubusercontent\.com\/HQBase\/hqbase\/[a-f0-9]{40}\/scripts\/release\/bootstrap\.mjs)";const h="([a-f0-9]{64})";const n=([1-9]\d*);/
+  );
+  if (!match) return false;
+  const sourceUrl = match[1];
+  const sha256 = match[2];
+  const size = match[3];
+  if (!sourceUrl || !sha256 || !size) return false;
+  return command === managedDeployCommand({ protocol: 2, sha256, size: Number(size), sourceUrl });
+}
+
+async function setBuildDeployCommand(
+  url: string,
+  deployCommand: string,
+  headers: Record<string, string>,
+  fetcher: typeof fetch
+): Promise<void> {
+  await cloudflare(
+    url,
+    { method: "PATCH", headers, body: JSON.stringify({ deploy_command: deployCommand }) },
+    fetcher
+  );
 }
 
 async function setBuildVersionPin(

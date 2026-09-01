@@ -129,7 +129,7 @@ jobs:
     needs: candidate
     runs-on: ubuntu-latest
     environment: hqbase-staging
-    timeout-minutes: 35
+    timeout-minutes: 45
     permissions:
       contents: read
     env:
@@ -146,6 +146,7 @@ jobs:
       HQBASE_STAGING_OAUTH_CLIENT_ID: ${{ vars.HQBASE_E2E_OAUTH_CLIENT_ID }}
       HQBASE_STAGING_SENDER: hello@${{ secrets.HQBASE_E2E_EMAIL_DOMAIN }}
       HQBASE_STAGING_URL: https://${{ secrets.HQBASE_E2E_APP_HOSTNAME }}
+      OLDEST_UPDATER_TAG: v1.0.0
       DEPLOYMENT_NAME: release-${{ github.run_id }}
     steps:
       - uses: actions/checkout@v6
@@ -168,6 +169,12 @@ jobs:
           path: release
       - run: pnpm install --frozen-lockfile
       - run: pnpm exec playwright install --with-deps chromium
+      - name: Verify the customer source checkout starts unchanged
+        run: |
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          git diff --quiet
+          git diff --cached --quiet
+          test -z "$(git ls-files --others --exclude-standard)"
       - name: Create disposable customer resources
         run: >-
           pnpm hqbase install
@@ -183,28 +190,37 @@ jobs:
           auth_secret="$(openssl rand -base64 48)"
           echo "::add-mask::$auth_secret"
           echo "HQBASE_STAGING_AUTH_SECRET=$auth_secret" >> "$GITHUB_ENV"
-      - name: Download and deploy the previous stable release
-        if: needs.candidate.outputs.previous_tag != ''
+      - name: Install the previous stable release with the oldest supported updater
         run: |
-          mkdir -p /tmp/hqbase-previous
+          test -n "$PREVIOUS_TAG"
+          oldest_version="${OLDEST_UPDATER_TAG#v}"
+          mkdir -p /tmp/hqbase-oldest-updater /tmp/hqbase-previous
+          gh release download "$OLDEST_UPDATER_TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --pattern "hqbase-${oldest_version}.tar.gz" \
+            --dir /tmp/hqbase-oldest-updater
           gh release download "$PREVIOUS_TAG" \
             --repo "$GITHUB_REPOSITORY" \
             --pattern stable.json \
             --pattern 'hqbase-*.tar.gz' \
             --dir /tmp/hqbase-previous
+          oldest_source="/tmp/hqbase-oldest-updater/source"
+          mkdir -p "$oldest_source"
+          tar -xzf "/tmp/hqbase-oldest-updater/hqbase-${oldest_version}.tar.gz" \
+            -C "$oldest_source"
+          pnpm --dir "$oldest_source" install --frozen-lockfile
           previous_version="${PREVIOUS_TAG#v}"
           previous_archive="/tmp/hqbase-previous/hqbase-${previous_version}.tar.gz"
           previous_source="/tmp/hqbase-previous/source"
           mkdir -p "$previous_source"
           tar -xzf "$previous_archive" -C "$previous_source"
-          pnpm --dir "$previous_source" install --frozen-lockfile
-          previous_deployment="$previous_source/.hqbase/deployments/$DEPLOYMENT_NAME"
-          test ! -e "$previous_deployment"
-          ln -s "$GITHUB_WORKSPACE/.hqbase/deployments/$DEPLOYMENT_NAME" "$previous_deployment"
-          previous_updater="$previous_source/scripts/release/deploy.mjs"
-          previous_config="$previous_deployment/wrangler.jsonc"
-          echo "HQBASE_PREVIOUS_UPDATER=$previous_updater" >> "$GITHUB_ENV"
-          echo "HQBASE_PREVIOUS_CONFIG=$previous_config" >> "$GITHUB_ENV"
+          oldest_deployment="$oldest_source/.hqbase/deployments/$DEPLOYMENT_NAME"
+          test ! -e "$oldest_deployment"
+          ln -s "$GITHUB_WORKSPACE/.hqbase/deployments/$DEPLOYMENT_NAME" "$oldest_deployment"
+          oldest_updater="$oldest_source/scripts/release/deploy.mjs"
+          oldest_config="$oldest_deployment/wrangler.jsonc"
+          echo "HQBASE_OLDEST_UPDATER=$oldest_updater" >> "$GITHUB_ENV"
+          echo "HQBASE_OLDEST_CONFIG=$oldest_config" >> "$GITHUB_ENV"
           if test -f "$previous_source/migrations/0025_activate_catch_all_policy.sql"; then
             echo "HQBASE_STAGING_PREVIOUS_HAS_CATCH_ALL_POLICY=1" >> "$GITHUB_ENV"
           else
@@ -214,9 +230,8 @@ jobs:
           HQBASE_EXPECTED_RELEASE_VERSION="$previous_version" \
           HQBASE_RELEASE_ARTIFACT_FILE="$previous_archive" \
           HQBASE_RELEASE_MANIFEST_FILE="/tmp/hqbase-previous/stable.json" \
-            node "$previous_updater" --config "$previous_config"
+            node "$oldest_updater" --config "$oldest_config"
       - name: Wait for the previous stable release
-        if: needs.candidate.outputs.previous_tag != ''
         run: |
           for attempt in $(seq 1 150); do
             if curl --fail --silent --show-error \
@@ -230,25 +245,36 @@ jobs:
           echo "Previous stable HQBase was not healthy within 300 seconds"
           exit 1
       - name: Bootstrap persistent N-1 staging data
-        if: needs.candidate.outputs.previous_tag != ''
         env:
           HQBASE_STAGING_MAIL_API_BASE_PATH: /api
         run: pnpm test:e2e:staging:lifecycle
+      - name: Configure customer OAuth for the candidate
+        run: >-
+          pnpm hqbase oauth
+          --name "$DEPLOYMENT_NAME"
+          --mode customer
+          --auth-url "$HQBASE_STAGING_URL"
+          --client-id "$HQBASE_STAGING_OAUTH_CLIENT_ID"
+          --skip-deploy
+      - name: Reproduce the legacy Worker configuration
+        run: |
+          config="$GITHUB_WORKSPACE/.hqbase/deployments/$DEPLOYMENT_NAME/wrangler.jsonc"
+          CONFIG_FILE="$config" node --input-type=module -e '
+            import { readFileSync, writeFileSync } from "node:fs";
+            const file = process.env.CONFIG_FILE;
+            const config = JSON.parse(readFileSync(file, "utf8"));
+            delete config.durable_objects;
+            delete config.migrations;
+            writeFileSync(file, `${JSON.stringify(config, null, 2)}\n`);
+          '
+          jq -e 'has("durable_objects") == false and has("migrations") == false' "$config"
       - name: Apply the exact signed candidate
         run: |
-          pnpm hqbase oauth \
-            --name "$DEPLOYMENT_NAME" \
-            --mode customer \
-            --auth-url "$HQBASE_STAGING_URL" \
-            --client-id "$HQBASE_STAGING_OAUTH_CLIENT_ID" \
-            --skip-deploy
-          config="${HQBASE_PREVIOUS_CONFIG:-$GITHUB_WORKSPACE/.hqbase/deployments/$DEPLOYMENT_NAME/wrangler.jsonc}"
-          updater="${HQBASE_PREVIOUS_UPDATER:-$GITHUB_WORKSPACE/scripts/release/deploy.mjs}"
           HQBASE_AUTH_SECRET="$HQBASE_STAGING_AUTH_SECRET" \
           HQBASE_EXPECTED_RELEASE_VERSION="$CANDIDATE_VERSION" \
           HQBASE_RELEASE_ARTIFACT_FILE="$GITHUB_WORKSPACE/release/hqbase-${CANDIDATE_VERSION}.tar.gz" \
           HQBASE_RELEASE_MANIFEST_FILE="$GITHUB_WORKSPACE/release/stable.json" \
-            node "$updater" --config "$config"
+            node "$HQBASE_OLDEST_UPDATER" --config "$HQBASE_OLDEST_CONFIG"
       - name: Wait for the signed candidate
         run: |
           for attempt in $(seq 1 150); do
@@ -265,14 +291,98 @@ jobs:
           done
           echo "Signed HQBase candidate was not active within 300 seconds"
           exit 1
-      - name: Verify the installed candidate release marker
+      - name: Verify the candidate restored the binding while the database remained at S0
         run: |
           config=".hqbase/deployments/$DEPLOYMENT_NAME/wrangler.jsonc"
           database="hqbase-$DEPLOYMENT_NAME"
+          status="$(pnpm exec wrangler deployments status \
+            --name hqbase-e2e-staging --json --config "$config")"
+          version_id="$(jq -er '.versions[] | select(.percentage == 100) | .version_id' \
+            <<<"$status")"
+          worker="$(pnpm exec wrangler versions view "$version_id" \
+            --name hqbase-e2e-staging --json --config "$config")"
+          jq -e '[.resources.bindings[].name] | index("MAIL_EVENTS") != null' <<<"$worker"
+          expected_normal_count="$(find migrations -maxdepth 1 -type f -name '*.sql' | wc -l | tr -d ' ')"
+          expected_schema_version="$(node --input-type=module -e '
+            import { readFileSync } from "node:fs";
+            const envelope = JSON.parse(readFileSync("release/stable.json", "utf8"));
+            const manifest = JSON.parse(Buffer.from(envelope.payload, "base64url").toString("utf8"));
+            process.stdout.write(String(manifest.schemaVersion));
+          ')"
           result="$(pnpm exec wrangler d1 execute "$database" --remote --config "$config" --json \
-            --command "SELECT installed_version FROM release_state WHERE singleton = 1")"
-          jq -e --arg version "$CANDIDATE_VERSION" \
-            '.[0].results[0].installed_version == $version' <<<"$result"
+            --command "SELECT (SELECT installed_version FROM release_state WHERE singleton = 1) AS installed_version, (SELECT installed_schema_version FROM release_state WHERE singleton = 1) AS installed_schema_version, (SELECT COUNT(*) FROM d1_migrations) AS normal_migration_count, (SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'd1_migrations_after_deploy') AS after_deploy_ledger_table_count, (SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name IN ('mailbox_addresses', 'mailbox_address_migration')) AS alias_table_count, (SELECT COUNT(*) FROM pragma_table_info('messages') WHERE name IN ('delivered_to_address_id', 'sent_from_address_id')) AS message_legacy_column_count, (SELECT COUNT(*) FROM pragma_table_info('mailbox_grants') WHERE name IN ('user_id', 'created_by')) AS grant_legacy_column_count, (SELECT COUNT(*) FROM pragma_table_info('drafts') WHERE name = 'user_id') AS draft_legacy_column_count, (SELECT COUNT(*) FROM pragma_table_info('draft_changes') WHERE name = 'user_id') AS draft_change_legacy_column_count, (SELECT COUNT(*) FROM sqlite_master WHERE type = 'trigger' AND name IN ('mailbox_addresses_transition_insert_guard', 'mailbox_addresses_transition_update_guard', 'mailbox_addresses_transition_delete_guard', 'mailboxes_transition_update_guard', 'mailboxes_transition_delete_guard', 'mailbox_grants_transition_insert_guard', 'mailbox_grants_transition_update_guard', 'mailbox_grants_transition_delete_guard', 'retention_policies_transition_insert_guard', 'retention_policies_transition_update_guard', 'retention_policies_transition_delete_guard')) AS transition_guard_count")"
+          jq -e \
+            --arg version "$CANDIDATE_VERSION" \
+            --argjson normal_count "$expected_normal_count" \
+            --argjson schema_version "$expected_schema_version" \
+            '.[0].results[0] == {installed_version:$version,installed_schema_version:$schema_version,normal_migration_count:$normal_count,after_deploy_ledger_table_count:0,alias_table_count:2,message_legacy_column_count:2,grant_legacy_column_count:2,draft_legacy_column_count:1,draft_change_legacy_column_count:1,transition_guard_count:11}' \
+            <<<"$result"
+          pnpm exec wrangler d1 execute "$database" --remote --config "$config" \
+            --command "INSERT INTO app_settings (key, value_json, created_at, updated_at) VALUES ('release-updater-bridge-probe', '{\"state\":\"preserved\"}', datetime('now'), datetime('now'))"
+          snapshot="$(pnpm exec wrangler d1 execute "$database" --remote --config "$config" --json \
+            --command "SELECT (SELECT COUNT(*) FROM \"user\") AS user_count, (SELECT COUNT(*) FROM mailboxes) AS mailbox_count, (SELECT value_json FROM app_settings WHERE key = 'release-updater-bridge-probe') AS probe")"
+          jq -c '.[0].results[0]' <<<"$snapshot" > /tmp/hqbase-pre-repair-data.json
+          pnpm test:e2e:staging:event-socket
+      - name: Finish the candidate through its canonical signed bootstrap
+        run: |
+          config="$GITHUB_WORKSPACE/.hqbase/deployments/$DEPLOYMENT_NAME/wrangler.jsonc"
+          HQBASE_AUTH_SECRET="$HQBASE_STAGING_AUTH_SECRET" \
+          HQBASE_EXPECTED_RELEASE_VERSION="$CANDIDATE_VERSION" \
+          HQBASE_RELEASE_ARTIFACT_FILE="$GITHUB_WORKSPACE/release/hqbase-${CANDIDATE_VERSION}.tar.gz" \
+          HQBASE_RELEASE_MANIFEST_FILE="$GITHUB_WORKSPACE/release/stable.json" \
+            node "$GITHUB_WORKSPACE/scripts/release/bootstrap.mjs" --config "$config"
+      - name: Verify exact migration ledgers, final schema, and preserved data
+        run: |
+          config=".hqbase/deployments/$DEPLOYMENT_NAME/wrangler.jsonc"
+          database="hqbase-$DEPLOYMENT_NAME"
+          expected_schema_version="$(node --input-type=module -e '
+            import { readFileSync } from "node:fs";
+            const envelope = JSON.parse(readFileSync("release/stable.json", "utf8"));
+            const manifest = JSON.parse(Buffer.from(envelope.payload, "base64url").toString("utf8"));
+            process.stdout.write(String(manifest.schemaVersion));
+          ')"
+          expected_normal="$(node --input-type=module -e '
+            import { readdirSync } from "node:fs";
+            process.stdout.write(JSON.stringify(readdirSync("migrations").filter((name) => name.endsWith(".sql")).sort()));
+          ')"
+          expected_after_deploy="$(node --input-type=module -e '
+            import { readdirSync } from "node:fs";
+            process.stdout.write(JSON.stringify(readdirSync("migrations-after-deploy").filter((name) => name.endsWith(".sql")).sort()));
+          ')"
+          normal="$(pnpm exec wrangler d1 execute "$database" --remote --config "$config" --json \
+            --command "SELECT name FROM d1_migrations ORDER BY id")"
+          after_deploy="$(pnpm exec wrangler d1 execute "$database" --remote --config "$config" --json \
+            --command "SELECT name FROM d1_migrations_after_deploy ORDER BY id")"
+          test "$(jq -c '[.[0].results[].name]' <<<"$normal")" = "$expected_normal"
+          test "$(jq -c '[.[0].results[].name]' <<<"$after_deploy")" = "$expected_after_deploy"
+          result="$(pnpm exec wrangler d1 execute "$database" --remote --config "$config" --json \
+            --command "SELECT (SELECT installed_version FROM release_state WHERE singleton = 1) AS installed_version, (SELECT installed_schema_version FROM release_state WHERE singleton = 1) AS installed_schema_version, (SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name IN ('mailbox_addresses', 'mailbox_address_migration')) AS alias_table_count, (SELECT COUNT(*) FROM pragma_table_info('messages') WHERE name IN ('delivered_to_address_id', 'sent_from_address_id')) AS message_legacy_column_count, (SELECT COUNT(*) FROM pragma_table_info('mailbox_grants') WHERE name IN ('user_id', 'created_by')) AS grant_legacy_column_count, (SELECT COUNT(*) FROM pragma_table_info('drafts') WHERE name = 'user_id') AS draft_legacy_column_count, (SELECT COUNT(*) FROM pragma_table_info('draft_changes') WHERE name = 'user_id') AS draft_change_legacy_column_count, (SELECT COUNT(*) FROM sqlite_master WHERE type = 'trigger' AND name LIKE '%_transition_%') AS transition_guard_count, (SELECT COUNT(*) FROM pragma_foreign_key_list('draft_labels') WHERE \"table\" = 'drafts' AND \"from\" = 'draft_id') AS draft_label_fk_count, (SELECT COUNT(*) FROM update_history WHERE from_version = '${CANDIDATE_VERSION}' AND to_version = '${CANDIDATE_VERSION}' AND checkpoint_bookmark IS NOT NULL AND worker_version IS NOT NULL AND state = 'verified') AS repair_history_count")"
+          jq -e \
+            --arg version "$CANDIDATE_VERSION" \
+            --argjson schema_version "$expected_schema_version" \
+            '.[0].results[0] == {installed_version:$version,installed_schema_version:$schema_version,alias_table_count:0,message_legacy_column_count:0,grant_legacy_column_count:0,draft_legacy_column_count:0,draft_change_legacy_column_count:0,transition_guard_count:0,draft_label_fk_count:1,repair_history_count:1}' \
+            <<<"$result"
+          foreign_keys="$(pnpm exec wrangler d1 execute "$database" --remote --config "$config" --json \
+            --command "PRAGMA foreign_key_check")"
+          jq -e '.[0].results == []' <<<"$foreign_keys"
+          snapshot="$(pnpm exec wrangler d1 execute "$database" --remote --config "$config" --json \
+            --command "SELECT (SELECT COUNT(*) FROM \"user\") AS user_count, (SELECT COUNT(*) FROM mailboxes) AS mailbox_count, (SELECT value_json FROM app_settings WHERE key = 'release-updater-bridge-probe') AS probe")"
+          jq -e '.[0].results[0].probe == "{\"state\":\"preserved\"}"' <<<"$snapshot"
+          test "$(jq -c '.[0].results[0]' <<<"$snapshot")" = "$(< /tmp/hqbase-pre-repair-data.json)"
+      - name: Prove the canonical same-version retry is idempotent
+        run: |
+          config="$GITHUB_WORKSPACE/.hqbase/deployments/$DEPLOYMENT_NAME/wrangler.jsonc"
+          database="hqbase-$DEPLOYMENT_NAME"
+          before="$(pnpm exec wrangler d1 execute "$database" --remote --config "$config" --json \
+            --command "SELECT (SELECT COUNT(*) FROM d1_migrations) AS normal_migration_count, (SELECT COUNT(*) FROM d1_migrations_after_deploy) AS after_deploy_migration_count, (SELECT COUNT(*) FROM update_history) AS update_history_count, (SELECT COUNT(*) FROM \"user\") AS user_count, (SELECT COUNT(*) FROM mailboxes) AS mailbox_count, (SELECT value_json FROM app_settings WHERE key = 'release-updater-bridge-probe') AS probe")"
+          HQBASE_AUTH_SECRET="$HQBASE_STAGING_AUTH_SECRET" \
+          HQBASE_EXPECTED_RELEASE_VERSION="$CANDIDATE_VERSION" \
+          HQBASE_RELEASE_ARTIFACT_FILE="$GITHUB_WORKSPACE/release/hqbase-${CANDIDATE_VERSION}.tar.gz" \
+          HQBASE_RELEASE_MANIFEST_FILE="$GITHUB_WORKSPACE/release/stable.json" \
+            node "$GITHUB_WORKSPACE/scripts/release/bootstrap.mjs" --config "$config"
+          after="$(pnpm exec wrangler d1 execute "$database" --remote --config "$config" --json \
+            --command "SELECT (SELECT COUNT(*) FROM d1_migrations) AS normal_migration_count, (SELECT COUNT(*) FROM d1_migrations_after_deploy) AS after_deploy_migration_count, (SELECT COUNT(*) FROM update_history) AS update_history_count, (SELECT COUNT(*) FROM \"user\") AS user_count, (SELECT COUNT(*) FROM mailboxes) AS mailbox_count, (SELECT value_json FROM app_settings WHERE key = 'release-updater-bridge-probe') AS probe")"
+          test "$(jq -c '.[0].results[0]' <<<"$after")" = "$(jq -c '.[0].results[0]' <<<"$before")"
       - name: Verify active Worker bindings
         run: |
           config=".hqbase/deployments/$DEPLOYMENT_NAME/wrangler.jsonc"
@@ -302,6 +412,12 @@ jobs:
           result="$(pnpm exec wrangler d1 execute "$database" --remote --config "$config" --json \
             --command "SELECT value_json FROM app_settings WHERE key = 'staging-restore-probe'")"
           jq -e '.[0].results[0].value_json == "{\"state\":\"before\"}"' <<<"$result"
+      - name: Verify the customer source checkout stayed unchanged
+        run: |
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          git diff --quiet
+          git diff --cached --quiet
+          test -z "$(git ls-files --others --exclude-standard)"
       - name: Upload non-secret deployment record
         if: always()
         uses: actions/upload-artifact@v6
@@ -394,10 +510,13 @@ jobs:
       - name: Verify public stable asset, signature, and digest
         run: |
           stable_url="https://github.com/HQBase/hqbase/releases/latest/download/stable.json"
+          version_manifest_url="https://github.com/HQBase/hqbase/releases/download/v${HQBASE_RELEASE_VERSION}/manifest-${HQBASE_RELEASE_VERSION}.json"
           artifact_url="https://github.com/HQBase/hqbase/releases/download/v${HQBASE_RELEASE_VERSION}/hqbase-${HQBASE_RELEASE_VERSION}.tar.gz"
           for attempt in $(seq 1 30); do
             if curl --fail --location --silent --show-error "$stable_url" --output /tmp/stable.json &&
-               curl --fail --location --silent --show-error "$artifact_url" --output /tmp/hqbase.tar.gz; then
+               curl --fail --location --silent --show-error "$version_manifest_url" --output /tmp/version-manifest.json &&
+               curl --fail --location --silent --show-error "$artifact_url" --output /tmp/hqbase.tar.gz &&
+               cmp -s /tmp/stable.json /tmp/version-manifest.json; then
               break
             fi
             test "$attempt" -lt 30
@@ -424,6 +543,11 @@ jobs:
             const version = process.env.HQBASE_RELEASE_VERSION;
             const config = JSON.parse(readFileSync("config/product.json", "utf8"));
             const envelope = JSON.parse(readFileSync("/tmp/stable.json", "utf8"));
+            const versionEnvelope = JSON.parse(readFileSync("/tmp/version-manifest.json", "utf8"));
+            if (versionEnvelope.payload !== envelope.payload ||
+                versionEnvelope.signature !== envelope.signature) {
+              throw new Error("Published stable and versioned manifests do not match.");
+            }
             const key = createPublicKey({
               key: Buffer.from(config.releasePublicKey, "base64"),
               format: "der",
@@ -436,10 +560,26 @@ jobs:
             if (manifest.product !== "hqbase" || manifest.version !== version) {
               throw new Error("Published stable manifest identity is invalid.");
             }
+            const expectedArtifactUrl = `https://github.com/HQBase/hqbase/releases/download/v${version}/hqbase-${version}.tar.gz`;
+            const expectedUpdaterUrl = `https://raw.githubusercontent.com/HQBase/hqbase/${process.env.RELEASE_COMMIT}/scripts/release/bootstrap.mjs`;
+            if (manifest.artifact.url !== expectedArtifactUrl ||
+                manifest.updater?.protocol !== 2 ||
+                manifest.updater.sourceUrl !== expectedUpdaterUrl) {
+              throw new Error("Published stable manifest sources are invalid.");
+            }
             const bytes = readFileSync("/tmp/hqbase.tar.gz");
             if (createHash("sha256").update(bytes).digest("hex") !== manifest.artifact.sha256 ||
                 statSync("/tmp/hqbase.tar.gz").size !== manifest.artifact.size) {
               throw new Error("Published artifact does not match the signed manifest.");
+            }
+            const updaterResponse = await fetch(manifest.updater.sourceUrl);
+            if (!updaterResponse.ok) {
+              throw new Error(`Published updater download failed (${updaterResponse.status}).`);
+            }
+            const updaterBytes = Buffer.from(await updaterResponse.arrayBuffer());
+            if (createHash("sha256").update(updaterBytes).digest("hex") !== manifest.updater.sha256 ||
+                updaterBytes.length !== manifest.updater.size) {
+              throw new Error("Published updater does not match the signed manifest.");
             }
           '
       - name: Post complete release notes to Discord

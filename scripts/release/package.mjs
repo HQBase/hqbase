@@ -33,6 +33,19 @@ writeFileSync(artifactFile, gzipSync(readFileSync(tarFile), { level: 9 }));
 rmSync(tarFile);
 
 const bytes = readFileSync(artifactFile);
+const sourceCommit = execFileSync("git", ["rev-parse", "HEAD"], {
+  cwd: root,
+  encoding: "utf8"
+}).trim();
+if (!/^[a-f0-9]{40}$/.test(sourceCommit)) {
+  throw new Error("Release source commit is invalid.");
+}
+// Hash the committed source that the URL serves, never uncommitted working-tree bytes.
+const updaterBytes = execFileSync(
+  "git",
+  ["show", `${sourceCommit}:scripts/release/bootstrap.mjs`],
+  { cwd: root }
+);
 const manifest = {
   format: "hqbase-release-v1",
   product,
@@ -47,6 +60,12 @@ const manifest = {
     url: `https://github.com/HQBase/hqbase/releases/download/v${version}/hqbase-${version}.tar.gz`,
     sha256: createHash("sha256").update(bytes).digest("hex"),
     size: statSync(artifactFile).size
+  },
+  updater: {
+    protocol: 2,
+    sourceUrl: `https://raw.githubusercontent.com/HQBase/hqbase/${sourceCommit}/scripts/release/bootstrap.mjs`,
+    sha256: createHash("sha256").update(updaterBytes).digest("hex"),
+    size: updaterBytes.length
   },
   keyId: "hqbase-release-2026-01"
 };

@@ -28,9 +28,23 @@ import {
   assertRequiredWorkerConfig,
   prepareRequiredWorkerConfig
 } from "../../../scripts/release/prepare-worker-config.mjs";
+import {
+  encodeVapidPrivateKey,
+  generateVapidKeys
+} from "../../../scripts/release/worker-deploy.mjs";
 import { foreignTrustees } from "../../../scripts/secure-directory.mjs";
 
 describe("HQBase release deployment", () => {
+  it("generates a standard P-256 VAPID key pair without package dependencies", () => {
+    const keys = generateVapidKeys();
+    expect(Buffer.from(keys.publicKey, "base64url")).toHaveLength(65);
+    expect(Buffer.from(keys.privateKey, "base64url")).toHaveLength(32);
+    expect(Buffer.from(keys.publicKey, "base64url")[0]).toBe(4);
+    expect(Buffer.from(encodeVapidPrivateKey(Buffer.alloc(31, 1)), "base64url")).toEqual(
+      Buffer.concat([Buffer.alloc(1), Buffer.alloc(31, 1)])
+    );
+  });
+
   it("verifies product-bound manifests", () => {
     const { privateKey, publicKey } = generateKeyPairSync("ed25519");
     const manifest = {

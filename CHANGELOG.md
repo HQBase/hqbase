@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.3.3
+
+### Fixed
+
+- Repair installations that reached HQBase 1.3 without completing the signed post-deploy database
+  phase. This fixes connection loading errors while preserving mail, drafts, labels, grants, and
+  other workspace data behind a new D1 recovery checkpoint.
+- Replace the frozen customer-repository update command with a signed canonical updater after owner
+  approval. Managed updates no longer depend on patching or synchronizing each customer source
+  repository.
+- Test releases through the oldest supported updater, then verify both migration ledgers, the final
+  schema, preserved data, required Worker bindings, and an idempotent same-version retry before
+  publication.
+
 ## 1.3.2
 
 ### Fixed

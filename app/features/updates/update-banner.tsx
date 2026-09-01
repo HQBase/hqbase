@@ -15,9 +15,20 @@ export function UpdateBanner({
   status: UpdateStatus | null;
   onOpen: () => void;
 }): React.ReactElement | null {
-  if (ready || (!inProgress && !status?.available)) return null;
+  const repairOnly =
+    status?.repairRequired === true && status.release.version === status.installedVersion;
+  if ((ready && !repairOnly) || (!inProgress && !status?.available)) return null;
   const targetVersion = status?.release.version;
-  const firstNote = status?.release.notes[0];
+  const firstNote = repairOnly
+    ? "Complete the signed database migration phase omitted by the older build bootstrap."
+    : status?.release.notes[0];
+  const title = inProgress
+    ? repairOnly
+      ? "Installation repair in progress"
+      : "Update in progress"
+    : repairOnly
+      ? "Installation repair available"
+      : "Update available";
   return (
     <div
       aria-live="polite"
@@ -36,7 +47,7 @@ export function UpdateBanner({
         )}
         <div className="min-w-0">
           <p>
-            <strong>{inProgress ? "Update in progress" : "Update available"}</strong>
+            <strong>{title}</strong>
             {targetVersion ? ` · HQBase ${targetVersion}` : null}
           </p>
           {!inProgress && firstNote ? (
@@ -45,7 +56,7 @@ export function UpdateBanner({
         </div>
       </div>
       <Button className="h-7 px-3 text-xs" onClick={onOpen} type="button" variant="outline">
-        {inProgress ? "View progress" : "View changelog"}
+        {inProgress ? "View progress" : repairOnly ? "View repair" : "View changelog"}
       </Button>
     </div>
   );

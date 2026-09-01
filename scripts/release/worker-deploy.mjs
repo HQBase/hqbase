@@ -1,8 +1,6 @@
-import { randomBytes, randomUUID } from "node:crypto";
+import { createECDH, randomBytes, randomUUID } from "node:crypto";
 import { readFileSync, rmSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
-import webpush from "web-push";
-
 import { createRestrictedDirectory } from "../secure-directory.mjs";
 import { isWorkerNotFound } from "./active-version.mjs";
 import { attemptRun, emitCommandOutput, run } from "./command.mjs";
@@ -66,7 +64,7 @@ export function deploySource(cwd, options = {}) {
       const generated =
         configuredPublicKey && configuredPrivateKey
           ? { publicKey: configuredPublicKey, privateKey: configuredPrivateKey }
-          : (options.generateVapidKeys ?? webpush.generateVAPIDKeys)();
+          : (options.generateVapidKeys ?? generateVapidKeys)();
       secrets.VAPID_PUBLIC_KEY = generated.publicKey;
       secrets.VAPID_PRIVATE_KEY = generated.privateKey;
     }
@@ -75,6 +73,22 @@ export function deploySource(cwd, options = {}) {
   } finally {
     rmSync(workspace, { recursive: true, force: true });
   }
+}
+
+export function generateVapidKeys() {
+  const key = createECDH("prime256v1");
+  key.generateKeys();
+  return {
+    privateKey: encodeVapidPrivateKey(key.getPrivateKey()),
+    publicKey: key.getPublicKey().toString("base64url")
+  };
+}
+
+export function encodeVapidPrivateKey(bytes) {
+  if (!Buffer.isBuffer(bytes) || bytes.length < 1 || bytes.length > 32) {
+    throw new Error("VAPID private key bytes are invalid.");
+  }
+  return Buffer.concat([Buffer.alloc(32 - bytes.length), bytes]).toString("base64url");
 }
 
 export function workerNameFromConfig(config) {

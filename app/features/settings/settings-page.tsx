@@ -11,7 +11,7 @@ import { InterfaceSettings } from "@/features/settings/interface-settings";
 import type { SetupStatus } from "@/features/setup/types";
 import { SignatureSettings } from "@/features/signatures/signature-settings";
 import type { UpdateStatus } from "@/features/updates/types";
-import type { UpdateProgress } from "@/features/updates/update-progress";
+import type { UpdateActionKind, UpdateProgress } from "@/features/updates/update-progress";
 import { UpdateSettings } from "@/features/updates/update-settings";
 import type { WorkspaceUser } from "@/features/users/types";
 import { UserSettings } from "@/features/users/user-settings";
@@ -31,7 +31,7 @@ type SettingsPageProps = {
   onDefaultFromMailboxChange: (mailboxId: string) => void;
   onRefresh: () => Promise<void>;
   onLabelsChanged?: () => Promise<void>;
-  onUpdateStarted: (buildId: string) => void;
+  onUpdateStarted: (buildId: string, kind: UpdateActionKind) => void;
   onUpdateStatusChange: (status: UpdateStatus) => void;
   updateProgress: UpdateProgress | null;
   updateStatus: UpdateStatus | null;

@@ -11,6 +11,7 @@ const availableStatus: UpdateStatus = {
   checkedAt: "2026-07-13T12:00:00.000Z",
   available: true,
   compatible: true,
+  repairRequired: false,
   release: {
     version: "0.2.0",
     schemaVersion: 10,
@@ -59,7 +60,7 @@ describe("update settings", () => {
     const html = renderToStaticMarkup(
       <UpdateSettings
         initialStatus={availableStatus}
-        progress={{ buildId: "build-123", startedAt: Date.now() }}
+        progress={{ buildId: "build-123", kind: "update", startedAt: Date.now() }}
         onStatusChange={() => undefined}
         onUpdateStarted={() => undefined}
       />
@@ -68,6 +69,55 @@ describe("update settings", () => {
     expect(html).toContain("animate-spin");
     expect(html).toContain("HQBase 0.2.0 is being deployed");
     expect(html).toContain("build-123");
+    expect(html).not.toContain("Install update");
+  });
+
+  it("labels an accepted repair build separately", () => {
+    const html = renderToStaticMarkup(
+      <UpdateSettings
+        initialStatus={{
+          ...availableStatus,
+          installedVersion: "0.2.0",
+          repairRequired: true
+        }}
+        progress={{ buildId: "repair-123", kind: "repair", startedAt: Date.now() }}
+        onStatusChange={() => undefined}
+        onUpdateStarted={() => undefined}
+      />
+    );
+
+    expect(html).toContain("Installation repair in progress");
+    expect(html).toContain("repair-123");
+    expect(html).not.toContain("Finish repair");
+  });
+
+  it("renders persisted repair progress before update status loads", () => {
+    const html = renderToStaticMarkup(
+      <UpdateSettings
+        initialStatus={null}
+        progress={{ buildId: "repair-123", kind: "repair", startedAt: Date.now() }}
+        onStatusChange={() => undefined}
+        onUpdateStarted={() => undefined}
+      />
+    );
+
+    expect(html).toContain("Installation repair in progress");
+    expect(html).toContain("HQBase is completing its signed installation");
+    expect(html).toContain("repair-123");
+  });
+
+  it("offers one global same-release repair without changing customer source", () => {
+    const html = renderSettings({
+      ...availableStatus,
+      installedVersion: "0.2.0",
+      repairRequired: true
+    });
+
+    expect(html).toContain("Finish installation repair");
+    expect(html).toContain("Finish repair");
+    expect(html).toContain("fresh recovery checkpoint");
+    expect(html).toContain("will not change your source repository");
+    expect(html).not.toContain("What’s changing");
     expect(html).not.toContain("Install update");
   });
 });
