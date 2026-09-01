@@ -551,6 +551,21 @@ describe("HQBase updates", () => {
     ).resolves.toEqual({ buildId: "reconciled-build", status: "queued" });
     expect(fetcher.mock.calls.some(([, init]) => init?.method === "DELETE")).toBe(false);
   });
+  it("also reconciles Cloudflare's documented string build-variable shape", async () => {
+    const fetcher = cloudflareUpdateFetcher({
+      ambiguousBuild: "accepted",
+      reconciledVariableShape: "string"
+    });
+
+    await expect(
+      triggerUpdate(
+        updateEnvironment(),
+        "temporary-token-that-is-long-enough",
+        "0.1.0",
+        fetcher as typeof fetch
+      )
+    ).resolves.toEqual({ buildId: "reconciled-build", status: "queued" });
+  });
   it("keeps verified configuration when build acceptance cannot be determined", async () => {
     const fetcher = cloudflareUpdateFetcher({ ambiguousBuild: "unknown" });
 
@@ -574,6 +589,24 @@ describe("HQBase updates", () => {
     const fetcher = cloudflareUpdateFetcher({
       ambiguousBuild: "accepted",
       reconciledLoader: "different-loader"
+    });
+
+    await expect(
+      triggerUpdate(
+        updateEnvironment(),
+        "temporary-token-that-is-long-enough",
+        "0.1.0",
+        fetcher as typeof fetch
+      )
+    ).rejects.toMatchObject({ code: "UPDATE_BUILD_STATUS_UNKNOWN", status: 502 });
+  });
+  it.each([
+    "secret",
+    "null"
+  ] as const)("does not reconcile a build with %s required variables", async (reconciledVariableShape) => {
+    const fetcher = cloudflareUpdateFetcher({
+      ambiguousBuild: "accepted",
+      reconciledVariableShape
     });
 
     await expect(
@@ -758,6 +791,7 @@ function cloudflareUpdateFetcher(
     rollbackFails?: boolean;
     rootDirectory?: string;
     reconciledLoader?: string;
+    reconciledVariableShape?: "null" | "record" | "secret" | "string";
     variables?: Record<string, { is_secret: boolean; value?: string | null }>;
     variablesFail?: boolean;
   } = {}
@@ -850,6 +884,18 @@ function cloudflareUpdateFetcher(
       });
     }
     if (url.includes("/builds/builds/latest?")) {
+      const buildVariable = (value: string) => {
+        switch (options.reconciledVariableShape ?? "record") {
+          case "null":
+            return { is_secret: false, value: null };
+          case "secret":
+            return { is_secret: true, value };
+          case "string":
+            return value;
+          default:
+            return { is_secret: false, value };
+        }
+      };
       return Response.json({
         success: true,
         result: {
@@ -862,9 +908,10 @@ function cloudflareUpdateFetcher(
                       build_trigger_source: "api",
                       deploy_command: managedDeployCommand(),
                       environment_variables: {
-                        HQBASE_EXPECTED_RELEASE_VERSION: "0.1.0",
-                        HQBASE_UPDATER_LOADER:
+                        HQBASE_EXPECTED_RELEASE_VERSION: buildVariable("0.1.0"),
+                        HQBASE_UPDATER_LOADER: buildVariable(
                           options.reconciledLoader ?? managedUpdaterLoader(updater)
+                        )
                       }
                     },
                     build_uuid: "reconciled-build",
