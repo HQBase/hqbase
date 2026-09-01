@@ -178,9 +178,15 @@ describe("HQBase release deployment", () => {
     });
     expect(normalized.d1_databases[0]).not.toHaveProperty("migrations_pattern");
   });
-  it("uses only the Durable Objects exported by the verified release", () => {
+  it("uses release-managed Worker configuration from the verified release", () => {
     const deploymentConfig = {
       name: "customer-worker",
+      assets: {
+        binding: "ASSETS",
+        directory: "../../../dist",
+        not_found_handling: "single-page-application",
+        run_worker_first: ["/api/*"]
+      },
       durable_objects: {
         bindings: [{ name: "CUSTOMER_EVENTS", class_name: "CustomerEvents" }]
       },
@@ -191,16 +197,23 @@ describe("HQBase release deployment", () => {
     expect(previous).not.toHaveProperty("migrations");
 
     const releaseConfig = {
+      assets: {
+        binding: "ASSETS",
+        directory: "./dist",
+        not_found_handling: "single-page-application",
+        run_worker_first: ["/api/*", "/management/*"]
+      },
       durable_objects: {
         bindings: [{ name: "MAIL_EVENTS", class_name: "MailEvents" }]
       },
       migrations: [{ tag: "mail-events-v1", new_sqlite_classes: ["MailEvents"] }]
     };
     const candidate = normalizeConfig(deploymentConfig, "1.3.0", "b".repeat(64), releaseConfig);
+    expect(candidate.assets).toEqual(releaseConfig.assets);
     expect(candidate.durable_objects).toEqual(releaseConfig.durable_objects);
     expect(candidate.migrations).toEqual(releaseConfig.migrations);
   });
-  it("repairs the required realtime configuration left out by an older updater", () => {
+  it("repairs required release configuration left out by an older updater", () => {
     const staleConfig = {
       assets: { binding: "ASSETS", directory: "./dist" },
       d1_databases: [{ binding: "DB", database_id: "database-id" }],
@@ -215,6 +228,7 @@ describe("HQBase release deployment", () => {
 
     const prepared = prepareRequiredWorkerConfig(staleConfig);
 
+    expect(prepared.assets.run_worker_first).toContain("/management/*");
     expect(prepared.durable_objects.bindings).toEqual([
       { name: "CUSTOMER_EVENTS", class_name: "CustomerEvents" },
       { name: "MAIL_EVENTS", class_name: "MailEvents" }

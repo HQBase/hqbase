@@ -108,6 +108,7 @@ export function normalizeConfig(config, version, artifactSha256, releaseConfig =
     ],
     assets: {
       ...config.assets,
+      ...releaseConfig.assets,
       directory: "./dist"
     },
     observability: {

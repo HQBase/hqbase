@@ -4,6 +4,18 @@ import { resolve } from "node:path";
 
 const mailEventsBinding = { name: "MAIL_EVENTS", class_name: "MailEvents" };
 const mailEventsMigration = { tag: "mail-events-v1", new_sqlite_classes: ["MailEvents"] };
+const requiredWorkerFirstRoutes = [
+  "/api/*",
+  "/management/*",
+  "/mcp",
+  "/mcp/*",
+  "/.well-known/*",
+  "/skills/hqbase-mail/SKILL.md",
+  "/skills/hqbase-mailbox/SKILL.md",
+  "/skills/hqbase-provisioner/SKILL.md",
+  "/AGENTS.md",
+  "/agents.md"
+];
 
 export function prepareRequiredWorkerConfig(config) {
   assertObject(config, "Worker configuration");
@@ -33,9 +45,17 @@ export function prepareRequiredWorkerConfig(config) {
   if (conflictingMigration) {
     throw new Error("MailEvents is assigned to an unexpected Durable Object migration tag.");
   }
+  const workerFirstRoutes = array(config.assets?.run_worker_first);
 
   const prepared = {
     ...config,
+    assets: {
+      ...config.assets,
+      run_worker_first: [
+        ...workerFirstRoutes,
+        ...requiredWorkerFirstRoutes.filter((route) => !workerFirstRoutes.includes(route))
+      ]
+    },
     durable_objects: {
       ...config.durable_objects,
       bindings: currentBinding ? durableBindings : [...durableBindings, mailEventsBinding]
@@ -47,8 +67,13 @@ export function prepareRequiredWorkerConfig(config) {
 }
 
 export function assertRequiredWorkerConfig(config) {
+  const workerFirstRoutes = array(config.assets?.run_worker_first);
   const checks = [
     [config.assets?.binding === "ASSETS", "ASSETS Worker Assets binding"],
+    [
+      requiredWorkerFirstRoutes.every((route) => workerFirstRoutes.includes(route)),
+      "Worker-first asset routes"
+    ],
     [array(config.d1_databases).some((binding) => binding?.binding === "DB"), "DB D1 binding"],
     [
       array(config.r2_buckets).some((binding) => binding?.binding === "MAIL_OBJECTS"),

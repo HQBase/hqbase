@@ -277,6 +277,12 @@ test("a mailbox agent stays inside its assigned mailbox and revokes cleanly", as
   const mailbox = mailboxes.find((item) => item.address === sender);
   if (!mailbox) throw new Error(`Staging mailbox ${sender} was not found.`);
 
+  const agentsResponse = await request.get("/management/v1/agents");
+  const agentsBody = await agentsResponse.text();
+  expect(agentsResponse.status(), agentsBody).toBe(200);
+  expect(agentsResponse.headers()["content-type"]).toContain("application/json");
+  expect(JSON.parse(agentsBody)).toMatchObject({ agents: expect.any(Array) });
+
   const createdResponse = await request.post("/management/v1/agents", {
     data: {
       profile: "mailbox",
