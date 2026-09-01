@@ -1,10 +1,27 @@
 import { generateKeyPairSync, sign } from "node:crypto";
-import { compareVersions, getUpdateStatus, triggerUpdate } from "@worker/features/updates/service";
+import {
+  afterDeployMigrationNames,
+  normalMigrationNames,
+  transitionGuards
+} from "@worker/features/updates/migration-state";
+import {
+  compareVersions,
+  getUpdateStatus,
+  isManagedDeployCommand,
+  managedDeployCommand,
+  triggerUpdate
+} from "@worker/features/updates/service";
 import type { WorkerEnv } from "@worker/lib/env";
 import { describe, expect, it, vi } from "vitest";
 
 const { privateKey, publicKey } = generateKeyPairSync("ed25519");
 const publicKeyBase64 = publicKey.export({ type: "spki", format: "der" }).toString("base64");
+const updater = {
+  protocol: 2 as const,
+  sourceUrl: `https://raw.githubusercontent.com/HQBase/hqbase/${"a".repeat(40)}/scripts/release/bootstrap.mjs`,
+  sha256: "b".repeat(64),
+  size: 1234
+};
 const payload = Buffer.from(
   JSON.stringify({
     format: "hqbase-release-v1",
@@ -21,6 +38,7 @@ const payload = Buffer.from(
       sha256: "0".repeat(64),
       size: 0
     },
+    updater,
     keyId: "hqbase-release-2026-01"
   })
 ).toString("base64url");
@@ -31,19 +49,27 @@ const envelope = {
 
 describe("HQBase updates", () => {
   it("verifies signed manifests", async () => {
-    const status = await getUpdateStatus(
-      { HQBASE_RELEASE_PUBLIC_KEY: publicKeyBase64 } as WorkerEnv,
-      async () => Response.json(envelope)
-    );
+    const environment = updateEnvironment("0.1.1");
+    const status = await getUpdateStatus(environment, async () => Response.json(envelope));
     expect(status).toMatchObject({
       product: "hqbase",
       installedVersion: "0.1.1",
       installedSchemaVersion: 3,
       available: false,
-      compatible: true
+      compatible: true,
+      repairRequired: false
     });
     expect(status.release.notes).toEqual(["Add a signed changelog."]);
     expect(compareVersions("0.2.0", "0.1.9")).toBeGreaterThan(0);
+  });
+  it("does not require the current release ledger before a supported older version updates", async () => {
+    const environment = updateEnvironment("0.0.9");
+    const prepare = vi.spyOn(environment.DB, "prepare");
+
+    await expect(
+      getUpdateStatus(environment, async () => Response.json(envelope))
+    ).resolves.toMatchObject({ available: true, repairRequired: false });
+    expect(prepare).not.toHaveBeenCalled();
   });
   it("rejects a tampered manifest", async () => {
     const replacement = envelope.signature.startsWith("A") ? "B" : "A";
@@ -71,6 +97,55 @@ describe("HQBase updates", () => {
       JSON.stringify({ HQBASE_EXPECTED_RELEASE_VERSION: { is_secret: false, value: "0.1.0" } })
     ]);
     expect(fetcher.mock.calls.some(([, init]) => init?.method === "DELETE")).toBe(false);
+    const commandRequests = fetcher.mock.calls.filter(
+      ([input, init]) =>
+        String(input).endsWith("/builds/triggers/trigger") && init?.method === "PATCH"
+    );
+    expect(commandRequests.map(([, init]) => init?.body)).toEqual([
+      JSON.stringify({ deploy_command: managedDeployCommand(updater) })
+    ]);
+  });
+  it("offers and starts an authorized repair for the already active signed release", async () => {
+    const environment = updateEnvironment("0.1.0", 0);
+    const fetcher = cloudflareUpdateFetcher();
+
+    await expect(getUpdateStatus(environment, fetcher as typeof fetch)).resolves.toMatchObject({
+      available: true,
+      repairRequired: true,
+      release: { version: "0.1.0" }
+    });
+    await expect(
+      triggerUpdate(
+        environment,
+        "temporary-token-that-is-long-enough",
+        "0.1.0",
+        fetcher as typeof fetch
+      )
+    ).resolves.toEqual({ buildId: "build-id", status: "queued" });
+  });
+  it("offers a retry when schema cleanup finished but bookkeeping is pending", async () => {
+    const environment = updateEnvironment("0.1.0", 3, true);
+
+    await expect(
+      getUpdateStatus(environment, cloudflareUpdateFetcher() as typeof fetch)
+    ).resolves.toMatchObject({
+      available: true,
+      repairRequired: true,
+      release: { version: "0.1.0" }
+    });
+  });
+  it("accepts only the exact canonical updater command", () => {
+    const command = managedDeployCommand(updater);
+    const previousReleaseCommand = managedDeployCommand({
+      ...updater,
+      sha256: "c".repeat(64)
+    });
+    expect(isManagedDeployCommand(command)).toBe(true);
+    expect(isManagedDeployCommand(previousReleaseCommand)).toBe(true);
+    expect(isManagedDeployCommand(`${command} && pnpm deploy`)).toBe(false);
+    expect(
+      isManagedDeployCommand(command.replace("HQBase updater verification failed.", "skip"))
+    ).toBe(false);
   });
   it("rejects an overlapping update before it can replace the shared release pin", async () => {
     let firstPinStarted: (() => void) | undefined;
@@ -309,6 +384,14 @@ describe("HQBase updates", () => {
       JSON.stringify({ HQBASE_EXPECTED_RELEASE_VERSION: { is_secret: false, value: "0.1.0" } }),
       JSON.stringify({ HQBASE_EXPECTED_RELEASE_VERSION: { is_secret: false, value: "0.0.8" } })
     ]);
+    const commandRequests = fetcher.mock.calls.filter(
+      ([input, init]) =>
+        String(input).endsWith("/builds/triggers/trigger") && init?.method === "PATCH"
+    );
+    expect(commandRequests.map(([, init]) => init?.body)).toEqual([
+      JSON.stringify({ deploy_command: managedDeployCommand(updater) }),
+      JSON.stringify({ deploy_command: "pnpm deploy" })
+    ]);
   });
   it("removes a new release pin when the build does not start", async () => {
     const fetcher = cloudflareUpdateFetcher({ buildFails: true });
@@ -329,7 +412,7 @@ describe("HQBase updates", () => {
       )
     ).toBe(true);
   });
-  it("preserves the build error when release pin rollback fails", async () => {
+  it("reports an incomplete build-configuration rollback", async () => {
     const fetcher = cloudflareUpdateFetcher({
       buildFails: true,
       rollbackFails: true,
@@ -345,16 +428,33 @@ describe("HQBase updates", () => {
         "0.1.0",
         fetcher as typeof fetch
       )
-    ).rejects.toThrow("Build could not start");
+    ).rejects.toMatchObject({ code: "UPDATE_TRIGGER_ROLLBACK_FAILED", status: 502 });
+    const commandRequests = fetcher.mock.calls.filter(
+      ([input, init]) =>
+        String(input).endsWith("/builds/triggers/trigger") && init?.method === "PATCH"
+    );
+    expect(commandRequests.map(([, init]) => init?.body)).toEqual([
+      JSON.stringify({ deploy_command: managedDeployCommand(updater) })
+    ]);
   });
 });
 
-function updateEnvironment(): WorkerEnv {
+function updateEnvironment(
+  installedVersion = "0.0.9",
+  migrationStage: 0 | 3 = 3,
+  pendingBookkeeping = false
+): WorkerEnv {
   const raw = vi.fn().mockResolvedValue([[JSON.stringify("mail.example.com")]]);
   let lockValue: string | null = null;
   const db = {
     prepare: vi.fn((query: string) => ({
+      all: vi.fn(async () =>
+        migrationQueryResult(query, migrationStage, installedVersion, pendingBookkeeping)
+      ),
       bind: vi.fn((...values: unknown[]) => ({
+        all: vi.fn(async () =>
+          migrationQueryResult(query, migrationStage, installedVersion, pendingBookkeeping, values)
+        ),
         first: vi.fn(async () => {
           if (!query.includes("INSERT INTO app_settings")) return null;
           if (lockValue) return null;
@@ -373,10 +473,104 @@ function updateEnvironment(): WorkerEnv {
   } as unknown as D1Database;
   return {
     DB: db,
-    HQBASE_APP_VERSION: "0.0.9",
+    HQBASE_APP_VERSION: installedVersion,
     HQBASE_RELEASE_PUBLIC_KEY: publicKeyBase64,
     HQBASE_WORKER_NAME: "hqbase"
   } as WorkerEnv;
+}
+
+function migrationQueryResult(
+  query: string,
+  stage: 0 | 3,
+  installedVersion: string,
+  pendingBookkeeping: boolean,
+  values: unknown[] = []
+): { results: unknown[] } {
+  if (query.includes("FROM sqlite_schema")) {
+    return {
+      results: [
+        { name: "d1_migrations", type: "table" },
+        ...(stage === 3
+          ? [{ name: "d1_migrations_after_deploy", type: "table" }]
+          : [
+              { name: "mailbox_address_migration", type: "table" },
+              { name: "mailbox_addresses", type: "table" },
+              ...transitionGuards.map((name) => ({ name, type: "trigger" }))
+            ])
+      ]
+    };
+  }
+  if (query.includes("FROM d1_migrations_after_deploy")) {
+    return { results: afterDeployMigrationNames.map((name) => ({ name })) };
+  }
+  if (query.includes("FROM d1_migrations")) {
+    return { results: normalMigrationNames.map((name) => ({ name })) };
+  }
+  if (query === "PRAGMA table_info(messages)") {
+    return {
+      results: [
+        "id",
+        "delivered_to_address",
+        ...(stage === 0 ? ["delivered_to_address_id", "sent_from_address_id"] : [])
+      ].map((name) => ({ name }))
+    };
+  }
+  if (query === "PRAGMA table_info(mailbox_grants)") {
+    return {
+      results: [
+        "mailbox_id",
+        "principal_id",
+        ...(stage === 0 ? ["created_by", "user_id"] : [])
+      ].map((name) => ({ name }))
+    };
+  }
+  if (query === "PRAGMA table_info(drafts)") {
+    return {
+      results: ["id", "principal_id", ...(stage === 0 ? ["user_id"] : [])].map((name) => ({ name }))
+    };
+  }
+  if (query === "PRAGMA table_info(draft_changes)") {
+    return {
+      results: ["sequence", "principal_id", ...(stage === 0 ? ["user_id"] : [])].map((name) => ({
+        name
+      }))
+    };
+  }
+  if (query === "PRAGMA foreign_key_list(draft_labels)") {
+    return {
+      results:
+        stage === 3 ? [{ from: "draft_id", on_delete: "CASCADE", table: "drafts", to: "id" }] : []
+    };
+  }
+  if (query.includes("FROM release_state")) {
+    return {
+      results: [
+        {
+          channel: "stable",
+          installed_schema_version: 2,
+          installed_version: installedVersion,
+          product: "hqbase"
+        }
+      ]
+    };
+  }
+  if (query.includes("FROM update_history")) {
+    return {
+      results: pendingBookkeeping
+        ? [
+            {
+              checkpoint_bookmark: "bookmark-before-update",
+              from_version: "0.0.9",
+              id: "pending-update",
+              state: "deployed",
+              to_version: String(values[0]),
+              worker_version: "worker-before-update"
+            }
+          ]
+        : []
+    };
+  }
+  return { results: [] };
 }
 
 function cloudflareUpdateFetcher(

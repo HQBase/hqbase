@@ -8,6 +8,7 @@ import { applyMigrationPhase } from "../d1-migrations.mjs";
 import { recordWorkerDeployedForConfig } from "../hqbase/manifest.mjs";
 import { windowsSystem32Executable } from "../windows-system32.mjs";
 import { assertRequiredActiveBindings, inspectActiveRelease } from "./active-version.mjs";
+import { inspectRemoteAfterDeployState } from "./after-deploy-state.mjs";
 import { capture, run } from "./command.mjs";
 import {
   compareVersions,
@@ -114,10 +115,23 @@ export async function deploy(options = {}) {
       );
     }
     if (activeRelease.version === manifest.version && activeRelease.tag === releaseTag) {
+      const afterDeployState = inspectRemoteAfterDeployState(source, manifest.version);
+      let retryActiveRelease = activeRelease;
       if (activeRelease.missingBindings.length > 0) {
-        deployConfiguration(source, config.name, releaseTag);
+        retryActiveRelease = deployConfiguration(source, config.name, releaseTag);
       }
-      completeActiveReleaseRetry(source, manifest, recordWorkerDeployed);
+      const retry = completeActiveReleaseRetry(source, manifest, recordWorkerDeployed, {
+        activeRelease: retryActiveRelease,
+        afterDeployState,
+        configFile,
+        workerName: config.name,
+        onRecovery: (checkpoint) => {
+          recovery = checkpoint;
+        }
+      });
+      if (activeRelease.missingBindings.length > 0 && !retry.workerRecorded) {
+        recordWorkerDeployed();
+      }
       console.log(`HQBase ${manifest.version} is already the active signed release.`);
       return;
     }
@@ -238,12 +252,94 @@ export function deployConfiguration(source, workerName, releaseTag, options = {}
 export function completeActiveReleaseRetry(source, manifest, recordWorkerDeployed, options = {}) {
   const applyMigrations = options.applyMigrationPhase ?? applyMigrationPhase;
   const updateReleaseState = options.executeSql ?? executeSql;
+  const afterDeployState =
+    options.afterDeployState ??
+    (options.inspectAfterDeployState ?? inspectRemoteAfterDeployState)(source, manifest.version);
+  if (!["S0", "S1", "S2", "S3"].includes(afterDeployState?.phase)) {
+    throw new Error("Refusing to repair HQBase because the D1 post-deploy state is invalid.");
+  }
+
+  let update = afterDeployState.pendingUpdate;
+  if (afterDeployState.phase === "S3" && !update) {
+    return { phase: "S3", repaired: false, workerRecorded: false };
+  }
+
+  let checkpoint;
+  if (update) {
+    checkpoint = {
+      bookmark: update.checkpoint_bookmark,
+      cleanupComplete: afterDeployState.phase === "S3",
+      configFile: options.configFile,
+      name: options.workerName,
+      workerVersion: update.worker_version
+    };
+  } else {
+    const workerVersion = options.activeRelease?.versionId;
+    if (!workerVersion) throw new Error("Could not establish the update recovery checkpoint.");
+    const bookmark = (options.createRecoveryBookmark ?? createRecoveryBookmark)(source, options);
+    const updateId = (options.randomUUID ?? randomUUID)();
+    if (!bookmark) throw new Error("Could not establish the update recovery checkpoint.");
+    update = {
+      checkpoint_bookmark: bookmark,
+      from_version: manifest.version,
+      id: updateId,
+      state: "started",
+      to_version: manifest.version,
+      worker_version: workerVersion
+    };
+    checkpoint = {
+      bookmark,
+      cleanupComplete: false,
+      configFile: options.configFile,
+      name: options.workerName,
+      workerVersion
+    };
+  }
+
+  options.onRecovery?.(checkpoint);
+  if (!afterDeployState.pendingUpdate) {
+    updateReleaseState(
+      source,
+      `INSERT INTO update_history (id, from_version, to_version, checkpoint_bookmark, worker_version, state, started_at) VALUES (${quote(update.id)}, ${quote(manifest.version)}, ${quote(manifest.version)}, ${quote(update.checkpoint_bookmark)}, ${quote(update.worker_version)}, 'started', datetime('now'))`
+    );
+  }
   recordWorkerDeployed();
-  applyMigrations(source, "normal", { target: "remote" });
-  applyMigrations(source, "after-deploy", { target: "remote" });
+  if (afterDeployState.phase !== "S3") {
+    applyMigrations(source, "normal", { target: "remote" });
+    applyMigrations(source, "after-deploy", { target: "remote" });
+    checkpoint.cleanupComplete = true;
+  }
   updateReleaseState(
     source,
-    `UPDATE release_state SET installed_version = ${quote(manifest.version)}, installed_schema_version = ${manifest.schemaVersion}, updated_at = datetime('now') WHERE singleton = 1; UPDATE update_history SET state = 'verified', completed_at = datetime('now') WHERE state IN ('started', 'deployed') AND id = (SELECT id FROM update_history WHERE to_version = ${quote(manifest.version)} AND state IN ('started', 'deployed') ORDER BY started_at DESC, rowid DESC LIMIT 1)`
+    `UPDATE release_state SET installed_version = ${quote(manifest.version)}, installed_schema_version = ${manifest.schemaVersion}, updated_at = datetime('now') WHERE singleton = 1; UPDATE update_history SET state = 'verified', completed_at = datetime('now') WHERE id = ${quote(update.id)} AND state IN ('started', 'deployed')`
+  );
+  return {
+    phase: afterDeployState.phase,
+    repaired: afterDeployState.phase !== "S3",
+    workerRecorded: true
+  };
+}
+
+export function createRecoveryBookmark(source, options = {}) {
+  return findString(
+    JSON.parse(
+      (options.capture ?? capture)(
+        "pnpm",
+        [
+          "exec",
+          "wrangler",
+          "d1",
+          "time-travel",
+          "info",
+          "DB",
+          "--json",
+          "--config",
+          "wrangler.jsonc"
+        ],
+        source
+      )
+    ),
+    "bookmark"
   );
 }
 

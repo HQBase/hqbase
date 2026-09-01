@@ -5,11 +5,18 @@ const progressLifetimeMs = 30 * 60 * 1000;
 
 export type UpdateProgress = {
   buildId: string;
+  kind: UpdateActionKind;
   startedAt: number;
 };
 
-export function beginUpdateProgress(buildId: string, now = Date.now()): UpdateProgress {
-  const progress = { buildId, startedAt: now };
+export type UpdateActionKind = "repair" | "update";
+
+export function beginUpdateProgress(
+  buildId: string,
+  kind: UpdateActionKind,
+  now = Date.now()
+): UpdateProgress {
+  const progress = { buildId, kind, startedAt: now };
   storage()?.setItem(storageKey, JSON.stringify(progress));
   if (typeof window !== "undefined") {
     window.dispatchEvent(
@@ -35,7 +42,15 @@ export function readUpdateProgress(now = Date.now()): UpdateProgress | null {
       sessionStorage?.removeItem(storageKey);
       return null;
     }
-    return { buildId: progress.buildId, startedAt: progress.startedAt };
+    if (progress.kind !== undefined && progress.kind !== "repair" && progress.kind !== "update") {
+      sessionStorage?.removeItem(storageKey);
+      return null;
+    }
+    return {
+      buildId: progress.buildId,
+      kind: progress.kind === "repair" ? "repair" : "update",
+      startedAt: progress.startedAt
+    };
   } catch {
     sessionStorage?.removeItem(storageKey);
     return null;

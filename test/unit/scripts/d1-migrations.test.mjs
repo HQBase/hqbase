@@ -2,7 +2,6 @@ import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, resolve } from "node:path";
-import { DatabaseSync } from "node:sqlite";
 import { describe, expect, it, vi } from "vitest";
 
 import { applyLocalMigrations, applyMigrationPhase } from "../../../scripts/d1-migrations.mjs";
@@ -135,91 +134,166 @@ describe("two-phase D1 migrations", () => {
     expect(cleanupMigrationSource).toContain("installed_schema_version = 3");
   });
 
-  it("verifies the latest pending retry when a newer update is already verified", () => {
+  it("creates a fresh checkpoint and a distinct same-version history row before repair", () => {
     const commands = [];
-    let bookkeepingSql;
+    const recovery = [];
+    const sql = [];
+
+    const result = completeActiveReleaseRetry(
+      "/release",
+      { schemaVersion: 16, version: "1.2.3" },
+      () => commands.push("record-worker"),
+      {
+        activeRelease: { versionId: "worker-current" },
+        afterDeployState: { phase: "S0", pendingUpdate: null },
+        applyMigrationPhase: (cwd, phase, options) =>
+          commands.push(`migrate:${cwd}:${phase}:${options.target}`),
+        configFile: "/customer/wrangler.jsonc",
+        createRecoveryBookmark: () => {
+          commands.push("checkpoint");
+          return "bookmark-fresh";
+        },
+        executeSql: (cwd, statement) => {
+          commands.push(`sql:${cwd}`);
+          sql.push(statement);
+        },
+        onRecovery: (checkpoint) => recovery.push(checkpoint),
+        randomUUID: () => "repair-update",
+        workerName: "hqbase"
+      }
+    );
+
+    expect(commands).toEqual([
+      "checkpoint",
+      "sql:/release",
+      "record-worker",
+      "migrate:/release:normal:remote",
+      "migrate:/release:after-deploy:remote",
+      "sql:/release"
+    ]);
+    expect(sql[0]).toContain(
+      "VALUES ('repair-update', '1.2.3', '1.2.3', 'bookmark-fresh', 'worker-current', 'started'"
+    );
+    expect(sql[1]).toContain("WHERE id = 'repair-update' AND state IN ('started', 'deployed')");
+    expect(sql[1]).not.toContain("SELECT id FROM update_history");
+    expect(recovery).toHaveLength(1);
+    expect(recovery[0]).toMatchObject({
+      bookmark: "bookmark-fresh",
+      cleanupComplete: true,
+      configFile: "/customer/wrangler.jsonc",
+      name: "hqbase",
+      workerVersion: "worker-current"
+    });
+    expect(result).toEqual({ phase: "S0", repaired: true, workerRecorded: true });
+  });
+
+  it.each(["S1", "S2"])("resumes the exact pending %s repair row", (phase) => {
+    const commands = [];
+    const sql = [];
+    const checkpoint = vi.fn();
 
     completeActiveReleaseRetry(
       "/release",
       { schemaVersion: 16, version: "1.2.3" },
       () => commands.push("record-worker"),
       {
-        applyMigrationPhase: (cwd, phase, options) =>
-          commands.push(`migrate:${cwd}:${phase}:${options.target}`),
-        executeSql: (cwd, sql) => {
-          commands.push(`bookkeeping:${cwd}`);
-          bookkeepingSql = sql;
-        }
+        activeRelease: { versionId: "worker-current" },
+        afterDeployState: {
+          phase,
+          pendingUpdate: {
+            checkpoint_bookmark: "bookmark-original",
+            from_version: "1.2.3",
+            id: "repair-original",
+            state: "started",
+            to_version: "1.2.3",
+            worker_version: "worker-original"
+          }
+        },
+        applyMigrationPhase: (cwd, migrationPhase, options) =>
+          commands.push(`migrate:${cwd}:${migrationPhase}:${options.target}`),
+        createRecoveryBookmark: checkpoint,
+        executeSql: (_cwd, statement) => sql.push(statement)
       }
     );
 
+    expect(checkpoint).not.toHaveBeenCalled();
     expect(commands).toEqual([
       "record-worker",
       "migrate:/release:normal:remote",
-      "migrate:/release:after-deploy:remote",
-      "bookkeeping:/release"
+      "migrate:/release:after-deploy:remote"
     ]);
-    expect(bookkeepingSql).toContain(
-      "UPDATE release_state SET installed_version = '1.2.3', installed_schema_version = 16"
-    );
-    expect(bookkeepingSql).toContain(
-      "UPDATE update_history SET state = 'verified', completed_at = datetime('now')"
-    );
-    expect(bookkeepingSql).toContain(
-      "WHERE state IN ('started', 'deployed') AND id = (SELECT id FROM update_history WHERE to_version = '1.2.3' AND state IN ('started', 'deployed')"
-    );
-    expect(bookkeepingSql).toContain("ORDER BY started_at DESC, rowid DESC LIMIT 1");
+    expect(sql).toHaveLength(1);
+    expect(sql[0]).toContain("WHERE id = 'repair-original'");
+  });
 
-    const database = new DatabaseSync(":memory:");
-    try {
-      database.exec(`
-        CREATE TABLE release_state (
-          singleton INTEGER PRIMARY KEY,
-          installed_version TEXT NOT NULL,
-          installed_schema_version INTEGER NOT NULL,
-          updated_at TEXT NOT NULL
-        );
-        INSERT INTO release_state VALUES (1, '1.2.2', 15, 'before');
-        CREATE TABLE update_history (
-          id TEXT PRIMARY KEY,
-          to_version TEXT NOT NULL,
-          state TEXT NOT NULL,
-          started_at TEXT NOT NULL,
-          completed_at TEXT
-        );
-        INSERT INTO update_history VALUES
-          ('older-target', '1.2.3', 'started', '2026-08-23 10:00:00', NULL),
-          ('latest-target', '1.2.3', 'verified', '2026-08-23 11:00:00', '2026-08-23 11:01:00'),
-          ('other-target', '1.2.4', 'started', '2026-08-23 12:00:00', NULL);
-      `);
+  it("leaves a complete S3 database unchanged and finalizes only its pending repair row", () => {
+    const recordWorker = vi.fn();
+    const migrate = vi.fn();
+    const execute = vi.fn();
+    const complete = { phase: "S3", pendingUpdate: null };
 
-      database.exec(bookkeepingSql);
-      expect(
-        database
-          .prepare(
-            "SELECT installed_version, installed_schema_version FROM release_state WHERE singleton = 1"
-          )
-          .get()
-      ).toEqual({ installed_schema_version: 16, installed_version: "1.2.3" });
-      expect(
-        database.prepare("SELECT id, state FROM update_history ORDER BY started_at").all()
-      ).toEqual([
-        { id: "older-target", state: "verified" },
-        { id: "latest-target", state: "verified" },
-        { id: "other-target", state: "started" }
-      ]);
+    expect(
+      completeActiveReleaseRetry(
+        "/release",
+        { schemaVersion: 16, version: "1.2.3" },
+        recordWorker,
+        {
+          afterDeployState: complete,
+          applyMigrationPhase: migrate,
+          executeSql: execute
+        }
+      )
+    ).toEqual({ phase: "S3", repaired: false, workerRecorded: false });
+    expect(recordWorker).not.toHaveBeenCalled();
+    expect(migrate).not.toHaveBeenCalled();
+    expect(execute).not.toHaveBeenCalled();
 
-      database.exec(bookkeepingSql);
-      expect(
-        database.prepare("SELECT id, state FROM update_history ORDER BY started_at").all()
-      ).toEqual([
-        { id: "older-target", state: "verified" },
-        { id: "latest-target", state: "verified" },
-        { id: "other-target", state: "started" }
-      ]);
-    } finally {
-      database.close();
-    }
+    completeActiveReleaseRetry("/release", { schemaVersion: 16, version: "1.2.3" }, recordWorker, {
+      afterDeployState: {
+        phase: "S3",
+        pendingUpdate: {
+          checkpoint_bookmark: "bookmark-original",
+          from_version: "1.2.3",
+          id: "repair-original",
+          state: "started",
+          to_version: "1.2.3",
+          worker_version: "worker-original"
+        }
+      },
+      applyMigrationPhase: migrate,
+      executeSql: execute
+    });
+    expect(recordWorker).toHaveBeenCalledOnce();
+    expect(migrate).not.toHaveBeenCalled();
+    expect(execute).toHaveBeenCalledOnce();
+    expect(execute.mock.calls[0][1]).toContain("WHERE id = 'repair-original'");
+  });
+
+  it("does not mutate anything when state inspection fails", () => {
+    const recordWorker = vi.fn();
+    const migrate = vi.fn();
+    const execute = vi.fn();
+    const checkpoint = vi.fn();
+
+    expect(() =>
+      completeActiveReleaseRetry(
+        "/release",
+        { schemaVersion: 16, version: "1.2.3" },
+        recordWorker,
+        {
+          applyMigrationPhase: migrate,
+          createRecoveryBookmark: checkpoint,
+          executeSql: execute,
+          inspectAfterDeployState: () => {
+            throw new Error("inconsistent post-deploy state");
+          }
+        }
+      )
+    ).toThrow("inconsistent post-deploy state");
+    expect(recordWorker).not.toHaveBeenCalled();
+    expect(migrate).not.toHaveBeenCalled();
+    expect(execute).not.toHaveBeenCalled();
+    expect(checkpoint).not.toHaveBeenCalled();
   });
 
   it("orders each remote phase around the active Worker cutover", () => {
@@ -239,7 +313,7 @@ describe("two-phase D1 migrations", () => {
       "const bookmark = findString"
     );
     expectOrder(retry, [
-      "completeActiveReleaseRetry(source, manifest, recordWorkerDeployed)",
+      "completeActiveReleaseRetry(source, manifest, recordWorkerDeployed, {",
       "console.log(`HQBase"
     ]);
 

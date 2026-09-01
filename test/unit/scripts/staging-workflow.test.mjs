@@ -114,19 +114,106 @@ describe("staging workflow lifecycle record", () => {
     expect(waitStep).toContain("candidate=$CANDIDATE_VERSION&attempt=$attempt");
   });
 
-  it("runs the previous updater against its own deployment root", () => {
+  it("uses the oldest supported updater for the previous release and candidate", () => {
+    const previousRelease = releaseWorkflow.indexOf(
+      "      - name: Install the previous stable release with the oldest supported updater"
+    );
+    const bootstrapData = releaseWorkflow.indexOf(
+      "      - name: Bootstrap persistent N-1 staging data"
+    );
+    const oauth = releaseWorkflow.indexOf(
+      "      - name: Configure customer OAuth for the candidate"
+    );
+    const legacyConfig = releaseWorkflow.indexOf(
+      "      - name: Reproduce the legacy Worker configuration"
+    );
+    const candidate = releaseWorkflow.indexOf("      - name: Apply the exact signed candidate");
+
+    expect(previousRelease).toBeGreaterThan(-1);
+    expect(bootstrapData).toBeGreaterThan(previousRelease);
+    expect(oauth).toBeGreaterThan(bootstrapData);
+    expect(legacyConfig).toBeGreaterThan(oauth);
+    expect(candidate).toBeGreaterThan(legacyConfig);
+    expect(releaseWorkflow).toContain("OLDEST_UPDATER_TAG: v1.0.0");
+    expect(releaseWorkflow.slice(legacyConfig, candidate)).toContain(
+      "delete config.durable_objects"
+    );
+    expect(releaseWorkflow.slice(legacyConfig, candidate)).toContain("delete config.migrations");
     expect(releaseWorkflow).toContain(
-      'previous_deployment="$previous_source/.hqbase/deployments/$DEPLOYMENT_NAME"'
+      'oldest_deployment="$oldest_source/.hqbase/deployments/$DEPLOYMENT_NAME"'
     );
     expect(releaseWorkflow).toContain(
-      'ln -s "$GITHUB_WORKSPACE/.hqbase/deployments/$DEPLOYMENT_NAME" "$previous_deployment"'
+      'ln -s "$GITHUB_WORKSPACE/.hqbase/deployments/$DEPLOYMENT_NAME" "$oldest_deployment"'
     );
-    expect(releaseWorkflow).toContain('previous_config="$previous_deployment/wrangler.jsonc"');
-    expect(releaseWorkflow).toContain('node "$previous_updater" --config "$previous_config"');
+    expect(releaseWorkflow).toContain('oldest_config="$oldest_deployment/wrangler.jsonc"');
+    expect(releaseWorkflow).toContain('node "$oldest_updater" --config "$oldest_config"');
     expect(releaseWorkflow).toContain(
-      `config="\${HQBASE_PREVIOUS_CONFIG:-$GITHUB_WORKSPACE/.hqbase/deployments/$DEPLOYMENT_NAME/wrangler.jsonc}"`
+      'node "$HQBASE_OLDEST_UPDATER" --config "$HQBASE_OLDEST_CONFIG"'
     );
-    expect(releaseWorkflow).toContain('node "$updater" --config "$config"');
+  });
+
+  it("proves the stale state before the canonical repair and its retry", () => {
+    const candidate = releaseWorkflow.indexOf("      - name: Apply the exact signed candidate");
+    const stale = releaseWorkflow.indexOf(
+      "      - name: Verify the candidate restored the binding while the database remained at S0"
+    );
+    const repair = releaseWorkflow.indexOf(
+      "      - name: Finish the candidate through its canonical signed bootstrap"
+    );
+    const final = releaseWorkflow.indexOf(
+      "      - name: Verify exact migration ledgers, final schema, and preserved data"
+    );
+    const retry = releaseWorkflow.indexOf(
+      "      - name: Prove the canonical same-version retry is idempotent"
+    );
+    const bindings = releaseWorkflow.indexOf("      - name: Verify active Worker bindings");
+    const lifecycle = releaseWorkflow.indexOf(
+      "      - name: Verify PWA, app shell, access, and operator lifecycle"
+    );
+    const backup = releaseWorkflow.indexOf(
+      "      - name: Exercise populated remote backup and restore"
+    );
+
+    expect(candidate).toBeGreaterThan(-1);
+    expect(stale).toBeGreaterThan(candidate);
+    expect(repair).toBeGreaterThan(stale);
+    expect(final).toBeGreaterThan(repair);
+    expect(retry).toBeGreaterThan(final);
+    expect(bindings).toBeGreaterThan(retry);
+    expect(lifecycle).toBeGreaterThan(bindings);
+    expect(backup).toBeGreaterThan(lifecycle);
+    expect(releaseWorkflow.slice(stale, repair)).toContain("after_deploy_ledger_table_count:0");
+    expect(releaseWorkflow.slice(stale, repair)).toContain("alias_table_count:2");
+    expect(releaseWorkflow.slice(stale, repair)).toContain("transition_guard_count:11");
+    expect(releaseWorkflow.slice(stale, repair)).toContain('index("MAIL_EVENTS") != null');
+    expect(releaseWorkflow.slice(stale, repair)).toContain("pnpm test:e2e:staging:event-socket");
+    expect(releaseWorkflow.slice(repair, final)).toContain(
+      'node "$GITHUB_WORKSPACE/scripts/release/bootstrap.mjs" --config "$config"'
+    );
+    expect(releaseWorkflow.slice(final, retry)).toContain(
+      "SELECT name FROM d1_migrations ORDER BY id"
+    );
+    expect(releaseWorkflow.slice(final, retry)).toContain(
+      "SELECT name FROM d1_migrations_after_deploy ORDER BY id"
+    );
+    expect(releaseWorkflow.slice(final, retry)).toContain("repair_history_count:1");
+    expect(releaseWorkflow.slice(final, retry)).toContain("PRAGMA foreign_key_check");
+    expect(releaseWorkflow.slice(final, retry)).toContain("hqbase-pre-repair-data.json");
+    expect(releaseWorkflow.slice(retry, bindings)).toContain(
+      'node "$GITHUB_WORKSPACE/scripts/release/bootstrap.mjs" --config "$config"'
+    );
+  });
+
+  it("keeps the customer source checkout unchanged", () => {
+    expect(releaseWorkflow).toContain(
+      "      - name: Verify the customer source checkout starts unchanged"
+    );
+    expect(releaseWorkflow).toContain(
+      "      - name: Verify the customer source checkout stayed unchanged"
+    );
+    expect(releaseWorkflow.match(/git diff --quiet/g)).toHaveLength(2);
+    expect(releaseWorkflow.match(/git diff --cached --quiet/g)).toHaveLength(2);
+    expect(releaseWorkflow.match(/git ls-files --others --exclude-standard/g)).toHaveLength(2);
   });
 
   it("moves the Deploy Button source before publication and verifies the exact commit", () => {
@@ -157,6 +244,13 @@ describe("staging workflow lifecycle record", () => {
     expect(releaseWorkflow).toContain("-F force=true");
     expect(releaseWorkflow).toContain('test "$tag_commit" = "$RELEASE_COMMIT"');
     expect(releaseWorkflow).toContain('test "$deploy_commit" = "$RELEASE_COMMIT"');
+    expect(releaseWorkflow).toContain("manifest.updater?.protocol !== 2");
+    expect(releaseWorkflow).toContain(["manifest-$", '{HQBASE_RELEASE_VERSION}.json"'].join(""));
+    expect(releaseWorkflow).toContain("Published stable and versioned manifests do not match.");
+    expect(releaseWorkflow).toContain("manifest.updater.sourceUrl !== expectedUpdaterUrl");
+    expect(releaseWorkflow).toContain("await fetch(manifest.updater.sourceUrl)");
+    expect(releaseWorkflow).toContain("manifest.updater.sha256");
+    expect(releaseWorkflow).toContain("manifest.updater.size");
     expect(readme).toContain("HQBase%2Fhqbase%2Ftree%2Fdeploy");
   });
 });

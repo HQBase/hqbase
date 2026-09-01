@@ -56,4 +56,21 @@ describe("update banner", () => {
     );
     expect(html).toBe("");
   });
+
+  it("shows a same-release installation repair even when no new app bundle is needed", () => {
+    const status = {
+      installedVersion: "1.3.3",
+      available: true,
+      repairRequired: true,
+      release: { version: "1.3.3", notes: ["Unrelated release note."] }
+    } as unknown as UpdateStatus;
+    const html = renderToStaticMarkup(
+      <UpdateBanner inProgress={false} ready status={status} onOpen={() => undefined} />
+    );
+
+    expect(html).toContain("Installation repair available");
+    expect(html).toContain("View repair");
+    expect(html).toContain("signed database migration phase");
+    expect(html).not.toContain("Unrelated release note");
+  });
 });

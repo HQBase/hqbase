@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { announcePwaUpdateReady } from "@/features/pwa/update-ready";
 import type { UpdateStatus } from "@/features/updates/types";
@@ -22,6 +22,7 @@ const status: UpdateStatus = {
   checkedAt: "2026-07-29T00:00:00.000Z",
   available: true,
   compatible: true,
+  repairRequired: false,
   release: {
     version: "0.1.23",
     schemaVersion: 5,
@@ -32,6 +33,11 @@ const status: UpdateStatus = {
 };
 
 describe("useUpdateMonitor", () => {
+  beforeEach(() => {
+    mocks.getUpdateStatus.mockReset();
+    window.sessionStorage.clear();
+  });
+
   it("checks while visible and removes refresh listeners when management is revoked", async () => {
     Object.defineProperty(document, "visibilityState", {
       configurable: true,
@@ -60,5 +66,36 @@ describe("useUpdateMonitor", () => {
     expect(mocks.getUpdateStatus).toHaveBeenCalledTimes(2);
     await hook.unmount();
     document.documentElement.removeAttribute("data-hqbase-update-ready");
+  });
+
+  it("clears update progress when the same release needs its second repair phase", async () => {
+    Object.defineProperty(document, "visibilityState", {
+      configurable: true,
+      value: "visible"
+    });
+    mocks.getUpdateStatus.mockResolvedValue(status);
+    const hook = await renderHook(() => useUpdateMonitor(true), undefined);
+    await flushHookEffects();
+
+    await flushHookEffects(() => hook.result.start("update-build", "update"));
+    expect(hook.result.progress).toMatchObject({ buildId: "update-build", kind: "update" });
+
+    const repairStatus: UpdateStatus = {
+      ...status,
+      installedVersion: status.release.version,
+      repairRequired: true
+    };
+    await flushHookEffects(() => hook.result.acceptStatus(repairStatus));
+    expect(hook.result.progress).toBeNull();
+
+    await flushHookEffects(() => hook.result.start("repair-build", "repair"));
+    await flushHookEffects(() => hook.result.acceptStatus(repairStatus));
+    expect(hook.result.progress).toMatchObject({ buildId: "repair-build", kind: "repair" });
+
+    await flushHookEffects(() =>
+      hook.result.acceptStatus({ ...repairStatus, available: false, repairRequired: false })
+    );
+    expect(hook.result.progress).toBeNull();
+    await hook.unmount();
   });
 });

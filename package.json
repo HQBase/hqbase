@@ -1,6 +1,6 @@
 {
   "name": "hqbase",
-  "version": "1.3.2",
+  "version": "1.3.3",
   "private": true,
   "license": "AGPL-3.0-only",
   "type": "module",
@@ -31,7 +31,8 @@
     "api:generate": "node scripts/generate-mail-api-artifacts.mjs --write && biome format --write api/hqbase-mail-api-v1.openapi.json api/hqbase-mail-api-v1.postman_collection.json api/hqbase-mail-api-v1.postman_environment.json api/hqbase-mail-api-v2.openapi.json api/hqbase-mail-api-v2.postman_collection.json api/hqbase-mail-api-v2.postman_environment.json",
     "api:check": "node scripts/generate-mail-api-artifacts.mjs --check",
     "test:pwa": "node scripts/test-pwa.mjs",
-    "test:e2e:staging": "playwright test --config playwright.config.ts app-shell-smoke.spec.ts lifecycle.spec.ts",
+    "test:e2e:staging": "playwright test --config playwright.config.ts app-shell-smoke.spec.ts event-socket.spec.ts lifecycle.spec.ts",
+    "test:e2e:staging:event-socket": "playwright test --config playwright.config.ts event-socket.spec.ts",
     "test:e2e:staging:smoke": "playwright test --config playwright.config.ts app-shell-smoke.spec.ts",
     "test:e2e:staging:lifecycle": "playwright test --config playwright.config.ts lifecycle.spec.ts",
     "pwa:icons": "node scripts/generate-pwa-icons.mjs",

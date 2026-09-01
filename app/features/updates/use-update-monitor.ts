@@ -6,6 +6,7 @@ import {
   beginUpdateProgress,
   clearUpdateProgress,
   readUpdateProgress,
+  type UpdateActionKind,
   type UpdateProgress
 } from "./update-progress";
 
@@ -16,17 +17,23 @@ export function useUpdateMonitor(canManage: boolean): {
   acceptStatus: (status: UpdateStatus) => void;
   progress: UpdateProgress | null;
   ready: boolean;
-  start: (buildId: string) => void;
+  start: (buildId: string, kind: UpdateActionKind) => void;
   status: UpdateStatus | null;
 } {
   const [status, setStatus] = React.useState<UpdateStatus | null>(null);
   const [progress, setProgress] = React.useState<UpdateProgress | null>(() => readUpdateProgress());
+  const progressRef = React.useRef(progress);
   const [ready, setReady] = React.useState(readPwaUpdateReady);
 
   const acceptStatus = React.useCallback((nextStatus: UpdateStatus) => {
     setStatus(nextStatus);
-    if (!nextStatus.available) {
+    const updateReachedRepair =
+      progressRef.current?.kind === "update" &&
+      nextStatus.repairRequired === true &&
+      nextStatus.release.version === nextStatus.installedVersion;
+    if (!nextStatus.available || updateReachedRepair) {
       clearUpdateProgress();
+      progressRef.current = null;
       setProgress(null);
     }
   }, []);
@@ -77,8 +84,10 @@ export function useUpdateMonitor(canManage: boolean): {
     };
   }, [acceptStatus, canManage, progress]);
 
-  const start = React.useCallback((buildId: string) => {
-    setProgress(beginUpdateProgress(buildId));
+  const start = React.useCallback((buildId: string, kind: UpdateActionKind) => {
+    const nextProgress = beginUpdateProgress(buildId, kind);
+    progressRef.current = nextProgress;
+    setProgress(nextProgress);
   }, []);
 
   return { acceptStatus, progress, ready, start, status };

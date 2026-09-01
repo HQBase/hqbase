@@ -67,6 +67,16 @@ export function verifyManifest(envelope, publicKeyBase64 = publicKey) {
     throw new Error("Release manifest signature is invalid.");
   }
   const manifest = JSON.parse(Buffer.from(envelope.payload, "base64url").toString("utf8"));
+  // Signed releases before the managed updater bridge do not have updater metadata.
+  const updaterIsValid =
+    manifest.updater === undefined ||
+    (manifest.updater?.protocol === 2 &&
+      /^https:\/\/raw\.githubusercontent\.com\/HQBase\/hqbase\/[a-f0-9]{40}\/scripts\/release\/bootstrap\.mjs$/.test(
+        manifest.updater?.sourceUrl
+      ) &&
+      /^[a-f0-9]{64}$/.test(manifest.updater?.sha256) &&
+      Number.isInteger(manifest.updater?.size) &&
+      manifest.updater.size > 0);
   if (
     manifest.format !== "hqbase-release-v1" ||
     manifest.product !== "hqbase" ||
@@ -81,7 +91,8 @@ export function verifyManifest(envelope, publicKeyBase64 = publicKey) {
         ))) ||
     !/^[a-f0-9]{64}$/.test(manifest.artifact?.sha256) ||
     !Number.isInteger(manifest.artifact?.size) ||
-    manifest.artifact.size <= 0
+    manifest.artifact.size <= 0 ||
+    !updaterIsValid
   ) {
     throw new Error("Release manifest is incompatible.");
   }

@@ -6,6 +6,7 @@ export type UpdateStatus = {
   checkedAt: string;
   available: boolean;
   compatible: boolean;
+  repairRequired: boolean;
   release: {
     version: string;
     schemaVersion: number;
