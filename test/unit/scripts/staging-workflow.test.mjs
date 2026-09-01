@@ -128,6 +128,9 @@ describe("staging workflow lifecycle record", () => {
       "      - name: Reproduce the legacy Worker configuration"
     );
     const candidate = releaseWorkflow.indexOf("      - name: Apply the exact signed candidate");
+    const candidateWait = releaseWorkflow.indexOf("      - name: Wait for the signed candidate");
+    const previousInstall = releaseWorkflow.slice(previousRelease, bootstrapData);
+    const candidateInstall = releaseWorkflow.slice(candidate, candidateWait);
 
     expect(previousRelease).toBeGreaterThan(-1);
     expect(bootstrapData).toBeGreaterThan(previousRelease);
@@ -150,6 +153,8 @@ describe("staging workflow lifecycle record", () => {
     expect(releaseWorkflow).toContain(
       'node "$HQBASE_OLDEST_UPDATER" --config "$HQBASE_OLDEST_CONFIG"'
     );
+    expect(previousInstall).toContain("WORKERS_CI=1");
+    expect(candidateInstall).toContain("WORKERS_CI=1");
   });
 
   it("proves the stale state before the canonical repair and its retry", () => {
