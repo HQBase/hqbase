@@ -306,6 +306,24 @@ describe("HQBase release deployment", () => {
     expect(
       inspectActiveRelease("/release", "customer-worker", {
         attempt: () => ({
+          status: 1,
+          stdout: "",
+          stderr: "The Worker customer-worker has no deployments."
+        })
+      })
+    ).toBeNull();
+    expect(() =>
+      inspectActiveRelease("/release", "customer-worker", {
+        attempt: () => ({
+          status: 1,
+          stdout: "",
+          stderr: "Cloudflare API authentication failed"
+        })
+      })
+    ).toThrow("wrangler deployments status exited with 1");
+    expect(
+      inspectActiveRelease("/release", "customer-worker", {
+        attempt: () => ({
           status: 0,
           stdout: JSON.stringify({
             versions: [{ version_id: "active-version", percentage: 100 }]

@@ -158,6 +158,36 @@ describe("staging workflow lifecycle record", () => {
     expect(candidateInstall.split("\n").map((line) => line.trim())).toContain(workersCiAssignment);
   });
 
+  it("isolates and cleans the signed-release staging Worker", () => {
+    const create = releaseWorkflow.indexOf("      - name: Create disposable customer resources");
+    const cleanup = releaseWorkflow.indexOf(
+      "      - name: Remove an empty disposable Worker service"
+    );
+    const destroy = releaseWorkflow.indexOf("      - name: Destroy disposable resources");
+    const cleanupStep = releaseWorkflow.slice(cleanup, destroy);
+
+    expect(releaseWorkflow).toMatch(
+      /STAGING_WORKER_NAME: hqbase-release-\$\{\{ github\.run_id \}\}/
+    );
+    expect(releaseWorkflow).toContain('--worker-name "$STAGING_WORKER_NAME"');
+    expect(releaseWorkflow.match(/--name "\$STAGING_WORKER_NAME"/g)).toHaveLength(4);
+    expect(releaseWorkflow).not.toContain("hqbase-e2e-staging");
+    expect(cleanup).toBeGreaterThan(create);
+    expect(destroy).toBeGreaterThan(cleanup);
+    expect(cleanupStep).toContain("if: always()");
+    expect(cleanupStep).toContain('manifest=".hqbase/deployments/$DEPLOYMENT_NAME/manifest.json"');
+    expect(cleanupStep).toContain(`worker_name="$(jq -er '.worker.name' "$manifest")"`);
+    expect(cleanupStep).toContain(`worker_deployed="$(jq -r '.worker.deployed' "$manifest")"`);
+    expect(cleanupStep).toContain('test "$worker_name" = "$STAGING_WORKER_NAME"');
+    expect(cleanupStep).toContain('case "$worker_deployed" in');
+    expect(cleanupStep).toContain("true) exit 0 ;;");
+    expect(cleanupStep).toContain("false) ;;");
+    expect(cleanupStep).toContain("Invalid Worker deployment state.");
+    expect(cleanupStep).toContain('wrangler delete "$worker_name"');
+    expect(cleanupStep).toContain("This Worker does not exist on your account.");
+    expect(cleanupStep).toContain("exit 1");
+  });
+
   it("proves the stale state before the canonical repair and its retry", () => {
     const candidate = releaseWorkflow.indexOf("      - name: Apply the exact signed candidate");
     const stale = releaseWorkflow.indexOf(

@@ -149,6 +149,7 @@ jobs:
       # This frozen bootstrap is independent of the active-release compatibility floor.
       OLDEST_UPDATER_TAG: v1.0.0
       DEPLOYMENT_NAME: release-${{ github.run_id }}
+      STAGING_WORKER_NAME: hqbase-release-${{ github.run_id }}
     steps:
       - uses: actions/checkout@v6
       - uses: pnpm/action-setup@v6
@@ -180,7 +181,7 @@ jobs:
         run: >-
           pnpm hqbase install
           --name "$DEPLOYMENT_NAME"
-          --worker-name hqbase-e2e-staging
+          --worker-name "$STAGING_WORKER_NAME"
           --domain "$HQBASE_STAGING_EMAIL_DOMAIN"
           --no-email
           --app-domain "${HQBASE_STAGING_URL#https://}"
@@ -299,11 +300,11 @@ jobs:
           config=".hqbase/deployments/$DEPLOYMENT_NAME/wrangler.jsonc"
           database="hqbase-$DEPLOYMENT_NAME"
           status="$(pnpm exec wrangler deployments status \
-            --name hqbase-e2e-staging --json --config "$config")"
+            --name "$STAGING_WORKER_NAME" --json --config "$config")"
           version_id="$(jq -er '.versions[] | select(.percentage == 100) | .version_id' \
             <<<"$status")"
           worker="$(pnpm exec wrangler versions view "$version_id" \
-            --name hqbase-e2e-staging --json --config "$config")"
+            --name "$STAGING_WORKER_NAME" --json --config "$config")"
           jq -e '[.resources.bindings[].name] | index("MAIL_EVENTS") != null' <<<"$worker"
           expected_normal_count="$(find migrations -maxdepth 1 -type f -name '*.sql' | wc -l | tr -d ' ')"
           expected_schema_version="$(node --input-type=module -e '
@@ -390,11 +391,11 @@ jobs:
         run: |
           config=".hqbase/deployments/$DEPLOYMENT_NAME/wrangler.jsonc"
           status="$(pnpm exec wrangler deployments status \
-            --name hqbase-e2e-staging --json --config "$config")"
+            --name "$STAGING_WORKER_NAME" --json --config "$config")"
           version_id="$(jq -er '.versions[] | select(.percentage == 100) | .version_id' \
             <<<"$status")"
           version="$(pnpm exec wrangler versions view "$version_id" \
-            --name hqbase-e2e-staging --json --config "$config")"
+            --name "$STAGING_WORKER_NAME" --json --config "$config")"
           jq -e '
             [.resources.bindings[].name] as $names |
             (["DB", "MAIL_OBJECTS", "HQBASE_JOBS", "MAIL_SENDER", "MAIL_EVENTS"] - $names) |
@@ -429,6 +430,34 @@ jobs:
           path: .hqbase/deployments/release-${{ github.run_id }}/manifest.json
           if-no-files-found: warn
           retention-days: 30
+      - name: Remove an empty disposable Worker service
+        if: always()
+        run: |
+          manifest=".hqbase/deployments/$DEPLOYMENT_NAME/manifest.json"
+          if test ! -f "$manifest"; then
+            exit 0
+          fi
+          worker_name="$(jq -er '.worker.name' "$manifest")"
+          worker_deployed="$(jq -r '.worker.deployed' "$manifest")"
+          test "$worker_name" = "$STAGING_WORKER_NAME"
+          case "$worker_deployed" in
+            true) exit 0 ;;
+            false) ;;
+            *) printf '%s\n' "Invalid Worker deployment state." >&2; exit 1 ;;
+          esac
+          config=".hqbase/deployments/$DEPLOYMENT_NAME/wrangler.jsonc"
+          if output="$(NO_COLOR=1 pnpm exec wrangler delete "$worker_name" \
+            --force --config "$config" 2>&1)"; then
+            printf '%s\n' "$output"
+            exit 0
+          fi
+          if grep -Eq '^Worker ".+" not found\.$' <<<"$output" ||
+             grep -Fq 'This Worker does not exist on your account.' <<<"$output" ||
+             grep -Eq 'code.*(10007|10090)' <<<"$output"; then
+            exit 0
+          fi
+          printf '%s\n' "$output" >&2
+          exit 1
       - name: Destroy disposable resources
         if: always()
         run: pnpm hqbase destroy --name "$DEPLOYMENT_NAME" --scope all --yes
