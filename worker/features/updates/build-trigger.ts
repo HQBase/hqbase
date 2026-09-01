@@ -8,6 +8,7 @@ export const updaterLoaderVariable = "HQBASE_UPDATER_LOADER";
 const legacyManagedDeployCommands = new Set(["pnpm deploy", "pnpm run deploy"]);
 
 export type BuildVariable = { is_secret: boolean; value?: string | null };
+type BuildSnapshotVariable = string | BuildVariable;
 export type BuildConfiguration = {
   deployCommand: string;
   variables: Record<string, BuildVariable>;
@@ -17,7 +18,7 @@ type BuildResponse = {
     branch?: string;
     build_trigger_source?: string;
     deploy_command?: string;
-    environment_variables?: Record<string, string>;
+    environment_variables?: Record<string, BuildSnapshotVariable>;
   };
   build_uuid?: string;
   created_on?: string;
@@ -246,6 +247,14 @@ export function buildVariableEquals(variable: BuildVariable | undefined, value: 
   return variable?.is_secret === false && variable.value === value;
 }
 
+function buildSnapshotVariableEquals(
+  variable: BuildSnapshotVariable | undefined,
+  value: string
+): boolean {
+  if (typeof variable === "string") return variable === value;
+  return buildVariableEquals(variable, value);
+}
+
 function sameBuildVariable(
   left: BuildVariable | undefined,
   right: BuildVariable | undefined
@@ -336,10 +345,14 @@ export async function reconcileAcceptedBuild(
       build.trigger?.trigger_uuid === triggerId &&
       build.build_trigger_metadata?.branch === "main" &&
       build.build_trigger_metadata.deploy_command === managedDeployCommand() &&
-      build.build_trigger_metadata.environment_variables?.[expectedReleaseVariable] ===
-        expectedVersion &&
-      build.build_trigger_metadata.environment_variables?.[updaterLoaderVariable] ===
-        expectedLoader &&
+      buildSnapshotVariableEquals(
+        build.build_trigger_metadata.environment_variables?.[expectedReleaseVariable],
+        expectedVersion
+      ) &&
+      buildSnapshotVariableEquals(
+        build.build_trigger_metadata.environment_variables?.[updaterLoaderVariable],
+        expectedLoader
+      ) &&
       (source === "api" || source === "manual") &&
       Number.isFinite(createdAt) &&
       createdAt >= earliestAcceptedTime &&

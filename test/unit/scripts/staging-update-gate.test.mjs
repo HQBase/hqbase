@@ -144,6 +144,17 @@ function workersBuildRecord() {
   };
 }
 
+function buildSnapshotVariables(updater, shape = "record") {
+  const values = {
+    HQBASE_EXPECTED_RELEASE_VERSION: version,
+    HQBASE_UPDATER_LOADER: managedUpdaterLoader(updater)
+  };
+  if (shape === "string") return values;
+  return Object.fromEntries(
+    Object.entries(values).map(([name, value]) => [name, { is_secret: false, value }])
+  );
+}
+
 function exactBuild(record, updater, environmentVariables = {}) {
   return {
     build_trigger_metadata: {
@@ -153,8 +164,7 @@ function exactBuild(record, updater, environmentVariables = {}) {
       build_trigger_source: "api",
       deploy_command: shortCommand,
       environment_variables: {
-        HQBASE_EXPECTED_RELEASE_VERSION: version,
-        HQBASE_UPDATER_LOADER: managedUpdaterLoader(updater),
+        ...buildSnapshotVariables(updater),
         ...environmentVariables
       },
       root_directory: record.rootDirectory
@@ -238,10 +248,7 @@ describe("deployed update-action release gate", () => {
               build_token_uuid: buildTokenUuid,
               build_trigger_source: "api",
               deploy_command: shortCommand,
-              environment_variables: {
-                HQBASE_EXPECTED_RELEASE_VERSION: version,
-                HQBASE_UPDATER_LOADER: managedUpdaterLoader(candidate.manifest.updater)
-              },
+              environment_variables: buildSnapshotVariables(candidate.manifest.updater),
               root_directory: "/"
             },
             build_uuid: buildUuid,
@@ -417,6 +424,47 @@ describe("deployed update-action release gate", () => {
     }
   });
 
+  it.each(["record", "string"])("accepts the %s build-variable snapshot shape", async (shape) => {
+    const release = releaseEnvelope().manifest;
+    const record = workersBuildRecord();
+    const manifest = { releaseGate: { workersBuild: record } };
+    const context = { accountId, candidateVersion: version, cleanupToken: "cleanup-token" };
+    const variables = {
+      HQBASE_EXPECTED_RELEASE_VERSION: { is_secret: false, value: version },
+      HQBASE_UPDATER_LOADER: {
+        is_secret: false,
+        value: managedUpdaterLoader(release.updater)
+      }
+    };
+    const fetcher = vi.fn(async (input) => {
+      const url = new URL(String(input));
+      if (url.pathname.includes(`/builds/workers/${productionWorkerTag}/triggers`)) {
+        return response([trigger(record, shortCommand)]);
+      }
+      if (url.pathname.endsWith(`/builds/triggers/${triggerUuid}/environment_variables`)) {
+        return response(variables);
+      }
+      if (url.pathname.endsWith(`/builds/builds/${buildUuid}`)) {
+        return response({
+          ...exactBuild(record, release.updater),
+          build_trigger_metadata: {
+            ...exactBuild(record, release.updater).build_trigger_metadata,
+            environment_variables: buildSnapshotVariables(release.updater, shape)
+          }
+        });
+      }
+      throw new Error(`Unexpected request: GET ${url}`);
+    });
+
+    await expect(
+      verifyAcceptedBuild(manifest, release, context, {
+        fetcher,
+        now: () => 0,
+        sleep: async () => {}
+      })
+    ).resolves.toBeUndefined();
+  });
+
   it("ends slow build-metadata polling in time to cancel the probe build", async () => {
     const release = releaseEnvelope().manifest;
     const record = workersBuildRecord();
@@ -513,7 +561,9 @@ describe("deployed update-action release gate", () => {
       }
       if (url.pathname.endsWith(`/builds/builds/${buildUuid}`)) {
         return response({
-          ...exactBuild(record, release.updater, { HQBASE_FORCE_SOURCE_DEPLOY: "1" }),
+          ...exactBuild(record, release.updater, {
+            HQBASE_FORCE_SOURCE_DEPLOY: { is_secret: false, value: "0" }
+          }),
           status: "stopped"
         });
       }
@@ -527,6 +577,46 @@ describe("deployed update-action release gate", () => {
         sleep: async () => {}
       })
     ).rejects.toThrow(/HQBASE_FORCE_SOURCE_DEPLOY/);
+  });
+
+  it.each([
+    ["secret", { is_secret: true, value: "hidden" }],
+    ["null", { is_secret: false, value: null }]
+  ])("rejects a %s required variable in the accepted build snapshot", async (_name, loader) => {
+    const release = releaseEnvelope().manifest;
+    const record = workersBuildRecord();
+    const manifest = { releaseGate: { workersBuild: record } };
+    const context = { accountId, candidateVersion: version, cleanupToken: "cleanup-token" };
+    const fetcher = vi.fn(async (input) => {
+      const url = new URL(String(input));
+      if (url.pathname.includes(`/builds/workers/${productionWorkerTag}/triggers`)) {
+        return response([trigger(record, shortCommand)]);
+      }
+      if (url.pathname.endsWith(`/builds/triggers/${triggerUuid}/environment_variables`)) {
+        return response({
+          HQBASE_EXPECTED_RELEASE_VERSION: { is_secret: false, value: version },
+          HQBASE_UPDATER_LOADER: {
+            is_secret: false,
+            value: managedUpdaterLoader(release.updater)
+          }
+        });
+      }
+      if (url.pathname.endsWith(`/builds/builds/${buildUuid}`)) {
+        return response({
+          ...exactBuild(record, release.updater, { HQBASE_UPDATER_LOADER: loader }),
+          status: "stopped"
+        });
+      }
+      throw new Error(`Unexpected request: GET ${url}`);
+    });
+
+    await expect(
+      verifyAcceptedBuild(manifest, release, context, {
+        fetcher,
+        now: () => 0,
+        sleep: async () => {}
+      })
+    ).rejects.toThrow(/HQBASE_UPDATER_LOADER/);
   });
 
   it("uses the production AES-GCM grant-cookie contract without exposing the token", () => {

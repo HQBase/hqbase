@@ -197,11 +197,16 @@ function acceptedBuildMismatches(build, record, release, context) {
     ...(["api", "manual"].includes(metadata.build_trigger_source) ? [] : ["build_trigger_source"]),
     ...(metadata.build_command === expected.build_command ? [] : ["build_command"]),
     ...(metadata.deploy_command === expected.deploy_command ? [] : ["deploy_command"]),
-    ...(metadata.environment_variables?.HQBASE_UPDATER_LOADER === expected.HQBASE_UPDATER_LOADER
+    ...(buildSnapshotVariableEquals(
+      metadata.environment_variables?.HQBASE_UPDATER_LOADER,
+      expected.HQBASE_UPDATER_LOADER
+    )
       ? []
       : ["HQBASE_UPDATER_LOADER"]),
-    ...(metadata.environment_variables?.HQBASE_EXPECTED_RELEASE_VERSION ===
-    expected.HQBASE_EXPECTED_RELEASE_VERSION
+    ...(buildSnapshotVariableEquals(
+      metadata.environment_variables?.HQBASE_EXPECTED_RELEASE_VERSION,
+      expected.HQBASE_EXPECTED_RELEASE_VERSION
+    )
       ? []
       : ["HQBASE_EXPECTED_RELEASE_VERSION"]),
     ...(metadata.environment_variables?.HQBASE_FORCE_SOURCE_DEPLOY === undefined
@@ -210,6 +215,11 @@ function acceptedBuildMismatches(build, record, release, context) {
     ...(metadata.build_token_uuid === expected.build_token_uuid ? [] : ["build_token_uuid"]),
     ...(metadata.root_directory === expected.root_directory ? [] : ["root_directory"])
   ];
+}
+
+function buildSnapshotVariableEquals(variable, expected) {
+  if (typeof variable === "string") return variable === expected;
+  return variable?.is_secret === false && variable.value === expected;
 }
 
 export async function reconcileAndCancelBuild(manifest, context, dependencies) {
