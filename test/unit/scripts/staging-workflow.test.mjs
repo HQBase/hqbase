@@ -161,10 +161,16 @@ describe("staging workflow lifecycle record", () => {
   it("isolates and cleans the signed-release staging Worker", () => {
     const create = releaseWorkflow.indexOf("      - name: Create disposable customer resources");
     const cleanup = releaseWorkflow.indexOf(
-      "      - name: Remove an empty disposable Worker service"
+      "      - name: Reconcile disposable Worker lifecycle record"
     );
+    const upload = releaseWorkflow.indexOf("      - name: Upload non-secret deployment record");
     const destroy = releaseWorkflow.indexOf("      - name: Destroy disposable resources");
-    const cleanupStep = releaseWorkflow.slice(cleanup, destroy);
+    const cleanupStep = releaseWorkflow.slice(cleanup, upload);
+    const destroyStep = releaseWorkflow.slice(destroy, releaseWorkflow.indexOf("\n\n", destroy));
+    const inspectWorker = cleanupStep.indexOf("wrangler deployments status");
+    const recordWorker = cleanupStep.indexOf("recordWorkerDeployedForConfig");
+    const emptyWorker = cleanupStep.indexOf("The Worker $worker_name has no deployments.");
+    const deleteWorker = cleanupStep.indexOf('wrangler delete "$worker_name"');
 
     expect(releaseWorkflow).toMatch(
       /STAGING_WORKER_NAME: hqbase-release-\$\{\{ github\.run_id \}\}/
@@ -173,8 +179,12 @@ describe("staging workflow lifecycle record", () => {
     expect(releaseWorkflow.match(/--name "\$STAGING_WORKER_NAME"/g)).toHaveLength(4);
     expect(releaseWorkflow).not.toContain("hqbase-e2e-staging");
     expect(cleanup).toBeGreaterThan(create);
-    expect(destroy).toBeGreaterThan(cleanup);
+    expect(upload).toBeGreaterThan(cleanup);
+    expect(destroy).toBeGreaterThan(upload);
     expect(cleanupStep).toContain("if: always()");
+    expect(cleanupStep).toContain("id: reconcile_worker");
+    expect(cleanupStep).toContain('echo "manifest_present=false" >> "$GITHUB_OUTPUT"');
+    expect(cleanupStep).toContain('echo "manifest_present=true" >> "$GITHUB_OUTPUT"');
     expect(cleanupStep).toContain('manifest=".hqbase/deployments/$DEPLOYMENT_NAME/manifest.json"');
     expect(cleanupStep).toContain(`worker_name="$(jq -er '.worker.name' "$manifest")"`);
     expect(cleanupStep).toContain(`worker_deployed="$(jq -r '.worker.deployed' "$manifest")"`);
@@ -183,9 +193,21 @@ describe("staging workflow lifecycle record", () => {
     expect(cleanupStep).toContain("true) exit 0 ;;");
     expect(cleanupStep).toContain("false) ;;");
     expect(cleanupStep).toContain("Invalid Worker deployment state.");
-    expect(cleanupStep).toContain('wrangler delete "$worker_name"');
+    expect(inspectWorker).toBeGreaterThan(-1);
+    expect(recordWorker).toBeGreaterThan(inspectWorker);
+    expect(emptyWorker).toBeGreaterThan(inspectWorker);
+    expect(deleteWorker).toBeGreaterThan(emptyWorker);
     expect(cleanupStep).toContain("This Worker does not exist on your account.");
     expect(cleanupStep).toContain("exit 1");
+    expect(destroyStep).toContain("steps.reconcile_worker.outcome == 'success'");
+    expect(destroyStep).toContain("steps.reconcile_worker.outputs.manifest_present == 'true'");
+  });
+
+  it("serializes workflows that own the protected staging hostname", () => {
+    expect(workflow).toContain("group: hqbase-staging-resources");
+    expect(workflow).toContain("queue: max");
+    expect(releaseWorkflow).toContain("group: hqbase-staging-resources");
+    expect(releaseWorkflow).toContain("queue: max");
   });
 
   it("proves the stale state before the canonical repair and its retry", () => {

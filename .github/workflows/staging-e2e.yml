@@ -14,7 +14,8 @@ permissions:
   contents: read
 
 concurrency:
-  group: hqbase-staging-e2e
+  group: hqbase-staging-resources
+  queue: max
   cancel-in-progress: false
 
 jobs:
