@@ -425,6 +425,12 @@ jobs:
             (["DB", "MAIL_OBJECTS", "HQBASE_JOBS", "MAIL_SENDER", "MAIL_EVENTS"] - $names) |
             length == 0
           ' <<<"$version"
+      - name: Reset disposable sign-in probes before final lifecycle
+        run: |
+          config=".hqbase/deployments/$DEPLOYMENT_NAME/wrangler.jsonc"
+          database="hqbase-$DEPLOYMENT_NAME"
+          pnpm exec wrangler d1 execute "$database" --remote --config "$config" \
+            --command "DELETE FROM rate_limits WHERE scope IN ('auth.email', 'auth.ip')"
       - name: Verify PWA, app shell, access, and operator lifecycle
         run: pnpm test:e2e:staging
       - name: Exercise populated remote backup and restore

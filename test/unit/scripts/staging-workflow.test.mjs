@@ -225,6 +225,9 @@ describe("staging workflow lifecycle record", () => {
       "      - name: Prove the canonical same-version retry is idempotent"
     );
     const bindings = releaseWorkflow.indexOf("      - name: Verify active Worker bindings");
+    const resetSignInProbes = releaseWorkflow.indexOf(
+      "      - name: Reset disposable sign-in probes before final lifecycle"
+    );
     const lifecycle = releaseWorkflow.indexOf(
       "      - name: Verify PWA, app shell, access, and operator lifecycle"
     );
@@ -238,7 +241,8 @@ describe("staging workflow lifecycle record", () => {
     expect(final).toBeGreaterThan(repair);
     expect(retry).toBeGreaterThan(final);
     expect(bindings).toBeGreaterThan(retry);
-    expect(lifecycle).toBeGreaterThan(bindings);
+    expect(resetSignInProbes).toBeGreaterThan(bindings);
+    expect(lifecycle).toBeGreaterThan(resetSignInProbes);
     expect(backup).toBeGreaterThan(lifecycle);
     expect(releaseWorkflow.slice(stale, repair)).toContain("after_deploy_ledger_table_count:0");
     expect(releaseWorkflow.slice(stale, repair)).toContain("alias_table_count:2");
@@ -259,6 +263,9 @@ describe("staging workflow lifecycle record", () => {
     expect(releaseWorkflow.slice(final, retry)).toContain("hqbase-pre-repair-data.json");
     expect(releaseWorkflow.slice(retry, bindings)).toContain(
       'node "$GITHUB_WORKSPACE/scripts/release/bootstrap.mjs" --config "$config"'
+    );
+    expect(releaseWorkflow.slice(resetSignInProbes, lifecycle)).toContain(
+      "DELETE FROM rate_limits WHERE scope IN ('auth.email', 'auth.ip')"
     );
   });
 
