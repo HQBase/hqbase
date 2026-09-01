@@ -90,6 +90,7 @@ describe("signed release bootstrap", () => {
           configFile,
           expectedVersion: version,
           manifestFile,
+          platform: "linux",
           publicKeyBase64: release.publicKeyBase64,
           run: (command, args, options) => {
             commands.push({ command, args, options });
