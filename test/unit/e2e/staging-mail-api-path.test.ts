@@ -56,7 +56,7 @@ describe("staging Mail API path", () => {
     expect(agentTest.indexOf("test.skip(")).toBeLessThan(agentTest.indexOf("request.post("));
   });
 
-  it("keeps catch-all expectations specific to fresh installs and N-1 upgrades", () => {
+  it("keeps catch-all expectations specific to the previous release schema", () => {
     const experienceTestStart = lifecycleSpec.indexOf(
       'test("candidate mail experience contracts work together"'
     );
@@ -65,7 +65,12 @@ describe("staging Mail API path", () => {
     expect(experienceTestStart).toBeGreaterThan(-1);
     expect(releaseWorkflow).toContain("PREVIOUS_TAG:");
     expect(releaseWorkflow).toContain("needs.candidate.outputs.previous_tag");
+    expect(releaseWorkflow).toContain("HQBASE_STAGING_PREVIOUS_HAS_CATCH_ALL_POLICY=1");
+    expect(releaseWorkflow).toContain("HQBASE_STAGING_PREVIOUS_HAS_CATCH_ALL_POLICY=0");
     expect(experienceTest).toContain("process.env.PREVIOUS_TAG");
+    expect(experienceTest).toContain(
+      'process.env.HQBASE_STAGING_PREVIOUS_HAS_CATCH_ALL_POLICY === "0"'
+    );
     expect(experienceTest).toContain('{ catchAllMailboxId: null, catchAllPolicy: "unassigned" }');
     expect(experienceTest).toContain(
       '{ catchAllMailboxId: primaryMailbox.id, catchAllPolicy: "mailbox" }'

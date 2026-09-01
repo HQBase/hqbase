@@ -198,14 +198,22 @@ jobs:
           mkdir -p "$previous_source"
           tar -xzf "$previous_archive" -C "$previous_source"
           pnpm --dir "$previous_source" install --frozen-lockfile
+          test ! -e "$previous_source/.hqbase"
+          ln -s "$GITHUB_WORKSPACE/.hqbase" "$previous_source/.hqbase"
           previous_updater="$previous_source/scripts/release/deploy.mjs"
+          previous_config="$previous_source/.hqbase/deployments/$DEPLOYMENT_NAME/wrangler.jsonc"
           echo "HQBASE_PREVIOUS_UPDATER=$previous_updater" >> "$GITHUB_ENV"
-          config=".hqbase/deployments/$DEPLOYMENT_NAME/wrangler.jsonc"
+          echo "HQBASE_PREVIOUS_CONFIG=$previous_config" >> "$GITHUB_ENV"
+          if test -f "$previous_source/migrations/0025_activate_catch_all_policy.sql"; then
+            echo "HQBASE_STAGING_PREVIOUS_HAS_CATCH_ALL_POLICY=1" >> "$GITHUB_ENV"
+          else
+            echo "HQBASE_STAGING_PREVIOUS_HAS_CATCH_ALL_POLICY=0" >> "$GITHUB_ENV"
+          fi
           HQBASE_AUTH_SECRET="$HQBASE_STAGING_AUTH_SECRET" \
           HQBASE_EXPECTED_RELEASE_VERSION="$previous_version" \
           HQBASE_RELEASE_ARTIFACT_FILE="$previous_archive" \
           HQBASE_RELEASE_MANIFEST_FILE="/tmp/hqbase-previous/stable.json" \
-            node "$previous_updater" --config "$GITHUB_WORKSPACE/$config"
+            node "$previous_updater" --config "$previous_config"
       - name: Wait for the previous stable release
         if: needs.candidate.outputs.previous_tag != ''
         run: |
@@ -233,13 +241,13 @@ jobs:
             --auth-url "$HQBASE_STAGING_URL" \
             --client-id "$HQBASE_STAGING_OAUTH_CLIENT_ID" \
             --skip-deploy
-          config=".hqbase/deployments/$DEPLOYMENT_NAME/wrangler.jsonc"
+          config="${HQBASE_PREVIOUS_CONFIG:-$GITHUB_WORKSPACE/.hqbase/deployments/$DEPLOYMENT_NAME/wrangler.jsonc}"
           updater="${HQBASE_PREVIOUS_UPDATER:-$GITHUB_WORKSPACE/scripts/release/deploy.mjs}"
           HQBASE_AUTH_SECRET="$HQBASE_STAGING_AUTH_SECRET" \
           HQBASE_EXPECTED_RELEASE_VERSION="$CANDIDATE_VERSION" \
           HQBASE_RELEASE_ARTIFACT_FILE="$GITHUB_WORKSPACE/release/hqbase-${CANDIDATE_VERSION}.tar.gz" \
           HQBASE_RELEASE_MANIFEST_FILE="$GITHUB_WORKSPACE/release/stable.json" \
-            node "$updater" --config "$GITHUB_WORKSPACE/$config"
+            node "$updater" --config "$config"
       - name: Wait for the signed candidate
         run: |
           for attempt in $(seq 1 150); do
