@@ -7,7 +7,6 @@ import {
   branch,
   cloudflareHeaders,
   cloudflareResult,
-  initialBuildCommand,
   initialDeployCommand,
   listTriggers,
   listWorkers,
@@ -150,23 +149,67 @@ export async function verifyAcceptedBuild(manifest, release, context, dependenci
   ) {
     throw new Error("The accepted build did not keep the exact signed updater variables.");
   }
-  const build = await waitForBuild(record.buildUuid, context, dependencies);
-  const metadata = build.build_trigger_metadata ?? {};
-  if (
-    build.build_uuid !== record.buildUuid ||
-    build.trigger?.trigger_uuid !== record.triggerUuid ||
-    metadata.branch !== branch ||
-    !["api", "manual"].includes(metadata.build_trigger_source) ||
-    metadata.build_command !== initialBuildCommand ||
-    metadata.deploy_command !== managedCommand ||
-    metadata.environment_variables?.HQBASE_UPDATER_LOADER !==
-      managedUpdaterLoader(release.updater) ||
-    metadata.environment_variables?.HQBASE_EXPECTED_RELEASE_VERSION !== context.candidateVersion ||
-    metadata.build_token_uuid !== record.buildTokenUuid ||
-    metadata.root_directory !== "/"
-  ) {
-    throw new Error("Cloudflare did not record the exact release-gate build configuration.");
+  await waitForAcceptedBuildConfiguration(record, release, context, dependencies);
+}
+
+async function waitForAcceptedBuildConfiguration(record, release, context, dependencies) {
+  const deadline = dependencies.now() + 60_000;
+  let mismatches = ["build_record"];
+  for (let attempt = 0; attempt < 60; attempt += 1) {
+    const remaining = deadline - dependencies.now();
+    if (remaining <= 0) break;
+    const build = await cloudflareResult(
+      `/accounts/${context.accountId}/builds/builds/${record.buildUuid}`,
+      { headers: cloudflareHeaders(context.cleanupToken) },
+      dependencies.fetcher,
+      { allowNotFound: true, timeoutMilliseconds: Math.min(30_000, remaining) }
+    );
+    if (build) {
+      mismatches = acceptedBuildMismatches(build, record, release, context);
+      if (mismatches.length === 0) return build;
+      if (build.status === "stopped") break;
+    }
+    const sleepMilliseconds = Math.min(1_000, deadline - dependencies.now());
+    if (sleepMilliseconds <= 0) break;
+    await dependencies.sleep(sleepMilliseconds);
   }
+  throw new Error(
+    `Cloudflare did not record the exact release-gate build configuration. Mismatched fields: ${mismatches.join(", ")}.`
+  );
+}
+
+function acceptedBuildMismatches(build, record, release, context) {
+  const metadata = build.build_trigger_metadata ?? {};
+  const expected = {
+    HQBASE_EXPECTED_RELEASE_VERSION: context.candidateVersion,
+    HQBASE_UPDATER_LOADER: managedUpdaterLoader(release.updater),
+    branch,
+    build_command: record.buildCommand,
+    build_token_uuid: record.buildTokenUuid,
+    deploy_command: managedCommand,
+    root_directory: record.rootDirectory,
+    trigger_uuid: record.triggerUuid
+  };
+  return [
+    ...(build.build_uuid === record.buildUuid ? [] : ["build_uuid"]),
+    ...(build.trigger?.trigger_uuid === expected.trigger_uuid ? [] : ["trigger_uuid"]),
+    ...(metadata.branch === expected.branch ? [] : ["branch"]),
+    ...(["api", "manual"].includes(metadata.build_trigger_source) ? [] : ["build_trigger_source"]),
+    ...(metadata.build_command === expected.build_command ? [] : ["build_command"]),
+    ...(metadata.deploy_command === expected.deploy_command ? [] : ["deploy_command"]),
+    ...(metadata.environment_variables?.HQBASE_UPDATER_LOADER === expected.HQBASE_UPDATER_LOADER
+      ? []
+      : ["HQBASE_UPDATER_LOADER"]),
+    ...(metadata.environment_variables?.HQBASE_EXPECTED_RELEASE_VERSION ===
+    expected.HQBASE_EXPECTED_RELEASE_VERSION
+      ? []
+      : ["HQBASE_EXPECTED_RELEASE_VERSION"]),
+    ...(metadata.environment_variables?.HQBASE_FORCE_SOURCE_DEPLOY === undefined
+      ? []
+      : ["HQBASE_FORCE_SOURCE_DEPLOY"]),
+    ...(metadata.build_token_uuid === expected.build_token_uuid ? [] : ["build_token_uuid"]),
+    ...(metadata.root_directory === expected.root_directory ? [] : ["root_directory"])
+  ];
 }
 
 export async function reconcileAndCancelBuild(manifest, context, dependencies) {

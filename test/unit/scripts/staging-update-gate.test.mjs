@@ -16,6 +16,10 @@ import {
   prepareStagingUpdateGate,
   probeStagingUpdateGate
 } from "../../../scripts/release/staging-update-gate.mjs";
+import {
+  cancelRecordedBuild,
+  verifyAcceptedBuild
+} from "../../../scripts/release/staging-update-gate-resources.mjs";
 
 const accountId = "a".repeat(32);
 const productionWorkerTag = "b".repeat(32);
@@ -121,6 +125,46 @@ function trigger(record, deployCommand = "pnpm deploy") {
   };
 }
 
+function workersBuildRecord() {
+  return {
+    branch: "main",
+    buildCommand: "sleep 600",
+    buildOutcome: null,
+    buildTokenUuid,
+    buildUuid,
+    initialDeployCommand: "pnpm deploy",
+    ownership: "created",
+    pathIncludes: [".hqbase-release-gate-never"],
+    repoConnectionUuid,
+    rootDirectory: "/",
+    stoppedOn: null,
+    triggerName: "hqbase-release-gate-9001-2",
+    triggerUuid,
+    workerTag: productionWorkerTag
+  };
+}
+
+function exactBuild(record, updater, environmentVariables = {}) {
+  return {
+    build_trigger_metadata: {
+      branch: record.branch,
+      build_command: record.buildCommand,
+      build_token_uuid: record.buildTokenUuid,
+      build_trigger_source: "api",
+      deploy_command: shortCommand,
+      environment_variables: {
+        HQBASE_EXPECTED_RELEASE_VERSION: version,
+        HQBASE_UPDATER_LOADER: managedUpdaterLoader(updater),
+        ...environmentVariables
+      },
+      root_directory: record.rootDirectory
+    },
+    build_uuid: record.buildUuid,
+    status: "queued",
+    trigger: { trigger_uuid: record.triggerUuid }
+  };
+}
+
 describe("deployed update-action release gate", () => {
   it("records, exercises, cancels, and exactly reconciles its real Cloudflare resources", async () => {
     const workspace = fs.mkdtempSync(path.join(os.tmpdir(), "hqbase-gate-test-"));
@@ -134,6 +178,7 @@ describe("deployed update-action release gate", () => {
     let fixtureExists = false;
     let buildTrigger = null;
     let build = null;
+    let buildReads = 0;
     let variables = {};
     const d1 = {
       after_deploy_ledger_table_count: 0,
@@ -258,9 +303,20 @@ describe("deployed update-action release gate", () => {
         return response(variables);
       }
       if (url.pathname.endsWith(`/builds/builds/${buildUuid}`) && method === "GET") {
+        buildReads += 1;
+        if (buildReads === 1 && build?.status === "queued") {
+          events.push("read-partial-build");
+          return response({
+            build_uuid: build.build_uuid,
+            created_on: build.created_on,
+            status: build.status,
+            trigger: build.trigger
+          });
+        }
         return response(build);
       }
       if (url.pathname.endsWith(`/builds/builds/${buildUuid}/cancel`)) {
+        events.push("cancel-build");
         build = {
           ...build,
           build_outcome: "cancelled",
@@ -326,6 +382,7 @@ describe("deployed update-action release gate", () => {
       expect(events.indexOf("record-created-creating")).toBeLessThan(
         events.indexOf("create-trigger")
       );
+      expect(events.indexOf("read-partial-build")).toBeLessThan(events.indexOf("cancel-build"));
       expect(manifest.releaseGate).toMatchObject({
         candidateManifest: { ownership: "removed", workerTag: fixtureWorkerTag },
         workersBuild: {
@@ -358,6 +415,118 @@ describe("deployed update-action release gate", () => {
     } finally {
       fs.rmSync(workspace, { force: true, recursive: true });
     }
+  });
+
+  it("ends slow build-metadata polling in time to cancel the probe build", async () => {
+    const release = releaseEnvelope().manifest;
+    const record = workersBuildRecord();
+    const manifest = { releaseGate: { workersBuild: record } };
+    const context = { accountId, candidateVersion: version, cleanupToken: "cleanup-token" };
+    const variables = {
+      HQBASE_EXPECTED_RELEASE_VERSION: { is_secret: false, value: version },
+      HQBASE_UPDATER_LOADER: {
+        is_secret: false,
+        value: managedUpdaterLoader(release.updater)
+      }
+    };
+    let clock = 0;
+    let checkingMetadata = true;
+    let stopped = false;
+    let cancelStartedAt = null;
+
+    const fetcher = vi.fn(async (input, init = {}) => {
+      const url = new URL(String(input));
+      const method = init.method ?? "GET";
+      if (url.pathname.includes(`/builds/workers/${productionWorkerTag}/triggers`)) {
+        return response([trigger(record, shortCommand)]);
+      }
+      if (url.pathname.endsWith(`/builds/triggers/${triggerUuid}/environment_variables`)) {
+        return response(variables);
+      }
+      if (url.pathname.endsWith(`/builds/builds/${buildUuid}`) && method === "GET") {
+        if (checkingMetadata) {
+          clock = Math.min(clock + 20_000, 60_000);
+          return response({
+            build_uuid: buildUuid,
+            status: "queued",
+            trigger: { trigger_uuid: triggerUuid }
+          });
+        }
+        return response({
+          ...exactBuild(record, release.updater),
+          ...(stopped
+            ? {
+                build_outcome: "cancelled",
+                status: "stopped",
+                stopped_on: "2026-09-01T04:00:00.000Z"
+              }
+            : {})
+        });
+      }
+      if (url.pathname.endsWith(`/builds/builds/${buildUuid}/cancel`) && method === "PUT") {
+        cancelStartedAt = clock;
+        stopped = true;
+        return response({ build_uuid: buildUuid });
+      }
+      throw new Error(`Unexpected request: ${method} ${url}`);
+    });
+    const dependencies = {
+      fetcher,
+      now: () => clock,
+      sleep: async (milliseconds) => {
+        clock += milliseconds;
+      },
+      writeManifest: vi.fn()
+    };
+
+    await expect(verifyAcceptedBuild(manifest, release, context, dependencies)).rejects.toThrow(
+      /Mismatched fields:/
+    );
+    checkingMetadata = false;
+    await cancelRecordedBuild(manifest, context, dependencies);
+
+    expect(cancelStartedAt).toBeLessThanOrEqual(60_000);
+    expect(record).toMatchObject({
+      buildOutcome: "cancelled",
+      stoppedOn: "2026-09-01T04:00:00.000Z"
+    });
+  });
+
+  it("rejects the source-deploy override in the accepted build snapshot", async () => {
+    const release = releaseEnvelope().manifest;
+    const record = workersBuildRecord();
+    const manifest = { releaseGate: { workersBuild: record } };
+    const context = { accountId, candidateVersion: version, cleanupToken: "cleanup-token" };
+    const fetcher = vi.fn(async (input) => {
+      const url = new URL(String(input));
+      if (url.pathname.includes(`/builds/workers/${productionWorkerTag}/triggers`)) {
+        return response([trigger(record, shortCommand)]);
+      }
+      if (url.pathname.endsWith(`/builds/triggers/${triggerUuid}/environment_variables`)) {
+        return response({
+          HQBASE_EXPECTED_RELEASE_VERSION: { is_secret: false, value: version },
+          HQBASE_UPDATER_LOADER: {
+            is_secret: false,
+            value: managedUpdaterLoader(release.updater)
+          }
+        });
+      }
+      if (url.pathname.endsWith(`/builds/builds/${buildUuid}`)) {
+        return response({
+          ...exactBuild(record, release.updater, { HQBASE_FORCE_SOURCE_DEPLOY: "1" }),
+          status: "stopped"
+        });
+      }
+      throw new Error(`Unexpected request: GET ${url}`);
+    });
+
+    await expect(
+      verifyAcceptedBuild(manifest, release, context, {
+        fetcher,
+        now: () => 0,
+        sleep: async () => {}
+      })
+    ).rejects.toThrow(/HQBASE_FORCE_SOURCE_DEPLOY/);
   });
 
   it("uses the production AES-GCM grant-cookie contract without exposing the token", () => {
