@@ -252,6 +252,19 @@ jobs:
           done
           echo "Previous stable HQBase was not healthy within 300 seconds"
           exit 1
+      - name: Record the previous stable Worker deployment
+        run: |
+          CONFIG_FILE="$GITHUB_WORKSPACE/.hqbase/deployments/$DEPLOYMENT_NAME/wrangler.jsonc" \
+          WORKER_NAME="$STAGING_WORKER_NAME" node --input-type=module -e '
+            import { recordWorkerDeployedForConfig } from "./scripts/hqbase/manifest.mjs";
+            const manifest = recordWorkerDeployedForConfig(
+              process.env.CONFIG_FILE,
+              process.env.WORKER_NAME
+            );
+            if (manifest?.worker?.deployed !== true) {
+              throw new Error("The previous stable staging Worker was not recorded.");
+            }
+          '
       - name: Bootstrap persistent N-1 staging data
         env:
           HQBASE_STAGING_MAIL_API_BASE_PATH: /api
