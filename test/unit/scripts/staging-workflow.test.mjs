@@ -262,6 +262,41 @@ describe("staging workflow lifecycle record", () => {
     );
   });
 
+  it("gates publication on the deployed update action and exact cleanup", () => {
+    const prepare = releaseWorkflow.indexOf(
+      "      - name: Prepare the deployed update-action release gate"
+    );
+    const candidate = releaseWorkflow.indexOf("      - name: Apply the exact signed candidate");
+    const stale = releaseWorkflow.indexOf(
+      "      - name: Verify the candidate restored the binding while the database remained at S0"
+    );
+    const probe = releaseWorkflow.indexOf(
+      "      - name: Exercise the deployed update action without deployment"
+    );
+    const repair = releaseWorkflow.indexOf(
+      "      - name: Finish the candidate through its canonical signed bootstrap"
+    );
+    const cleanup = releaseWorkflow.indexOf(
+      "      - name: Reconcile deployed update-action gate resources"
+    );
+    const upload = releaseWorkflow.indexOf("      - name: Upload non-secret deployment record");
+
+    expect(prepare).toBeGreaterThan(-1);
+    expect(candidate).toBeGreaterThan(prepare);
+    expect(stale).toBeGreaterThan(candidate);
+    expect(probe).toBeGreaterThan(stale);
+    expect(repair).toBeGreaterThan(probe);
+    expect(cleanup).toBeGreaterThan(repair);
+    expect(upload).toBeGreaterThan(cleanup);
+    expect(releaseWorkflow).toContain("HQBASE_E2E_REPO_CONNECTION_UUID:");
+    expect(releaseWorkflow).toContain("HQBASE_E2E_BUILD_TOKEN_UUID:");
+    expect(releaseWorkflow).toContain("HQBASE_E2E_UPDATE_API_TOKEN:");
+    expect(releaseWorkflow).toContain("staging-update-gate.mjs prepare");
+    expect(releaseWorkflow).toContain("staging-update-gate.mjs probe");
+    expect(releaseWorkflow).toContain("staging-update-gate.mjs cleanup");
+    expect(releaseWorkflow).toContain("steps.reconcile_update_gate.outcome == 'success'");
+  });
+
   it("keeps the customer source checkout unchanged", () => {
     expect(releaseWorkflow).toContain(
       "      - name: Verify the customer source checkout starts unchanged"
@@ -303,6 +338,13 @@ describe("staging workflow lifecycle record", () => {
     expect(releaseWorkflow).toContain('test "$tag_commit" = "$RELEASE_COMMIT"');
     expect(releaseWorkflow).toContain('test "$deploy_commit" = "$RELEASE_COMMIT"');
     expect(releaseWorkflow).toContain("manifest.updater?.protocol !== 2");
+    expect(releaseWorkflow).toContain("fetch-depth: 0");
+    expect(releaseWorkflow).toContain(
+      "const configuredUpdaterCommit = packageJson.hqbaseRelease?.updaterCommit"
+    );
+    expect(releaseWorkflow).toContain("updaterCommitVersion !== version");
+    expect(releaseWorkflow).toContain("Committed release updater commit is invalid.");
+    expect(releaseWorkflow).toContain("!immutableUpdaterUrl.test(manifest.updater.sourceUrl)");
     expect(releaseWorkflow).toContain(["manifest-$", '{HQBASE_RELEASE_VERSION}.json"'].join(""));
     expect(releaseWorkflow).toContain("Published stable and versioned manifests do not match.");
     expect(releaseWorkflow).toContain("manifest.updater.sourceUrl !== expectedUpdaterUrl");

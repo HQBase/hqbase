@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.3.4
+
+### Fixed
+
+- Start managed updates with a short Workers Builds deploy command and a verified updater-loader
+  variable. This prevents the **Invalid request body** failure after HQBase 1.3.4 is installed and
+  does not change customer source repositories. An affected HQBase 1.3.3 installation that still
+  uses `pnpm deploy` needs the documented one-time Cloudflare recovery to reach this release.
+- Report the exact failed Cloudflare operation after authorization, restore verified trigger changes
+  when setup is rejected, and reconcile an uncertain build response before reporting its result.
+- Test the deployed update action with a real disposable Workers Builds trigger and build request
+  before a signed release is published. The release gate now covers the Cloudflare configuration and
+  build-dispatch boundary that was not tested in 1.3.3.
+
 ## 1.3.3
 
 ### Fixed

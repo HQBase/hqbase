@@ -40,10 +40,38 @@ const sourceCommit = execFileSync("git", ["rev-parse", "HEAD"], {
 if (!/^[a-f0-9]{40}$/.test(sourceCommit)) {
   throw new Error("Release source commit is invalid.");
 }
+const configuredUpdaterCommit = packageJson.hqbaseRelease?.updaterCommit;
+const updaterCommitVersion = packageJson.hqbaseRelease?.updaterCommitVersion;
+if (Boolean(configuredUpdaterCommit) !== Boolean(updaterCommitVersion)) {
+  throw new Error("Release updater override needs both a commit and a version.");
+}
+if (configuredUpdaterCommit && updaterCommitVersion !== version) {
+  throw new Error("Release updater override is not approved for this version.");
+}
+const updaterCommit = configuredUpdaterCommit ?? sourceCommit;
+if (!/^[a-f0-9]{40}$/.test(updaterCommit)) {
+  throw new Error("Release updater commit is invalid.");
+}
+let resolvedUpdaterCommit;
+try {
+  resolvedUpdaterCommit = execFileSync(
+    "git",
+    ["rev-parse", "--verify", `${updaterCommit}^{commit}`],
+    {
+      cwd: root,
+      encoding: "utf8"
+    }
+  ).trim();
+} catch {
+  throw new Error("Release updater commit is not available in the checkout.");
+}
+if (resolvedUpdaterCommit !== updaterCommit) {
+  throw new Error("Release updater commit must identify a commit.");
+}
 // Hash the committed source that the URL serves, never uncommitted working-tree bytes.
 const updaterBytes = execFileSync(
   "git",
-  ["show", `${sourceCommit}:scripts/release/bootstrap.mjs`],
+  ["show", `${updaterCommit}:scripts/release/bootstrap.mjs`],
   { cwd: root }
 );
 const manifest = {
@@ -63,7 +91,7 @@ const manifest = {
   },
   updater: {
     protocol: 2,
-    sourceUrl: `https://raw.githubusercontent.com/HQBase/hqbase/${sourceCommit}/scripts/release/bootstrap.mjs`,
+    sourceUrl: `https://raw.githubusercontent.com/HQBase/hqbase/${updaterCommit}/scripts/release/bootstrap.mjs`,
     sha256: createHash("sha256").update(updaterBytes).digest("hex"),
     size: updaterBytes.length
   },

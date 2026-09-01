@@ -1,7 +1,23 @@
+// @vitest-environment happy-dom
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { UpdateStatus } from "@/features/updates/types";
 import { UpdateSettings } from "@/features/updates/update-settings";
+import { renderComponent } from "../render-hook";
+
+const mocks = vi.hoisted(() => ({
+  applyUpdate: vi.fn(),
+  getUpdateStatus: vi.fn()
+}));
+
+vi.mock("@/features/updates/api", () => mocks);
+
+afterEach(() => {
+  document.body.replaceChildren();
+  window.history.replaceState(null, "", "/");
+  window.sessionStorage.clear();
+  vi.clearAllMocks();
+});
 
 const availableStatus: UpdateStatus = {
   product: "hqbase",
@@ -119,6 +135,36 @@ describe("update settings", () => {
     expect(html).toContain("will not change your source repository");
     expect(html).not.toContain("What’s changing");
     expect(html).not.toContain("Install update");
+  });
+
+  it("labels an apply failure after Cloudflare authorization as an update failure", async () => {
+    window.sessionStorage.setItem("hqb_update_expected_version", availableStatus.release.version);
+    window.sessionStorage.setItem("hqb_update_action_kind", "repair");
+    window.history.replaceState(
+      null,
+      "",
+      "/settings/updates?cloudflare=connected&settings=updates"
+    );
+    mocks.applyUpdate.mockRejectedValue(new Error("Invalid request body"));
+
+    const view = await renderComponent(
+      <UpdateSettings
+        initialStatus={{
+          ...availableStatus,
+          installedVersion: availableStatus.release.version,
+          repairRequired: true
+        }}
+        progress={null}
+        onStatusChange={() => undefined}
+        onUpdateStarted={() => undefined}
+      />
+    );
+
+    await vi.waitFor(() => expect(mocks.applyUpdate).toHaveBeenCalledWith("0.2.0"));
+    expect(view.container.textContent).toContain("Update could not start");
+    expect(view.container.textContent).toContain("Invalid request body");
+    expect(view.container.textContent).not.toContain("Update authorization unavailable");
+    await view.unmount();
   });
 });
 
