@@ -54,9 +54,10 @@ export async function listTriggers(workerTag, context, dependencies) {
 }
 
 export async function cloudflareResult(pathname, init, fetcher, options = {}) {
+  const timeoutMilliseconds = Math.max(1, options.timeoutMilliseconds ?? 30_000);
   const response = await fetcher(`${apiBase}${pathname}`, {
     ...init,
-    signal: AbortSignal.timeout(30_000)
+    signal: AbortSignal.timeout(timeoutMilliseconds)
   });
   if (options.allowNotFound && response.status === 404) return null;
   let body;
@@ -272,6 +273,7 @@ export function resolveDependencies(options) {
     fetcher: options.fetcher ?? fetch,
     loadManifest: options.loadManifest ?? loadManifest,
     manifestExists: options.manifestExists ?? manifestExists,
+    now: options.now ?? Date.now,
     readFile: options.readFile ?? fs.readFileSync,
     runCommand: options.runCommand ?? run,
     sleep:
