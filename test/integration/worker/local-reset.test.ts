@@ -84,7 +84,7 @@ describe("local database reset", () => {
       env.DB.prepare(
         "SELECT installed_schema_version FROM release_state WHERE singleton = 1"
       ).first()
-    ).resolves.toEqual({ installed_schema_version: 3 });
+    ).resolves.toEqual({ installed_schema_version: 4 });
     await expect(
       env.DB.prepare(
         "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'mailbox_addresses'"
