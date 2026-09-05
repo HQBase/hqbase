@@ -2,6 +2,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { request as httpsRequest } from "node:https";
 
 import { expect, test } from "@playwright/test";
+import { ensureStagingSetup } from "./setup";
 
 const accessClientId = required("HQBASE_STAGING_ACCESS_CLIENT_ID");
 const accessClientSecret = required("HQBASE_STAGING_ACCESS_CLIENT_SECRET");
@@ -24,6 +25,7 @@ type ProbeOutcome =
   | { kind: "network-error"; code: string };
 
 test("authenticated event WebSocket opens", async ({ page }) => {
+  await ensureStagingSetup(page.context().request);
   const login = await page.context().request.post("/api/auth/sign-in/email", {
     data: { email, password, rememberMe: false },
     headers: { origin: stagingUrl }
