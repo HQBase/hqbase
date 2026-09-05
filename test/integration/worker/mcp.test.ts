@@ -652,7 +652,7 @@ describe("HQBase MCP server", () => {
     ).resolves.toEqual({ count: 1 });
   });
 
-  it("defaults MCP sends, replies, and forwards to the automatic signature", async () => {
+  it("defaults MCP sends to the automatic signature", async () => {
     const sent = (await callTool(
       "send_email",
       {
@@ -665,7 +665,9 @@ describe("HQBase MCP server", () => {
       "/mcp/full"
     )) as { id: string };
     expect(await storedText(sent.id)).toBe("Send authored\n\nMCP signature");
+  });
 
+  it("defaults MCP replies to the automatic signature", async () => {
     const replied = (await callTool(
       "reply_to_message",
       {
@@ -681,7 +683,9 @@ describe("HQBase MCP server", () => {
     expect(replyText.indexOf("MCP signature")).toBeLessThan(
       replyText.indexOf("Earlier signature body")
     );
+  });
 
+  it("defaults MCP forwards to the automatic signature", async () => {
     const forwarded = (await callTool(
       "forward_message",
       {
@@ -701,7 +705,9 @@ describe("HQBase MCP server", () => {
     expect(forwardText.indexOf("MCP signature")).toBeLessThan(
       forwardText.indexOf("Forwarded message")
     );
+  });
 
+  it("keeps the automatic signature and attachments when sending a saved MCP forward", async () => {
     const savedForwardDraft = (await callTool(
       "create_draft",
       {
@@ -744,7 +750,9 @@ describe("HQBase MCP server", () => {
     expect(
       await env.DB.prepare("SELECT id FROM drafts WHERE id = ?").bind(savedForwardDraft.id).first()
     ).toBeNull();
+  });
 
+  it("omits the MCP signature when requested", async () => {
     const unsigned = (await callTool(
       "send_email",
       {
