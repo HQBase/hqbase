@@ -88,6 +88,12 @@ export function createAuth(
         await sendPasswordSetupEmail(env, { user, url });
       },
       onPasswordReset: async ({ user }) => {
+        // Offline grants no longer depend on browser sessions.
+        await env.DB.batch([
+          env.DB.prepare("DELETE FROM oauthAccessToken WHERE userId = ?").bind(user.id),
+          env.DB.prepare("DELETE FROM oauthRefreshToken WHERE userId = ?").bind(user.id),
+          env.DB.prepare("DELETE FROM oauthConsent WHERE userId = ?").bind(user.id)
+        ]);
         const completedSetup = await completePasswordSetup(env.DB, user.id);
         await recordAudit(env.DB, {
           correlationId: crypto.randomUUID(),
@@ -123,7 +129,12 @@ export function createAuth(
           mcpFullResource(env, request),
           ...mailApiResources
         ],
-        clientRegistrationAllowedScopes: ["mail:write", "mail:send", "offline_access"],
+        clientRegistrationAllowedScopes: [
+          "mail:write",
+          "mail:send",
+          "signatures:manage",
+          "offline_access"
+        ],
         clientRegistrationDefaultScopes: ["mail:read"],
         consentPage: "/oauth/consent",
         disableJwtPlugin: true,
@@ -135,7 +146,7 @@ export function createAuth(
           opaqueAccessToken: "hqb_access_",
           refreshToken: "hqb_refresh_"
         },
-        scopes: ["mail:read", "mail:write", "mail:send", "offline_access"],
+        scopes: ["mail:read", "mail:write", "mail:send", "signatures:manage", "offline_access"],
         storeTokens: { hash: hashOAuthToken },
         resources: [mcpResource(env, request), mcpFullResource(env, request), ...mailApiResources],
         enforcePerClientResources: false

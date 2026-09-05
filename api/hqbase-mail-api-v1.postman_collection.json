@@ -188,6 +188,12 @@
                   "value": "",
                   "disabled": true,
                   "description": "Maximum number of journal entries read for this page."
+                },
+                {
+                  "key": "includeLabels",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Include label membership. Does not filter results or change the cursor."
                 }
               ]
             },
@@ -400,6 +406,12 @@
                   "value": "",
                   "disabled": true,
                   "description": "Opaque cursor from the previous page. Read it from the Link header and send it unchanged."
+                },
+                {
+                  "key": "includeLabels",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Include label membership. Does not filter results or change the cursor."
                 }
               ]
             },
@@ -419,6 +431,14 @@
                   "key": "id",
                   "value": "{{id}}"
                 }
+              ],
+              "query": [
+                {
+                  "key": "includeLabels",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Include label membership. Does not filter results or change the cursor."
+                }
               ]
             },
             "description": "Get a message"
@@ -436,6 +456,14 @@
                 {
                   "key": "id",
                   "value": "{{id}}"
+                }
+              ],
+              "query": [
+                {
+                  "key": "includeLabels",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Include label membership. Does not filter results or change the cursor."
                 }
               ]
             },
@@ -543,6 +571,14 @@
                   "key": "action",
                   "value": "{{action}}"
                 }
+              ],
+              "query": [
+                {
+                  "key": "includeLabels",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Include label membership in the updated message."
+                }
               ]
             },
             "description": "Update message state"
@@ -598,6 +634,12 @@
                   "value": "",
                   "disabled": true,
                   "description": "Opaque cursor from the previous page."
+                },
+                {
+                  "key": "includeLabels",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Include label membership. Does not filter results or change the cursor."
                 }
               ]
             },
@@ -1001,6 +1043,96 @@
               ]
             },
             "description": "Returns only personal, mailbox, and exact-domain signatures usable from the exact address."
+          },
+          "response": []
+        },
+        {
+          "name": "Create a signature",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/signatures",
+              "variable": []
+            },
+            "description": "Create a signature",
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "List manageable signatures",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/signatures/manage",
+              "variable": []
+            },
+            "description": "List manageable signatures"
+          },
+          "response": []
+        },
+        {
+          "name": "Update a signature",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/signatures/:id",
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{id}}"
+                }
+              ]
+            },
+            "description": "Update a signature",
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete a signature",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/signatures/:id",
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{id}}"
+                }
+              ]
+            },
+            "description": "Delete a signature"
           },
           "response": []
         }

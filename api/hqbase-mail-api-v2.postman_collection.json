@@ -1003,6 +1003,96 @@
             "description": "Returns only personal, mailbox, and exact-domain signatures usable from the exact address."
           },
           "response": []
+        },
+        {
+          "name": "Create a signature",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v2/signatures",
+              "variable": []
+            },
+            "description": "Create a signature",
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "List manageable signatures",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v2/signatures/manage",
+              "variable": []
+            },
+            "description": "List manageable signatures"
+          },
+          "response": []
+        },
+        {
+          "name": "Update a signature",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v2/signatures/:id",
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{id}}"
+                }
+              ]
+            },
+            "description": "Update a signature",
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete a signature",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v2/signatures/:id",
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{id}}"
+                }
+              ]
+            },
+            "description": "Delete a signature"
+          },
+          "response": []
         }
       ]
     }

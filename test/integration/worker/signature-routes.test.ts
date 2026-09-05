@@ -3,6 +3,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 
 import { createAuth } from "../../../worker/auth/auth";
 import { applyCurrentMigrations } from "./current-migrations";
+import { tokenRow } from "./mail-api-token-fixture";
 
 const origin = "https://hqbase.test";
 const pngDataUrl = "data:image/png;base64,iVBORw0KGgo=";
@@ -200,6 +201,171 @@ describe("signature routes", () => {
     const invalid = await sessionFetch("/api/v2/signatures?from=invalid", memberCookie);
     expect(invalid.status).toBe(400);
     await expect(invalid.json()).resolves.toMatchObject({ error: { code: "SIGNATURE_INVALID" } });
+  });
+
+  it.each([
+    "v1",
+    "v2"
+  ])("manages signatures with a separate OAuth permission on %s", async (version) => {
+    const base = `/api/${version}/signatures`;
+    const client = `signature-manager-${version}`;
+    const bearer = `hqb_access_${client}`;
+    const sendBearer = `hqb_access_${client}-send`;
+    const session = await env.DB.prepare('SELECT id FROM "session" WHERE userId = ?')
+      .bind(memberId)
+      .first<{ id: string }>();
+    if (!session) throw new Error("Expected member session.");
+    const now = new Date().toISOString();
+    const future = new Date(Date.now() + 3600000).toISOString();
+    await env.DB.batch([
+      env.DB.prepare(
+        "INSERT INTO oauthClient (id, clientId, redirectUris, createdAt, updatedAt) VALUES (?, ?, '[]', ?, ?)"
+      ).bind(client, client, now, now),
+      env.DB.prepare(
+        "INSERT INTO oauthConsent (id, clientId, userId, scopes, resources, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?)"
+      ).bind(
+        client,
+        client,
+        memberId,
+        '["signatures:manage","mail:send"]',
+        JSON.stringify([`${origin}/api/${version}`]),
+        now,
+        now
+      ),
+      await tokenRow(
+        env.DB,
+        client,
+        bearer,
+        client,
+        session.id,
+        memberId,
+        future,
+        ["signatures:manage"],
+        `${origin}/api/${version}`
+      ),
+      await tokenRow(
+        env.DB,
+        `${client}-send`,
+        sendBearer,
+        client,
+        session.id,
+        memberId,
+        future,
+        ["mail:send"],
+        `${origin}/api/${version}`
+      )
+    ]);
+    const api = (path: string, method = "GET", body?: object, token = bearer) =>
+      SELF.fetch(`${origin}${path}`, {
+        method,
+        headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
+        ...(body ? { body: JSON.stringify(body) } : {})
+      });
+    const input = {
+      name: `API ${version}`,
+      html: `<p>Private signature</p><img src="${pngDataUrl}" alt="Logo">`,
+      scope: { type: "user", id: memberId },
+      isDefault: false
+    };
+    for (const [path, method, body] of [
+      [`${base}/manage`, "GET", undefined],
+      [base, "POST", input],
+      [`${base}/${personalId}`, "PATCH", { name: "Denied" }],
+      [`${base}/${personalId}`, "DELETE", undefined]
+    ] as const) {
+      const denied = await api(path, method, body, sendBearer);
+      expect(denied.status).toBe(403);
+      expect(denied.headers.get("www-authenticate")).toContain('scope="signatures:manage"');
+    }
+    expect(
+      (await api(`${base}?from=team%40signature-routes.example`, "GET", undefined, sendBearer))
+        .status
+    ).toBe(200);
+    const created = await api(base, "POST", input);
+    expect(created.status).toBe(201);
+    const signature = await created.json<{ id: string; html: string }>();
+    expect(signature.html).toContain("data:image/png");
+    expect((await api(base, "POST", input)).status).toBe(409);
+    expect(
+      (
+        await api(base, "POST", {
+          ...input,
+          name: "Other person",
+          scope: { type: "user", id: ownerId }
+        })
+      ).status
+    ).toBe(403);
+    expect(
+      (
+        await api(base, "POST", {
+          ...input,
+          name: "Domain denied",
+          scope: { type: "domain", id: "dom_signature_routes" }
+        })
+      ).status
+    ).toBe(403);
+    expect(
+      (
+        await api(base, "POST", {
+          ...input,
+          name: "Mailbox denied",
+          scope: { type: "mailbox", id: "mbx_signature_routes" }
+        })
+      ).status
+    ).toBe(403);
+    expect((await api(base, "POST", { ...input, html: "x".repeat(400001) })).status).toBe(400);
+    expect((await api(`${base}/${signature.id}`, "PATCH", {})).status).toBe(400);
+    const changed = await api(`${base}/${signature.id}`, "PATCH", {
+      name: `Changed ${version}`,
+      isDefault: true
+    });
+    expect(changed.status).toBe(200);
+    await expect(changed.json()).resolves.toMatchObject({
+      name: `Changed ${version}`,
+      isDefault: true
+    });
+    const list = await api(`${base}/manage`);
+    expect(list.status).toBe(200);
+    await expect(list.json()).resolves.toEqual(
+      expect.arrayContaining([expect.objectContaining({ id: signature.id })])
+    );
+    await env.DB.prepare(
+      "UPDATE mailbox_grants SET access_level = 'manager' WHERE mailbox_id = ? AND principal_id = ?"
+    )
+      .bind("mbx_signature_routes", memberId)
+      .run();
+    try {
+      const shared = await api(base, "POST", {
+        ...input,
+        name: `Shared ${version}`,
+        scope: { type: "mailbox", id: "mbx_signature_routes" }
+      });
+      expect(shared.status).toBe(201);
+      const sharedId = (await shared.json<{ id: string }>()).id;
+      expect((await api(`${base}/${sharedId}`, "DELETE")).status).toBe(204);
+    } finally {
+      await env.DB.prepare(
+        "UPDATE mailbox_grants SET access_level = 'agent' WHERE mailbox_id = ? AND principal_id = ?"
+      )
+        .bind("mbx_signature_routes", memberId)
+        .run();
+    }
+    expect((await api(`${base}/${signature.id}`, "DELETE")).status).toBe(204);
+    expect((await api(`${base}/${signature.id}`, "PATCH", { name: "Missing" })).status).toBe(404);
+    const audits = await env.DB.prepare(
+      "SELECT action, metadata_json FROM audit_events WHERE resource_id = ?"
+    )
+      .bind(signature.id)
+      .all<{ action: string; metadata_json: string }>();
+    expect(audits.results.map((row) => row.action)).toEqual(
+      expect.arrayContaining([
+        "signature.create",
+        "signature.update",
+        "signature.delete",
+        "signature.default.change"
+      ])
+    );
+    expect(JSON.stringify(audits.results)).not.toContain("Private signature");
   });
 
   it("resolves explicit REST selections and preserves omission semantics", async () => {
