@@ -3,6 +3,7 @@ import {
   classifyManagedMigrationState,
   type ManagedMigrationSnapshot,
   normalMigrationNames,
+  pendingSendGuards,
   transitionGuards
 } from "@worker/features/updates/migration-state";
 import { describe, expect, it } from "vitest";
@@ -12,7 +13,8 @@ describe("managed update migration state", () => {
     [0, "stale", true],
     [1, "partial", true],
     [2, "partial", true],
-    [3, "clean", false]
+    [3, "partial", true],
+    [4, "clean", false]
   ] as const)("accepts the exact S%s migration state", (completed, state, repairRequired) => {
     expect(classifyManagedMigrationState(snapshot(completed), "1.3.3", 3)).toEqual({
       completedAfterDeployMigrations: completed,
@@ -106,10 +108,11 @@ describe("managed update migration state", () => {
   });
 });
 
-function snapshot(completed: 0 | 1 | 2 | 3): ManagedMigrationSnapshot {
+function snapshot(completed: 0 | 1 | 2 | 3 | 4): ManagedMigrationSnapshot {
   const aliasesAreLegacy = completed === 0;
   const principalsAreLegacy = completed < 2;
   return {
+    pendingSendGuards: completed === 4 ? [...pendingSendGuards] : [],
     afterDeployLedger: completed === 0 ? null : [...afterDeployMigrationNames.slice(0, completed)],
     columns: {
       draft_changes: ["sequence", "principal_id", ...(principalsAreLegacy ? ["user_id"] : [])],
@@ -126,7 +129,7 @@ function snapshot(completed: 0 | 1 | 2 | 3): ManagedMigrationSnapshot {
       ]
     },
     draftLabelForeignKeys:
-      completed === 3
+      completed >= 3
         ? [
             {
               from: "draft_id",

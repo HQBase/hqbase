@@ -22,6 +22,7 @@ import {
   type StoredOutgoingAttachment,
   totalAttachmentBytes
 } from "./content-attachments";
+import { identifySend, resumeSend } from "./operations";
 import { sendNewMessage } from "./service";
 import type { ForwardMessageInput, SendMessageInput } from "./validation";
 
@@ -33,7 +34,10 @@ export async function forwardMessage(
   principalId: string,
   signature?: SignatureSnapshot
 ) {
-  const original = await getMessageDetail(env.DB, input.messageId);
+  const identity = await identifySend(principalId, input, "forward");
+  const previous = await resumeSend(env, identity);
+  if (previous) return previous;
+  const original = await getMessageDetail(env.DB, input.messageId, env.MAIL_OBJECTS);
   if (!original) throw new AppError("MESSAGE_NOT_FOUND", "Message not found.", 404);
 
   const mailbox = await findMailboxForSending(env.DB, input.from);
@@ -69,7 +73,8 @@ export async function forwardMessage(
       principalId,
       signature,
       forwarded.context,
-      forwarded.inlineAttachments
+      forwarded.inlineAttachments,
+      identity
     );
   }
 
@@ -121,7 +126,8 @@ export async function forwardMessage(
       principalId,
       signature,
       forwarded.context,
-      forwarded.inlineAttachments
+      forwarded.inlineAttachments,
+      identity
     );
   } finally {
     try {
@@ -140,7 +146,10 @@ export async function sendForwardDraft(
   principalId: string,
   signature?: SignatureSnapshot
 ) {
-  const original = await getMessageDetail(env.DB, originalMessageId);
+  const identity = await identifySend(principalId, input, "send");
+  const previous = await resumeSend(env, identity);
+  if (previous) return previous;
+  const original = await getMessageDetail(env.DB, originalMessageId, env.MAIL_OBJECTS);
   if (!original) throw new AppError("MESSAGE_NOT_FOUND", "Message not found.", 404);
   const authored = stripLegacyForwardContext(input);
   const originalAttachments = forwardableAttachments(original.attachments);
@@ -158,7 +167,8 @@ export async function sendForwardDraft(
       principalId,
       signature,
       forwarded.context,
-      forwarded.inlineAttachments
+      forwarded.inlineAttachments,
+      identity
     );
   }
 
@@ -189,10 +199,13 @@ export async function sendForwardDraft(
       principalId,
       signature,
       forwarded.context,
-      forwarded.inlineAttachments
+      forwarded.inlineAttachments,
+      identity
     );
   } catch (error) {
-    await removeCopiedAttachments(env, principalId, draftId, copiedAttachmentIds);
+    if (!(error instanceof AppError && error.code.startsWith("SEND_"))) {
+      await removeCopiedAttachments(env, principalId, draftId, copiedAttachmentIds);
+    }
     throw error;
   }
 }

@@ -129,7 +129,7 @@ describe("two-phase D1 migrations", () => {
   });
 
   it("publishes schema epoch 3 only after the cleanup phase", () => {
-    expect(releasePackageSource).toContain("const schemaVersion = 3;");
+    expect(releasePackageSource).toContain("const schemaVersion = 4;");
     expect(updateServiceSource).toContain("installedSchemaVersion: 3");
     expect(cleanupMigrationSource).toContain("installed_schema_version = 3");
   });
@@ -226,11 +226,11 @@ describe("two-phase D1 migrations", () => {
     expect(sql[0]).toContain("WHERE id = 'repair-original'");
   });
 
-  it("leaves a complete S3 database unchanged and finalizes only its pending repair row", () => {
+  it("leaves a complete S4 database unchanged and finalizes only its pending repair row", () => {
     const recordWorker = vi.fn();
     const migrate = vi.fn();
     const execute = vi.fn();
-    const complete = { phase: "S3", pendingUpdate: null };
+    const complete = { phase: "S4", pendingUpdate: null };
 
     expect(
       completeActiveReleaseRetry(
@@ -243,14 +243,14 @@ describe("two-phase D1 migrations", () => {
           executeSql: execute
         }
       )
-    ).toEqual({ phase: "S3", repaired: false, workerRecorded: false });
+    ).toEqual({ phase: "S4", repaired: false, workerRecorded: false });
     expect(recordWorker).not.toHaveBeenCalled();
     expect(migrate).not.toHaveBeenCalled();
     expect(execute).not.toHaveBeenCalled();
 
     completeActiveReleaseRetry("/release", { schemaVersion: 16, version: "1.2.3" }, recordWorker, {
       afterDeployState: {
-        phase: "S3",
+        phase: "S4",
         pendingUpdate: {
           checkpoint_bookmark: "bookmark-original",
           from_version: "1.2.3",

@@ -82,7 +82,7 @@ messageRoutes.get("/", async (c) => {
 
 messageRoutes.get("/:id/thread", async (c) => {
   const auth = await requireMailApiPrincipal(c.env, c.req.raw, "mail:read");
-  const message = await getMessageDetail(c.env.DB, c.req.param("id"));
+  const message = await getMessageDetail(c.env.DB, c.req.param("id"), c.env.MAIL_OBJECTS);
   if (!message) {
     throw new AppError("MESSAGE_NOT_FOUND", "Message not found.", 404);
   }
@@ -93,7 +93,9 @@ messageRoutes.get("/:id/thread", async (c) => {
     auth.principal.role,
     "read"
   );
-  const messages = (await listThreadMessages(c.env.DB, message.threadId, scope)).map(publicMessage);
+  const messages = (
+    await listThreadMessages(c.env.DB, message.threadId, scope, c.env.MAIL_OBJECTS)
+  ).map(publicMessage);
   return c.json(includeLabels(c.req.raw) ? await withMessageLabels(c.env.DB, messages) : messages);
 });
 
@@ -106,7 +108,7 @@ messageRoutes.get("/:id", async (c) => {
     c.req.param("id"),
     "read"
   );
-  const message = await getMessageDetail(c.env.DB, c.req.param("id"));
+  const message = await getMessageDetail(c.env.DB, c.req.param("id"), c.env.MAIL_OBJECTS);
   if (!message) {
     throw new AppError("MESSAGE_NOT_FOUND", "Message not found.", 404);
   }
@@ -125,7 +127,7 @@ messageRoutes.get("/:id/html", async (c) => {
     c.req.param("id"),
     "read"
   );
-  const message = await getMessageDetail(c.env.DB, c.req.param("id"));
+  const message = await getMessageDetail(c.env.DB, c.req.param("id"), c.env.MAIL_OBJECTS);
   if (!message) {
     throw new AppError("MESSAGE_NOT_FOUND", "Message not found.", 404);
   }
@@ -167,7 +169,7 @@ messageRoutes.post("/:id/remote-media/trust", async (c) => {
     c.req.param("id"),
     "read"
   );
-  const message = await getMessageDetail(c.env.DB, c.req.param("id"));
+  const message = await getMessageDetail(c.env.DB, c.req.param("id"), c.env.MAIL_OBJECTS);
   if (!message) {
     throw new AppError("MESSAGE_NOT_FOUND", "Message not found.", 404);
   }

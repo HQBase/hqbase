@@ -3876,6 +3876,14 @@
                 "items": {
                   "$ref": "#/components/schemas/Attachment"
                 }
+              },
+              "replyTo": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "format": "email"
+                },
+                "description": "Preferred recipients for replies to inbound mail when no explicit recipients are supplied."
               }
             }
           }
@@ -4281,6 +4289,12 @@
           },
           "signature": {
             "$ref": "#/components/schemas/SignatureSelection"
+          },
+          "idempotencyKey": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100,
+            "description": "Reuse this key only for a retry of the same send request. A saved draft already has a stable send identity."
           }
         }
       },
@@ -4337,6 +4351,12 @@
           },
           "signature": {
             "$ref": "#/components/schemas/SignatureSelection"
+          },
+          "idempotencyKey": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100,
+            "description": "Reuse this key only for a retry of the same send request. A saved draft already has a stable send identity."
           }
         }
       },
@@ -4410,6 +4430,12 @@
           },
           "signature": {
             "$ref": "#/components/schemas/SignatureSelection"
+          },
+          "idempotencyKey": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100,
+            "description": "Reuse this key only for a retry of the same send request. A saved draft already has a stable send identity."
           }
         }
       },

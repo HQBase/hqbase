@@ -366,6 +366,7 @@ async function createUser(
 function sessionFetch(path: string, cookie: string, init: RequestInit = {}): Promise<Response> {
   const headers = new Headers(init.headers);
   headers.set("cookie", cookie);
+  headers.set("origin", origin);
   return SELF.fetch(`${origin}${path}`, { ...init, headers });
 }
 

@@ -541,7 +541,7 @@ describe("agent mailboxes", () => {
     try {
       const failedEnable = await SELF.fetch(`${origin}/management/v1/agents/${created.agent.id}`, {
         body: JSON.stringify({ isActive: true }),
-        headers: { "content-type": "application/json", cookie: ownerCookie },
+        headers: { "content-type": "application/json", cookie: ownerCookie, origin },
         method: "PATCH"
       });
       expect(failedEnable.status).toBe(500);
@@ -591,7 +591,7 @@ async function requestJson<T>(
     token?: string;
   } = {}
 ): Promise<T> {
-  const headers = new Headers();
+  const headers = new Headers({ origin });
   if (options.body !== undefined) headers.set("content-type", "application/json");
   if (options.cookie) headers.set("cookie", options.cookie);
   if (options.token) headers.set("authorization", `Bearer ${options.token}`);

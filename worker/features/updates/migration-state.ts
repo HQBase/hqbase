@@ -1,39 +1,14 @@
-export const normalMigrationNames = [
-  "0001_initial.sql",
-  "0002_workspace.sql",
-  "0003_oauth_resources.sql",
-  "0004_conversations.sql",
-  "0005_rebuild_threads.sql",
-  "0006_push_notifications.sql",
-  "0007_user_mail_preferences.sql",
-  "0008_user_onboarding.sql",
-  "0009_login_email_domain_isolation.sql",
-  "0010_oauth_device_authorization.sql",
-  "0011_latest_password_reset_token.sql",
-  "0012_message_activity_index.sql",
-  "0013_message_changes.sql",
-  "0014_unassigned_messages.sql",
-  "0015_draft_changes.sql",
-  "0016_one_address_per_mailbox.sql",
-  "0017_agent_principals.sql",
-  "0018_mailbox_lifecycle.sql",
-  "0019_contacts.sql",
-  "0020_labels.sql",
-  "0021_email_signatures.sql",
-  "0022_login_email_domain_exact_match.sql",
-  "0023_message_sender_names.sql",
-  "0024_draft_inline_images.sql",
-  "0025_activate_catch_all_policy.sql",
-  "0026_domain_disconnect.sql",
-  "0027_message_attachment_disposition.sql",
-  "0028_draft_labels.sql"
-] as const;
+import {
+  afterDeployMigrationNames,
+  normalMigrationNames,
+  pendingSendGuards
+} from "./migration-names";
 
-export const afterDeployMigrationNames = [
-  "0001_remove_mailbox_alias_storage.sql",
-  "0002_finalize_agent_principals.sql",
-  "0003_finalize_draft_labels.sql"
-] as const;
+export {
+  afterDeployMigrationNames,
+  normalMigrationNames,
+  pendingSendGuards
+} from "./migration-names";
 
 const aliasTables = ["mailbox_address_migration", "mailbox_addresses"] as const;
 const aliasMessageColumns = ["delivered_to_address_id", "sent_from_address_id"] as const;
@@ -57,7 +32,7 @@ export const transitionGuards = [
 ] as const;
 
 export type ManagedMigrationState = {
-  completedAfterDeployMigrations: 0 | 1 | 2 | 3;
+  completedAfterDeployMigrations: 0 | 1 | 2 | 3 | 4;
   repairRequired: boolean;
   state: "stale" | "partial" | "clean";
 };
@@ -88,6 +63,7 @@ export type ManagedMigrationSnapshot = {
   } | null;
   tables: string[];
   transitionGuards: string[];
+  pendingSendGuards: string[];
 };
 
 export async function inspectManagedMigrationState(
@@ -104,6 +80,7 @@ export async function inspectManagedMigrationState(
          'd1_migrations_after_deploy',
          'mailbox_address_migration',
          'mailbox_addresses',
+         ${pendingSendGuards.map((name) => `'${name}'`).join(", ")},
          ${transitionGuards.map((name) => `'${name}'`).join(", ")}
        )`
     )
@@ -166,8 +143,16 @@ export async function inspectManagedMigrationState(
       tables: foundTables.filter((name) =>
         aliasTables.includes(name as (typeof aliasTables)[number])
       ),
+      pendingSendGuards: objects.results
+        .filter(
+          ({ type, name }) =>
+            type === "trigger" && pendingSendGuards.some((guard) => guard === name)
+        )
+        .map(({ name }) => name),
       transitionGuards: objects.results
-        .filter(({ type }) => type === "trigger")
+        .filter(
+          ({ type, name }) => type === "trigger" && transitionGuards.some((guard) => guard === name)
+        )
         .map(({ name }) => name)
     },
     expectedVersion,
@@ -245,19 +230,22 @@ export function classifyManagedMigrationState(
 
   const valid =
     baseSchemaPresent &&
+    (completedCount === 4
+      ? includesExactly(snapshot.pendingSendGuards, pendingSendGuards)
+      : snapshot.pendingSendGuards.length === 0) &&
     ((completedCount === 0 && aliasLegacy && principalLegacy && draftForeignKeys.length === 0) ||
       (completedCount === 1 && aliasFinal && principalLegacy && draftForeignKeys.length === 0) ||
       (completedCount === 2 && aliasFinal && principalFinal && draftForeignKeys.length === 0) ||
-      (completedCount === 3 && aliasFinal && principalFinal && hasFinalDraftLabelForeignKey));
+      (completedCount >= 3 && aliasFinal && principalFinal && hasFinalDraftLabelForeignKey));
   if (!valid) throw inconsistentState();
 
   return {
-    completedAfterDeployMigrations: completedCount as 0 | 1 | 2 | 3,
+    completedAfterDeployMigrations: completedCount as 0 | 1 | 2 | 3 | 4,
     repairRequired: completedCount < afterDeployMigrationNames.length || pendingUpdate !== null,
     state:
       completedCount === 0
         ? "stale"
-        : completedCount === 3 && pendingUpdate === null
+        : completedCount === afterDeployMigrationNames.length && pendingUpdate === null
           ? "clean"
           : "partial"
   };

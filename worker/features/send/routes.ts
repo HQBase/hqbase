@@ -5,6 +5,7 @@ import type { HonoApp } from "../../lib/env";
 import { AppError } from "../../lib/errors";
 import { readJson } from "../../lib/json";
 import { parseWith } from "../../lib/validation";
+import { operationalLog } from "../../observability/log";
 import { enforceRateLimit } from "../../security/rate-limit";
 import { recordAudit } from "../audit/service";
 import { getAccessibleDraft, requireDraftAttachmentIdsAccess } from "../drafts/access";
@@ -12,8 +13,8 @@ import { scheduleSentMailEvents } from "../events/service";
 import { findMailboxForSending } from "../mailboxes/queries";
 import { requireMessageAccess } from "../messages/access";
 import { resolveSendSignature } from "../signatures/service";
-
 import { forwardMessage, sendForwardDraft } from "./forward";
+import { identifySend, resumeSend } from "./operations";
 import { replyToMessage, sendNewMessage } from "./service";
 import { forwardMessageSchema, replyMessageSchema, sendMessageSchema } from "./validation";
 
@@ -32,6 +33,8 @@ sendRoutes.post("/send", async (c) => {
   const mailbox = await findMailboxForSending(c.env.DB, input.from);
   if (!mailbox) throw new AppError("MAILBOX_NOT_FOUND", "Sending mailbox not found.", 404);
   await requireMailboxAccess(c.env.DB, principal.id, principal.role, mailbox.id, "agent");
+  const previous = await resumeSend(c.env, await identifySend(principal.id, input, "send"));
+  if (previous) return c.json(previous, 201);
   const draftPrincipal = { id: principal.id, role: principal.role };
   const draft = input.draftId
     ? await getAccessibleDraft(c.env, draftPrincipal, input.draftId)
@@ -58,15 +61,19 @@ sendRoutes.post("/send", async (c) => {
     mailboxId: mailbox.id,
     userId: principal.id
   });
-  await recordAudit(c.env.DB, {
-    correlationId: c.get("correlationId"),
-    actorType: principal.type,
-    actorId: principal.id,
-    action: "message.send",
-    resourceType: "mailbox",
-    resourceId: mailbox.id,
-    outcome: "success"
-  });
+  c.executionCtx.waitUntil(
+    recordAudit(c.env.DB, {
+      correlationId: c.get("correlationId"),
+      actorType: principal.type,
+      actorId: principal.id,
+      action: "message.send",
+      resourceType: "mailbox",
+      resourceId: mailbox.id,
+      outcome: "success"
+    }).catch(() =>
+      operationalLog("error", "send_audit_failed", { requestId: c.get("correlationId") })
+    )
+  );
   return c.json(sent, 201);
 });
 
@@ -90,6 +97,8 @@ sendRoutes.post("/reply", async (c) => {
   const mailbox = await findMailboxForSending(c.env.DB, input.from);
   if (!mailbox) throw new AppError("MAILBOX_NOT_FOUND", "Sending mailbox not found.", 404);
   await requireMailboxAccess(c.env.DB, principal.id, principal.role, mailbox.id, "agent");
+  const previous = await resumeSend(c.env, await identifySend(principal.id, input, "reply"));
+  if (previous) return c.json(previous, 201);
   const draftPrincipal = { id: principal.id, role: principal.role };
   const draft = input.draftId
     ? await getAccessibleDraft(c.env, draftPrincipal, input.draftId)
@@ -107,15 +116,19 @@ sendRoutes.post("/reply", async (c) => {
     mailboxId: mailbox.id,
     userId: principal.id
   });
-  await recordAudit(c.env.DB, {
-    correlationId: c.get("correlationId"),
-    actorType: principal.type,
-    actorId: principal.id,
-    action: "message.reply",
-    resourceType: "mailbox",
-    resourceId: mailbox.id,
-    outcome: "success"
-  });
+  c.executionCtx.waitUntil(
+    recordAudit(c.env.DB, {
+      correlationId: c.get("correlationId"),
+      actorType: principal.type,
+      actorId: principal.id,
+      action: "message.reply",
+      resourceType: "mailbox",
+      resourceId: mailbox.id,
+      outcome: "success"
+    }).catch(() =>
+      operationalLog("error", "send_audit_failed", { requestId: c.get("correlationId") })
+    )
+  );
   return c.json(sent, 201);
 });
 
@@ -133,6 +146,8 @@ sendRoutes.post("/forward", async (c) => {
   const mailbox = await findMailboxForSending(c.env.DB, input.from);
   if (!mailbox) throw new AppError("MAILBOX_NOT_FOUND", "Sending mailbox not found.", 404);
   await requireMailboxAccess(c.env.DB, principal.id, principal.role, mailbox.id, "agent");
+  const previous = await resumeSend(c.env, await identifySend(principal.id, input, "forward"));
+  if (previous) return c.json(previous, 201);
   const draftPrincipal = { id: principal.id, role: principal.role };
   await requireDraftAttachmentIdsAccess(c.env, draftPrincipal, input.attachmentIds);
   const signature = await resolveSendSignature(c.env.DB, principal, {
@@ -144,14 +159,18 @@ sendRoutes.post("/forward", async (c) => {
     mailboxId: mailbox.id,
     userId: principal.id
   });
-  await recordAudit(c.env.DB, {
-    correlationId: c.get("correlationId"),
-    actorType: principal.type,
-    actorId: principal.id,
-    action: "message.forward",
-    resourceType: "mailbox",
-    resourceId: mailbox.id,
-    outcome: "success"
-  });
+  c.executionCtx.waitUntil(
+    recordAudit(c.env.DB, {
+      correlationId: c.get("correlationId"),
+      actorType: principal.type,
+      actorId: principal.id,
+      action: "message.forward",
+      resourceType: "mailbox",
+      resourceId: mailbox.id,
+      outcome: "success"
+    }).catch(() =>
+      operationalLog("error", "send_audit_failed", { requestId: c.get("correlationId") })
+    )
+  );
   return c.json(sent, 201);
 });

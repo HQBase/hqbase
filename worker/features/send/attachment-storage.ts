@@ -1,7 +1,5 @@
-import { sql } from "drizzle-orm";
-
-import { getRows } from "../../db/drizzle";
 import type { WorkerEnv } from "../../lib/env";
+import { referencedObjectKeys } from "../messages/object-references";
 
 import type { StoredOutgoingAttachment } from "./content-attachments";
 
@@ -17,19 +15,6 @@ export async function stageOutgoingAttachments(
     }
   } catch (error) {
     await cleanupStagedObjects(bucket, attachments);
-    throw error;
-  }
-}
-
-export async function sendWithStagedCleanup(
-  env: Pick<WorkerEnv, "MAIL_OBJECTS" | "MAIL_SENDER">,
-  email: Parameters<SendEmail["send"]>[0],
-  stagedAttachments: StoredOutgoingAttachment[]
-): Promise<Awaited<ReturnType<SendEmail["send"]>>> {
-  try {
-    return await env.MAIL_SENDER.send(email);
-  } catch (error) {
-    await cleanupStagedObjects(env.MAIL_OBJECTS, stagedAttachments);
     throw error;
   }
 }
@@ -61,19 +46,7 @@ export async function cleanupUnstoredObjectKeys(
   const uniqueKeys = [...new Set(keys)];
   if (uniqueKeys.length === 0) return;
   try {
-    const values = sql.join(
-      uniqueKeys.map((key) => sql`${key}`),
-      sql`, `
-    );
-    const referenced = await getRows<{ r2_key: string }>(
-      env.DB,
-      sql`SELECT r2_key FROM message_attachments WHERE r2_key IN (${values})
-          UNION
-          SELECT html_r2_key AS r2_key FROM messages WHERE html_r2_key IN (${values})
-          UNION
-          SELECT raw_r2_key AS r2_key FROM messages WHERE raw_r2_key IN (${values})`
-    );
-    const referencedKeys = new Set(referenced.map((object) => object.r2_key));
+    const referencedKeys = await referencedObjectKeys(env.DB, uniqueKeys);
     await deleteObjectKeys(
       env.MAIL_OBJECTS,
       uniqueKeys.filter((key) => !referencedKeys.has(key))

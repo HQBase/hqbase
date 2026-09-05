@@ -32,13 +32,16 @@ export function messageScopeSql(
 ): { params: string[]; sql: string } | null {
   const clauses: string[] = [];
   if (scope.mailboxIds.length > 0) {
-    clauses.push(`${mailboxColumn} IN (${scope.mailboxIds.map(() => "?").join(", ")})`);
+    clauses.push(`${mailboxColumn} IN (SELECT value FROM json_each(?))`);
   }
   if (scope.includeUnassigned) {
     clauses.push(`${unassignedColumn} = 1`);
   }
   if (clauses.length === 0) return null;
-  return { params: [...scope.mailboxIds], sql: `(${clauses.join(" OR ")})` };
+  return {
+    params: scope.mailboxIds.length ? [JSON.stringify(scope.mailboxIds)] : [],
+    sql: `(${clauses.join(" OR ")})`
+  };
 }
 
 export function messageScopeCondition(
@@ -49,10 +52,7 @@ export function messageScopeCondition(
   const clauses = [];
   if (scope.mailboxIds.length > 0) {
     clauses.push(
-      sql`${sql.raw(mailboxColumn)} IN (${sql.join(
-        scope.mailboxIds.map((mailboxId) => sql`${mailboxId}`),
-        sql`, `
-      )})`
+      sql`${sql.raw(mailboxColumn)} IN (SELECT value FROM json_each(${JSON.stringify(scope.mailboxIds)}))`
     );
   }
   if (scope.includeUnassigned) {

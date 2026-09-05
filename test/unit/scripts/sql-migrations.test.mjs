@@ -41,12 +41,14 @@ const expectedMigrationNames = [
   "0025_activate_catch_all_policy.sql",
   "0026_domain_disconnect.sql",
   "0027_message_attachment_disposition.sql",
-  "0028_draft_labels.sql"
+  "0028_draft_labels.sql",
+  "0029_mail_reliability.sql"
 ];
 const expectedAfterDeployMigrationNames = [
   "0001_remove_mailbox_alias_storage.sql",
   "0002_finalize_agent_principals.sql",
-  "0003_finalize_draft_labels.sql"
+  "0003_finalize_draft_labels.sql",
+  "0004_mail_reliability_guards.sql"
 ];
 const oneAddressMigrationSource = readFileSync(
   resolve(migrationsDirectory, "0016_one_address_per_mailbox.sql"),
@@ -421,7 +423,7 @@ describe("SQL migration contract", () => {
     const tables = database
       .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'")
       .all();
-    expect(tables).toHaveLength(48);
+    expect(tables).toHaveLength(49);
     expect(tables.map((table) => table.name)).not.toContain("mailbox_addresses");
 
     const mailboxColumns = database.prepare("PRAGMA table_info(mailboxes)").all();
@@ -567,6 +569,9 @@ describe("SQL migration contract", () => {
       )
     ).toBe(true);
     expect(applyMigration(database, migrationNamed(migrations, "0028_draft_labels.sql"))).toBe(
+      true
+    );
+    expect(applyMigration(database, migrationNamed(migrations, "0029_mail_reliability.sql"))).toBe(
       true
     );
     database
@@ -819,11 +824,11 @@ describe("SQL migration contract", () => {
       )
     ).toBe(false);
     expect(database.prepare("SELECT count(*) AS count FROM d1_migrations").get()).toEqual({
-      count: 28
+      count: 29
     });
     expect(
       database.prepare("SELECT count(*) AS count FROM d1_migrations_after_deploy").get()
-    ).toEqual({ count: 3 });
+    ).toEqual({ count: 4 });
   });
 
   it("closes deleted agent mailboxes before and after principal finalization", async () => {

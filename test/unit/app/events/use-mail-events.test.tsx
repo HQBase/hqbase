@@ -65,6 +65,27 @@ describe("useMailEvents", () => {
     vi.unstubAllGlobals();
   });
 
+  it("reconciles a healthy connection after a missed wake-up", async () => {
+    vi.useFakeTimers();
+    const callbacks = handlers();
+    const hook = await renderHook(({ userId }) => useMailEvents(userId, callbacks), {
+      userId: "user-1"
+    });
+    const socket = FakeWebSocket.instances[0];
+    await flushHookEffects(() => socket?.open());
+    for (let beat = 0; beat < 4; beat += 1) {
+      await flushHookEffects(async () => {
+        await vi.advanceTimersByTimeAsync(30_000);
+        socket?.message("pong");
+      });
+    }
+    expect(hook.result).toBe("connected");
+    expect(callbacks.onFallbackPoll).toHaveBeenCalledOnce();
+    await hook.unmount();
+    await vi.advanceTimersByTimeAsync(120_000);
+    expect(callbacks.onFallbackPoll).toHaveBeenCalledOnce();
+  });
+
   it("opens one same-origin socket and coalesces wake events by topic", async () => {
     const callbacks = handlers();
     const hook = await renderHook(({ userId }) => useMailEvents(userId, callbacks), {

@@ -68,6 +68,12 @@ export async function requireAuthContext(
     throw new AppError("UNAUTHENTICATED", "Sign in is required.", 401);
   }
   if (
+    !["GET", "HEAD", "OPTIONS"].includes(request.method) &&
+    request.headers.get("origin") !== new URL(request.url).origin
+  ) {
+    throw new AppError("ORIGIN_FORBIDDEN", "Request origin is not allowed.", 403);
+  }
+  if (
     !options.allowPasswordSetupRequired &&
     (await isPasswordSetupRequired(env.DB, authContext.user.id))
   ) {

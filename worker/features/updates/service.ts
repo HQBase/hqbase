@@ -26,6 +26,7 @@ import {
 import { cloudflare, isAmbiguousCloudflareOperation } from "./cloudflare";
 import { inspectManagedMigrationState, type ManagedMigrationState } from "./migration-state";
 import type { ReleaseManifest, UpdateStatus } from "./types";
+import { findZoneAccount } from "./zone-account";
 
 export { isManagedDeployCommand, managedDeployCommand, managedUpdaterLoader };
 
@@ -139,22 +140,7 @@ export async function triggerUpdate(
   if (!domain)
     throw new AppError("UPDATE_DOMAIN_REQUIRED", "Configure the workspace portal first.", 409);
   const headers = { authorization: `Bearer ${apiToken}`, "content-type": "application/json" };
-  const zones = await cloudflare<{ result: Array<{ name: string; account: { id: string } }> }>(
-    "https://api.cloudflare.com/client/v4/zones?per_page=50",
-    { headers },
-    fetcher,
-    "read_zones"
-  );
-  const zone = zones.result
-    .filter((candidate) => domain === candidate.name || domain.endsWith(`.${candidate.name}`))
-    .sort((left, right) => right.name.length - left.name.length)[0];
-  if (!zone)
-    throw new AppError(
-      "UPDATE_ACCOUNT_NOT_FOUND",
-      "The token cannot access the workspace zone.",
-      403
-    );
-  const accountId = zone.account.id;
+  const accountId = await findZoneAccount(domain, headers, fetcher);
   const scripts = await cloudflare<{ result: Array<{ id: string; tag?: string }> }>(
     `https://api.cloudflare.com/client/v4/accounts/${accountId}/workers/scripts`,
     { headers },

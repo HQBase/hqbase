@@ -96,6 +96,9 @@ export const operationRuns = sqliteTable(
     kind: text("kind").notNull(),
     status: text("status", { enum: ["running", "succeeded", "failed"] }).notNull(),
     cursor: text("cursor"),
+    attempts: integer("attempts").default(0).notNull(),
+    leaseToken: text("lease_token"),
+    leaseExpiresAt: text("lease_expires_at"),
     counters: text("counters_json", { mode: "json" })
       .$type<Record<string, number>>()
       .default(sql`'{}'`)

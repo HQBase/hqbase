@@ -143,14 +143,20 @@ export function App(): React.ReactElement {
       const results = await Promise.allSettled([
         refreshWorkspace(),
         hardRefresh ? mailSync.hardRefresh() : mailSync.refresh(),
-        draftState.refresh()
+        hardRefresh ? draftState.hardRefresh() : draftState.refresh()
       ]);
       if (results.every((result) => result.status === "rejected")) {
         const failure = results.find((result) => result.status === "rejected");
         throw failure?.reason;
       }
     },
-    [draftState.refresh, mailSync.hardRefresh, mailSync.refresh, refreshWorkspace]
+    [
+      draftState.hardRefresh,
+      draftState.refresh,
+      mailSync.hardRefresh,
+      mailSync.refresh,
+      refreshWorkspace
+    ]
   );
   const hardRefreshRealtimeState = React.useCallback(
     () => refreshRealtimeState(true),

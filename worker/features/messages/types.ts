@@ -45,6 +45,7 @@ export type MessageSummary = {
 };
 
 export type MessageDetail = MessageSummary & {
+  replyTo?: string[];
   cc: string[];
   bcc: string[];
   deliveredToAddress: string | null;
@@ -83,6 +84,8 @@ export type MessageRow = {
   subject: string;
   snippet: string;
   text_body: string;
+  text_r2_key?: string | null;
+  reply_to_json?: string;
   html_r2_key: string | null;
   raw_r2_key: string | null;
   message_id: string | null;
@@ -123,6 +126,8 @@ export type AttachmentRow = {
 };
 
 export type InsertMessageInput = {
+  textR2Key?: string | null;
+  replyTo?: string[];
   threadId: string;
   mailboxId: string | null;
   isUnassigned: boolean;

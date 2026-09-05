@@ -9,6 +9,7 @@ const maxTotalRecipients = 50;
 
 export const sendMessageSchema = z
   .object({
+    idempotencyKey: z.string().min(1).max(100).optional(),
     from: emailAddressSchema,
     to: recipientListSchema,
     cc: optionalRecipientListSchema,
@@ -34,6 +35,7 @@ export const sendMessageSchema = z
 export const replyMessageSchema = z
   .object({
     messageId: z.string().min(1),
+    idempotencyKey: z.string().min(1).max(100).optional(),
     from: emailAddressSchema,
     to: z.array(emailAddressSchema).max(50).optional(),
     cc: optionalRecipientListSchema,
@@ -58,6 +60,7 @@ export const replyMessageSchema = z
 export const forwardMessageSchema = z
   .object({
     messageId: z.string().min(1).max(100),
+    idempotencyKey: z.string().min(1).max(100).optional(),
     from: emailAddressSchema,
     to: recipientListSchema,
     cc: optionalRecipientListSchema,

@@ -31,6 +31,7 @@ import { userRoutes } from "../features/users/routes";
 import type { HonoApp } from "../lib/env";
 import { errorBody, toAppError } from "../lib/errors";
 import { jsonResponse } from "../lib/json";
+import { operationalLog } from "../observability/log";
 import { enforceRateLimit } from "../security/rate-limit";
 
 import { healthRoutes } from "./health";
@@ -51,6 +52,12 @@ apiRoutes.use("*", async (c, next) => {
 
 apiRoutes.onError((error, c) => {
   const appError = toAppError(error);
+  if (appError.status >= 500) {
+    operationalLog("error", "api_request_failed", {
+      code: appError.code,
+      requestId: c.get("correlationId") ?? "unavailable"
+    });
+  }
   const response = jsonResponse(errorBody(appError.code, appError.message), {
     status: appError.status
   });

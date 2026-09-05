@@ -1,3 +1,12 @@
+DROP TRIGGER IF EXISTS send_operations_require_draft;
+DROP TRIGGER IF EXISTS drafts_before_update_pending_send;
+DROP TRIGGER IF EXISTS drafts_before_delete_pending_send;
+DROP TRIGGER IF EXISTS draft_attachments_before_update_pending_send;
+DROP TRIGGER IF EXISTS draft_attachments_before_delete_pending_send;
+DROP TRIGGER IF EXISTS draft_attachments_before_insert_pending_send;
+DROP TRIGGER IF EXISTS draft_labels_before_update_pending_send;
+DROP TRIGGER IF EXISTS draft_labels_before_delete_pending_send;
+DROP TRIGGER IF EXISTS draft_labels_before_insert_pending_send;
 PRAGMA foreign_keys = OFF;
 
 DROP TRIGGER IF EXISTS mailbox_addresses_transition_insert_guard;
@@ -51,6 +60,7 @@ DROP TABLE IF EXISTS update_history;
 DROP TABLE IF EXISTS release_state;
 DROP TABLE IF EXISTS installation_identity;
 DROP TABLE IF EXISTS draft_attachments;
+DROP TABLE IF EXISTS send_operations;
 DROP TABLE IF EXISTS drafts;
 DROP TABLE IF EXISTS email_signatures;
 DROP TABLE IF EXISTS draft_attachments_agent_transition;

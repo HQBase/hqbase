@@ -107,18 +107,7 @@ userRoutes.patch("/:id", async (c) => {
   if ((input.role === "owner" || target.role === "owner") && authContext.user.role !== "owner") {
     throw new AppError("OWNER_REQUIRED", "Only an owner can change owner membership.", 403);
   }
-  if (target.role === "owner" && input.role !== "owner") {
-    const owners = await getRow<{ count: number }>(
-      c.env.DB,
-      sql`SELECT COUNT(*) AS count
-          FROM "user"
-          WHERE role = 'owner' AND COALESCE(banned, 0) = 0`
-    );
-    if ((owners?.count ?? 0) <= 1) {
-      throw new AppError("LAST_OWNER", "The last active owner cannot be demoted.", 409);
-    }
-  }
-  await setWorkspaceUserRole(c.env.DB, c.req.param("id"), input.role);
+  await setWorkspaceUserRole(c.env.DB, c.req.param("id"), input.role, authContext.user.id);
   await recordAudit(c.env.DB, {
     correlationId: c.get("correlationId"),
     actorType: "user",

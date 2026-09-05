@@ -3,11 +3,26 @@ import { resolve } from "node:path";
 
 import { attemptRun, emitCommandOutput } from "./command.mjs";
 
+export const pendingSendGuards = [
+  "send_operations_require_draft",
+  "drafts_before_update_pending_send",
+  "drafts_before_delete_pending_send",
+  "draft_attachments_before_update_pending_send",
+  "draft_attachments_before_delete_pending_send",
+  "draft_attachments_before_insert_pending_send",
+  "draft_labels_before_update_pending_send",
+  "draft_labels_before_delete_pending_send",
+  "draft_labels_before_insert_pending_send"
+];
+
 const afterDeployMigrations = [
   "0001_remove_mailbox_alias_storage.sql",
   "0002_finalize_agent_principals.sql",
-  "0003_finalize_draft_labels.sql"
+  "0003_finalize_draft_labels.sql",
+  "0004_mail_reliability_guards.sql"
 ];
+
+export const finalAfterDeployPhase = `S${afterDeployMigrations.length}`;
 
 const addressTransitionTables = ["mailbox_addresses", "mailbox_address_migration"];
 const addressTransitionColumns = [
@@ -99,6 +114,7 @@ const inspectedTables = [
   "d1_migrations_after_deploy"
 ];
 const inspectedTriggers = [
+  ...pendingSendGuards,
   ...requiredTriggers,
   ...addressTransitionTriggers,
   ...principalTransitionTriggers
@@ -316,7 +332,8 @@ function expectedSchemaItems(appliedCount, hasAfterDeployLedger) {
       ...principalTransitionForeignKeys.map((name) => `foreign-key:${name}`)
     );
   }
-  if (appliedCount === 3) items.push(`foreign-key:${draftLabelsForeignKey}`);
+  if (appliedCount >= 3) items.push(`foreign-key:${draftLabelsForeignKey}`);
+  if (appliedCount >= 4) items.push(...pendingSendGuards.map((name) => `trigger:${name}`));
   return new Set(items);
 }
 

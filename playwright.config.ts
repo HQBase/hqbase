@@ -24,6 +24,7 @@ export default defineConfig({
     extraHTTPHeaders:
       accessClientId && accessClientSecret
         ? {
+            origin: baseURL ? new URL(baseURL).origin : "https://staging.invalid",
             "CF-Access-Client-Id": accessClientId,
             "CF-Access-Client-Secret": accessClientSecret
           }

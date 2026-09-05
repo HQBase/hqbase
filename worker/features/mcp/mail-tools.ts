@@ -165,7 +165,9 @@ function registerReadTools(server: McpServer, env: WorkerEnv, principal: McpPrin
         );
         return withMessageLabels(
           env.DB,
-          (await listThreadMessages(env.DB, message.threadId, scope)).map(publicMessage)
+          (await listThreadMessages(env.DB, message.threadId, scope, env.MAIL_OBJECTS)).map(
+            publicMessage
+          )
         );
       })
   );
@@ -273,7 +275,7 @@ function registerWriteTools(
 
 async function readMessage(env: WorkerEnv, principal: McpPrincipal, messageId: string) {
   await requireMessageAccess(env.DB, principal.userId, principal.role, messageId, "read");
-  const message = await getMessageDetail(env.DB, messageId);
+  const message = await getMessageDetail(env.DB, messageId, env.MAIL_OBJECTS);
   if (!message) throw new AppError("MESSAGE_NOT_FOUND", "Message not found.", 404);
   const [result] = await withMessageLabels(env.DB, [publicMessage(message)]);
   if (!result) throw new AppError("MESSAGE_NOT_FOUND", "Message not found.", 404);

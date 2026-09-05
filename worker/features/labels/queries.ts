@@ -116,10 +116,7 @@ export async function labelsForMessageIds(
           label.created_at, label.updated_at
         FROM message_labels assignment
         JOIN labels label ON label.id = assignment.label_id
-        WHERE assignment.message_id IN (${sql.join(
-          messageIds.map((id) => sql`${id}`),
-          sql`, `
-        )})
+        WHERE assignment.message_id IN (SELECT value FROM json_each(${JSON.stringify(messageIds)}))
         ORDER BY label.name COLLATE NOCASE ASC, label.id ASC`
   );
   return groupedLabels(rows, "message_id");
@@ -136,10 +133,7 @@ export async function labelsForDraftIds(
           label.created_at, label.updated_at
         FROM draft_labels assignment
         JOIN labels label ON label.id = assignment.label_id
-        WHERE assignment.draft_id IN (${sql.join(
-          draftIds.map((id) => sql`${id}`),
-          sql`, `
-        )})
+        WHERE assignment.draft_id IN (SELECT value FROM json_each(${JSON.stringify(draftIds)}))
         ORDER BY label.name COLLATE NOCASE ASC, label.id ASC`
   );
   return groupedLabels(rows, "draft_id");
@@ -161,10 +155,7 @@ export async function labelsForThreadIds(
         JOIN message_labels assignment ON assignment.message_id = message.id
         JOIN labels label ON label.id = assignment.label_id
         WHERE ${access}
-          AND message.thread_id IN (${sql.join(
-            threadIds.map((id) => sql`${id}`),
-            sql`, `
-          )})
+          AND message.thread_id IN (SELECT value FROM json_each(${JSON.stringify(threadIds)}))
         ORDER BY label.name COLLATE NOCASE ASC, label.id ASC`
   );
   return groupedLabels(rows, "thread_id");

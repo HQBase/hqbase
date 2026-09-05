@@ -1,3 +1,8 @@
+vi.mock("@worker/features/send/operations", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@worker/features/send/operations")>()),
+  resumeSend: vi.fn().mockResolvedValue(null)
+}));
+
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@worker/features/drafts/queries", () => ({
@@ -134,7 +139,8 @@ describe("forward service", () => {
       expect.objectContaining({
         text: expect.stringContaining("---------- Forwarded message ---------")
       }),
-      []
+      [],
+      expect.objectContaining({ id: expect.any(String), hash: expect.any(String) })
     );
     expect(saveDraft).not.toHaveBeenCalled();
   });
@@ -180,7 +186,8 @@ describe("forward service", () => {
       "user-1",
       undefined,
       expect.any(Object),
-      []
+      [],
+      expect.objectContaining({ id: expect.any(String), hash: expect.any(String) })
     );
   });
 
@@ -305,7 +312,8 @@ describe("forward service", () => {
       expect.objectContaining({
         text: expect.stringContaining("---------- Forwarded message ---------")
       }),
-      []
+      [],
+      expect.objectContaining({ id: expect.any(String), hash: expect.any(String) })
     );
     expect(vi.mocked(sendNewMessage).mock.calls[0]?.[1]).not.toHaveProperty("draftId");
     expect(deleteDraft).toHaveBeenCalledWith(env.DB, env.MAIL_OBJECTS, "user-1", "draft-forward");
@@ -374,7 +382,8 @@ describe("forward service", () => {
       expect.objectContaining({
         text: expect.stringContaining("---------- Forwarded message ---------")
       }),
-      []
+      [],
+      expect.objectContaining({ id: expect.any(String), hash: expect.any(String) })
     );
     expect(saveDraft).not.toHaveBeenCalled();
     expect(removeDraftAttachment).not.toHaveBeenCalled();
@@ -438,7 +447,8 @@ describe("forward service", () => {
           disposition: "inline",
           filename: "logo.png"
         })
-      ]
+      ],
+      expect.objectContaining({ id: expect.any(String), hash: expect.any(String) })
     );
   });
 

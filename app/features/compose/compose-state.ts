@@ -115,7 +115,8 @@ export function hasInvalidRecipients(...values: string[]): boolean {
 }
 
 export function replyRecipients(message: MessageDetail): string[] {
-  if (message.direction === "inbound") return [message.fromAddress];
+  if (message.direction === "inbound")
+    return message.replyTo?.length ? message.replyTo : [message.fromAddress];
 
   const sender = message.fromAddress.toLowerCase();
   return message.to.filter((address) => address.toLowerCase() !== sender);

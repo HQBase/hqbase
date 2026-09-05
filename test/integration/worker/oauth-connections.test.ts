@@ -69,7 +69,7 @@ describe("OAuth connections", () => {
 
   it("lists and fully revokes only the signed-in person's connection", async () => {
     const list = await SELF.fetch(`${origin}/api/oauth-connections`, {
-      headers: { cookie: first.cookie }
+      headers: { origin, cookie: first.cookie }
     });
     expect(list.status, await list.clone().text()).toBe(200);
     await expect(list.json()).resolves.toEqual({
@@ -84,7 +84,7 @@ describe("OAuth connections", () => {
     });
 
     const revoked = await SELF.fetch(`${origin}/api/oauth-connections/client_connections`, {
-      headers: { cookie: first.cookie },
+      headers: { origin, cookie: first.cookie },
       method: "DELETE"
     });
     expect(revoked.status, await revoked.clone().text()).toBe(204);

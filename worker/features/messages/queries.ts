@@ -2,7 +2,7 @@ import { and, eq, type SQL, sql } from "drizzle-orm";
 
 import type { MessageScope } from "../../auth/mailbox-access";
 import { messageScopeCondition } from "../../auth/mailbox-access";
-import { newId, nowIso } from "../../db/client";
+import { nowIso } from "../../db/client";
 import { createDatabase, getRow, getRows } from "../../db/drizzle";
 import { messageAttachments, messages as messagesTable } from "../../db/schema";
 import { AppError } from "../../lib/errors";
@@ -10,6 +10,8 @@ import type { MessageAction } from "./actions";
 import { buildMessageActionPatch } from "./actions";
 import { decodeKeysetCursor, encodeKeysetCursor, type KeysetCursor } from "./keyset-cursor";
 import { literalContains } from "./search";
+import { attachmentValues, messageValues } from "./storage";
+import { loadMessageText } from "./text-storage";
 import type {
   AttachmentRow,
   InsertAttachmentInput,
@@ -55,41 +57,9 @@ export async function insertMessage(
   db: D1Database,
   input: InsertMessageInput
 ): Promise<MessageSummary> {
-  const id = newId("msg");
-  const timestamp = nowIso();
-
-  await createDatabase(db)
-    .insert(messagesTable)
-    .values({
-      id,
-      threadId: input.threadId,
-      mailboxId: input.mailboxId,
-      isUnassigned: input.isUnassigned,
-      direction: input.direction,
-      folder: input.folder,
-      fromAddress: input.fromAddress,
-      fromName: input.fromName,
-      to: input.to,
-      cc: input.cc,
-      bcc: input.bcc,
-      subject: input.subject,
-      snippet: input.snippet,
-      textBody: input.textBody,
-      htmlR2Key: input.htmlR2Key,
-      rawR2Key: input.rawR2Key,
-      messageId: input.messageId,
-      dedupeKey: input.dedupeKey,
-      inReplyTo: input.inReplyTo,
-      references: input.references,
-      receivedAt: input.receivedAt,
-      sentAt: input.sentAt,
-      readAt: input.readAt,
-      hasAttachments: input.hasAttachments,
-      createdAt: timestamp,
-      updatedAt: timestamp,
-      deliveredToAddress: input.deliveredToAddress ?? null
-    })
-    .run();
+  const values = messageValues(input);
+  const id = values.id;
+  await createDatabase(db).insert(messagesTable).values(values).run();
 
   const row = await getMessageRow(db, id);
   if (!row) {
@@ -102,34 +72,9 @@ export async function insertAttachment(
   db: D1Database,
   input: InsertAttachmentInput
 ): Promise<StoredAttachment> {
-  const id = newId("att");
-  const timestamp = nowIso();
-  await createDatabase(db)
-    .insert(messageAttachments)
-    .values({
-      id,
-      messageId: input.messageId,
-      filename: input.filename,
-      contentType: input.contentType,
-      sizeBytes: input.sizeBytes,
-      contentId: input.contentId,
-      disposition: input.disposition,
-      r2Key: input.r2Key,
-      createdAt: timestamp
-    })
-    .run();
-
-  return {
-    id,
-    messageId: input.messageId,
-    filename: input.filename,
-    contentType: input.contentType,
-    sizeBytes: input.sizeBytes,
-    contentId: input.contentId,
-    disposition: input.disposition,
-    r2Key: input.r2Key,
-    createdAt: timestamp
-  };
+  const values = attachmentValues(input);
+  await createDatabase(db).insert(messageAttachments).values(values).run();
+  return values;
 }
 
 export async function listMessages(
@@ -211,19 +156,24 @@ function messageActivityOf(row: MessageRow): string {
   return row.received_at ?? row.sent_at ?? row.created_at;
 }
 
-export async function getMessageDetail(db: D1Database, id: string): Promise<MessageDetail | null> {
+export async function getMessageDetail(
+  db: D1Database,
+  id: string,
+  bucket?: R2Bucket
+): Promise<MessageDetail | null> {
   const row = await getMessageRow(db, id);
   if (!row) {
     return null;
   }
 
-  return mapMessageDetail(db, row);
+  return mapMessageDetail(db, row, bucket);
 }
 
 export async function listThreadMessages(
   db: D1Database,
   threadId: string,
-  scope: MessageScope
+  scope: MessageScope,
+  bucket?: R2Bucket
 ): Promise<MessageDetail[]> {
   const scopeCondition = messageScopeCondition(scope, "mailbox_id", "is_unassigned");
   if (!scopeCondition) return [];
@@ -233,16 +183,21 @@ export async function listThreadMessages(
        WHERE thread_id = ${threadId} AND ${scopeCondition}
        ORDER BY COALESCE(received_at, sent_at, created_at) ASC`
   );
-  return Promise.all(rows.map((row) => mapMessageDetail(db, row)));
+  return Promise.all(rows.map((row) => mapMessageDetail(db, row, bucket)));
 }
 
-async function mapMessageDetail(db: D1Database, row: MessageRow): Promise<MessageDetail> {
+async function mapMessageDetail(
+  db: D1Database,
+  row: MessageRow,
+  bucket?: R2Bucket
+): Promise<MessageDetail> {
   return {
     ...mapMessageSummary(row),
     cc: parseJsonList(row.cc_json),
     bcc: parseJsonList(row.bcc_json),
     deliveredToAddress: row.delivered_to_address,
-    textBody: row.text_body,
+    replyTo: parseJsonList(row.reply_to_json ?? "[]"),
+    textBody: await loadMessageText(bucket, row.text_r2_key, row.text_body),
     htmlAvailable: row.html_r2_key !== null,
     messageId: row.message_id,
     inReplyTo: row.in_reply_to,

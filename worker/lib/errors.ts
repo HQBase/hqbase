@@ -26,5 +26,19 @@ export function toAppError(error: unknown): AppError {
     return error;
   }
 
+  let cause = error;
+  for (let depth = 0; depth < 5 && cause instanceof Error; depth += 1) {
+    if (cause.message.includes("draft send is pending")) {
+      return new AppError(
+        "DRAFT_SEND_PENDING",
+        "This draft has a pending or uncertain delivery. Do not send another copy.",
+        409
+      );
+    }
+    if (cause.message.includes("draft was removed before send")) {
+      return new AppError("DRAFT_CONFLICT", "The draft was removed before sending.", 409);
+    }
+    cause = cause.cause;
+  }
   return new AppError("INTERNAL_ERROR", "An internal error occurred.", 500);
 }

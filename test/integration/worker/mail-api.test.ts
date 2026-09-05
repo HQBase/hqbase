@@ -3,6 +3,7 @@ import { beforeAll, describe, expect, it, vi } from "vitest";
 import { createAuth } from "../../../worker/auth/auth";
 import { draftAttachmentObjects } from "../../../worker/features/drafts/attachment-lookups";
 import { mailEventInternalHeaders } from "../../../worker/features/events/durable-object";
+import { removeExpiredOrphanedObjects } from "../../../worker/jobs/consumer";
 import { applyCurrentMigrations } from "./current-migrations";
 import { tokenRow } from "./mail-api-token-fixture";
 
@@ -941,6 +942,7 @@ describe("HQBase Mail API", () => {
       r2_key: expect.stringMatching(/^sent\//u)
     });
     expect(await env.MAIL_OBJECTS.get(sentInline?.r2_key ?? "missing")).not.toBeNull();
+    await removeExpiredOrphanedObjects(env, Date.now() + 25 * 60 * 60 * 1000);
     expect(await env.MAIL_OBJECTS.get(objectKeys.get(attachment.id) ?? "missing")).toBeNull();
     expect(await env.MAIL_OBJECTS.get(objectKeys.get(unusedAttachment.id) ?? "missing")).toBeNull();
     expect(await apiFetch(`/api/v2/drafts/${draft.id}`, fullToken)).toMatchObject({ status: 404 });

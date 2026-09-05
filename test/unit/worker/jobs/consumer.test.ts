@@ -1,153 +1,56 @@
+import { getRows } from "@worker/db/drizzle";
+import { scanObjectPage } from "@worker/jobs/object-scan";
+import type { WorkerEnv } from "@worker/lib/env";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("@worker/db/drizzle", () => ({
-  createDatabase: vi.fn(),
-  getRow: vi.fn(),
-  getRows: vi.fn()
-}));
-vi.mock("@worker/observability/log", () => ({ operationalLog: vi.fn() }));
-
-import { createDatabase, getRow, getRows } from "@worker/db/drizzle";
-import { consumeJobs, removeExpiredOrphanedObjects } from "@worker/jobs/consumer";
-import type { Job } from "@worker/jobs/types";
-import type { WorkerEnv } from "@worker/lib/env";
-
+vi.mock("@worker/db/drizzle", () => ({ getRow: vi.fn(), getRows: vi.fn() }));
 const now = Date.parse("2026-08-25T12:00:00.000Z");
-const oneDay = 24 * 60 * 60 * 1_000;
-
-function r2Object(key: string, uploaded: number) {
-  return { key, uploaded: new Date(uploaded) };
-}
-
-describe("maintenance orphan cleanup", () => {
+const day = 86_400_000;
+const object = (key: string, age = day + 1) => ({ key, uploaded: new Date(now - age) });
+describe("bounded maintenance object pages", () => {
   const list = vi.fn();
-  const deleteObjects = vi.fn();
-  const env = {
-    DB: {} as D1Database,
-    MAIL_OBJECTS: { delete: deleteObjects, list }
-  } as unknown as WorkerEnv;
-
+  const remove = vi.fn();
+  const env = { DB: {}, MAIL_OBJECTS: { list, delete: remove } } as unknown as WorkerEnv;
   beforeEach(() => {
     vi.resetAllMocks();
-  });
-
-  it("removes only expired, unreferenced objects across list pages", async () => {
-    list
-      .mockResolvedValueOnce({
-        cursor: "page-2",
-        delimitedPrefixes: [],
-        objects: [
-          r2Object("old-orphan", now - oneDay - 1),
-          r2Object("old-reference", now - oneDay - 1),
-          r2Object("age-boundary", now - oneDay)
-        ],
-        truncated: true
-      })
-      .mockResolvedValueOnce({
-        delimitedPrefixes: [],
-        objects: [
-          r2Object("recent-orphan", now - oneDay + 1),
-          r2Object("second-old-orphan", now - oneDay - 1)
-        ],
-        truncated: false
-      });
-    vi.mocked(getRow)
-      .mockResolvedValueOnce(null)
-      .mockResolvedValueOnce({ found: 1 })
-      .mockResolvedValueOnce(null);
-
-    await expect(removeExpiredOrphanedObjects(env, now)).resolves.toBe(2);
-
-    expect(list).toHaveBeenNthCalledWith(1, { limit: 1_000 });
-    expect(list).toHaveBeenNthCalledWith(2, { cursor: "page-2", limit: 1_000 });
-    expect(getRow).toHaveBeenCalledTimes(3);
-    expect(deleteObjects).toHaveBeenCalledWith(["old-orphan", "second-old-orphan"]);
-  });
-
-  it("limits each maintenance run to 10,000 listed objects", async () => {
-    let page = 0;
-    list.mockImplementation(async (options: { cursor?: string; limit: number }) => {
-      page += 1;
-      const count = page === 1 ? options.limit - 1 : options.limit;
-      return {
-        cursor: `page-${page + 1}`,
-        delimitedPrefixes: [],
-        objects: Array.from({ length: count }, (_, index) =>
-          r2Object(`recent-${page}-${index}`, now)
-        ),
-        truncated: true
-      };
-    });
-
-    await expect(removeExpiredOrphanedObjects(env, now)).resolves.toBe(0);
-
-    expect(list).toHaveBeenCalledTimes(11);
-    expect(list).toHaveBeenLastCalledWith({ cursor: "page-11", limit: 1 });
-    expect(getRow).not.toHaveBeenCalled();
-    expect(deleteObjects).not.toHaveBeenCalled();
-  });
-
-  it("deletes orphan keys in R2 batches of at most 1,000", async () => {
-    const firstPage = Array.from({ length: 1_000 }, (_, index) =>
-      r2Object(`orphan-${index}`, now - oneDay - 1)
-    );
-    list
-      .mockResolvedValueOnce({
-        cursor: "page-2",
-        delimitedPrefixes: [],
-        objects: firstPage,
-        truncated: true
-      })
-      .mockResolvedValueOnce({
-        delimitedPrefixes: [],
-        objects: [r2Object("orphan-1000", now - oneDay - 1)],
-        truncated: false
-      });
-    vi.mocked(getRow).mockResolvedValue(null);
-
-    await expect(removeExpiredOrphanedObjects(env, now)).resolves.toBe(1_001);
-
-    expect(deleteObjects).toHaveBeenCalledTimes(2);
-    expect(deleteObjects.mock.calls[0]?.[0]).toHaveLength(1_000);
-    expect(deleteObjects.mock.calls[1]?.[0]).toEqual(["orphan-1000"]);
-  });
-
-  it("records the removed orphan count on maintenance runs", async () => {
-    const insertRun = vi.fn().mockResolvedValue({ meta: { changes: 1 } });
-    const deleteRun = vi.fn().mockResolvedValue({ meta: { changes: 3 } });
-    const updateRun = vi.fn().mockResolvedValue({ meta: { changes: 1 } });
-    const setUpdate = vi.fn((values: unknown) => ({
-      where: () => ({ run: updateRun, values })
-    }));
-    vi.mocked(createDatabase).mockReturnValue({
-      delete: () => ({ where: () => ({ run: deleteRun }) }),
-      insert: () => ({
-        values: () => ({ onConflictDoNothing: () => ({ run: insertRun }) })
-      }),
-      update: () => ({ set: setUpdate })
-    } as never);
     vi.mocked(getRows).mockResolvedValue([]);
-    list.mockResolvedValue({ delimitedPrefixes: [], objects: [], truncated: false });
-    const ack = vi.fn();
-    const retry = vi.fn();
-    const job: Job = {
-      id: "maintenance:2026-08-25",
-      kind: "maintenance",
-      requestedAt: "2026-08-25T12:00:00.000Z"
-    };
-
-    await consumeJobs(
-      { messages: [{ ack, body: job, id: "queue-1", retry }] } as unknown as MessageBatch<Job>,
-      env
-    );
-
-    expect(setUpdate).toHaveBeenCalledWith(
-      expect.objectContaining({
-        counters: { rateLimits: 3, removedR2Orphans: 0, retainedMessages: 0 },
-        status: "succeeded"
-      })
-    );
-    expect(ack).toHaveBeenCalledOnce();
-    expect(retry).not.toHaveBeenCalled();
+  });
+  it("keeps referenced objects and the full 24-hour upload grace period", async () => {
+    list.mockResolvedValue({
+      objects: [object("old"), object("referenced"), object("boundary", day), object("new", 1)],
+      truncated: true,
+      cursor: "next"
+    });
+    vi.mocked(getRows).mockResolvedValue([{ key: "referenced" }]);
+    await expect(scanObjectPage(env, undefined, true, now)).resolves.toEqual({
+      cursor: "next",
+      counters: { r2ObjectsScanned: 4, removedR2Orphans: 1 }
+    });
+    expect(remove).toHaveBeenCalledExactlyOnceWith(["old"]);
+    expect(list).toHaveBeenCalledExactlyOnceWith({ limit: 1000 });
+    expect(getRows).toHaveBeenCalledOnce();
+  });
+  it("can continue beyond 10,000 objects with one query and one delete per page", async () => {
+    const keys = Array.from({ length: 1000 }, (_, index) => object(`object-${index}`));
+    list.mockImplementation(({ cursor }: { cursor?: string }) => {
+      const page = Number(cursor ?? 0);
+      return { objects: keys, truncated: page < 10, cursor: String(page + 1) };
+    });
+    let cursor: string | undefined;
+    let total = 0;
+    do {
+      const page = await scanObjectPage(env, cursor, true, now);
+      cursor = page.cursor;
+      total += page.counters.removedR2Orphans ?? 0;
+    } while (cursor);
+    expect(total).toBe(11000);
+    expect(getRows).toHaveBeenCalledTimes(11);
+    expect(remove.mock.calls.every(([page]) => page.length === 1000)).toBe(true);
+  });
+  it("does not delete anything when reference inspection fails", async () => {
+    list.mockResolvedValue({ objects: [object("protected")], truncated: false });
+    vi.mocked(getRows).mockRejectedValue(new Error("D1 unavailable"));
+    await expect(scanObjectPage(env, undefined, true, now)).rejects.toThrow("D1 unavailable");
+    expect(remove).not.toHaveBeenCalled();
   });
 });
