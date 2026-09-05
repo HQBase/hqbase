@@ -1,5 +1,7 @@
 import { readFile } from "node:fs/promises";
+import { AjvJsonSchemaValidator } from "@modelcontextprotocol/sdk/validation/ajv";
 import { describe, expect, it } from "vitest";
+import { withSignatures } from "../../../scripts/mail-api-signatures.mjs";
 
 const openApi = JSON.parse(await readFile("api/hqbase-mail-api-v2.openapi.json", "utf8"));
 const postman = JSON.parse(
@@ -102,6 +104,118 @@ describe("Mail API public artifacts", () => {
     ).toBeDefined();
     expect(openApi.paths["/api/v2/users"]).toBeUndefined();
     expect(JSON.stringify(openApi)).not.toContain("r2Key");
+  });
+
+  it.each([
+    [1, v1OpenApi],
+    [2, openApi]
+  ])("separates draft selections from saved snapshots in v%i", (version, document) => {
+    const schemas = document.components.schemas;
+    const validator = new AjvJsonSchemaValidator();
+    const compile = (name) =>
+      validator.getValidator({
+        $ref: `#/components/schemas/${name}`,
+        components: document.components
+      });
+    const draft = {
+      id: "drf_deleted_signature",
+      version: 3,
+      updatedAt: "2026-09-04T10:00:00.000Z",
+      mailboxId: null,
+      replyToMessageId: null,
+      forwardOfMessageId: null,
+      from: "owner@example.test",
+      to: ["a@example.test"],
+      cc: [],
+      bcc: [],
+      subject: "Hello",
+      text: "Body",
+      html: "",
+      attachments: [],
+      labels: [],
+      signature: {
+        mode: "selected",
+        id: null,
+        name: "Saved name",
+        html: "<p>Saved signature</p>",
+        text: "Saved signature"
+      }
+    };
+    expect(compile("Draft")(draft).valid).toBe(true);
+    expect(compile("DraftInput")(draft).valid).toBe(false);
+    for (const signature of [
+      { mode: "automatic" },
+      { mode: "selected", id: "sig_1" },
+      { mode: "none" }
+    ]) {
+      expect(compile("DraftInput")({ ...draft, signature }).valid).toBe(true);
+    }
+
+    const signatures = (schema) => {
+      if (schema.$ref) return signatures(schemas[schema.$ref.split("/").at(-1)]);
+      return [
+        ...(schema.properties?.signature ? [schema.properties.signature] : []),
+        ...(schema.allOf ?? []).flatMap(signatures)
+      ];
+    };
+    expect(signatures(schemas.DraftInput)).toEqual([
+      { $ref: "#/components/schemas/SignatureSelection" }
+    ]);
+    expect(signatures(schemas.Draft)).toEqual([{ $ref: "#/components/schemas/SignatureSnapshot" }]);
+    expect(schemas.SignatureSnapshot.properties.id.anyOf).toContainEqual({ type: "null" });
+    expect(schemas.SignatureSnapshot.properties.mode.enum).toContain("selected");
+    expect(
+      schemas.SignatureSelection.oneOf.find((schema) => schema.properties.mode.const === "selected")
+        .properties.id
+    ).toMatchObject({ type: "string", minLength: 1 });
+    expect(schemas.Draft.allOf[1].required).toContain("labels");
+    expect(withSignatures(withSignatures(document, version), version)).toEqual(
+      withSignatures(document, version)
+    );
+    const serialized = JSON.stringify(document);
+    expect(serialized).not.toContain('"type":["string","null"]');
+  });
+
+  it.each([
+    [1, v1OpenApi],
+    [2, openApi]
+  ])("publishes human-only signature management in v%i", (version, document) => {
+    for (const [path, method] of [
+      ["/signatures/manage", "get"],
+      ["/signatures", "post"],
+      ["/signatures/{id}", "patch"],
+      ["/signatures/{id}", "delete"]
+    ]) {
+      const operation = document.paths[`/api/v${version}${path}`][method];
+      expect(operation.security).toEqual([
+        { oauth2: ["signatures:manage"] },
+        { cookieSession: [] }
+      ]);
+      expect(operation["x-hqbase-agent-capabilities"]).toBeUndefined();
+    }
+    expect(document.paths[`/api/v${version}/signatures`].get.security).toContainEqual({
+      oauth2: ["mail:send"]
+    });
+  });
+
+  it("documents optional v1 label membership and keeps v2 membership required", () => {
+    for (const path of [
+      "/messages",
+      "/messages/{id}",
+      "/messages/{id}/thread",
+      "/conversations",
+      "/changes"
+    ]) {
+      expect(v1OpenApi.paths[`/api/v1${path}`].get.parameters).toContainEqual(
+        expect.objectContaining({
+          name: "includeLabels",
+          schema: { type: "boolean", default: false }
+        })
+      );
+    }
+    expect(v1OpenApi.components.schemas.MessageSummary.properties.labels).toBeDefined();
+    expect(v1OpenApi.components.schemas.MessageSummary.required).not.toContain("labels");
+    expect(openApi.components.schemas.MessageSummary.required).toContain("labels");
   });
 
   it("publishes the v1 mailbox schema without reviving alias storage", () => {

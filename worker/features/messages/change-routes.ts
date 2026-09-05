@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 
-import { mailApiBasePath, requireMailApiPrincipal } from "../../auth/mail-api";
+import { includeMailApiLabels, requireMailApiPrincipal } from "../../auth/mail-api";
 import { accessibleMessageScope } from "../../auth/mailbox-access";
 import type { HonoApp } from "../../lib/env";
 import { AppError } from "../../lib/errors";
@@ -32,7 +32,7 @@ changeRoutes.get("/", async (c) => {
     limit: parseChangeLimit(c.req.query("limit")),
     scope
   });
-  if (mailApiBasePath(c.req.raw) === "/api/v1") return c.json(page);
+  if (!includeMailApiLabels(c.req.raw)) return c.json(page);
   const assignments = await labelsForMessageIds(
     c.env.DB,
     page.changes.flatMap((change) => (change.type === "upsert" ? [change.message.id] : []))

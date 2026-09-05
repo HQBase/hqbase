@@ -323,9 +323,11 @@ function StatusBadge({ status }: { status: string }): React.ReactElement {
 }
 
 export function oauthAccessLabel(scopes: readonly string[]): string {
-  return scopes.includes("mail:write") || scopes.includes("mail:send")
-    ? "Handle mail"
-    : "Read only";
+  const handleMail = scopes.includes("mail:write") || scopes.includes("mail:send");
+  if (scopes.includes("signatures:manage")) {
+    return handleMail ? "Handle mail, manage signatures" : "Manage signatures";
+  }
+  return handleMail ? "Handle mail" : "Read only";
 }
 
 export function connectionLabel(resources: readonly string[]): string {

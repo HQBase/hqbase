@@ -46,7 +46,7 @@ test("deployed HQBase publishes the v2 Mail API OAuth resource", async ({ reques
   expect(JSON.parse(metadata)).toMatchObject({
     resource: `${origin}/api/v2`,
     authorization_servers: [`${origin}/api/auth`],
-    scopes_supported: ["mail:read", "mail:write", "mail:send"]
+    scopes_supported: ["mail:read", "mail:write", "mail:send", "signatures:manage"]
   });
 
   const v1Metadata = await getSuccessfulResponseBody(
@@ -56,7 +56,7 @@ test("deployed HQBase publishes the v2 Mail API OAuth resource", async ({ reques
   expect(JSON.parse(v1Metadata)).toMatchObject({
     resource: `${origin}/api/v1`,
     authorization_servers: [`${origin}/api/auth`],
-    scopes_supported: ["mail:read", "mail:write", "mail:send"]
+    scopes_supported: ["mail:read", "mail:write", "mail:send", "signatures:manage"]
   });
 
   const v1OpenApi = await getSuccessfulResponseBody(request, "/api/v1/openapi.json");
