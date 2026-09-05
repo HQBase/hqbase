@@ -21,17 +21,7 @@ export default defineConfig({
       reporter: ["text", "json-summary"],
       reportsDirectory: "coverage",
       include: ["app/**/*.{ts,tsx}", "worker/**/*.ts"],
-      exclude: [
-        "app/components/ui/**",
-        "app/features/ui-lab/**",
-        "app/main.tsx",
-        "worker/index.ts",
-        "worker/features/domains/queries.ts",
-        "worker/features/domains/routes.ts",
-        "worker/features/drafts/queries.ts",
-        "worker/features/drafts/routes.ts",
-        "worker/features/setup/cloudflare.ts"
-      ],
+      exclude: ["app/components/ui/**", "app/features/ui-lab/**", "app/main.tsx"],
       thresholds: {
         branches: 30,
         functions: 30,

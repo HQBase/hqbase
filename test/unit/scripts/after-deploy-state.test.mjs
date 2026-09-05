@@ -23,7 +23,7 @@ afterEach(() => {
 });
 
 describe("after-deploy state inspection", () => {
-  it("recognizes only the exact S0, S1, S2, and S3 ledger and schema pairs", async () => {
+  it("recognizes only the exact S0, S1, S2, S3, and S4 ledger and schema pairs", async () => {
     const database = createDatabase();
     const normal = await readD1Migrations(migrationsDirectory);
     const afterDeploy = await readD1Migrations(afterDeployMigrationsDirectory);
@@ -57,7 +57,7 @@ describe("after-deploy state inspection", () => {
           worker_version: "worker-before-repair"
         }
       ])
-    ).toMatchObject({ phase: "S3", repairRequired: true });
+    ).toMatchObject({ phase: "S4", repairRequired: true });
   });
 
   it("fails closed when a ledger is incomplete, out of order, or unlike the live schema", async () => {

@@ -1,8 +1,11 @@
 import { sql } from "drizzle-orm";
 
 import { newId, nowIso } from "../db/client";
-import { getRow } from "../db/drizzle";
-import { getMessageDetail, insertAttachment, insertMessage } from "../features/messages/queries";
+import { createDatabase, getRow } from "../db/drizzle";
+import { messageAttachments, messages } from "../db/schema";
+import { getMessageDetail } from "../features/messages/queries";
+import { attachmentValues, messageValues } from "../features/messages/storage";
+import { searchTextProjection } from "../features/messages/text-storage";
 import { resolveInboundThread } from "../features/messages/threading";
 import type { MessageDetail, MessageSummary } from "../features/messages/types";
 
@@ -33,7 +36,7 @@ export async function storeInboundEmail(
     parsed: input.parsed
   });
   const dedupeKey = plan.dedupeKey;
-  const duplicate = dedupeKey ? await findDuplicate(db, dedupeKey) : null;
+  const duplicate = dedupeKey ? await findDuplicate(db, dedupeKey, bucket) : null;
   if (duplicate) {
     return { inserted: false, message: duplicate };
   }
@@ -59,7 +62,14 @@ export async function storeInboundEmail(
     references: input.parsed.references,
     subject: input.parsed.subject
   });
-  const message = await insertMessage(db, {
+  const projection = searchTextProjection(input.parsed.textBody);
+  const textR2Key = projection.truncated ? `${objectBase}/body.txt` : null;
+  if (textR2Key) {
+    await bucket.put(textR2Key, input.parsed.textBody, {
+      httpMetadata: { contentType: "text/plain; charset=utf-8" }
+    });
+  }
+  const message = messageValues({
     threadId,
     isUnassigned: plan.isUnassigned,
     mailboxId: plan.mailboxId,
@@ -72,7 +82,9 @@ export async function storeInboundEmail(
     bcc: input.parsed.bcc,
     subject: input.parsed.subject,
     snippet: input.parsed.snippet,
-    textBody: input.parsed.textBody,
+    textBody: projection.text,
+    textR2Key,
+    replyTo: input.parsed.replyTo ?? [],
     htmlR2Key,
     rawR2Key,
     messageId: input.parsed.messageId,
@@ -85,28 +97,44 @@ export async function storeInboundEmail(
     hasAttachments: hasDownloadableAttachments(input.parsed.attachments),
     deliveredToAddress: recipient
   });
-
+  const attachments = [];
   for (const attachment of input.parsed.attachments) {
-    const r2Key = `${objectBase}/attachments/${newId("att")}-${attachment.filename}`;
+    const r2Key = `${objectBase}/attachments/${newId("att")}`;
     await bucket.put(r2Key, attachmentBody(attachment.content), {
       httpMetadata: { contentType: attachment.contentType }
     });
-    await insertAttachment(db, {
-      messageId: message.id,
-      filename: attachment.filename,
-      contentType: attachment.contentType,
-      sizeBytes: attachmentSize(attachment.content),
-      contentId: attachment.contentId,
-      disposition: messageAttachmentDisposition(attachment),
-      r2Key
-    });
+    attachments.push(
+      attachmentValues({
+        messageId: message.id,
+        filename: attachment.filename,
+        contentType: attachment.contentType,
+        sizeBytes: attachmentSize(attachment.content),
+        contentId: attachment.contentId,
+        disposition: messageAttachmentDisposition(attachment),
+        r2Key
+      })
+    );
+  }
+  const database = createDatabase(db);
+  const attachmentInserts = [];
+  for (let start = 0; start < attachments.length; start += 8) {
+    attachmentInserts.push(
+      database.insert(messageAttachments).values(attachments.slice(start, start + 8))
+    );
+  }
+  try {
+    await database.batch([database.insert(messages).values(message), ...attachmentInserts]);
+  } catch (error) {
+    // A concurrent delivery can win the unique key. Its batch contains every attachment.
+    // Keep staged objects on uncertain failures; maintenance removes only proven orphans.
+    const winner = dedupeKey ? await findDuplicate(db, dedupeKey, bucket) : null;
+    if (winner) return { inserted: false, message: winner };
+    throw error;
   }
 
-  return {
-    inserted: true,
-    isUnassigned: plan.isUnassigned,
-    message: (await getMessageDetail(db, message.id)) ?? message
-  };
+  const stored = await getMessageDetail(db, message.id, bucket);
+  if (!stored) throw new Error("Committed inbound message could not be read.");
+  return { inserted: true, isUnassigned: plan.isUnassigned, message: stored };
 }
 
 export function hasDownloadableAttachments(attachments: ParsedEmail["attachments"]): boolean {
@@ -122,7 +150,11 @@ function messageAttachmentDisposition(
   return attachment.disposition === "inline" || attachment.contentId ? "inline" : "attachment";
 }
 
-async function findDuplicate(db: D1Database, dedupeKey: string): Promise<MessageSummary | null> {
+async function findDuplicate(
+  db: D1Database,
+  dedupeKey: string,
+  bucket: R2Bucket
+): Promise<MessageSummary | null> {
   const row = await getRow<{ id: string }>(
     db,
     sql`SELECT id FROM messages WHERE dedupe_key = ${dedupeKey}`
@@ -132,5 +164,5 @@ async function findDuplicate(db: D1Database, dedupeKey: string): Promise<Message
     return null;
   }
 
-  return getMessageDetail(db, row.id);
+  return getMessageDetail(db, row.id, bucket);
 }

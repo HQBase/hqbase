@@ -1,7 +1,8 @@
 import { and, eq, like, sql } from "drizzle-orm";
 
 import { createDatabase, getRow, getRows } from "../../db/drizzle";
-import { userOnboarding, users, verifications } from "../../db/schema";
+import { userOnboarding, verifications } from "../../db/schema";
+import { AppError } from "../../lib/errors";
 import type { WorkspaceRole } from "../../lib/validation";
 
 import type { UserOnboardingMethod, UserRow, WorkspaceUser } from "./types";
@@ -84,13 +85,25 @@ export async function clearInvitationSentAt(db: D1Database, userId: string): Pro
 export async function setWorkspaceUserRole(
   db: D1Database,
   userId: string,
-  role: WorkspaceRole
+  role: WorkspaceRole,
+  actorId: string
 ): Promise<void> {
-  await createDatabase(db)
-    .update(users)
-    .set({ role, updatedAt: new Date().toISOString() })
-    .where(eq(users.id, userId))
-    .run();
+  const result = await createDatabase(db).run(sql`
+    UPDATE "user" SET role = ${role}, updatedAt = ${new Date().toISOString()}
+    WHERE id = ${userId} AND COALESCE(banned, 0) = 0
+      AND (role <> 'owner' OR ${role} = 'owner' OR
+        (SELECT COUNT(*) FROM "user" WHERE role = 'owner' AND COALESCE(banned, 0) = 0) > 1)
+      AND EXISTS (SELECT 1 FROM "user" actor WHERE actor.id = ${actorId}
+        AND COALESCE(actor.banned, 0) = 0
+        AND (actor.role = 'owner' OR
+          (actor.role = 'admin' AND "user".role <> 'owner' AND ${role} <> 'owner')))`);
+  if ((result.meta.changes ?? 0) === 0) {
+    throw new AppError(
+      "USER_ROLE_CONFLICT",
+      "The role could not change. Keep an active owner and refresh the user list.",
+      409
+    );
+  }
 }
 
 function mapUser(row: UserRow): WorkspaceUser {

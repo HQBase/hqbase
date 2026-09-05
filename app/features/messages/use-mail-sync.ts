@@ -7,6 +7,7 @@ import { playNotificationSound } from "@/lib/notification-sounds";
 import type { FolderId } from "@/lib/routes";
 
 import { listConversations } from "./api";
+import { listConversationWindow } from "./conversation-window";
 import type { ConversationAction, ConversationSummary } from "./types";
 
 const noLabelIds: readonly string[] = [];
@@ -58,7 +59,8 @@ export function useMailSync({
     key: string;
     promise: Promise<void>;
   } | null>(null);
-  const loadedAdditionalPages = React.useRef(false);
+  const loadedPageCount = React.useRef(1);
+  const nextCursorRef = React.useRef<string | null>(null);
   const refreshGeneration = React.useRef(0);
   currentUserId.current = userId;
   currentSyncKey.current = syncKey;
@@ -67,11 +69,12 @@ export function useMailSync({
     refreshGeneration.current += 1;
     inFlight.current = null;
     loadMoreInFlight.current = null;
-    loadedAdditionalPages.current = false;
+    loadedPageCount.current = 1;
     setIsLoadingMore(false);
     setLoadMoreError(null);
     if (preserveVisible) return;
     setConversations([]);
+    nextCursorRef.current = null;
     setNextCursor(null);
     setTotalCount(null);
   }, []);
@@ -79,6 +82,9 @@ export function useMailSync({
   const refresh = React.useCallback((): Promise<void> => {
     if (inFlight.current?.key === syncKey) return inFlight.current.promise;
 
+    if (loadMoreInFlight.current?.key === syncKey) {
+      return loadMoreInFlight.current.promise.then(() => refresh());
+    }
     const generation = refreshGeneration.current;
     const promise = (async () => {
       if (!userId) {
@@ -96,12 +102,15 @@ export function useMailSync({
         activeFolder === "agents" ||
         activeFolder === "drafts"
           ? Promise.resolve<null>(null)
-          : listConversations({
-              folder: activeFolder,
-              labelIds: labelIds.length === 0 ? undefined : labelIds,
-              mailboxId: mailboxId === "all" ? undefined : mailboxId,
-              search: search || undefined
-            })
+          : listConversationWindow(
+              {
+                folder: activeFolder,
+                labelIds: labelIds.length === 0 ? undefined : labelIds,
+                mailboxId: mailboxId === "all" ? undefined : mailboxId,
+                search: search || undefined
+              },
+              loadedPageCount.current
+            )
       ]);
       if (
         currentSyncKey.current !== syncKey ||
@@ -114,12 +123,9 @@ export function useMailSync({
       if (conversationResult.status === "fulfilled" && conversationResult.value !== null) {
         const page = conversationResult.value;
         if (page.totalCount !== null) setTotalCount(page.totalCount);
-        if (loadedAdditionalPages.current) {
-          setConversations((current) => reconcileNewestPage(page.conversations, current));
-        } else {
-          setConversations(page.conversations);
-          setNextCursor(page.nextCursor);
-        }
+        setConversations(page.conversations);
+        nextCursorRef.current = page.nextCursor;
+        setNextCursor(page.nextCursor);
       }
       if (notificationResult.status === "fulfilled") {
         const nextInboundId = notificationResult.value.latestInboundMessageId;
@@ -203,9 +209,11 @@ export function useMailSync({
   }, [refresh, userId]);
 
   const loadMore = React.useCallback((): Promise<void> => {
+    if (inFlight.current?.key === syncKey) return inFlight.current.promise.then(() => loadMore());
+    const cursor = nextCursorRef.current;
     if (
       !userId ||
-      !nextCursor ||
+      !cursor ||
       activeFolder === "settings" ||
       activeFolder === "contacts" ||
       activeFolder === "agents" ||
@@ -213,14 +221,10 @@ export function useMailSync({
     ) {
       return Promise.resolve();
     }
-    if (
-      loadMoreInFlight.current?.key === syncKey &&
-      loadMoreInFlight.current.cursor === nextCursor
-    ) {
+    if (loadMoreInFlight.current?.key === syncKey && loadMoreInFlight.current.cursor === cursor) {
       return loadMoreInFlight.current.promise;
     }
 
-    const cursor = nextCursor;
     const generation = refreshGeneration.current;
     setIsLoadingMore(true);
     setLoadMoreError(null);
@@ -240,8 +244,9 @@ export function useMailSync({
         ) {
           return;
         }
-        loadedAdditionalPages.current = true;
+        loadedPageCount.current += 1;
         setConversations((current) => appendConversationPage(current, page.conversations));
+        nextCursorRef.current = page.nextCursor;
         setNextCursor(page.nextCursor);
       } catch (error: unknown) {
         if (currentSyncKey.current === syncKey && refreshGeneration.current === generation) {
@@ -261,7 +266,7 @@ export function useMailSync({
     };
     void promise.then(clearInFlight, clearInFlight);
     return promise;
-  }, [activeFolder, labelIds, mailboxId, nextCursor, search, syncKey, userId]);
+  }, [activeFolder, labelIds, mailboxId, search, syncKey, userId]);
 
   const applyConversationAction = React.useCallback(
     (threadId: string, action: ConversationAction, affected: number): void => {
@@ -327,17 +332,6 @@ export function useMailSync({
     refresh,
     totalCount
   };
-}
-
-function reconcileNewestPage(
-  newest: ConversationSummary[],
-  current: ConversationSummary[]
-): ConversationSummary[] {
-  const newestThreadIds = new Set(newest.map((conversation) => conversation.threadId));
-  return [
-    ...newest,
-    ...current.filter((conversation) => !newestThreadIds.has(conversation.threadId))
-  ];
 }
 
 function appendConversationPage(

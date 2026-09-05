@@ -1,8 +1,11 @@
 import { AppError } from "./errors";
+import { maxJsonBytes, readBoundedBody, requireMediaType } from "./request-body";
 
 export async function readJson(request: Request): Promise<unknown> {
+  requireMediaType(request, "application/json");
+  const body = await readBoundedBody(request, maxJsonBytes);
   try {
-    return await request.json();
+    return JSON.parse(new TextDecoder().decode(body));
   } catch {
     throw new AppError("INVALID_JSON", "Request body must be valid JSON.", 400);
   }

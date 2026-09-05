@@ -9,6 +9,7 @@ const fallbackPollBaseDelayMs = 30_000;
 const fallbackPollMaxDelayMs = 60_000;
 const heartbeatIntervalMs = 30_000;
 const heartbeatTimeoutMs = 10_000;
+const reconciliationIntervalMs = 120_000;
 
 type MailEventTopic = "drafts" | "labels" | "mailboxes" | "messages";
 
@@ -50,6 +51,7 @@ export function useMailEvents(
     let heartbeatTimeoutTimer: number | null = null;
     let reconnectTimer: number | null = null;
     let socket: WebSocket | null = null;
+    let reconciliationTimer: number | null = null;
     const pendingTopics = new Set<MailEventTopic>();
     let flushScheduled = false;
 
@@ -93,6 +95,25 @@ export function useMailEvents(
       window.clearTimeout(fallbackTimer);
       fallbackTimer = null;
     };
+    const clearReconciliationTimer = (): void => {
+      if (reconciliationTimer !== null) window.clearTimeout(reconciliationTimer);
+      reconciliationTimer = null;
+    };
+    const scheduleReconciliation = (current: WebSocket): void => {
+      clearReconciliationTimer();
+      reconciliationTimer = window.setTimeout(() => {
+        reconciliationTimer = null;
+        if (!canConnect() || socket !== current || !socketIsOpen()) return;
+        void Promise.resolve()
+          .then(currentHandlers.current.onFallbackPoll)
+          .catch(() => {
+            if (active && socket === current) current.close(4000, "Synchronization failed.");
+          })
+          .finally(() => {
+            if (active && socket === current && socketIsOpen()) scheduleReconciliation(current);
+          });
+      }, reconciliationIntervalMs);
+    };
     const clearHeartbeatTimers = (): void => {
       if (heartbeatTimer !== null) window.clearTimeout(heartbeatTimer);
       if (heartbeatTimeoutTimer !== null) window.clearTimeout(heartbeatTimeoutTimer);
@@ -101,6 +122,7 @@ export function useMailEvents(
     };
     const closeSocket = (): void => {
       clearConnectionTimer();
+      clearReconciliationTimer();
       clearHeartbeatTimers();
       const current = socket;
       socket = null;
@@ -198,6 +220,7 @@ export function useMailEvents(
         fallbackAttempt = 0;
         setStatus("connected");
         scheduleHeartbeat(next);
+        scheduleReconciliation(next);
         invoke(currentHandlers.current.onReconnect);
       });
       next.addEventListener("message", (event) => {
@@ -220,6 +243,7 @@ export function useMailEvents(
         if (socket !== next) return;
         socket = null;
         clearConnectionTimer();
+        clearReconciliationTimer();
         clearHeartbeatTimers();
         if (!canConnect()) {
           if (navigator.onLine === false) setStatus("unavailable");

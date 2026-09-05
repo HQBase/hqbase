@@ -50,6 +50,7 @@ export type MessageFolderAction = Extract<
 >;
 
 export type MessageDetail = MessageSummary & {
+  replyTo?: string[];
   cc: string[];
   bcc: string[];
   deliveredToAddress: string | null;

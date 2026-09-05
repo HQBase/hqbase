@@ -1,4 +1,4 @@
-import type * as React from "react";
+import * as React from "react";
 import { PiNotePencil, PiPaperclip } from "react-icons/pi";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -45,6 +45,9 @@ export function DraftsPage({
   onSelect,
   onToggleLabel
 }: DraftsPageProps): React.ReactElement {
+  const filterKey = JSON.stringify([mailboxId, search, labelIds]);
+  const [page, setPage] = React.useState({ filterKey, limit: 50 });
+  const limit = page.filterKey === filterKey ? page.limit : 50;
   const normalizedSearch = search.trim().toLowerCase();
   const visibleDrafts = drafts.filter((draft) => {
     if (mailboxId !== "all" && draft.mailboxId !== mailboxId) return false;
@@ -99,7 +102,7 @@ export function DraftsPage({
     );
   }
 
-  const groups = groupDrafts(visibleDrafts);
+  const groups = groupDrafts(visibleDrafts.slice(0, limit));
 
   return (
     <div className="flex h-full flex-col bg-list" data-mobile-view="message-list">
@@ -149,6 +152,15 @@ export function DraftsPage({
                   </div>
                 </section>
               ))}
+              {visibleDrafts.length > limit ? (
+                <Button
+                  className="mt-4"
+                  variant="outline"
+                  onClick={() => setPage({ filterKey, limit: limit + 50 })}
+                >
+                  Load more drafts
+                </Button>
+              ) : null}
             </div>
           )}
         </div>

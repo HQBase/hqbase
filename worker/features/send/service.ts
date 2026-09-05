@@ -1,29 +1,14 @@
-import { sql } from "drizzle-orm";
-
 import type { MessageScope } from "../../auth/mailbox-access";
 import { newId, nowIso } from "../../db/client";
-import { getRows } from "../../db/drizzle";
 import type { WorkerEnv } from "../../lib/env";
 import { AppError } from "../../lib/errors";
 import { findMailboxForSending } from "../mailboxes/queries";
 import type { Mailbox } from "../mailboxes/types";
 import { ensureReplySubject } from "../messages/headers";
-import {
-  getMessageDetail,
-  insertAttachment,
-  insertMessage,
-  listThreadMessages
-} from "../messages/queries";
-import { createThread, touchThread } from "../messages/threading";
+import { getMessageDetail, listThreadMessages } from "../messages/queries";
+import { storeMessageBody } from "../messages/text-storage";
 import type { MessageSummary } from "../messages/types";
 import type { SignatureSnapshot } from "../signatures/types";
-import {
-  cleanupUnstoredObjectKeys,
-  cleanupUnstoredObjects,
-  deleteObjectKeys,
-  sendWithStagedCleanup,
-  stageOutgoingAttachments
-} from "./attachment-storage";
 import { assembleMessageBody, type MessageBodyPart } from "./body";
 import {
   asEmailAttachment,
@@ -39,6 +24,8 @@ import {
   type StoredOutgoingAttachment,
   totalAttachmentBytes
 } from "./content-attachments";
+import { deliverPreparedMail } from "./delivery";
+import { identifySend, makeSendPayload, resumeSend, type SendIdentity } from "./operations";
 import { buildReplyChainContext } from "./reply-body";
 import type { ReplyMessageInput, SendMessageInput } from "./validation";
 
@@ -48,9 +35,13 @@ export async function sendNewMessage(
   principalId?: string,
   signature?: SignatureSnapshot,
   context?: MessageBodyPart,
-  contextAttachments: StoredOutgoingAttachment[] = []
+  contextAttachments: StoredOutgoingAttachment[] = [],
+  operationIdentity?: SendIdentity
 ): Promise<MessageSummary> {
   const mailbox = await ensureActiveMailbox(env.DB, input.from);
+  const identity = operationIdentity ?? (await identifySend(principalId, input, "send"));
+  const previous = await resumeSend(env, identity);
+  if (previous) return previous;
 
   const timestamp = nowIso();
   const draftAttachments = await loadAttachments(env, input.attachmentIds, principalId);
@@ -81,14 +72,44 @@ export async function sendNewMessage(
     subject: input.subject,
     text: body.text
   };
-  const stagedAttachments = [
-    ...preparedDraftAttachments,
-    ...preparedSignature.attachments,
-    ...preparedContextAttachments
-  ];
-  await stageOutgoingAttachments(env.MAIL_OBJECTS, stagedAttachments);
-  const sendResult = await sendWithStagedCleanup(
+  const storedBody = await storeMessageBody(
+    env.MAIL_OBJECTS,
+    body.text,
+    body.html,
+    `sent/${timestamp.slice(0, 10)}/${newId("obj")}`
+  );
+  const payload = makeSendPayload(
+    {
+      threadId: newId("thr"),
+      isUnassigned: false,
+      mailboxId: mailbox.id,
+      direction: "outbound",
+      folder: "sent",
+      fromAddress: input.from,
+      fromName: mailbox.displayName,
+      to: input.to,
+      cc: input.cc,
+      bcc: input.bcc,
+      subject: input.subject,
+      snippet: body.text.replace(/\s+/g, " ").trim().slice(0, 180),
+      ...storedBody,
+      rawR2Key: null,
+      messageId: null,
+      dedupeKey: null,
+      inReplyTo: null,
+      references: [],
+      receivedAt: null,
+      sentAt: timestamp,
+      readAt: timestamp,
+      hasAttachments: attachments.some((attachment) => attachment.disposition === "attachment")
+    },
+    attachments,
+    true
+  );
+  return deliverPreparedMail(
     env,
+    identity,
+    payload,
     {
       ...email,
       ...(input.cc.length ? { cc: input.cc } : {}),
@@ -96,30 +117,8 @@ export async function sendNewMessage(
       ...(body.html ? { html: body.html } : {}),
       ...(attachments.length ? { attachments: attachments.map(asEmailAttachment) } : {})
     },
-    stagedAttachments
+    attachments
   );
-  try {
-    const threadId = await createThread(env.DB, input.subject, timestamp);
-    return await storeSentMessage(env, {
-      ...input,
-      fromName: mailbox.displayName,
-      text: body.text,
-      ...(body.html ? { html: body.html } : { html: undefined }),
-      inReplyTo: null,
-      messageId: sendResult.messageId,
-      mailboxId: mailbox.id,
-      references: [],
-      sentAt: timestamp,
-      subject: input.subject,
-      threadId,
-      storedAttachments: attachments,
-      draftId: input.draftId ?? null,
-      principalId: principalId ?? null
-    });
-  } catch (error) {
-    await cleanupUnstoredObjects(env, stagedAttachments);
-    throw error;
-  }
 }
 
 export async function replyToMessage(
@@ -130,13 +129,16 @@ export async function replyToMessage(
   messageScope?: MessageScope
 ): Promise<MessageSummary> {
   const mailbox = await ensureActiveMailbox(env.DB, input.from);
+  const identity = await identifySend(principalId, input, "reply");
+  const previous = await resumeSend(env, identity);
+  if (previous) return previous;
 
-  const original = await getMessageDetail(env.DB, input.messageId);
+  const original = await getMessageDetail(env.DB, input.messageId, env.MAIL_OBJECTS);
   if (!original) {
     throw new AppError("MESSAGE_NOT_FOUND", "Message not found.", 404);
   }
   const threadMessages = messageScope
-    ? (await listThreadMessages(env.DB, original.threadId, messageScope)).filter(
+    ? (await listThreadMessages(env.DB, original.threadId, messageScope, env.MAIL_OBJECTS)).filter(
         (message) => (message.folder === "trash") === (original.folder === "trash")
       )
     : [original];
@@ -147,7 +149,14 @@ export async function replyToMessage(
   const references = [...original.references, original.messageId].filter(
     (value): value is string => value !== null
   );
-  const to = input.to?.length ? input.to : [original.fromAddress];
+  const to = input.to?.length
+    ? input.to
+    : original.replyTo?.length
+      ? original.replyTo
+      : [original.fromAddress];
+  if (to.length + input.cc.length + input.bcc.length > 50) {
+    throw new AppError("RECIPIENTS_TOO_MANY", "Choose at most 50 total recipients.", 400);
+  }
   const draftAttachments = await loadAttachments(env, input.attachmentIds, principalId);
   const authoredDraftId = resolveAuthoredDraftId(input.draftId, draftAttachments);
   const authored = prepareAuthoredContent({
@@ -186,14 +195,46 @@ export async function replyToMessage(
   const preparedQuotedAttachments = prepareStoredAttachments(quoted.inlineAttachments, timestamp);
   const outgoingAttachments = [...baseAttachments, ...preparedQuotedAttachments];
   requireAttachmentLimits(outgoingAttachments);
-  const stagedAttachments = [
-    ...preparedDraftAttachments,
-    ...preparedSignature.attachments,
-    ...preparedQuotedAttachments
-  ];
-  await stageOutgoingAttachments(env.MAIL_OBJECTS, stagedAttachments);
-  const sendResult = await sendWithStagedCleanup(
+  const storedBody = await storeMessageBody(
+    env.MAIL_OBJECTS,
+    body.text,
+    body.html,
+    `sent/${timestamp.slice(0, 10)}/${newId("obj")}`
+  );
+  const payload = makeSendPayload(
+    {
+      threadId: original.threadId,
+      isUnassigned: false,
+      mailboxId: mailbox.id,
+      direction: "outbound",
+      folder: "sent",
+      fromAddress: input.from,
+      fromName: mailbox.displayName,
+      to,
+      cc: input.cc,
+      bcc: input.bcc,
+      subject: ensureReplySubject(original.subject),
+      snippet: body.text.replace(/\s+/g, " ").trim().slice(0, 180),
+      ...storedBody,
+      rawR2Key: null,
+      messageId: null,
+      dedupeKey: null,
+      inReplyTo: original.messageId,
+      references,
+      receivedAt: null,
+      sentAt: timestamp,
+      readAt: timestamp,
+      hasAttachments: outgoingAttachments.some(
+        (attachment) => attachment.disposition === "attachment"
+      )
+    },
+    outgoingAttachments,
+    false
+  );
+  return deliverPreparedMail(
     env,
+    identity,
+    payload,
     {
       from: { name: mailbox.displayName, email: mailbox.address },
       to,
@@ -202,7 +243,7 @@ export async function replyToMessage(
       subject: ensureReplySubject(original.subject),
       text: body.text,
       headers: {
-        "In-Reply-To": original.messageId ?? original.id,
+        ...(original.messageId ? { "In-Reply-To": original.messageId } : {}),
         References: references.join(" ")
       },
       ...(body.html ? { html: body.html } : {}),
@@ -210,32 +251,8 @@ export async function replyToMessage(
         ? { attachments: outgoingAttachments.map(asEmailAttachment) }
         : {})
     },
-    stagedAttachments
+    outgoingAttachments
   );
-  try {
-    return await storeSentMessage(env, {
-      from: input.from,
-      fromName: mailbox.displayName,
-      to,
-      cc: input.cc,
-      bcc: input.bcc,
-      subject: ensureReplySubject(original.subject),
-      text: body.text,
-      ...(body.html ? { html: body.html } : {}),
-      inReplyTo: original.messageId ?? original.id,
-      messageId: sendResult.messageId,
-      mailboxId: mailbox.id,
-      references,
-      sentAt: timestamp,
-      threadId: original.threadId,
-      storedAttachments: outgoingAttachments,
-      draftId: input.draftId ?? null,
-      principalId: principalId ?? null
-    });
-  } catch (error) {
-    await cleanupUnstoredObjects(env, stagedAttachments);
-    throw error;
-  }
 }
 
 async function ensureActiveMailbox(db: D1Database, address: string): Promise<Mailbox> {
@@ -247,109 +264,4 @@ async function ensureActiveMailbox(db: D1Database, address: string): Promise<Mai
     throw new AppError("MAILBOX_DISABLED", "Disabled mailboxes cannot send email.", 400);
   }
   return mailbox;
-}
-
-async function storeSentMessage(
-  env: WorkerEnv,
-  input: {
-    from: string;
-    fromName: string;
-    to: string[];
-    cc: string[];
-    bcc: string[];
-    subject: string;
-    text: string;
-    html?: string | undefined;
-    inReplyTo: string | null;
-    messageId: string;
-    mailboxId: string;
-    references: string[];
-    sentAt: string;
-    threadId: string;
-    storedAttachments: StoredOutgoingAttachment[];
-    draftId: string | null;
-    principalId: string | null;
-  }
-): Promise<MessageSummary> {
-  const htmlR2Key = input.html ? `sent/${input.sentAt.slice(0, 10)}/${newId("html")}.html` : null;
-  try {
-    if (input.html && htmlR2Key) {
-      await env.MAIL_OBJECTS.put(htmlR2Key, input.html, {
-        httpMetadata: { contentType: "text/html; charset=utf-8" }
-      });
-    }
-
-    await touchThread(env.DB, input.threadId, input.sentAt);
-    const message = await insertMessage(env.DB, {
-      threadId: input.threadId,
-      isUnassigned: false,
-      mailboxId: input.mailboxId,
-      direction: "outbound",
-      folder: "sent",
-      fromAddress: input.from,
-      fromName: input.fromName,
-      to: input.to,
-      cc: input.cc,
-      bcc: input.bcc,
-      subject: input.subject,
-      snippet: input.text.replace(/\s+/g, " ").trim().slice(0, 180),
-      textBody: input.text,
-      htmlR2Key,
-      rawR2Key: null,
-      messageId: input.messageId,
-      dedupeKey: null,
-      inReplyTo: input.inReplyTo,
-      references: input.references,
-      receivedAt: null,
-      sentAt: input.sentAt,
-      readAt: input.sentAt,
-      hasAttachments: input.storedAttachments.some(
-        (attachment) => attachment.disposition === "attachment"
-      )
-    });
-    for (const attachment of input.storedAttachments) {
-      await insertAttachment(env.DB, {
-        messageId: message.id,
-        filename: attachment.filename,
-        contentType: attachment.contentType,
-        sizeBytes: attachment.sizeBytes,
-        contentId: attachment.contentId,
-        disposition: attachment.disposition,
-        r2Key: attachment.r2Key
-      });
-    }
-    if (input.draftId && input.principalId) {
-      const draftObjects = await getRows<{ r2_key: string }>(
-        env.DB,
-        sql`SELECT a.r2_key
-            FROM draft_attachments a
-            JOIN drafts d ON d.id = a.draft_id
-            WHERE d.id = ${input.draftId} AND d.principal_id = ${input.principalId}`
-      );
-      await env.DB.batch([
-        env.DB.prepare(
-          `INSERT OR IGNORE INTO message_labels
-             (message_id, label_id, assigned_by_principal_id, created_at)
-             SELECT ?, assignment.label_id, assignment.assigned_by_principal_id,
-                    assignment.created_at
-             FROM draft_labels assignment
-             JOIN drafts draft ON draft.id = assignment.draft_id
-             WHERE draft.id = ? AND draft.principal_id = ?`
-        ).bind(message.id, input.draftId, input.principalId),
-        env.DB.prepare("DELETE FROM drafts WHERE id = ? AND principal_id = ?").bind(
-          input.draftId,
-          input.principalId
-        )
-      ]);
-      const retainedKeys = new Set(input.storedAttachments.map((attachment) => attachment.r2Key));
-      const unusedKeys = draftObjects
-        .map((object) => object.r2_key)
-        .filter((key) => !retainedKeys.has(key));
-      await deleteObjectKeys(env.MAIL_OBJECTS, unusedKeys);
-    }
-    return message;
-  } catch (error) {
-    if (htmlR2Key) await cleanupUnstoredObjectKeys(env, [htmlR2Key]);
-    throw error;
-  }
 }

@@ -14,3 +14,11 @@ export async function getRow<T>(client: D1Database, query: SQL): Promise<T | nul
 export function getRows<T>(client: D1Database, query: SQL): Promise<T[]> {
   return createDatabase(client).all<T>(query);
 }
+
+export function preparedStatement(
+  client: D1Database,
+  query: { toSQL(): { sql: string; params: unknown[] } }
+): D1PreparedStatement {
+  const { sql, params } = query.toSQL();
+  return client.prepare(sql).bind(...params);
+}

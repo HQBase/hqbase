@@ -1,3 +1,8 @@
+vi.mock("@worker/features/send/operations", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@worker/features/send/operations")>()),
+  resumeSend: vi.fn().mockResolvedValue(null)
+}));
+
 import type { WorkerEnv } from "@worker/lib/env";
 import { errorBody, toAppError } from "@worker/lib/errors";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -68,6 +73,7 @@ const noSignature = { mode: "none", id: null, name: "", html: "", text: "" } as 
 describe("send routes", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.recordAudit.mockResolvedValue(undefined);
     mocks.requireMailApiPrincipal.mockResolvedValue({
       principal: {
         email: "person@example.com",
@@ -116,7 +122,8 @@ describe("send routes", () => {
       {
         BETTER_AUTH_SECRET: "test-secret",
         DB: db
-      } as WorkerEnv
+      } as WorkerEnv,
+      { waitUntil: vi.fn(), passThroughOnException: vi.fn(), props: {} }
     );
 
     expect(response.status).toBe(201);
@@ -162,7 +169,8 @@ describe("send routes", () => {
       {
         BETTER_AUTH_SECRET: "test-secret",
         DB: db
-      } as WorkerEnv
+      } as WorkerEnv,
+      { waitUntil: vi.fn(), passThroughOnException: vi.fn(), props: {} }
     );
 
     expect(response.status).toBe(201);
@@ -335,6 +343,7 @@ async function request(db: D1Database, path: string, body: object): Promise<Resp
       headers: { "content-type": "application/json" },
       method: "POST"
     },
-    { BETTER_AUTH_SECRET: "test-secret", DB: db } as WorkerEnv
+    { BETTER_AUTH_SECRET: "test-secret", DB: db } as WorkerEnv,
+    { waitUntil: vi.fn(), passThroughOnException: vi.fn(), props: {} }
   );
 }

@@ -3,6 +3,7 @@ import { requireMailApiPrincipal } from "../../auth/mail-api";
 import type { HonoApp } from "../../lib/env";
 import { AppError } from "../../lib/errors";
 import { readJson } from "../../lib/json";
+import { readUpload } from "../../lib/request-body";
 import { parseWith } from "../../lib/validation";
 import { ignoreMailEventFailure, publishUserMailEvent } from "../events/service";
 import { requireLabel, setDraftLabel } from "../labels/queries";
@@ -143,7 +144,7 @@ draftRoutes.delete("/:id", async (c) => {
 draftRoutes.post("/:id/attachments", async (c) => {
   const auth = await requireMailApiPrincipal(c.env, c.req.raw, "mail:send");
   await getAccessibleDraft(c.env, draftPrincipal(auth), c.req.param("id"));
-  const body = await c.req.raw.formData();
+  const body = await readUpload(c.req.raw);
   const file = body.get("file");
   if (!(file instanceof File)) throw new AppError("FILE_REQUIRED", "Choose a file.", 400);
   const attachment = await storeDraftAttachment(

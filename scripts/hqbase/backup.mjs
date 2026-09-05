@@ -4,6 +4,7 @@ import path from "node:path";
 import { optionalString, requireString } from "./args.mjs";
 import { run } from "./command.mjs";
 import { configPath, deploymentDir, loadManifest } from "./manifest.mjs";
+import { inspectRelease } from "./recovery-verification.mjs";
 
 function findString(value, keys) {
   if (!value || typeof value !== "object") return null;
@@ -22,6 +23,16 @@ export function parseTimeTravelBookmark(output) {
 }
 
 export function parseWorkerVersion(output) {
+  const parsed = JSON.parse(output);
+  const deployment = parsed.result ?? parsed;
+  if (
+    Array.isArray(deployment.versions) &&
+    (deployment.versions.length !== 1 ||
+      (deployment.versions[0]?.percentage !== undefined &&
+        deployment.versions[0].percentage !== 100))
+  ) {
+    throw new Error("Recovery requires one Worker version serving all traffic.");
+  }
   const version = findString(JSON.parse(output), new Set(["version_id", "versionId"]));
   if (!version) throw new Error("Worker deployment status did not return a version ID.");
   return version;
@@ -30,6 +41,7 @@ export function parseWorkerVersion(output) {
 export function createBackup(name, options = {}) {
   const manifest = loadManifest(name);
   const config = configPath(name);
+  const release = inspectRelease(manifest);
   const bookmark = parseTimeTravelBookmark(
     run(
       "pnpm",
@@ -44,7 +56,7 @@ export function createBackup(name, options = {}) {
         "--config",
         config
       ],
-      { quiet: true }
+      { quiet: true, stdoutOnly: true }
     )
   );
   const workerVersion = parseWorkerVersion(
@@ -61,7 +73,7 @@ export function createBackup(name, options = {}) {
         "--config",
         config
       ],
-      { quiet: true }
+      { quiet: true, stdoutOnly: true }
     )
   );
   const r2 = JSON.parse(
@@ -78,17 +90,19 @@ export function createBackup(name, options = {}) {
         "--config",
         config
       ],
-      { quiet: true }
+      { quiet: true, stdoutOnly: true }
     )
   );
   const createdAt = new Date().toISOString();
   const backup = {
-    format: "hqbase-backup-v1",
+    format: "hqbase-backup-v2",
     deployment: name,
     createdAt,
+    accountId: manifest.accountId,
+    release,
     d1: { name: manifest.d1.name, id: manifest.d1.id, bookmark },
     worker: { name: manifest.worker.name, version: workerVersion },
-    r2: { bucket: manifest.r2.bucket, inventory: r2 }
+    r2: { bucket: manifest.r2.bucket, metadata: r2 }
   };
   const output = options.output
     ? path.resolve(process.cwd(), options.output)

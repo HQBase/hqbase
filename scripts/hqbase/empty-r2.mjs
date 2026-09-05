@@ -74,7 +74,7 @@ export function authenticationHeaders(authentication) {
   throw new Error("Wrangler did not return usable Cloudflare authentication.");
 }
 
-function readWranglerAuthentication(options) {
+export function readWranglerAuthentication(options = {}) {
   const runAuthentication = options.runAuthentication ?? defaultAuthenticationCommand;
   let authentication;
   try {

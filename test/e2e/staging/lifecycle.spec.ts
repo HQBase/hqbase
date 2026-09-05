@@ -1001,8 +1001,12 @@ function accessHeaders(): Record<string, string> {
   const clientId = process.env.HQBASE_STAGING_ACCESS_CLIENT_ID;
   const clientSecret = process.env.HQBASE_STAGING_ACCESS_CLIENT_SECRET;
   return clientId && clientSecret
-    ? { "CF-Access-Client-Id": clientId, "CF-Access-Client-Secret": clientSecret }
-    : {};
+    ? {
+        origin: stagingUrl,
+        "CF-Access-Client-Id": clientId,
+        "CF-Access-Client-Secret": clientSecret
+      }
+    : { origin: stagingUrl };
 }
 
 function stagingSetupGrantCookie(secret: string): string {

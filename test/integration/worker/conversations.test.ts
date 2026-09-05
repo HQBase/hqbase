@@ -6,6 +6,7 @@ import workspaceMigration from "../../../migrations/0002_workspace.sql?raw";
 import oauthResourcesMigration from "../../../migrations/0003_oauth_resources.sql?raw";
 import conversationMigration from "../../../migrations/0004_conversations.sql?raw";
 import threadRebuildMigration from "../../../migrations/0005_rebuild_threads.sql?raw";
+import senderNameMigration from "../../../migrations/0023_message_sender_names.sql?raw";
 import {
   listConversationPage,
   listConversations,
@@ -62,6 +63,7 @@ describe("conversation persistence", () => {
       occurredAt: "2026-07-28T14:00:00.000Z"
     });
     await applyMigration(threadRebuildMigration);
+    await applyMigration(senderNameMigration);
   });
 
   it("repairs subject-only history from message headers", async () => {

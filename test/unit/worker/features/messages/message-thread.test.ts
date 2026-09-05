@@ -57,7 +57,7 @@ describe("message threads", () => {
     expect(prepare.mock.calls[0]?.[0]).toContain("ORDER BY COALESCE");
     expect(prepare.mock.calls[0]?.[0]).toContain("SELECT messages.* FROM messages");
     expect(prepare.mock.calls[0]?.[0]).not.toMatch(/\bLIMIT\b/u);
-    expect(threadBind).toHaveBeenCalledWith("thr_1", "mbx_allowed", "mbx_second");
+    expect(threadBind).toHaveBeenCalledWith("thr_1", '["mbx_allowed","mbx_second"]');
     expect(prepare.mock.calls[0]?.[0]).not.toContain("IS NULL");
   });
 
@@ -74,7 +74,7 @@ describe("message threads", () => {
     });
 
     expect(prepare.mock.calls[0]?.[0]).toContain("is_unassigned = 1");
-    expect(threadBind).toHaveBeenCalledWith("thr_1", "mbx_allowed");
+    expect(threadBind).toHaveBeenCalledWith("thr_1", '["mbx_allowed"]');
   });
 
   it("does not query when no mailbox is accessible", async () => {

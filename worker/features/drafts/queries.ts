@@ -123,10 +123,7 @@ export async function attachmentsForDrafts(
     db,
     sql`SELECT draft_id, id, filename, content_type, size_bytes, content_id, r2_key
         FROM draft_attachments
-        WHERE draft_id IN (${sql.join(
-          draftIds.map((id) => sql`${id}`),
-          sql`, `
-        )})
+        WHERE draft_id IN (SELECT value FROM json_each(${JSON.stringify(draftIds)}))
         ORDER BY draft_id, created_at`
   );
 }
@@ -160,53 +157,47 @@ export async function saveDraft(
     input.signature && "name" in input.signature
       ? input.signature
       : (current?.signature ?? emptySignatureSnapshot("none"));
-  await createDatabase(db)
-    .insert(drafts)
-    .values({
-      id,
-      principalId,
-      mailboxId: input.mailboxId,
-      replyToMessageId: input.replyToMessageId,
-      forwardOfMessageId: input.forwardOfMessageId,
-      fromAddress: input.from,
-      to: input.to,
-      cc: input.cc,
-      bcc: input.bcc,
-      subject: input.subject,
-      textBody: input.text,
-      htmlBody: input.html,
-      signatureMode: signature.mode,
-      signatureId: signature.id,
-      signatureNameSnapshot: signature.name,
-      signatureHtmlSnapshot: signature.html,
-      signatureTextSnapshot: signature.text,
-      version: nextVersion,
-      createdAt: current?.updatedAt ?? now,
-      updatedAt: now
-    })
-    .onConflictDoUpdate({
-      target: drafts.id,
-      set: {
-        mailboxId: input.mailboxId,
-        replyToMessageId: input.replyToMessageId,
-        forwardOfMessageId: input.forwardOfMessageId,
-        fromAddress: input.from,
-        to: input.to,
-        cc: input.cc,
-        bcc: input.bcc,
-        subject: input.subject,
-        textBody: input.text,
-        htmlBody: input.html,
-        signatureMode: signature.mode,
-        signatureId: signature.id,
-        signatureNameSnapshot: signature.name,
-        signatureHtmlSnapshot: signature.html,
-        signatureTextSnapshot: signature.text,
-        version: nextVersion,
-        updatedAt: now
-      }
-    })
-    .run();
+  const database = createDatabase(db);
+  const values = {
+    mailboxId: input.mailboxId,
+    replyToMessageId: input.replyToMessageId,
+    forwardOfMessageId: input.forwardOfMessageId,
+    fromAddress: input.from,
+    to: input.to,
+    cc: input.cc,
+    bcc: input.bcc,
+    subject: input.subject,
+    textBody: input.text,
+    htmlBody: input.html,
+    signatureMode: signature.mode,
+    signatureId: signature.id,
+    signatureNameSnapshot: signature.name,
+    signatureHtmlSnapshot: signature.html,
+    signatureTextSnapshot: signature.text,
+    version: nextVersion,
+    updatedAt: now
+  };
+  if (current) {
+    const result = await database
+      .update(drafts)
+      .set(values)
+      .where(
+        and(
+          eq(drafts.id, id),
+          eq(drafts.principalId, principalId),
+          eq(drafts.version, current.version)
+        )
+      )
+      .run();
+    if ((result.meta.changes ?? 0) === 0) {
+      throw new AppError("DRAFT_CONFLICT", "This draft changed in another session.", 409);
+    }
+  } else {
+    await database
+      .insert(drafts)
+      .values({ ...values, id, principalId, createdAt: now })
+      .run();
+  }
   const saved = await getDraft(db, principalId, id);
   if (!saved) throw new AppError("DRAFT_SAVE_FAILED", "Draft could not be saved.", 500);
   return saved;

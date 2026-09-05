@@ -1,8 +1,8 @@
 import * as React from "react";
+import { Spinner } from "@/components/ui/spinner";
 
-import { AgentsPage } from "@/features/agents/agents-page";
 import type { CurrentUser } from "@/features/auth/types";
-import { ContactsPage } from "@/features/contacts/contacts-page";
+
 import { setDraftLabel } from "@/features/drafts/api";
 import { DraftsPage } from "@/features/drafts/drafts-page";
 import type { useDrafts } from "@/features/drafts/use-drafts";
@@ -10,12 +10,24 @@ import { InboxPage } from "@/features/inbox/inbox-page";
 import type { MailLabel } from "@/features/labels/types";
 import type { Mailbox } from "@/features/mailboxes/types";
 import type { useMailSync } from "@/features/messages/use-mail-sync";
-import { SettingsPage } from "@/features/settings/settings-page";
+
 import type { SetupStatus } from "@/features/setup/types";
 import type { useUpdateMonitor } from "@/features/updates/use-update-monitor";
 import type { WorkspaceUser } from "@/features/users/types";
 import type { AppRoute, FolderId, MailFolderId, SettingsTabId } from "@/lib/routes";
 import type { useAppRoute } from "@/lib/use-app-route";
+
+const AgentsPage = React.lazy(() =>
+  import("@/features/agents/agents-page").then((module) => ({ default: module.AgentsPage }))
+);
+
+const ContactsPage = React.lazy(() =>
+  import("@/features/contacts/contacts-page").then((module) => ({ default: module.ContactsPage }))
+);
+
+const SettingsPage = React.lazy(() =>
+  import("@/features/settings/settings-page").then((module) => ({ default: module.SettingsPage }))
+);
 
 const DraftComposeDialog = React.lazy(() =>
   import("@/features/drafts/draft-compose-dialog").then((module) => ({
@@ -94,7 +106,13 @@ export function WorkspacePages({
     );
 
   return (
-    <>
+    <React.Suspense
+      fallback={
+        <div className="flex h-full items-center justify-center">
+          <Spinner />
+        </div>
+      }
+    >
       {activeFolder === "agents" ? (
         <AgentsPage
           canManage={canManageWorkspace}
@@ -222,6 +240,6 @@ export function WorkspacePages({
           />
         </React.Suspense>
       ) : null}
-    </>
+    </React.Suspense>
   );
 }

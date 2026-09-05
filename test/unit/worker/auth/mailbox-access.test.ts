@@ -55,7 +55,7 @@ describe("mailbox access levels", () => {
         "mailbox_id",
         "is_unassigned"
       )
-    ).toEqual({ params: ["mbx_1"], sql: "(mailbox_id IN (?))" });
+    ).toEqual({ params: ['["mbx_1"]'], sql: "(mailbox_id IN (SELECT value FROM json_each(?)))" });
     expect(
       messageScopeSql(
         { includeUnassigned: true, mailboxIds: ["mbx_1"] },
@@ -63,8 +63,8 @@ describe("mailbox access levels", () => {
         "is_unassigned"
       )
     ).toEqual({
-      params: ["mbx_1"],
-      sql: "(mailbox_id IN (?) OR is_unassigned = 1)"
+      params: ['["mbx_1"]'],
+      sql: "(mailbox_id IN (SELECT value FROM json_each(?)) OR is_unassigned = 1)"
     });
     expect(
       messageScopeSql({ includeUnassigned: true, mailboxIds: [] }, "mailbox_id", "is_unassigned")

@@ -70,6 +70,31 @@ describe("useMailSync", () => {
     mocks.refreshNotifications.mockReset();
   });
 
+  it("removes a remotely archived conversation after additional pages were loaded", async () => {
+    const first = conversation("first", "2026-09-04T12:00:00Z");
+    const older = conversation("older", "2026-09-03T12:00:00Z");
+    mocks.refreshNotifications.mockResolvedValue(status("first"));
+    mocks.listConversations
+      .mockResolvedValueOnce({ conversations: [first], nextCursor: "older", totalCount: 2 })
+      .mockResolvedValueOnce({ conversations: [older], nextCursor: null, totalCount: null })
+      .mockResolvedValueOnce({ conversations: [older], nextCursor: null, totalCount: 1 });
+    const hook = await renderHook(useMailSync, {
+      activeFolder: "inbox",
+      mailboxId: "all",
+      search: "",
+      userId: "audit"
+    });
+    try {
+      await flushHookEffects();
+      await flushHookEffects(() => hook.result.loadMore());
+      await flushHookEffects(() => hook.result.refresh());
+      expect(hook.result.totalCount).toBe(1);
+      expect(hook.result.conversations.map((row) => row.id)).toEqual(["older"]);
+    } finally {
+      await hook.unmount();
+    }
+  });
+
   it("uses one refresh path for initial load, focus, unread state, and incoming sound", async () => {
     Object.defineProperty(document, "visibilityState", {
       configurable: true,
@@ -158,6 +183,7 @@ describe("useMailSync", () => {
         nextCursor: "cursor-2",
         totalCount: 3
       })
+      .mockResolvedValueOnce({ conversations: [second], nextCursor: null, totalCount: null })
       .mockReturnValueOnce(replacementRequest);
     mocks.refreshNotifications
       .mockResolvedValueOnce(status("message-1"))
@@ -197,7 +223,7 @@ describe("useMailSync", () => {
       hardRefresh = hook.result.hardRefresh();
     });
     expect(mocks.listConversations).toHaveBeenNthCalledWith(
-      4,
+      5,
       expect.not.objectContaining({ cursor: expect.anything() })
     );
     expect(hook.result.conversations.map((item) => item.id)).toEqual([

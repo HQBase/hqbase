@@ -123,7 +123,13 @@ export async function listConversationPage(
   const rows = await getRows<ConversationRow>(
     db,
     sql`WITH accessible AS (
-         SELECT messages.*,
+         SELECT messages.id, messages.thread_id, messages.mailbox_id, messages.direction,
+           messages.folder, messages.from_address, messages.from_name, messages.to_json,
+           messages.subject, messages.snippet, messages.received_at, messages.sent_at,
+           messages.created_at, messages.read_at, messages.starred_at, messages.has_attachments,
+           ${filters.search ? sql`messages.text_body` : sql`NULL`} AS text_body,
+           ${filters.correspondentEmail ? sql`messages.cc_json` : sql`NULL`} AS cc_json,
+           ${filters.correspondentEmail ? sql`messages.bcc_json` : sql`NULL`} AS bcc_json,
            COALESCE(messages.received_at, messages.sent_at, messages.created_at) AS activity_at
          FROM messages
          WHERE ${scope} AND ${visibility}

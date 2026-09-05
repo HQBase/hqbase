@@ -260,10 +260,7 @@ describe("Better Auth schema", () => {
 
     const updated = await SELF.fetch(`${origin}/api/me`, {
       body: JSON.stringify({ defaultFromMailboxId: "mailbox_preferences" }),
-      headers: {
-        "content-type": "application/json",
-        cookie
-      },
+      headers: { origin, "content-type": "application/json", cookie },
       method: "PATCH"
     });
     expect(updated.status, await updated.clone().text()).toBe(200);
@@ -272,7 +269,7 @@ describe("Better Auth schema", () => {
       defaultFromMailboxId: "mailbox_preferences"
     });
 
-    const current = await SELF.fetch(`${origin}/api/me`, { headers: { cookie } });
+    const current = await SELF.fetch(`${origin}/api/me`, { headers: { origin, cookie } });
     expect(current.status, await current.clone().text()).toBe(200);
     await expect(current.json()).resolves.toMatchObject({
       email,
@@ -316,7 +313,7 @@ describe("Better Auth schema", () => {
     const staleSessionCookie = extractSessionCookie(signIn);
 
     const recent = await SELF.fetch(`${origin}/api/sessions/recent-authentication`, {
-      headers: { cookie: staleSessionCookie }
+      headers: { origin, cookie: staleSessionCookie }
     });
     expect(await recent.json()).toEqual({ recent: true });
 
@@ -329,7 +326,7 @@ describe("Better Auth schema", () => {
       .run();
 
     const stale = await SELF.fetch(`${origin}/api/sessions/recent-authentication`, {
-      headers: { cookie: staleSessionCookie }
+      headers: { origin, cookie: staleSessionCookie }
     });
     expect(await stale.json()).toEqual({ recent: false });
 
@@ -365,7 +362,7 @@ describe("Better Auth schema", () => {
     const recentSessionCookie = extractSessionCookie(reauthenticated);
 
     const refreshed = await SELF.fetch(`${origin}/api/sessions/recent-authentication`, {
-      headers: { cookie: recentSessionCookie }
+      headers: { origin, cookie: recentSessionCookie }
     });
     expect(await refreshed.json()).toEqual({ recent: true });
 

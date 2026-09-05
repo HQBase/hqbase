@@ -8,7 +8,7 @@ import { applyMigrationPhase } from "../d1-migrations.mjs";
 import { recordWorkerDeployedForConfig } from "../hqbase/manifest.mjs";
 import { windowsSystem32Executable } from "../windows-system32.mjs";
 import { assertRequiredActiveBindings, inspectActiveRelease } from "./active-version.mjs";
-import { inspectRemoteAfterDeployState } from "./after-deploy-state.mjs";
+import { finalAfterDeployPhase, inspectRemoteAfterDeployState } from "./after-deploy-state.mjs";
 import { capture, run } from "./command.mjs";
 import {
   compareVersions,
@@ -255,20 +255,20 @@ export function completeActiveReleaseRetry(source, manifest, recordWorkerDeploye
   const afterDeployState =
     options.afterDeployState ??
     (options.inspectAfterDeployState ?? inspectRemoteAfterDeployState)(source, manifest.version);
-  if (!["S0", "S1", "S2", "S3"].includes(afterDeployState?.phase)) {
+  if (!["S0", "S1", "S2", "S3", finalAfterDeployPhase].includes(afterDeployState?.phase)) {
     throw new Error("Refusing to repair HQBase because the D1 post-deploy state is invalid.");
   }
 
   let update = afterDeployState.pendingUpdate;
-  if (afterDeployState.phase === "S3" && !update) {
-    return { phase: "S3", repaired: false, workerRecorded: false };
+  if (afterDeployState.phase === finalAfterDeployPhase && !update) {
+    return { phase: finalAfterDeployPhase, repaired: false, workerRecorded: false };
   }
 
   let checkpoint;
   if (update) {
     checkpoint = {
       bookmark: update.checkpoint_bookmark,
-      cleanupComplete: afterDeployState.phase === "S3",
+      cleanupComplete: afterDeployState.phase === finalAfterDeployPhase,
       configFile: options.configFile,
       name: options.workerName,
       workerVersion: update.worker_version
@@ -304,7 +304,7 @@ export function completeActiveReleaseRetry(source, manifest, recordWorkerDeploye
     );
   }
   recordWorkerDeployed();
-  if (afterDeployState.phase !== "S3") {
+  if (afterDeployState.phase !== finalAfterDeployPhase) {
     applyMigrations(source, "normal", { target: "remote" });
     applyMigrations(source, "after-deploy", { target: "remote" });
     checkpoint.cleanupComplete = true;
@@ -315,7 +315,7 @@ export function completeActiveReleaseRetry(source, manifest, recordWorkerDeploye
   );
   return {
     phase: afterDeployState.phase,
-    repaired: afterDeployState.phase !== "S3",
+    repaired: afterDeployState.phase !== finalAfterDeployPhase,
     workerRecorded: true
   };
 }

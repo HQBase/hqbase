@@ -2,6 +2,7 @@ import { generateKeyPairSync, sign } from "node:crypto";
 import {
   afterDeployMigrationNames,
   normalMigrationNames,
+  pendingSendGuards,
   transitionGuards
 } from "@worker/features/updates/migration-state";
 import {
@@ -698,7 +699,10 @@ function migrationQueryResult(
       results: [
         { name: "d1_migrations", type: "table" },
         ...(stage === 3
-          ? [{ name: "d1_migrations_after_deploy", type: "table" }]
+          ? [
+              { name: "d1_migrations_after_deploy", type: "table" },
+              ...pendingSendGuards.map((name) => ({ name, type: "trigger" }))
+            ]
           : [
               { name: "mailbox_address_migration", type: "table" },
               { name: "mailbox_addresses", type: "table" },

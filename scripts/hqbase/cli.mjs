@@ -38,7 +38,7 @@ try {
       backup(flags);
       break;
     case "restore":
-      restore(flags);
+      await restore(flags);
       break;
     case "reset":
       reset(flags);

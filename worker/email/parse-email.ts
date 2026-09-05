@@ -12,6 +12,7 @@ type ParsedAttachment = {
 };
 
 export type ParsedEmail = {
+  replyTo?: string[];
   fromAddress: string;
   fromName: string | null;
   to: string[];
@@ -42,6 +43,9 @@ export async function parseRawEmail(raw: ArrayBuffer): Promise<ParsedEmail> {
     fromName: normalizeSenderName(from.name),
     to: flattenAddresses(email.to),
     cc: flattenAddresses(email.cc),
+    replyTo: flattenAddresses(email.replyTo).filter(
+      (address) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/u.test(address) && address.length <= 254
+    ),
     bcc: flattenAddresses(email.bcc),
     subject: email.subject?.trim() || "(no subject)",
     date: parseDate(email.date),

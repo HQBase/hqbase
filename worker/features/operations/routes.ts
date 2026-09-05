@@ -7,6 +7,7 @@ import { requireAuthContext, requireRole } from "../../auth/session";
 import { nowIso } from "../../db/client";
 import { createDatabase, getRow, getRows } from "../../db/drizzle";
 import { retentionPolicies } from "../../db/schema";
+import { defaultTrashDays } from "../../jobs/maintenance";
 import type { HonoApp } from "../../lib/env";
 import { readJson } from "../../lib/json";
 import { parseWith } from "../../lib/validation";
@@ -106,7 +107,11 @@ operationRoutes.get("/retention/:mailboxId", async (c) => {
         FROM retention_policies WHERE mailbox_id = ${c.req.param("mailboxId")}`
   );
   return c.json(
-    policy ?? { mailbox_id: c.req.param("mailboxId"), message_days: null, trash_days: 30 }
+    policy ?? {
+      mailbox_id: c.req.param("mailboxId"),
+      message_days: null,
+      trash_days: defaultTrashDays
+    }
   );
 });
 

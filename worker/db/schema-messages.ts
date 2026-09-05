@@ -37,6 +37,8 @@ export const messages = sqliteTable(
     subject: text("subject").notNull(),
     snippet: text("snippet").notNull(),
     textBody: text("text_body").notNull(),
+    textR2Key: text("text_r2_key"),
+    replyTo: text("reply_to_json", { mode: "json" }).$type<string[]>().default(sql`'[]'`).notNull(),
     htmlR2Key: text("html_r2_key"),
     rawR2Key: text("raw_r2_key"),
     messageId: text("message_id"),

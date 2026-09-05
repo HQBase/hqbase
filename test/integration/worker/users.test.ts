@@ -67,11 +67,13 @@ describe("workspace user onboarding", () => {
     expect(account?.password).not.toBe(result.temporaryPassword);
 
     const memberCookie = await signIn("direct-user@gmail.com", result.temporaryPassword);
-    const meBefore = await SELF.fetch(`${origin}/api/me`, { headers: { cookie: memberCookie } });
+    const meBefore = await SELF.fetch(`${origin}/api/me`, {
+      headers: { origin, cookie: memberCookie }
+    });
     await expect(meBefore.json()).resolves.toMatchObject({ passwordSetupRequired: true });
 
     const blocked = await SELF.fetch(`${origin}/api/mailboxes`, {
-      headers: { cookie: memberCookie }
+      headers: { origin, cookie: memberCookie }
     });
     expect(blocked.status).toBe(403);
     await expect(blocked.json()).resolves.toMatchObject({
@@ -90,10 +92,12 @@ describe("workspace user onboarding", () => {
     expect(changed.status, await changed.clone().text()).toBe(200);
     const refreshedCookie = extractSessionCookie(changed);
 
-    const meAfter = await SELF.fetch(`${origin}/api/me`, { headers: { cookie: refreshedCookie } });
+    const meAfter = await SELF.fetch(`${origin}/api/me`, {
+      headers: { origin, cookie: refreshedCookie }
+    });
     await expect(meAfter.json()).resolves.toMatchObject({ passwordSetupRequired: false });
     const allowed = await SELF.fetch(`${origin}/api/mailboxes`, {
-      headers: { cookie: refreshedCookie }
+      headers: { origin, cookie: refreshedCookie }
     });
     expect(allowed.status, await allowed.clone().text()).toBe(200);
   });
@@ -159,7 +163,7 @@ describe("workspace user onboarding", () => {
 
     const regenerated = await SELF.fetch(
       `${origin}/api/users/${initial.user.id}/temporary-password`,
-      { headers: { cookie: ownerCookie }, method: "POST" }
+      { headers: { origin, cookie: ownerCookie }, method: "POST" }
     );
     expect(regenerated.status, await regenerated.clone().text()).toBe(200);
     const next = (await regenerated.json()) as { temporaryPassword: string };
@@ -207,7 +211,7 @@ describe("workspace user onboarding", () => {
     expect(invitationLifetimeMs).toBeLessThanOrEqual(7 * 24 * 60 * 60 * 1000);
 
     const resent = await SELF.fetch(`${origin}/api/users/${result.user.id}/resend-invitation`, {
-      headers: { cookie: ownerCookie },
+      headers: { origin, cookie: ownerCookie },
       method: "POST"
     });
     expect(resent.status, await resent.clone().text()).toBe(200);
@@ -338,7 +342,9 @@ describe("workspace user onboarding", () => {
       .bind(result.user.id)
       .first<{ status: string }>();
     expect(onboarding?.status).toBe("complete");
-    const revoked = await SELF.fetch(`${origin}/api/me`, { headers: { cookie: temporaryCookie } });
+    const revoked = await SELF.fetch(`${origin}/api/me`, {
+      headers: { origin, cookie: temporaryCookie }
+    });
     expect(revoked.status).toBe(401);
     await expect(
       signIn("pending-recovery-user@gmail.com", result.temporaryPassword)
@@ -446,7 +452,9 @@ describe("workspace user onboarding", () => {
     });
     expect(reset.status, await reset.clone().text()).toBe(200);
 
-    const revoked = await SELF.fetch(`${origin}/api/me`, { headers: { cookie: activeCookie } });
+    const revoked = await SELF.fetch(`${origin}/api/me`, {
+      headers: { origin, cookie: activeCookie }
+    });
     expect(revoked.status).toBe(401);
     await expect(
       signIn("recovery-user@gmail.com", "first-recovery-password-123")
@@ -539,7 +547,7 @@ describe("workspace user onboarding", () => {
     ]);
 
     const removed = await SELF.fetch(`${origin}/api/users/${result.user.id}`, {
-      headers: { cookie: ownerCookie },
+      headers: { origin, cookie: ownerCookie },
       method: "DELETE"
     });
     expect(removed.status, await removed.clone().text()).toBe(204);
@@ -575,19 +583,19 @@ describe("workspace user onboarding", () => {
     });
     await expect(signIn("removed-user@gmail.com", result.temporaryPassword)).rejects.toThrow();
     const revokedSession = await SELF.fetch(`${origin}/api/me`, {
-      headers: { cookie: userCookie }
+      headers: { origin, cookie: userCookie }
     });
     expect(revokedSession.status).toBe(401);
 
     const listed = await SELF.fetch(`${origin}/api/users`, {
-      headers: { cookie: ownerCookie }
+      headers: { origin, cookie: ownerCookie }
     });
     const users = (await listed.json()) as Array<{ banned: boolean; id: string }>;
     expect(users).toContainEqual(expect.objectContaining({ banned: true, id: result.user.id }));
 
     const roleChange = await SELF.fetch(`${origin}/api/users/${result.user.id}`, {
       body: JSON.stringify({ role: "admin" }),
-      headers: { "content-type": "application/json", cookie: ownerCookie },
+      headers: { origin, "content-type": "application/json", cookie: ownerCookie },
       method: "PATCH"
     });
     expect(roleChange.status).toBe(409);
@@ -596,7 +604,7 @@ describe("workspace user onboarding", () => {
     });
 
     const restored = await SELF.fetch(`${origin}/api/users/${result.user.id}/restore`, {
-      headers: { cookie: ownerCookie },
+      headers: { origin, cookie: ownerCookie },
       method: "POST"
     });
     expect(restored.status, await restored.clone().text()).toBe(200);
@@ -633,7 +641,7 @@ describe("workspace user onboarding", () => {
       .bind("owner@login.example")
       .first<{ id: string }>();
     const response = await SELF.fetch(`${origin}/api/users/${owner?.id}`, {
-      headers: { cookie: ownerCookie },
+      headers: { origin, cookie: ownerCookie },
       method: "DELETE"
     });
     expect(response.status).toBe(409);
@@ -673,7 +681,7 @@ describe("workspace user onboarding", () => {
     });
     const ownerResult = (await ownerCreated.json()) as { user: { id: string } };
     const deniedRemoval = await SELF.fetch(`${origin}/api/users/${ownerResult.user.id}`, {
-      headers: { cookie: adminCookie },
+      headers: { origin, cookie: adminCookie },
       method: "DELETE"
     });
     expect(deniedRemoval.status).toBe(403);
@@ -682,12 +690,12 @@ describe("workspace user onboarding", () => {
     });
 
     const removed = await SELF.fetch(`${origin}/api/users/${ownerResult.user.id}`, {
-      headers: { cookie: ownerCookie },
+      headers: { origin, cookie: ownerCookie },
       method: "DELETE"
     });
     expect(removed.status, await removed.clone().text()).toBe(204);
     const deniedRestore = await SELF.fetch(`${origin}/api/users/${ownerResult.user.id}/restore`, {
-      headers: { cookie: adminCookie },
+      headers: { origin, cookie: adminCookie },
       method: "POST"
     });
     expect(deniedRestore.status).toBe(403);
@@ -696,7 +704,7 @@ describe("workspace user onboarding", () => {
     });
 
     const restored = await SELF.fetch(`${origin}/api/users/${ownerResult.user.id}/restore`, {
-      headers: { cookie: ownerCookie },
+      headers: { origin, cookie: ownerCookie },
       method: "POST"
     });
     expect(restored.status, await restored.clone().text()).toBe(200);
@@ -731,20 +739,20 @@ describe("workspace user onboarding", () => {
     if (!owner || !ownerSession) throw new Error("Owner session was not created.");
 
     const listed = await SELF.fetch(`${origin}/api/sessions?userId=${owner.id}`, {
-      headers: { cookie: adminCookie }
+      headers: { origin, cookie: adminCookie }
     });
     expect(listed.status).toBe(403);
     await expect(listed.json()).resolves.toMatchObject({ error: { code: "OWNER_REQUIRED" } });
 
     const revoked = await SELF.fetch(`${origin}/api/sessions/${ownerSession.id}`, {
-      headers: { cookie: adminCookie },
+      headers: { origin, cookie: adminCookie },
       method: "DELETE"
     });
     expect(revoked.status).toBe(403);
     await expect(revoked.json()).resolves.toMatchObject({ error: { code: "OWNER_REQUIRED" } });
 
     const ownerStillSignedIn = await SELF.fetch(`${origin}/api/me`, {
-      headers: { cookie: ownerCookie }
+      headers: { origin, cookie: ownerCookie }
     });
     expect(ownerStillSignedIn.status).toBe(200);
   });

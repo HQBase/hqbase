@@ -1,6 +1,15 @@
-import { apiDelete, apiGetPage, apiPatch, apiPost } from "@/lib/api-client";
+import { apiDelete, apiGet, apiGetPage, apiPatch, apiPost } from "@/lib/api-client";
 
 import type { Draft, DraftAttachment, DraftInput, DraftLabelMutationResult } from "./types";
+
+export type DraftChangePage = {
+  changes: Array<{ type: "upsert"; draft: Draft } | { type: "delete"; draftId: string }>;
+  nextCursor: string;
+  hasMore: boolean;
+};
+
+export const listDraftChanges = (cursor?: string): Promise<DraftChangePage> =>
+  apiGet(`/api/v2/drafts/changes${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ""}`);
 
 export async function listDrafts(): Promise<Draft[]> {
   const drafts: Draft[] = [];
