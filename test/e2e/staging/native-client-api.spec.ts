@@ -118,7 +118,7 @@ test("a native v1 client manages signatures and refreshes after browser sign-out
         200
       );
     }
-    expect((await request.post("/api/auth/sign-out")).status()).toBe(200);
+    expect((await request.post("/api/auth/sign-out", { data: {} })).status()).toBe(200);
     const refreshed = await request.post("/api/auth/oauth2/token", {
       form: {
         client_id: client.client_id,
