@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const workflow = readFileSync(
@@ -9,6 +9,10 @@ const releaseWorkflow = readFileSync(
   new URL("../../../.github/workflows/release.yml", import.meta.url),
   "utf8"
 );
+const migrationCount = (directory) =>
+  readdirSync(new URL(`../../../${directory}/`, import.meta.url)).filter((name) =>
+    name.endsWith(".sql")
+  ).length;
 const readme = readFileSync(new URL("../../../README.md", import.meta.url), "utf8");
 
 describe("staging workflow lifecycle record", () => {
@@ -23,8 +27,8 @@ describe("staging workflow lifecycle record", () => {
     const afterDeployDirectory = workflow.indexOf('"../../../migrations-after-deploy"');
     const afterAliasAssertion = workflow.indexOf('"alias_table_count":0');
     const afterAddressIdAssertion = workflow.indexOf('"address_id_column_count":0');
-    const afterSchemaAssertion = workflow.indexOf('"schema_version":3');
-    const finalAssertion = workflow.indexOf('"post_migration_count":3');
+    const afterSchemaAssertion = workflow.indexOf('"schema_version":4');
+    const finalAssertion = workflow.indexOf('"post_migration_count":4');
     const cleanup = workflow.indexOf(
       "DELETE FROM messages WHERE id IN ('msg_sql_upgrade', 'msg_sql_alias_upgrade')"
     );
@@ -57,9 +61,11 @@ describe("staging workflow lifecycle record", () => {
     expect(workflow).toContain('"delivered_to_address":"alias@sql-upgrade.example.test"');
     expect(workflow).toContain('"draft_content_id_column_count":1');
     expect(workflow).toContain('"disconnected_at":null');
-    expect(workflow).toContain('"migration_count":28');
+    expect(workflow).toContain(`"migration_count":${migrationCount("migrations")}`);
     expect(workflow).toContain('"from_name":null');
-    expect(workflow).toContain('"post_migration_count":3');
+    expect(workflow).toContain(
+      `"post_migration_count":${migrationCount("migrations-after-deploy")}`
+    );
     expect(workflow).toContain('migrations_table = "d1_migrations_after_deploy"');
     expect(workflow).toContain("del(.d1_databases[0].migrations_pattern)");
     expect(normalUpgrade.match(/migrations apply DB --remote --config "\$config"/g)).toHaveLength(

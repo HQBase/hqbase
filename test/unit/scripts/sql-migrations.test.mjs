@@ -456,7 +456,7 @@ describe("SQL migration contract", () => {
       database
         .prepare("SELECT installed_schema_version FROM release_state WHERE singleton = 1")
         .get()
-    ).toEqual({ installed_schema_version: 3 });
+    ).toEqual({ installed_schema_version: 4 });
   });
 
   it("preserves populated data through the latest upgrade and skips it on retry", async () => {
@@ -765,7 +765,7 @@ describe("SQL migration contract", () => {
       database
         .prepare("SELECT installed_schema_version FROM release_state WHERE singleton = 1")
         .get()
-    ).toEqual({ installed_schema_version: 3 });
+    ).toEqual({ installed_schema_version: 4 });
     expect(
       database.prepare("SELECT 1 FROM sqlite_master WHERE name = 'mailbox_addresses'").get()
     ).toBeUndefined();

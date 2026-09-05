@@ -35,3 +35,9 @@ BEGIN SELECT RAISE(ABORT, 'draft send is pending'); END;
 CREATE TRIGGER draft_labels_before_insert_pending_send BEFORE INSERT ON draft_labels
 WHEN EXISTS (SELECT 1 FROM send_operations WHERE draft_id = NEW.draft_id AND status <> 'stored')
 BEGIN SELECT RAISE(ABORT, 'draft send is pending'); END;
+
+UPDATE release_state
+SET installed_schema_version = 4, updated_at = datetime('now')
+WHERE singleton = 1;
+
+PRAGMA foreign_key_check;
