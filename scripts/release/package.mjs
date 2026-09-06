@@ -78,6 +78,7 @@ const manifest = {
   format: "hqbase-release-v1",
   product,
   channel: "stable",
+  sourceCommit,
   version,
   schemaVersion,
   minVersion,
@@ -106,6 +107,19 @@ const signature = sign(
 const envelope = `${JSON.stringify({ payload, signature })}\n`;
 writeFileSync(resolve(output, `manifest-${version}.json`), envelope);
 writeFileSync(resolve(output, "stable.json"), envelope);
+// Discovery changes by channel. Versioned installation records stay compatible with old bootstraps.
+const nightlyPayload = Buffer.from(JSON.stringify({ ...manifest, channel: "nightly" })).toString(
+  "base64url"
+);
+const nightlySignature = sign(
+  null,
+  Buffer.from(nightlyPayload, "base64url"),
+  createPrivateKey(privateKeyValue)
+).toString("base64url");
+writeFileSync(
+  resolve(output, "nightly.json"),
+  `${JSON.stringify({ payload: nightlyPayload, signature: nightlySignature })}\n`
+);
 writeFileSync(
   resolve(output, `hqbase-${version}.sha256`),
   `${manifest.artifact.sha256}  hqbase-${version}.tar.gz\n`

@@ -100,6 +100,7 @@ export function SettingsPage({
         ) : null}
         {activeTab === "updates" && canManage ? (
           <UpdateSettings
+            canChangeChannel={currentUser.role === "owner"}
             initialStatus={updateStatus}
             progress={updateProgress}
             onStatusChange={onUpdateStatusChange}

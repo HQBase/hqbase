@@ -1,7 +1,7 @@
 export type ReleaseManifest = {
   format: "hqbase-release-v1";
   product: "hqbase";
-  channel: "stable";
+  channel: "stable" | "nightly";
   version: string;
   schemaVersion: number;
   minVersion: string;
@@ -17,7 +17,8 @@ export type UpdateStatus = {
   product: "hqbase";
   installedVersion: string;
   installedSchemaVersion: number;
-  channel: "stable";
+  channel: "stable" | "nightly";
+  waitingForStable?: boolean;
   checkedAt: string;
   available: boolean;
   compatible: boolean;

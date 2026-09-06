@@ -1,0 +1,220 @@
+name: Verify public candidate upgrades
+
+on:
+  workflow_dispatch:
+    inputs:
+      candidate_version:
+        description: "Candidate to test for Stable"
+        type: string
+        required: true
+      successor_version:
+        description: "Later published candidate used to test the next upgrade"
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hqbase-staging-resources
+  queue: max
+  cancel-in-progress: false
+
+jobs:
+  upgrade:
+    if: github.ref_name == 'main'
+    runs-on: ubuntu-latest
+    environment: hqbase-staging
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix:
+        edge: [inbound, outbound]
+    env:
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.HQBASE_E2E_CLOUDFLARE_ACCOUNT_ID }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.HQBASE_E2E_CLOUDFLARE_API_TOKEN }}
+      GH_TOKEN: ${{ github.token }}
+      HQBASE_STAGING_ACCESS_CLIENT_ID: ${{ secrets.HQBASE_E2E_ACCESS_CLIENT_ID }}
+      HQBASE_STAGING_ACCESS_CLIENT_SECRET: ${{ secrets.HQBASE_E2E_ACCESS_CLIENT_SECRET }}
+      HQBASE_STAGING_EMAIL_DOMAIN: ${{ secrets.HQBASE_E2E_EMAIL_DOMAIN }}
+      HQBASE_STAGING_OWNER_EMAIL: ${{ secrets.HQBASE_E2E_OWNER_EMAIL }}
+      HQBASE_STAGING_OWNER_PASSWORD: ${{ secrets.HQBASE_E2E_OWNER_PASSWORD }}
+      HQBASE_STAGING_OAUTH_CLIENT_ID: ${{ vars.HQBASE_E2E_OAUTH_CLIENT_ID }}
+      HQBASE_E2E_REPO_CONNECTION_UUID: ${{ vars.HQBASE_E2E_REPO_CONNECTION_UUID }}
+      HQBASE_E2E_BUILD_TOKEN_UUID: ${{ vars.HQBASE_E2E_BUILD_TOKEN_UUID }}
+      HQBASE_STAGING_SENDER: hello@${{ secrets.HQBASE_E2E_EMAIL_DOMAIN }}
+      HQBASE_STAGING_URL: https://${{ secrets.HQBASE_E2E_APP_HOSTNAME }}
+      TEST_CANDIDATE_VERSION: ${{ inputs.candidate_version }}
+      TEST_SUCCESSOR_VERSION: ${{ inputs.successor_version }}
+      UPGRADE_EDGE: ${{ matrix.edge }}
+      HQBASE_STAGING_PUBLIC_UPGRADE: "1"
+      HQBASE_E2E_UPDATE_API_TOKEN: ${{ secrets.HQBASE_E2E_UPDATE_API_TOKEN }}
+      DEPLOYMENT_NAME: public-${{ github.run_id }}-${{ matrix.edge }}
+      STAGING_WORKER_NAME: hqbase-public-${{ github.run_id }}-${{ matrix.edge }}
+      HQBASE_UPGRADE_RECEIPT: ${{ runner.temp }}/upgrade-${{ matrix.edge }}.json
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 11.7.0
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: Cache Playwright Chromium
+        uses: actions/cache@v5
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-${{ runner.arch }}-playwright-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: ${{ runner.os }}-${{ runner.arch }}-playwright-
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
+      - name: Download and verify the public source and target archives
+        run: node scripts/release/public-upgrade-inputs.mjs
+      - name: Create disposable customer resources
+        run: >-
+          pnpm hqbase install --name "$DEPLOYMENT_NAME" --worker-name "$STAGING_WORKER_NAME"
+          --domain "$HQBASE_STAGING_EMAIL_DOMAIN" --no-email
+          --app-domain "${HQBASE_STAGING_URL#https://}" --skip-build --skip-deploy
+      - name: Generate disposable authentication secret
+        run: |
+          auth_secret="$(openssl rand -base64 48)"
+          echo "::add-mask::$auth_secret"
+          echo "HQBASE_STAGING_AUTH_SECRET=$auth_secret" >> "$GITHUB_ENV"
+      - name: Install the source release
+        run: |
+          HQBASE_AUTH_SECRET="$HQBASE_STAGING_AUTH_SECRET" \
+          HQBASE_EXPECTED_RELEASE_VERSION="$SOURCE_VERSION" \
+          HQBASE_RELEASE_MANIFEST_FILE="$GITHUB_WORKSPACE/release/source/manifest.json" \
+          HQBASE_RELEASE_ARTIFACT_FILE="$GITHUB_WORKSPACE/release/source/archive.tar.gz" \
+            node scripts/release/bootstrap.mjs --config ".hqbase/deployments/$DEPLOYMENT_NAME/wrangler.jsonc"
+      - name: Create persistent source-version data
+        env:
+          HQBASE_STAGING_MAIL_API_BASE_PATH: /api
+        run: pnpm test:e2e:staging:lifecycle
+      - name: Configure disposable customer authorization
+        run: >-
+          pnpm hqbase oauth --name "$DEPLOYMENT_NAME" --mode customer
+          --auth-url "$HQBASE_STAGING_URL" --client-id "$HQBASE_STAGING_OAUTH_CLIENT_ID" --skip-deploy
+      - name: Prepare a public upgrade trigger and signed discovery fixture
+        run: node scripts/release/staging-update-gate.mjs prepare
+      - name: Apply only discovery and OAuth configuration to the source release
+        run: |
+          node --input-type=module -e '
+            import { deploy } from "./scripts/release/deploy.mjs";
+            await deploy({ configurationOnly: true,
+              configFile: `.hqbase/deployments/${process.env.DEPLOYMENT_NAME}/wrangler.jsonc`,
+              expectedVersion: process.env.SOURCE_VERSION,
+              manifestFile: "release/source/manifest.json", artifactFile: "release/source/archive.tar.gz" });
+          '
+      - name: Complete the customer update through Workers Builds
+        run: node scripts/release/staging-update-gate.mjs probe
+      - name: Verify mail, lifecycle, backup, restore, and PWA after the update
+        run: |
+          pnpm test:e2e:staging
+          pnpm test:pwa
+      - name: Seal the successful upgrade receipt
+        run: |
+          node --input-type=module -e '
+            import { readFileSync, writeFileSync } from "node:fs";
+            const file = process.env.HQBASE_UPGRADE_RECEIPT;
+            const receipt = JSON.parse(readFileSync(file, "utf8"));
+            receipt.verified = true;
+            writeFileSync(file, JSON.stringify(receipt, null, 2));
+          '
+      - uses: actions/upload-artifact@v6
+        with:
+          name: public-upgrade-${{ matrix.edge }}
+          path: ${{ env.HQBASE_UPGRADE_RECEIPT }}
+          if-no-files-found: error
+          retention-days: 90
+      - name: Reconcile deployed update-action gate resources
+        if: always()
+        id: reconcile_update_gate
+        run: node scripts/release/staging-update-gate.mjs cleanup
+      - name: Reconcile disposable Worker lifecycle record
+        if: always()
+        id: reconcile_worker
+        run: |
+          manifest=".hqbase/deployments/$DEPLOYMENT_NAME/manifest.json"
+          if test ! -f "$manifest"; then
+            echo "manifest_present=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "manifest_present=true" >> "$GITHUB_OUTPUT"
+          worker_name="$(jq -er '.worker.name' "$manifest")"
+          worker_deployed="$(jq -r '.worker.deployed' "$manifest")"
+          test "$worker_name" = "$STAGING_WORKER_NAME"
+          case "$worker_deployed" in
+            true) exit 0 ;;
+            false) ;;
+            *) printf '%s\n' "Invalid Worker deployment state." >&2; exit 1 ;;
+          esac
+          config=".hqbase/deployments/$DEPLOYMENT_NAME/wrangler.jsonc"
+          if output="$(NO_COLOR=1 pnpm exec wrangler deployments status \
+            --name "$worker_name" --json --config "$config" 2>&1)"; then
+            CONFIG_FILE="$config" WORKER_NAME="$worker_name" node --input-type=module -e '
+              import { recordWorkerDeployedForConfig } from "./scripts/hqbase/manifest.mjs";
+              const manifest = recordWorkerDeployedForConfig(
+                process.env.CONFIG_FILE,
+                process.env.WORKER_NAME
+              );
+              if (manifest?.worker?.deployed !== true) {
+                throw new Error("The active staging Worker was not recorded.");
+              }
+            '
+            exit 0
+          fi
+          if grep -Fxq "The Worker $worker_name has no deployments." <<<"$output"; then
+            if delete_output="$(NO_COLOR=1 pnpm exec wrangler delete "$worker_name" \
+              --force --config "$config" 2>&1)"; then
+              printf '%s\n' "$delete_output"
+              exit 0
+            fi
+            if grep -Fxq "Worker \"$worker_name\" not found." <<<"$delete_output" ||
+               grep -Fq 'This Worker does not exist on your account.' <<<"$delete_output" ||
+               grep -Eq 'code.*(10007|10090)' <<<"$delete_output"; then
+              exit 0
+            fi
+            printf '%s\n' "$delete_output" >&2
+            exit 1
+          fi
+          if grep -Fxq "Worker \"$worker_name\" not found." <<<"$output" ||
+             grep -Fq 'This Worker does not exist on your account.' <<<"$output" ||
+             grep -Eq 'code.*(10007|10090)' <<<"$output"; then
+            exit 0
+          fi
+          printf '%s\n' "$output" >&2
+          exit 1
+      - name: Upload non-secret deployment record
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: hqbase-public-manifest-${{ github.run_id }}-${{ matrix.edge }}
+          path: .hqbase/deployments/${{ env.DEPLOYMENT_NAME }}/manifest.json
+          if-no-files-found: warn
+          retention-days: 30
+      - name: Destroy disposable resources
+        if: >-
+          always() &&
+          steps.reconcile_update_gate.outcome == 'success' &&
+          steps.reconcile_worker.outcome == 'success' &&
+          steps.reconcile_worker.outputs.manifest_present == 'true'
+        run: pnpm hqbase destroy --name "$DEPLOYMENT_NAME" --scope all --yes
+
+  evidence:
+    needs: upgrade
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v6
+        with:
+          pattern: public-upgrade-*
+          path: evidence
+          merge-multiple: true
+      - uses: actions/upload-artifact@v6
+        with:
+          name: public-upgrade-evidence
+          path: evidence/*.json
+          if-no-files-found: error
+          retention-days: 90

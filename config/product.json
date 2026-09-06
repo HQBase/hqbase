@@ -7,6 +7,7 @@
     "domains": "workers-scripts.write zone.read zone-settings.write email-routing-rule.write email-sending.write",
     "updates": "workers-scripts.write workers-ci.write zone.read"
   },
+  "nightlyManifestUrl": "https://github.com/HQBase/hqbase/releases/download/nightly/nightly.json",
   "releaseManifestUrl": "https://github.com/HQBase/hqbase/releases/latest/download/stable.json",
   "releasePublicKey": "MCowBQYDK2VwAyEARmCVvXVUDzwewmIDAVez9Uyv2K+7ylU6+YhR5iN2WTc="
 }

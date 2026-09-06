@@ -13,7 +13,6 @@ const migrationCount = (directory) =>
   readdirSync(new URL(`../../../${directory}/`, import.meta.url)).filter((name) =>
     name.endsWith(".sql")
   ).length;
-const readme = readFileSync(new URL("../../../README.md", import.meta.url), "utf8");
 
 describe("staging workflow lifecycle record", () => {
   it("tests a populated two-phase SQL cutover around deployment", () => {
@@ -333,48 +332,20 @@ describe("staging workflow lifecycle record", () => {
     expect(releaseWorkflow.match(/git ls-files --others --exclude-standard/g)).toHaveLength(2);
   });
 
-  it("moves the Deploy Button source before publication and verifies the exact commit", () => {
-    const readSource = releaseWorkflow.indexOf("Read current Deploy Button source");
-    const verifyTag = releaseWorkflow.indexOf("Verify any existing release tag source");
-    const advance = releaseWorkflow.indexOf("Advance Deploy Button source to validated candidate");
-    const publish = releaseWorkflow.indexOf("Publish the validated draft");
-    const restore = releaseWorkflow.indexOf(
-      "Restore Deploy Button source after publication failure"
+  it("publishes Nightly separately from stable promotion", () => {
+    const publish = releaseWorkflow.slice(
+      releaseWorkflow.indexOf("  publish:"),
+      releaseWorkflow.indexOf("  cleanup-failed-draft:")
     );
-    const verify = releaseWorkflow.indexOf("Verify public stable asset, signature, and digest");
-
-    expect(readSource).toBeGreaterThan(-1);
-    expect(verifyTag).toBeGreaterThan(readSource);
-    expect(advance).toBeGreaterThan(verifyTag);
-    expect(publish).toBeGreaterThan(advance);
-    expect(restore).toBeGreaterThan(publish);
-    expect(verify).toBeGreaterThan(restore);
-    expect(releaseWorkflow).toContain("RELEASE_COMMIT: \u0024{{ needs.candidate.outputs.commit }}");
-    expect(releaseWorkflow).toContain("git/refs/heads/deploy");
-    expect(releaseWorkflow).toContain("git/matching-refs/tags/$tag_name");
-    expect(releaseWorkflow).toContain("git/tags/$tag_commit");
-    expect(releaseWorkflow).toContain("steps.publish_release.outcome == 'failure'");
-    expect(releaseWorkflow).toContain("--json isDraft --jq .isDraft");
-    expect(releaseWorkflow).toContain("release_lookup_succeeded=false");
-    expect(releaseWorkflow).toContain('test "$release_lookup_succeeded" != "true"');
-    expect(releaseWorkflow).toContain('test "$release_is_draft" = "false"');
-    expect(releaseWorkflow).toContain("-F force=true");
-    expect(releaseWorkflow).toContain('test "$tag_commit" = "$RELEASE_COMMIT"');
-    expect(releaseWorkflow).toContain('test "$deploy_commit" = "$RELEASE_COMMIT"');
-    expect(releaseWorkflow).toContain("manifest.updater?.protocol !== 2");
-    expect(releaseWorkflow).toContain("fetch-depth: 0");
-    expect(releaseWorkflow).toContain(
-      "const configuredUpdaterCommit = packageJson.hqbaseRelease?.updaterCommit"
+    expect(publish).toContain("node scripts/release/channels.mjs publish");
+    expect(publish).not.toContain("git/refs/heads/deploy");
+    expect(publish).not.toContain("--latest");
+    const promotion = readFileSync(
+      new URL("../../../.github/workflows/promote-stable.yml", import.meta.url),
+      "utf8"
     );
-    expect(releaseWorkflow).toContain("updaterCommitVersion !== version");
-    expect(releaseWorkflow).toContain("Committed release updater commit is invalid.");
-    expect(releaseWorkflow).toContain("!immutableUpdaterUrl.test(manifest.updater.sourceUrl)");
-    expect(releaseWorkflow).toContain(["manifest-$", '{HQBASE_RELEASE_VERSION}.json"'].join(""));
-    expect(releaseWorkflow).toContain("Published stable and versioned manifests do not match.");
-    expect(releaseWorkflow).toContain("manifest.updater.sourceUrl !== expectedUpdaterUrl");
-    expect(releaseWorkflow).toContain("await fetch(manifest.updater.sourceUrl)");
-    expect(releaseWorkflow).toContain("manifest.updater.sha256");
-    expect(releaseWorkflow).toContain("manifest.updater.size");
-    expect(readme).toContain("HQBase%2Fhqbase%2Ftree%2Fdeploy");
+    expect(promotion).toContain("environment: release");
+    expect(promotion).toContain("node scripts/release/channels.mjs promote");
+    expect(promotion).not.toContain("release:package");
   });
 });

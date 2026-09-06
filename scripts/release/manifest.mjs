@@ -50,7 +50,7 @@ export async function loadVerifiedRelease(options = {}) {
   return { bytes, manifest };
 }
 
-export function verifyManifest(envelope, publicKeyBase64 = publicKey) {
+export function verifyManifest(envelope, publicKeyBase64 = publicKey, channel = "stable") {
   const key = createPublicKey({
     key: Buffer.from(publicKeyBase64, "base64"),
     format: "der",
@@ -80,7 +80,7 @@ export function verifyManifest(envelope, publicKeyBase64 = publicKey) {
   if (
     manifest.format !== "hqbase-release-v1" ||
     manifest.product !== "hqbase" ||
-    manifest.channel !== "stable" ||
+    manifest.channel !== channel ||
     !/^\d+\.\d+\.\d+/.test(manifest.version) ||
     !/^\d+\.\d+\.\d+/.test(manifest.minVersion) ||
     (manifest.notes !== undefined &&

@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { createHash, generateKeyPairSync } from "node:crypto";
+import { createHash, generateKeyPairSync, verify } from "node:crypto";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
@@ -75,7 +75,7 @@ describe("release package", () => {
       git(workspace, "add", ".");
       git(workspace, "commit", "--quiet", "-m", "candidate");
 
-      const { privateKey } = generateKeyPairSync("ed25519");
+      const { privateKey, publicKey } = generateKeyPairSync("ed25519");
       execFileSync(process.execPath, [resolve(releaseDirectory, "package.mjs")], {
         cwd: workspace,
         env: {
@@ -86,6 +86,20 @@ describe("release package", () => {
 
       const envelope = JSON.parse(readFileSync(resolve(workspace, "release/stable.json"), "utf8"));
       const manifest = JSON.parse(Buffer.from(envelope.payload, "base64url").toString("utf8"));
+      const nightly = JSON.parse(readFileSync(resolve(workspace, "release/nightly.json"), "utf8"));
+      expect(
+        verify(
+          null,
+          Buffer.from(nightly.payload, "base64url"),
+          publicKey,
+          Buffer.from(nightly.signature, "base64url")
+        )
+      ).toBe(true);
+      expect(JSON.parse(Buffer.from(nightly.payload, "base64url").toString())).toEqual({
+        ...manifest,
+        channel: "nightly"
+      });
+      expect(manifest.sourceCommit).toBe(git(workspace, "rev-parse", "HEAD"));
       expect(manifest.updater).toEqual({
         protocol: 2,
         sourceUrl: `https://raw.githubusercontent.com/HQBase/hqbase/${updaterCommit}/scripts/release/bootstrap.mjs`,

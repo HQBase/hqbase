@@ -23,6 +23,7 @@ import {
   updaterLoaderVariable,
   verifyBuildConfiguration
 } from "./build-trigger";
+import { getUpdateChannel } from "./channel";
 import { cloudflare, isAmbiguousCloudflareOperation } from "./cloudflare";
 import { inspectManagedMigrationState, type ManagedMigrationState } from "./migration-state";
 import type { ReleaseManifest, UpdateStatus } from "./types";
@@ -34,7 +35,7 @@ const envelopeSchema = z.object({ payload: z.string().min(1), signature: z.strin
 const manifestSchema = z.object({
   format: z.literal("hqbase-release-v1"),
   product: z.literal("hqbase"),
-  channel: z.literal("stable"),
+  channel: z.enum(["stable", "nightly"]),
   version: z.string().regex(/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/),
   schemaVersion: z.number().int().positive(),
   minVersion: z.string(),
@@ -64,10 +65,40 @@ export async function getUpdateStatus(
   fetcher: typeof fetch = fetch
 ): Promise<UpdateStatus> {
   const installedVersion = env.HQBASE_APP_VERSION ?? "0.1.1";
-  const response = await fetcher(
+  const stable = await fetchRelease(
+    env,
+    fetcher,
     env.HQBASE_RELEASE_MANIFEST_URL?.trim() || hqbaseProductConfig.releaseManifestUrl,
-    { headers: { accept: "application/json" }, signal: AbortSignal.timeout(5_000) }
+    "stable"
   );
+  if (!stable) throw new AppError("UPDATE_CHECK_FAILED", "Stable release is unavailable.", 503);
+  const channel = await getUpdateChannel(env.DB);
+  let release = stable;
+  if (channel === "nightly") {
+    const nightly = await fetchRelease(
+      env,
+      fetcher,
+      hqbaseProductConfig.nightlyManifestUrl,
+      "nightly",
+      true
+    );
+    if (nightly && compareVersions(nightly.version, stable.version) > 0) release = nightly;
+  }
+  return releaseStatus(env, installedVersion, channel, release);
+}
+
+async function fetchRelease(
+  env: WorkerEnv,
+  fetcher: typeof fetch,
+  url: string,
+  channel: "stable" | "nightly",
+  optional = false
+): Promise<ReleaseManifest | null> {
+  const response = await fetcher(url, {
+    headers: { accept: "application/json" },
+    signal: AbortSignal.timeout(5_000)
+  });
+  if (optional && response.status === 404) return null;
   if (!response.ok)
     throw new AppError("UPDATE_CHECK_FAILED", "Update service is unavailable.", 503);
   const envelope = envelopeSchema.parse(await response.json());
@@ -79,6 +110,34 @@ export async function getUpdateStatus(
   )
     throw new AppError("UPDATE_SIGNATURE_INVALID", "Release signature verification failed.", 503);
   const release = manifestSchema.parse(JSON.parse(decodeBase64Url(envelope.payload)));
+  if (release.channel !== channel) {
+    throw new AppError(
+      "UPDATE_CHANNEL_INVALID",
+      "The signed release does not match the update channel.",
+      503
+    );
+  }
+  return release as ReleaseManifest;
+}
+
+async function releaseStatus(
+  env: WorkerEnv,
+  installedVersion: string,
+  channel: "stable" | "nightly",
+  release: ReleaseManifest
+): Promise<UpdateStatus> {
+  const installed = await env.DB.prepare(
+    "SELECT installed_version, installed_schema_version FROM release_state WHERE singleton = 1"
+  )
+    .bind()
+    .first<{ installed_version: string; installed_schema_version: number }>();
+  if (!installed || !Number.isInteger(installed.installed_schema_version)) {
+    throw new AppError(
+      "UPDATE_SCHEMA_INCONSISTENT",
+      "The installed database version could not be verified.",
+      503
+    );
+  }
   const releaseComparison = compareVersions(release.version, installedVersion);
   let migrationState: ManagedMigrationState | null = null;
   if (releaseComparison === 0) {
@@ -100,11 +159,15 @@ export async function getUpdateStatus(
   return {
     product: "hqbase",
     installedVersion,
-    installedSchemaVersion: 3,
-    channel: "stable",
+    installedSchemaVersion: installed.installed_schema_version,
+    channel,
+    waitingForStable: channel === "stable" && releaseComparison < 0,
     checkedAt: new Date().toISOString(),
     available: releaseComparison > 0 || repairRequired,
-    compatible: compareVersions(installedVersion, release.minVersion) >= 0,
+    compatible:
+      compareVersions(installedVersion, release.minVersion) >= 0 &&
+      release.schemaVersion >= installed.installed_schema_version &&
+      compareVersions(release.version, installed.installed_version) >= 0,
     repairRequired,
     release: release as ReleaseManifest
   };

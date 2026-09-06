@@ -8,7 +8,7 @@ import {
 } from "../../../scripts/release/notify-discord.mjs";
 
 const releaseWorkflow = readFileSync(
-  new URL("../../../.github/workflows/release.yml", import.meta.url),
+  new URL("../../../.github/workflows/promote-stable.yml", import.meta.url),
   "utf8"
 );
 
@@ -117,10 +117,8 @@ describe("Discord release notifications", () => {
   });
 
   it("runs only after public release verification and cannot fail a valid release", () => {
-    const verification = releaseWorkflow.indexOf(
-      "Verify public stable asset, signature, and digest"
-    );
-    const notification = releaseWorkflow.indexOf("Post complete release notes to Discord");
+    const verification = releaseWorkflow.indexOf("Verify evidence and promote the fixed archive");
+    const notification = releaseWorkflow.indexOf("Announce verified Stable release");
 
     expect(verification).toBeGreaterThan(-1);
     expect(notification).toBeGreaterThan(verification);

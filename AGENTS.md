@@ -10,7 +10,7 @@ behavior or working across HQBase repositories.
 
 ## Boundaries
 
-- Keep one public product identity and one signed public release channel.
+- Keep one public product identity and signed Stable and opt-in Nightly release channels.
 - Keep public distribution direct from the canonical `HQBase/hqbase` repository.
 - Record every schema change as a migration with fresh-install and update tests.
 - Keep customer mail and Cloudflare credentials in customer infrastructure.
