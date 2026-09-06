@@ -141,7 +141,6 @@ jobs:
             "release/hqbase-${HQBASE_RELEASE_VERSION}.tar.gz" \
             "release/hqbase-${HQBASE_RELEASE_VERSION}.sha256" \
             "release/manifest-${HQBASE_RELEASE_VERSION}.json" \
-            "release/stable.json" \
             "release/nightly.json"
           echo "created=true" >> "$GITHUB_OUTPUT"
 
