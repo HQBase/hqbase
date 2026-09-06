@@ -1,5 +1,38 @@
 # Changelog
 
+## 1.4.0
+
+### New
+
+- Add owner-controlled Nightly updates. Stable remains the default. Turning Nightly off keeps the
+  installed version until Stable catches up.
+- Publish signed Nightly candidates and promote the same tested archive to Stable only after
+  public upgrade checks and a reviewed test report pass.
+
+### Fixed
+
+- Prevent duplicate delivery when a send is retried. Recover accepted mail after a storage failure
+  and protect pending drafts when the delivery result is uncertain.
+- Store inbound messages and attachment records together. Preserve large plain-text bodies and
+  Reply-To addresses, and support attachment names with Unicode characters.
+- Reject conflicting draft saves and concurrent changes that would remove the last active owner.
+  Tighten session-write checks and disabled signup routes.
+- Keep draft paging and live mail refresh consistent, and bound conversation queries and object
+  scans for larger workspaces.
+- Resume failed maintenance jobs and verify the database, Worker version, and referenced mail
+  objects during recovery.
+- Find the correct Cloudflare account when an update token can access many zones, and let owners
+  change their update channel when release discovery is unavailable.
+- Initialize public upgrade receipt paths after the runner starts so GitHub can validate the
+  upgrade workflow.
+
+### Changed
+
+- Apply the default 30-day Trash retention period when a mailbox has no custom policy. Older Trash
+  messages can be permanently removed by maintenance after this update.
+- Update the database to schema version 4. Sending waits until the post-deploy draft protections
+  are installed.
+
 ## 1.3.4
 
 ### Fixed
