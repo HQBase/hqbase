@@ -7,7 +7,7 @@ import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui
 import { Spinner } from "@/components/ui/spinner";
 import { CloudflareAuthorizationDialog } from "@/features/settings/cloudflare-authorization-dialog";
 import { SettingsSection } from "@/features/settings/settings-section";
-import { applyUpdate, getUpdateStatus, setUpdateChannel } from "./api";
+import { applyUpdate, getUpdateChannel, getUpdateStatus, setUpdateChannel } from "./api";
 import type { UpdateStatus } from "./types";
 import type { UpdateActionKind, UpdateProgress } from "./update-progress";
 
@@ -28,6 +28,7 @@ export function UpdateSettings({
   onUpdateStarted: (buildId: string, kind: UpdateActionKind) => void;
 }): React.ReactElement {
   const [status, setStatus] = React.useState(initialStatus);
+  const [channel, setChannel] = React.useState<UpdateStatus["channel"] | null>(null);
   const [checkError, setCheckError] = React.useState<string | null>(null);
   const [applyError, setApplyError] = React.useState<string | null>(null);
   const [pendingAction, setPendingAction] = React.useState<"check" | "apply" | "channel" | null>(
@@ -35,6 +36,23 @@ export function UpdateSettings({
   );
   const [authorizationOpen, setAuthorizationOpen] = React.useState(false);
   const resumedRef = React.useRef(false);
+
+  React.useEffect(() => {
+    let active = true;
+    void getUpdateChannel()
+      .then((result) => {
+        if (active) setChannel(result.channel);
+      })
+      .catch((error: unknown) => {
+        if (active)
+          setCheckError(
+            error instanceof Error ? error.message : "The update channel could not be read."
+          );
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   React.useEffect(() => {
     setStatus(initialStatus);
@@ -99,6 +117,7 @@ export function UpdateSettings({
     setCheckError(null);
     try {
       const { channel } = await setUpdateChannel(nightly ? "nightly" : "stable");
+      setChannel(channel);
       window.sessionStorage.removeItem(reviewedVersionKey);
       window.sessionStorage.removeItem(reviewedActionKindKey);
       if (status) {
@@ -129,8 +148,8 @@ export function UpdateSettings({
           <div className="flex items-center gap-2">
             <Checkbox
               id="nightly-updates"
-              checked={status?.channel === "nightly"}
-              disabled={!canChangeChannel || isPending || Boolean(progress) || !status}
+              checked={channel === "nightly"}
+              disabled={!canChangeChannel || isPending || Boolean(progress) || channel === null}
               onCheckedChange={(checked) => void changeChannel(checked === true)}
               aria-describedby="nightly-updates-description"
             />
