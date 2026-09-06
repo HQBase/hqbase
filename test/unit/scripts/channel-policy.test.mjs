@@ -64,11 +64,18 @@ describe("stable promotion", () => {
   it("accepts only the tested candidate with both completed public upgrades", () => {
     expect(() => assertPromotion(evidence())).not.toThrow();
   });
+  it("does not require a minimum test duration or candidate age", () => {
+    const e = evidence();
+    e.release.published_at = new Date(e.now).toISOString();
+    e.report.startedAt = e.release.published_at;
+    e.report.finishedAt = e.release.published_at;
+    expect(() => assertPromotion(e)).not.toThrow();
+  });
   it.each([
     [
-      "short soak",
+      "reversed test dates",
       (e) => {
-        e.report.finishedAt = "2026-09-02T01:00:00Z";
+        e.report.finishedAt = "2026-09-01T23:00:00Z";
       }
     ],
     [
