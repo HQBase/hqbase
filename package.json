@@ -1,6 +1,6 @@
 {
   "name": "hqbase",
-  "version": "1.4.0",
+  "version": "1.4.1",
   "private": true,
   "license": "AGPL-3.0-only",
   "type": "module",
