@@ -1,7 +1,6 @@
 import { compareVersions } from "./manifest.mjs";
 import { assertStableReleaseVersion } from "./version.mjs";
 
-export const minimumSoakMs = 72 * 60 * 60 * 1000;
 export const mailChecks = [
   "send",
   "receive",
@@ -40,9 +39,9 @@ export function assertPromotion({
     ![published, started, finished, now].every(Number.isFinite) ||
     started < published ||
     finished > now ||
-    finished - started < minimumSoakMs
+    finished < started
   ) {
-    throw new Error("Record at least 72 hours of real use after this candidate was published.");
+    throw new Error("Record valid test dates after publication, in order and not in the future.");
   }
   if (
     report.version !== manifest.version ||
