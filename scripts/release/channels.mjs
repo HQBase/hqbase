@@ -6,6 +6,7 @@ import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { assertPromotion } from "./channel-policy.mjs";
 import { compareVersions, loadVerifiedRelease, verifyManifest } from "./manifest.mjs";
+import { fetchPublicAsset } from "./public-assets.mjs";
 import { assertStableReleaseVersion } from "./version.mjs";
 
 const repository = "HQBase/hqbase";
@@ -30,13 +31,14 @@ function api(path, body) {
   );
 }
 async function json(url) {
-  const response = await fetch(url, { signal: AbortSignal.timeout(30_000) });
+  const response = await fetchPublicAsset(url);
   if (!response.ok) throw new Error(`Public release read failed (${response.status}).`);
   return response.json();
 }
 export async function verifiedCandidate(version) {
   assertStableReleaseVersion(version);
   const { manifest } = await loadVerifiedRelease({
+    fetcher: fetchPublicAsset,
     expectedVersion: version,
     manifestUrl: `${base}/v${version}/manifest-${version}.json`
   });
@@ -56,7 +58,7 @@ export async function verifiedCandidate(version) {
   while (object.type === "tag") object = api(`git/tags/${object.sha}`).object;
   if (object.type !== "commit" || object.sha !== manifest.sourceCommit)
     throw new Error("Release tag source changed.");
-  const response = await fetch(manifest.updater.sourceUrl, { signal: AbortSignal.timeout(30_000) });
+  const response = await fetchPublicAsset(manifest.updater.sourceUrl);
   if (!response.ok) throw new Error("Candidate updater is unavailable.");
   const bytes = Buffer.from(await response.arrayBuffer());
   if (
@@ -197,7 +199,10 @@ async function promote(version) {
       }
       throw error;
     }
-    const { manifest: published } = await loadVerifiedRelease({ expectedVersion: version });
+    const { manifest: published } = await loadVerifiedRelease({
+      expectedVersion: version,
+      fetcher: fetchPublicAsset
+    });
     if (
       published.artifact.sha256 !== manifest.artifact.sha256 ||
       api("git/ref/heads/deploy").object.sha !== manifest.sourceCommit
