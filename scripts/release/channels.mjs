@@ -44,12 +44,12 @@ export async function verifiedCandidate(version) {
   });
   if (!/^[a-f0-9]{40}$/.test(manifest.sourceCommit ?? ""))
     throw new Error("Candidate source commit is missing.");
-  const stableEnvelope = await json(`${base}/v${version}/stable.json`);
-  const stable = verifyManifest(stableEnvelope);
+  const versionEnvelope = await json(`${base}/v${version}/manifest-${version}.json`);
+  const installation = verifyManifest(versionEnvelope);
   const nightlyEnvelope = await json(`${base}/v${version}/nightly.json`);
   const nightly = verifyManifest(nightlyEnvelope, undefined, "nightly");
   if (
-    JSON.stringify(manifest) !== JSON.stringify(stable) ||
+    JSON.stringify(manifest) !== JSON.stringify(installation) ||
     JSON.stringify(manifest) !== JSON.stringify({ ...nightly, channel: "stable" })
   ) {
     throw new Error("Channel records do not identify the same fixed candidate.");
@@ -67,7 +67,7 @@ export async function verifiedCandidate(version) {
   ) {
     throw new Error("Candidate updater integrity check failed.");
   }
-  return { manifest, nightlyEnvelope };
+  return { manifest, nightlyEnvelope, versionEnvelope };
 }
 
 async function publish(version) {
@@ -169,7 +169,7 @@ async function promote(version) {
       .filter((name) => name.endsWith(".json"))
       .map((name) => JSON.parse(readFileSync(resolve(temporary, name), "utf8")));
     const release = api(`releases/tags/v${version}`);
-    const { manifest } = await verifiedCandidate(version);
+    const { manifest, versionEnvelope } = await verifiedCandidate(version);
     const previous = api("releases/latest");
     const { manifest: stable } = await loadVerifiedRelease({
       expectedVersion: previous.tag_name.slice(1)
@@ -179,6 +179,19 @@ async function promote(version) {
     const onward = receipts.find((item) => item.fromVersion === version);
     if (onward.toArtifactSha256 !== successor.manifest.artifact.sha256)
       throw new Error("Successor evidence no longer matches its archive.");
+    if (release.immutable)
+      throw new Error(
+        "The candidate release is locked. Stable discovery must be attached after evidence passes."
+      );
+    const stableFile = resolve(temporary, "stable.json");
+    writeFileSync(stableFile, `${JSON.stringify(versionEnvelope)}\n`);
+    if (release.assets.some((asset) => asset.name === "stable.json")) {
+      const existing = verifyManifest(await json(`${base}/v${version}/stable.json`));
+      if (JSON.stringify(existing) !== JSON.stringify(manifest))
+        throw new Error("Existing Stable discovery does not match the tested candidate.");
+    } else {
+      gh(["release", "upload", `v${version}`, stableFile, "--repo", repository]);
+    }
     const previousCommit = api("git/ref/heads/deploy").object.sha;
     api("git/refs/heads/deploy", { sha: manifest.sourceCommit, force: false });
     try {

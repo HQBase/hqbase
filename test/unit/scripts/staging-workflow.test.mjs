@@ -340,6 +340,12 @@ describe("staging workflow lifecycle record", () => {
     expect(publish).toContain("node scripts/release/channels.mjs publish");
     expect(publish).not.toContain("git/refs/heads/deploy");
     expect(publish).not.toContain("--latest");
+    const draft = releaseWorkflow.slice(
+      releaseWorkflow.indexOf("      - name: Create draft GitHub Release"),
+      releaseWorkflow.indexOf("  staging:")
+    );
+    expect(draft).not.toContain('"release/stable.json"');
+    expect(draft).toContain('"release/nightly.json"');
     const promotion = readFileSync(
       new URL("../../../.github/workflows/promote-stable.yml", import.meta.url),
       "utf8"
