@@ -26,11 +26,10 @@ test("owner can leave Nightly without changing the installed release", async ({ 
     await nightly.uncheck();
     await expect(nightly).not.toBeChecked();
     await expect(nightly).toBeEnabled({ timeout: 30_000 });
-    const status = await request.get("/api/updates");
+    const status = await request.get("/api/updates/channel");
     expect(status.ok()).toBeTruthy();
     expect(await status.json()).toMatchObject({
-      channel: "stable",
-      installedVersion: before.version
+      channel: "stable"
     });
     expect(await (await request.get("/api/health")).json()).toMatchObject({
       version: before.version

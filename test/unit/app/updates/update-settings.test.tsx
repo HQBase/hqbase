@@ -8,6 +8,7 @@ import { flushHookEffects, renderComponent } from "../render-hook";
 const mocks = vi.hoisted(() => ({
   applyUpdate: vi.fn(),
   getUpdateStatus: vi.fn(),
+  getUpdateChannel: vi.fn(async () => ({ channel: "stable" })),
   setUpdateChannel: vi.fn()
 }));
 
@@ -71,6 +72,30 @@ describe("update settings", () => {
     expect(view.container.querySelector("#nightly-updates")?.getAttribute("aria-checked")).toBe(
       "true"
     );
+    await view.unmount();
+  });
+  it("lets an owner leave Nightly when release discovery is unavailable", async () => {
+    mocks.getUpdateChannel.mockResolvedValueOnce({ channel: "nightly" });
+    mocks.setUpdateChannel.mockResolvedValueOnce({ channel: "stable" });
+    mocks.getUpdateStatus.mockRejectedValueOnce(new Error("Update service is unavailable."));
+    const view = await renderComponent(
+      <UpdateSettings
+        canChangeChannel
+        initialStatus={null}
+        progress={null}
+        onStatusChange={() => undefined}
+        onUpdateStarted={() => undefined}
+      />
+    );
+    const checkbox = view.container.querySelector<HTMLButtonElement>("#nightly-updates");
+    expect(checkbox?.disabled).toBe(false);
+    expect(checkbox?.getAttribute("aria-checked")).toBe("true");
+    await flushHookEffects(() => checkbox?.click());
+    expect(mocks.setUpdateChannel).toHaveBeenCalledWith("stable");
+    expect(checkbox?.getAttribute("aria-checked")).toBe("false");
+    expect(view.container.textContent).toContain("Update service is unavailable.");
+    expect(checkbox?.disabled).toBe(false);
+    expect(mocks.applyUpdate).not.toHaveBeenCalled();
     await view.unmount();
   });
   it("disables the channel setting for admins", () => {

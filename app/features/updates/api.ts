@@ -5,6 +5,10 @@ export function getUpdateStatus(): Promise<UpdateStatus> {
   return apiGet<UpdateStatus>("/api/updates");
 }
 
+export function getUpdateChannel(): Promise<{ channel: UpdateStatus["channel"] }> {
+  return apiGet("/api/updates/channel");
+}
+
 export function setUpdateChannel(
   channel: UpdateStatus["channel"]
 ): Promise<{ channel: UpdateStatus["channel"] }> {

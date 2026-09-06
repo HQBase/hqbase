@@ -10,7 +10,8 @@ const mocks = vi.hoisted(() => ({
   resolveRuntimeCloudflareGrant: vi.fn(),
   revokeRuntimeCloudflareGrant: vi.fn(),
   triggerUpdate: vi.fn(),
-  setUpdateChannel: vi.fn()
+  setUpdateChannel: vi.fn(),
+  getUpdateChannel: vi.fn(async () => "stable")
 }));
 
 vi.mock("@worker/auth/session", () => ({

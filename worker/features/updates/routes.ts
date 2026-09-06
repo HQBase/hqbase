@@ -20,7 +20,7 @@ import {
   revokeRuntimeCloudflareGrant,
   startRuntimeCloudflareOAuth
 } from "../cloudflare/oauth";
-import { setUpdateChannel } from "./channel";
+import { getUpdateChannel, setUpdateChannel } from "./channel";
 import { getUpdateStatus, triggerUpdate } from "./service";
 
 export const updateRoutes = new Hono<HonoApp>();
@@ -36,6 +36,11 @@ updateRoutes.get("/", async (c) => {
   const auth = await requireAuthContext(c.env, c.req.raw);
   requireRole(auth, ["owner", "admin"]);
   return c.json(await getUpdateStatus(c.env));
+});
+updateRoutes.get("/channel", async (c) => {
+  const auth = await requireAuthContext(c.env, c.req.raw);
+  requireRole(auth, ["owner", "admin"]);
+  return c.json({ channel: await getUpdateChannel(c.env.DB) });
 });
 updateRoutes.post("/channel", async (c) => {
   const auth = await requireAuthContext(c.env, c.req.raw);
