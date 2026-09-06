@@ -3,13 +3,13 @@ import { randomUUID } from "node:crypto";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
-
 import { applyMigrationPhase } from "../d1-migrations.mjs";
 import { recordWorkerDeployedForConfig } from "../hqbase/manifest.mjs";
 import { windowsSystem32Executable } from "../windows-system32.mjs";
 import { assertRequiredActiveBindings, inspectActiveRelease } from "./active-version.mjs";
 import { finalAfterDeployPhase, inspectRemoteAfterDeployState } from "./after-deploy-state.mjs";
 import { capture, run } from "./command.mjs";
+import { assertRemoteDatabaseUpdate } from "./database-compatibility.mjs";
 import {
   compareVersions,
   hqbaseReleaseTag,
@@ -106,6 +106,7 @@ export async function deploy(options = {}) {
       console.log(`HQBase ${manifest.version} installed from its signed release.`);
       return;
     }
+    assertRemoteDatabaseUpdate(source, manifest);
     if (compareVersions(activeRelease.version, manifest.version) > 0) {
       throw new Error("The active HQBase Worker is newer than the signed stable release.");
     }

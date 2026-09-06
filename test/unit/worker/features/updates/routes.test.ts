@@ -9,7 +9,8 @@ const mocks = vi.hoisted(() => ({
   requireRole: vi.fn(),
   resolveRuntimeCloudflareGrant: vi.fn(),
   revokeRuntimeCloudflareGrant: vi.fn(),
-  triggerUpdate: vi.fn()
+  triggerUpdate: vi.fn(),
+  setUpdateChannel: vi.fn()
 }));
 
 vi.mock("@worker/auth/session", () => ({
@@ -30,6 +31,7 @@ vi.mock("@worker/features/updates/service", () => ({
   getUpdateStatus: vi.fn(),
   triggerUpdate: mocks.triggerUpdate
 }));
+vi.mock("@worker/features/updates/channel", () => ({ setUpdateChannel: mocks.setUpdateChannel }));
 vi.mock("@worker/observability/log", () => ({ operationalLog: mocks.operationalLog }));
 
 import { updateRoutes } from "@worker/features/updates/routes";
@@ -44,6 +46,23 @@ describe("update routes", () => {
     mocks.resolveRuntimeCloudflareGrant.mockResolvedValue("temporary-grant");
     mocks.revokeRuntimeCloudflareGrant.mockResolvedValue(undefined);
     mocks.triggerUpdate.mockResolvedValue({ buildId: "build-1", status: "queued" });
+  });
+
+  it("restricts channel changes to owners and does not request Cloudflare access", async () => {
+    const response = await updateRoutes.request(
+      "/channel",
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ channel: "nightly" })
+      },
+      {} as WorkerEnv
+    );
+    expect(response.status).toBe(200);
+    expect(mocks.requireRole).toHaveBeenCalledWith(expect.anything(), ["owner"]);
+    expect(mocks.setUpdateChannel).toHaveBeenCalledWith(undefined, "nightly");
+    expect(mocks.resolveRuntimeCloudflareGrant).not.toHaveBeenCalled();
+    expect(mocks.triggerUpdate).not.toHaveBeenCalled();
   });
 
   it("returns the build result and clears the cookie when grant revocation fails", async () => {

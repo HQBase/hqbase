@@ -1,8 +1,8 @@
 import { createHash } from "node:crypto";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
-
 import { assertCurrentManifest } from "../hqbase/lifecycle-manifest.mjs";
+import { finishPublicUpgrade } from "./staging-public-upgrade.mjs";
 import {
   appErrorCode,
   appRequest,
@@ -38,6 +38,7 @@ import {
   listWorkers,
   managedUpdaterLoader,
   probeContext,
+  publicBuildCommand,
   readCandidate,
   resolveDependencies,
   uuidPattern,
@@ -85,7 +86,7 @@ export async function prepareStagingUpdateGate(options = {}) {
     },
     workersBuild: {
       branch,
-      buildCommand: initialBuildCommand,
+      buildCommand: context.publicUpgrade ? publicBuildCommand : initialBuildCommand,
       buildOutcome: null,
       buildTokenUuid: context.buildTokenUuid,
       buildUuid: null,
@@ -139,11 +140,12 @@ export async function probeStagingUpdateGate(options = {}) {
   );
   const status = await requireAppJson(statusResponse, 200, "update status");
   if (
-    status.installedVersion !== context.candidateVersion ||
+    status.installedVersion !==
+      (context.publicUpgrade ? context.sourceVersion : context.candidateVersion) ||
     status.release?.version !== context.candidateVersion ||
     status.available !== true ||
     status.compatible !== true ||
-    status.repairRequired !== true
+    status.repairRequired !== !context.publicUpgrade
   ) {
     throw new Error("The deployed candidate did not report the expected same-version repair.");
   }
@@ -195,6 +197,9 @@ export async function probeStagingUpdateGate(options = {}) {
     await verifyAcceptedBuild(manifest, candidate.manifest, context, dependencies);
   } catch (error) {
     verificationError = error;
+  }
+  if (context.publicUpgrade && !verificationError) {
+    return finishPublicUpgrade(manifest, candidate.manifest, before, context, dependencies);
   }
   await cancelRecordedBuild(manifest, context, dependencies);
   const after = await installationSnapshot(manifest, context, dependencies);

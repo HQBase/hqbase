@@ -221,9 +221,11 @@ function assertReleaseGate(gate) {
       'Refusing to continue: a created release-gate trigger must record "releaseGate.workersBuild.triggerUuid".'
     );
   }
+  if (!["sleep 600", "pnpm install --frozen-lockfile"].includes(build?.buildCommand)) {
+    throw new Error("The release gate must use a fixed probe or public-upgrade build command.");
+  }
   for (const [field, expected] of [
     ["branch", "main"],
-    ["buildCommand", "sleep 600"],
     ["initialDeployCommand", "pnpm deploy"],
     ["rootDirectory", "/"]
   ]) {
@@ -245,7 +247,11 @@ function assertReleaseGate(gate) {
   if (
     build?.buildOutcome !== null &&
     build.buildOutcome !== "cancelled" &&
-    build.buildOutcome !== "terminated"
+    build.buildOutcome !== "terminated" &&
+    !(
+      build.buildCommand === "pnpm install --frozen-lockfile" &&
+      ["success", "fail", "skipped"].includes(build.buildOutcome)
+    )
   ) {
     throw new Error(
       'Refusing to continue: manifest field "releaseGate.workersBuild.buildOutcome" must be null or a cancellation outcome.'

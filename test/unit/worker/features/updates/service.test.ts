@@ -50,15 +50,75 @@ const envelope = {
 };
 
 describe("HQBase updates", () => {
+  function signedRelease(channel: "stable" | "nightly", version: string) {
+    const release = {
+      ...JSON.parse(Buffer.from(payload, "base64url").toString()),
+      channel,
+      version
+    };
+    const encoded = Buffer.from(JSON.stringify(release));
+    return {
+      payload: encoded.toString("base64url"),
+      signature: sign(null, encoded, privateKey).toString("base64url")
+    };
+  }
+  it("does not request Nightly without an owner opt-in", async () => {
+    const fetcher = vi.fn(async (_url: RequestInfo | URL) => Response.json(envelope));
+    await getUpdateStatus(updateEnvironment(), fetcher);
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    expect(String(fetcher.mock.calls[0]?.[0])).not.toContain("nightly");
+  });
+  it("offers Nightly only after opt-in and keeps Stable as a fallback", async () => {
+    const environment = updateEnvironment("0.0.9", 3, false, "nightly");
+    const fetcher = vi.fn(async (url: RequestInfo | URL) =>
+      Response.json(String(url).includes("nightly") ? signedRelease("nightly", "0.2.0") : envelope)
+    );
+    expect(await getUpdateStatus(environment, fetcher)).toMatchObject({
+      channel: "nightly",
+      available: true,
+      release: { version: "0.2.0" }
+    });
+    expect(
+      await getUpdateStatus(environment, async (url) =>
+        String(url).includes("nightly")
+          ? new Response(null, { status: 404 })
+          : Response.json(envelope)
+      )
+    ).toMatchObject({ channel: "nightly", release: { version: "0.1.0" } });
+  });
+  it("rejects a Nightly record on the Stable discovery URL", async () => {
+    await expect(
+      getUpdateStatus(updateEnvironment(), async () =>
+        Response.json(signedRelease("nightly", "0.2.0"))
+      )
+    ).rejects.toMatchObject({ code: "UPDATE_CHANNEL_INVALID" });
+  });
+  it("waits for Stable without offering or dispatching a downgrade", async () => {
+    const environment = updateEnvironment("0.2.0");
+    expect(await getUpdateStatus(environment, async () => Response.json(envelope))).toMatchObject({
+      waitingForStable: true,
+      available: false
+    });
+    await expect(
+      triggerUpdate(environment, "unused", "0.1.0", async () => Response.json(envelope))
+    ).rejects.toMatchObject({ code: "UPDATE_NOT_AVAILABLE" });
+  });
+  it("blocks a newer version when it would reduce the database schema", async () => {
+    expect(
+      await getUpdateStatus(updateEnvironment("0.0.9", 3, false, "stable", 4), async () =>
+        Response.json(envelope)
+      )
+    ).toMatchObject({ available: true, compatible: false, installedSchemaVersion: 4 });
+  });
   it("verifies signed manifests", async () => {
     const environment = updateEnvironment("0.1.1");
     const status = await getUpdateStatus(environment, async () => Response.json(envelope));
     expect(status).toMatchObject({
       product: "hqbase",
       installedVersion: "0.1.1",
-      installedSchemaVersion: 3,
+      installedSchemaVersion: 2,
       available: false,
-      compatible: true,
+      compatible: false,
       repairRequired: false
     });
     expect(status.release.notes).toEqual(["Add a signed changelog."]);
@@ -71,7 +131,7 @@ describe("HQBase updates", () => {
     await expect(
       getUpdateStatus(environment, async () => Response.json(envelope))
     ).resolves.toMatchObject({ available: true, repairRequired: false });
-    expect(prepare).not.toHaveBeenCalled();
+    expect(prepare.mock.calls.some(([query]) => query.includes("sqlite_schema"))).toBe(false);
   });
   it("rejects a tampered manifest", async () => {
     const replacement = envelope.signature.startsWith("A") ? "B" : "A";
@@ -650,7 +710,9 @@ describe("HQBase updates", () => {
 function updateEnvironment(
   installedVersion = "0.0.9",
   migrationStage: 0 | 3 = 3,
-  pendingBookkeeping = false
+  pendingBookkeeping = false,
+  channel: "stable" | "nightly" = "stable",
+  schemaVersion = 2
 ): WorkerEnv {
   const raw = vi.fn().mockResolvedValue([[JSON.stringify("mail.example.com")]]);
   let lockValue: string | null = null;
@@ -664,12 +726,17 @@ function updateEnvironment(
           migrationQueryResult(query, migrationStage, installedVersion, pendingBookkeeping, values)
         ),
         first: vi.fn(async () => {
+          if (query.startsWith("SELECT installed_version"))
+            return { installed_version: installedVersion, installed_schema_version: schemaVersion };
           if (!query.includes("INSERT INTO app_settings")) return null;
           if (lockValue) return null;
           lockValue = String(values[1]);
           return { value_json: lockValue };
         }),
-        raw,
+        raw:
+          values[0] === "update_channel"
+            ? vi.fn().mockResolvedValue([[JSON.stringify(channel)]])
+            : raw,
         run: vi.fn(async () => {
           if (query.startsWith("DELETE FROM app_settings") && values[1] === lockValue) {
             lockValue = null;

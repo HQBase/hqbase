@@ -3,11 +3,12 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { UpdateStatus } from "@/features/updates/types";
 import { UpdateSettings } from "@/features/updates/update-settings";
-import { renderComponent } from "../render-hook";
+import { flushHookEffects, renderComponent } from "../render-hook";
 
 const mocks = vi.hoisted(() => ({
   applyUpdate: vi.fn(),
-  getUpdateStatus: vi.fn()
+  getUpdateStatus: vi.fn(),
+  setUpdateChannel: vi.fn()
 }));
 
 vi.mock("@/features/updates/api", () => mocks);
@@ -38,6 +39,46 @@ const availableStatus: UpdateStatus = {
 };
 
 describe("update settings", () => {
+  it("explains the wait for Stable without offering an older version", () => {
+    const html = renderSettings({
+      ...availableStatus,
+      installedVersion: "0.3.0",
+      available: false,
+      waitingForStable: true
+    });
+    expect(html).toContain("Waiting for Stable");
+    expect(html).not.toContain("Install update");
+    expect(html).not.toContain("0.2.0");
+  });
+  it("saves owner opt-in without starting an update", async () => {
+    const nightly = { ...availableStatus, channel: "nightly" as const };
+    mocks.setUpdateChannel.mockResolvedValue({ channel: "nightly" });
+    mocks.getUpdateStatus.mockResolvedValue(nightly);
+    const view = await renderComponent(
+      <UpdateSettings
+        canChangeChannel
+        initialStatus={availableStatus}
+        progress={null}
+        onStatusChange={() => undefined}
+        onUpdateStarted={() => undefined}
+      />
+    );
+    await flushHookEffects(() =>
+      view.container.querySelector<HTMLButtonElement>("#nightly-updates")?.click()
+    );
+    expect(mocks.setUpdateChannel).toHaveBeenCalledWith("nightly");
+    expect(mocks.applyUpdate).not.toHaveBeenCalled();
+    expect(view.container.querySelector("#nightly-updates")?.getAttribute("aria-checked")).toBe(
+      "true"
+    );
+    await view.unmount();
+  });
+  it("disables the channel setting for admins", () => {
+    const html = renderSettings(availableStatus);
+    const container = document.createElement("div");
+    container.innerHTML = html;
+    expect(container.querySelector("#nightly-updates")?.hasAttribute("disabled")).toBe(true);
+  });
   it("does not present an unknown update state as success", () => {
     const html = renderSettings(null);
     expect(html).toContain("Not checked");

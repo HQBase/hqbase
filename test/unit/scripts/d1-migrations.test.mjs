@@ -130,7 +130,9 @@ describe("two-phase D1 migrations", () => {
 
   it("publishes schema epoch 3 only after the cleanup phase", () => {
     expect(releasePackageSource).toContain("const schemaVersion = 4;");
-    expect(updateServiceSource).toContain("installedSchemaVersion: 3");
+    expect(updateServiceSource).toContain(
+      "installedSchemaVersion: installed.installed_schema_version"
+    );
     expect(cleanupMigrationSource).toContain("installed_schema_version = 3");
   });
 

@@ -12,6 +12,7 @@ import {
   listWorkers,
   managedCommand,
   managedUpdaterLoader,
+  publicBuildCommand,
   repositoryRoot,
   terminalOutcomes,
   triggerCreateBody,
@@ -275,7 +276,11 @@ export async function cancelRecordedBuild(manifest, context, dependencies) {
   }
   if (
     build.status !== "stopped" ||
-    !terminalOutcomes.has(build.build_outcome) ||
+    !(
+      terminalOutcomes.has(build.build_outcome) ||
+      (record.buildCommand === publicBuildCommand &&
+        ["success", "fail", "skipped"].includes(build.build_outcome))
+    ) ||
     !Number.isFinite(Date.parse(build.stopped_on ?? ""))
   ) {
     throw new Error("The release-gate build did not stop with a verified cancellation outcome.");

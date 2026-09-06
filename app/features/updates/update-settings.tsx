@@ -2,10 +2,12 @@ import * as React from "react";
 import { PiArrowRight, PiArrowsClockwise } from "react-icons/pi";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Spinner } from "@/components/ui/spinner";
 import { CloudflareAuthorizationDialog } from "@/features/settings/cloudflare-authorization-dialog";
 import { SettingsSection } from "@/features/settings/settings-section";
-import { applyUpdate, getUpdateStatus } from "./api";
+import { applyUpdate, getUpdateStatus, setUpdateChannel } from "./api";
 import type { UpdateStatus } from "./types";
 import type { UpdateActionKind, UpdateProgress } from "./update-progress";
 
@@ -13,11 +15,13 @@ const reviewedActionKindKey = "hqb_update_action_kind";
 const reviewedVersionKey = "hqb_update_expected_version";
 
 export function UpdateSettings({
+  canChangeChannel = false,
   initialStatus,
   progress,
   onStatusChange,
   onUpdateStarted
 }: {
+  canChangeChannel?: boolean;
   initialStatus: UpdateStatus | null;
   progress: UpdateProgress | null;
   onStatusChange: (status: UpdateStatus) => void;
@@ -26,7 +30,9 @@ export function UpdateSettings({
   const [status, setStatus] = React.useState(initialStatus);
   const [checkError, setCheckError] = React.useState<string | null>(null);
   const [applyError, setApplyError] = React.useState<string | null>(null);
-  const [pendingAction, setPendingAction] = React.useState<"check" | "apply" | null>(null);
+  const [pendingAction, setPendingAction] = React.useState<"check" | "apply" | "channel" | null>(
+    null
+  );
   const [authorizationOpen, setAuthorizationOpen] = React.useState(false);
   const resumedRef = React.useRef(false);
 
@@ -88,13 +94,64 @@ export function UpdateSettings({
       setPendingAction(null);
     }
   }
+  async function changeChannel(nightly: boolean): Promise<void> {
+    setPendingAction("channel");
+    setCheckError(null);
+    try {
+      const { channel } = await setUpdateChannel(nightly ? "nightly" : "stable");
+      window.sessionStorage.removeItem(reviewedVersionKey);
+      window.sessionStorage.removeItem(reviewedActionKindKey);
+      if (status) {
+        const changedStatus = { ...status, channel, available: false, waitingForStable: false };
+        setStatus(changedStatus);
+        onStatusChange(changedStatus);
+      }
+      const nextStatus = await getUpdateStatus();
+      setStatus(nextStatus);
+      onStatusChange(nextStatus);
+    } catch (error) {
+      setCheckError(
+        error instanceof Error ? error.message : "The update channel could not be changed."
+      );
+    } finally {
+      setPendingAction(null);
+    }
+  }
   const isPending = pendingAction !== null;
   const repairOnly =
     status?.repairRequired === true && status.release.version === status.installedVersion;
   const repairInProgress = progress?.kind === "repair";
 
   return (
-    <SettingsSection description="Signed stable releases" title="Updates">
+    <SettingsSection description="Signed Stable and Nightly releases" title="Updates">
+      <FieldGroup>
+        <Field>
+          <div className="flex items-center gap-2">
+            <Checkbox
+              id="nightly-updates"
+              checked={status?.channel === "nightly"}
+              disabled={!canChangeChannel || isPending || Boolean(progress) || !status}
+              onCheckedChange={(checked) => void changeChannel(checked === true)}
+              aria-describedby="nightly-updates-description"
+            />
+            <FieldLabel htmlFor="nightly-updates">Receive Nightly updates</FieldLabel>
+          </div>
+          <FieldDescription id="nightly-updates-description">
+            Nightly releases are still being tested and can contain faults. Each update needs your
+            approval. Turn this off to receive Stable updates when they catch up with your installed
+            version. Only an owner can change this setting.
+          </FieldDescription>
+        </Field>
+      </FieldGroup>
+      {status?.waitingForStable ? (
+        <Alert>
+          <AlertTitle>Waiting for Stable</AlertTitle>
+          <AlertDescription>
+            You will keep version {status.installedVersion} until a compatible Stable release
+            catches up. Your installation and mail have not changed.
+          </AlertDescription>
+        </Alert>
+      ) : null}
       {checkError ? (
         <Alert variant="destructive">
           <AlertTitle>Update check unavailable</AlertTitle>
@@ -153,7 +210,13 @@ export function UpdateSettings({
           />
           <Version
             label={repairOnly ? "Installation" : "Available"}
-            value={repairOnly ? "Repair required" : (status?.release.version ?? "Not checked")}
+            value={
+              repairOnly
+                ? "Repair required"
+                : status?.waitingForStable
+                  ? "Waiting for Stable"
+                  : (status?.release.version ?? "Not checked")
+            }
           />
         </div>
         <Button

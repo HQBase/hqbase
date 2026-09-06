@@ -1,0 +1,44 @@
+name: Promote tested candidate to Stable
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Tested candidate version, for example 1.4.2"
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hqbase-staging-resources
+  queue: max
+  cancel-in-progress: false
+
+jobs:
+  promote:
+    if: github.ref_name == 'main'
+    runs-on: ubuntu-latest
+    environment: release
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      actions: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      HQBASE_RELEASE_VERSION: ${{ inputs.version }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+      - name: Verify evidence and promote the fixed archive
+        run: node scripts/release/channels.mjs promote
+      - name: Announce verified Stable release
+        continue-on-error: true
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_RELEASE_WEBHOOK_URL }}
+        run: |
+          gh release view "v${HQBASE_RELEASE_VERSION}" --json body --jq .body > "$RUNNER_TEMP/release-notes.md"
+          node scripts/release/notify-discord.mjs "$RUNNER_TEMP/release-notes.md"

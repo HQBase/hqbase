@@ -13,6 +13,7 @@ export const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-
 export const workerTagPattern = /^[0-9a-f]{32}$/i;
 export const managedCommand = 'node --input-type=module --eval "$HQBASE_UPDATER_LOADER"';
 export const initialBuildCommand = "sleep 600";
+export const publicBuildCommand = "pnpm install --frozen-lockfile";
 export const initialDeployCommand = "pnpm deploy";
 export const gatePath = ".hqbase-release-gate-never";
 export const branch = "main";
@@ -214,6 +215,8 @@ export function commonContext(environment) {
     accountId,
     buildTokenUuid,
     candidateVersion: required(environment, "CANDIDATE_VERSION"),
+    publicUpgrade: environment.HQBASE_STAGING_PUBLIC_UPGRADE === "1",
+    sourceVersion: environment.SOURCE_VERSION,
     cleanupToken: required(environment, "CLOUDFLARE_API_TOKEN"),
     configFile: environment.HQBASE_STAGING_CONFIG || configPath(deploymentName),
     deploymentName,

@@ -1,7 +1,9 @@
-name: Signed HQBase release
+name: Publish Nightly candidate
 
 on:
   workflow_dispatch:
+  schedule:
+    - cron: "0 6 * * *"
 
 permissions:
   contents: read
@@ -19,6 +21,7 @@ jobs:
     permissions:
       contents: write
     outputs:
+      publish: ${{ steps.metadata.outputs.publish }}
       artifact_name: ${{ steps.metadata.outputs.artifact_name }}
       commit: ${{ steps.metadata.outputs.commit }}
       draft_created: ${{ steps.draft.outputs.created }}
@@ -54,9 +57,13 @@ jobs:
               assertStableReleaseVersion(packageJson.version, "package.json version")
             );
           ')"
-          previous_tag="$(gh release list --exclude-drafts --exclude-pre-releases --limit 1 --json tagName --jq '.[0].tagName // ""')"
+          previous_tag="$(gh api "repos/$GITHUB_REPOSITORY/releases/latest" --jq .tag_name)"
           if gh release view "v${release_version}" >/dev/null 2>&1; then
-            echo "Release v${release_version} already exists." >&2
+            if test "$GITHUB_EVENT_NAME" = "schedule"; then
+              echo "publish=false" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            echo "Release v${release_version} already exists. Use a new version." >&2
             exit 1
           fi
           if test -n "$previous_tag"; then
@@ -86,18 +93,25 @@ jobs:
           echo "commit=$GITHUB_SHA" >> "$GITHUB_OUTPUT"
           echo "previous_tag=$previous_tag" >> "$GITHUB_OUTPUT"
           echo "version=$release_version" >> "$GITHUB_OUTPUT"
+          echo "publish=true" >> "$GITHUB_OUTPUT"
       - run: pnpm install --frozen-lockfile
+        if: steps.metadata.outputs.publish == 'true'
       - run: pnpm check
+        if: steps.metadata.outputs.publish == 'true'
       - run: pnpm deploy:dry-run
+        if: steps.metadata.outputs.publish == 'true'
       - name: Verify signing key
+        if: steps.metadata.outputs.publish == 'true'
         env:
           HQBASE_RELEASE_PRIVATE_KEY: ${{ secrets.HQBASE_RELEASE_PRIVATE_KEY }}
         run: test -n "$HQBASE_RELEASE_PRIVATE_KEY"
       - name: Package and sign candidate
+        if: steps.metadata.outputs.publish == 'true'
         env:
           HQBASE_RELEASE_PRIVATE_KEY: ${{ secrets.HQBASE_RELEASE_PRIVATE_KEY }}
         run: pnpm release:package
       - name: Extract release notes
+        if: steps.metadata.outputs.publish == 'true'
         run: |
           node --input-type=module -e '
             import { readFileSync, writeFileSync } from "node:fs";
@@ -108,6 +122,7 @@ jobs:
             writeFileSync("release/notes.md", `${body}\n`);
           '
       - name: Preserve the exact candidate for staging
+        if: steps.metadata.outputs.publish == 'true'
         uses: actions/upload-artifact@v6
         with:
           name: ${{ steps.metadata.outputs.artifact_name }}
@@ -115,6 +130,7 @@ jobs:
           if-no-files-found: error
           retention-days: 7
       - name: Create draft GitHub Release
+        if: steps.metadata.outputs.publish == 'true'
         id: draft
         run: |
           gh release create "v${HQBASE_RELEASE_VERSION}" \
@@ -125,11 +141,13 @@ jobs:
             "release/hqbase-${HQBASE_RELEASE_VERSION}.tar.gz" \
             "release/hqbase-${HQBASE_RELEASE_VERSION}.sha256" \
             "release/manifest-${HQBASE_RELEASE_VERSION}.json" \
-            "release/stable.json"
+            "release/stable.json" \
+            "release/nightly.json"
           echo "created=true" >> "$GITHUB_OUTPUT"
 
   staging:
     needs: candidate
+    if: needs.candidate.outputs.publish == 'true'
     runs-on: ubuntu-latest
     environment: hqbase-staging
     timeout-minutes: 45
@@ -538,173 +556,11 @@ jobs:
       HQBASE_RELEASE_VERSION: ${{ needs.candidate.outputs.version }}
     steps:
       - uses: actions/checkout@v6
-      - name: Read current Deploy Button source
-        id: deploy_source
-        run: |
-          previous_commit="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/deploy" --jq .object.sha)"
-          test -n "$previous_commit"
-          echo "previous_commit=$previous_commit" >> "$GITHUB_OUTPUT"
-      - name: Verify any existing release tag source
-        run: |
-          tag_name="v${HQBASE_RELEASE_VERSION}"
-          tag_ref="$(gh api "repos/$GITHUB_REPOSITORY/git/matching-refs/tags/$tag_name" \
-            --jq ".[] | select(.ref == \"refs/tags/$tag_name\") | [.object.type, .object.sha] | @tsv")"
-          if test -z "$tag_ref"; then
-            exit 0
-          fi
-          read -r tag_type tag_commit <<< "$tag_ref"
-          while test "$tag_type" = "tag"; do
-            read -r tag_type tag_commit < <(
-              gh api "repos/$GITHUB_REPOSITORY/git/tags/$tag_commit" \
-                --jq '[.object.type, .object.sha] | @tsv'
-            )
-          done
-          test "$tag_type" = "commit"
-          test "$tag_commit" = "$RELEASE_COMMIT"
-      - name: Advance Deploy Button source to validated candidate
-        id: advance_deploy
-        run: >-
-          gh api --method PATCH "repos/$GITHUB_REPOSITORY/git/refs/heads/deploy"
-          -f sha="$RELEASE_COMMIT"
-      - name: Publish the validated draft
-        id: publish_release
-        run: gh release edit "v${HQBASE_RELEASE_VERSION}" --draft=false --latest
-      - name: Restore Deploy Button source after publication failure
-        if: ${{ failure() && steps.advance_deploy.outcome == 'success' && steps.publish_release.outcome == 'failure' }}
-        env:
-          PREVIOUS_DEPLOY_COMMIT: ${{ steps.deploy_source.outputs.previous_commit }}
-        run: |
-          release_lookup_succeeded=false
-          release_is_draft=""
-          for attempt in $(seq 1 5); do
-            if release_is_draft="$(gh release view "v${HQBASE_RELEASE_VERSION}" --json isDraft --jq .isDraft)"; then
-              release_lookup_succeeded=true
-              break
-            fi
-            sleep 2
-          done
-          if test "$release_lookup_succeeded" != "true"; then
-            echo "Could not determine whether the release is public; refusing to change the Deploy branch." >&2
-            exit 1
-          fi
-          if test "$release_is_draft" = "false"; then
-            echo "::warning title=Deploy branch retained::The release is public, so the validated Deploy Button source was not rolled back."
-            exit 0
-          fi
-          if test "$release_is_draft" != "true"; then
-            echo "GitHub returned an invalid release draft state: $release_is_draft" >&2
-            exit 1
-          fi
-          current_commit="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/deploy" --jq .object.sha)"
-          if test "$current_commit" != "$RELEASE_COMMIT"; then
-            echo "Deploy branch moved after the candidate update; refusing to overwrite it." >&2
-            exit 1
-          fi
-          gh api --method PATCH "repos/$GITHUB_REPOSITORY/git/refs/heads/deploy" \
-            -f sha="$PREVIOUS_DEPLOY_COMMIT" \
-            -F force=true
-      - name: Verify public stable asset, signature, and digest
-        run: |
-          stable_url="https://github.com/HQBase/hqbase/releases/latest/download/stable.json"
-          version_manifest_url="https://github.com/HQBase/hqbase/releases/download/v${HQBASE_RELEASE_VERSION}/manifest-${HQBASE_RELEASE_VERSION}.json"
-          artifact_url="https://github.com/HQBase/hqbase/releases/download/v${HQBASE_RELEASE_VERSION}/hqbase-${HQBASE_RELEASE_VERSION}.tar.gz"
-          for attempt in $(seq 1 30); do
-            if curl --fail --location --silent --show-error "$stable_url" --output /tmp/stable.json &&
-               curl --fail --location --silent --show-error "$version_manifest_url" --output /tmp/version-manifest.json &&
-               curl --fail --location --silent --show-error "$artifact_url" --output /tmp/hqbase.tar.gz &&
-               cmp -s /tmp/stable.json /tmp/version-manifest.json; then
-              break
-            fi
-            test "$attempt" -lt 30
-            sleep 2
-          done
-          tag_name="v${HQBASE_RELEASE_VERSION}"
-          read -r tag_type tag_commit < <(
-            gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$tag_name" \
-              --jq '[.object.type, .object.sha] | @tsv'
-          )
-          while test "$tag_type" = "tag"; do
-            read -r tag_type tag_commit < <(
-              gh api "repos/$GITHUB_REPOSITORY/git/tags/$tag_commit" \
-                --jq '[.object.type, .object.sha] | @tsv'
-            )
-          done
-          test "$tag_type" = "commit"
-          test "$tag_commit" = "$RELEASE_COMMIT"
-          deploy_commit="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/deploy" --jq .object.sha)"
-          test "$deploy_commit" = "$RELEASE_COMMIT"
-          node --input-type=module -e '
-            import { createHash, createPublicKey, verify } from "node:crypto";
-            import { readFileSync, statSync } from "node:fs";
-            const version = process.env.HQBASE_RELEASE_VERSION;
-            const config = JSON.parse(readFileSync("config/product.json", "utf8"));
-            const packageJson = JSON.parse(readFileSync("package.json", "utf8"));
-            const envelope = JSON.parse(readFileSync("/tmp/stable.json", "utf8"));
-            const versionEnvelope = JSON.parse(readFileSync("/tmp/version-manifest.json", "utf8"));
-            if (versionEnvelope.payload !== envelope.payload ||
-                versionEnvelope.signature !== envelope.signature) {
-              throw new Error("Published stable and versioned manifests do not match.");
-            }
-            const key = createPublicKey({
-              key: Buffer.from(config.releasePublicKey, "base64"),
-              format: "der",
-              type: "spki"
-            });
-            if (!verify(null, Buffer.from(envelope.payload, "base64url"), key, Buffer.from(envelope.signature, "base64url"))) {
-              throw new Error("Published stable manifest signature is invalid.");
-            }
-            const manifest = JSON.parse(Buffer.from(envelope.payload, "base64url").toString("utf8"));
-            if (manifest.product !== "hqbase" || manifest.version !== version) {
-              throw new Error("Published stable manifest identity is invalid.");
-            }
-            const expectedArtifactUrl = `https://github.com/HQBase/hqbase/releases/download/v${version}/hqbase-${version}.tar.gz`;
-            const configuredUpdaterCommit = packageJson.hqbaseRelease?.updaterCommit;
-            const updaterCommitVersion = packageJson.hqbaseRelease?.updaterCommitVersion;
-            if (Boolean(configuredUpdaterCommit) !== Boolean(updaterCommitVersion) ||
-                (configuredUpdaterCommit && updaterCommitVersion !== version)) {
-              throw new Error("Committed release updater override is not approved for this version.");
-            }
-            const updaterCommit = configuredUpdaterCommit ?? process.env.RELEASE_COMMIT;
-            if (!/^[a-f0-9]{40}$/.test(updaterCommit)) {
-              throw new Error("Committed release updater commit is invalid.");
-            }
-            const expectedUpdaterUrl = `https://raw.githubusercontent.com/HQBase/hqbase/${updaterCommit}/scripts/release/bootstrap.mjs`;
-            const immutableUpdaterUrl = /^https:\/\/raw\.githubusercontent\.com\/HQBase\/hqbase\/[a-f0-9]{40}\/scripts\/release\/bootstrap\.mjs$/;
-            if (manifest.artifact.url !== expectedArtifactUrl ||
-                manifest.updater?.protocol !== 2 ||
-                !immutableUpdaterUrl.test(manifest.updater.sourceUrl) ||
-                manifest.updater.sourceUrl !== expectedUpdaterUrl) {
-              throw new Error("Published stable manifest sources are invalid.");
-            }
-            const bytes = readFileSync("/tmp/hqbase.tar.gz");
-            if (createHash("sha256").update(bytes).digest("hex") !== manifest.artifact.sha256 ||
-                statSync("/tmp/hqbase.tar.gz").size !== manifest.artifact.size) {
-              throw new Error("Published artifact does not match the signed manifest.");
-            }
-            const updaterResponse = await fetch(manifest.updater.sourceUrl);
-            if (!updaterResponse.ok) {
-              throw new Error(`Published updater download failed (${updaterResponse.status}).`);
-            }
-            const updaterBytes = Buffer.from(await updaterResponse.arrayBuffer());
-            if (createHash("sha256").update(updaterBytes).digest("hex") !== manifest.updater.sha256 ||
-                updaterBytes.length !== manifest.updater.size) {
-              throw new Error("Published updater does not match the signed manifest.");
-            }
-          '
-      - name: Post complete release notes to Discord
-        id: discord_release
-        continue-on-error: true
-        env:
-          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_RELEASE_WEBHOOK_URL }}
-        run: |
-          notes_file="$RUNNER_TEMP/hqbase-release-notes.md"
-          gh release view "v${HQBASE_RELEASE_VERSION}" --json body --jq .body > "$notes_file"
-          node scripts/release/notify-discord.mjs "$notes_file"
-      - name: Report a Discord delivery failure
-        if: steps.discord_release.outcome == 'failure'
-        run: >-
-          echo "::warning title=Discord release notification failed::The signed release is valid,
-          but its Discord message was not delivered."
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+      - name: Publish and verify Nightly without changing Stable
+        run: node scripts/release/channels.mjs publish
 
   cleanup-failed-draft:
     needs: [candidate, staging]
