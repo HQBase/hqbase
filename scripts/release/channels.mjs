@@ -70,10 +70,31 @@ export async function verifiedCandidate(version) {
   return { manifest, nightlyEnvelope, versionEnvelope };
 }
 
+export function candidateRelease(version, runGh = gh) {
+  const release = JSON.parse(
+    runGh([
+      "release",
+      "view",
+      `v${version}`,
+      "--repo",
+      repository,
+      "--json",
+      "tagName,isDraft,isPrerelease"
+    ])
+  );
+  if (
+    release.tagName !== `v${version}` ||
+    typeof release.isDraft !== "boolean" ||
+    typeof release.isPrerelease !== "boolean"
+  )
+    throw new Error("Candidate release identity is invalid.");
+  return { draft: release.isDraft, prerelease: release.isPrerelease };
+}
+
 async function publish(version) {
   const before = api("releases/latest");
   const deployBefore = api("git/ref/heads/deploy").object.sha;
-  const release = api(`releases/tags/v${version}`);
+  const release = candidateRelease(version);
   if (!release.draft && !release.prerelease) throw new Error("This version is already Stable.");
   gh([
     "release",
