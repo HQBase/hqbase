@@ -73,6 +73,7 @@ describe("release package", () => {
         cwd: workspace,
         env: {
           ...process.env,
+          HQBASE_RELEASE_VERSION: "1.3.4",
           HQBASE_RELEASE_PRIVATE_KEY: privateKey.export({ type: "pkcs8", format: "pem" }).toString()
         }
       });
