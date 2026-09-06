@@ -52,8 +52,9 @@ jobs:
       HQBASE_E2E_UPDATE_API_TOKEN: ${{ secrets.HQBASE_E2E_UPDATE_API_TOKEN }}
       DEPLOYMENT_NAME: public-${{ github.run_id }}-${{ matrix.edge }}
       STAGING_WORKER_NAME: hqbase-public-${{ github.run_id }}-${{ matrix.edge }}
-      HQBASE_UPGRADE_RECEIPT: ${{ runner.temp }}/upgrade-${{ matrix.edge }}.json
     steps:
+      - name: Set the upgrade receipt path
+        run: echo "HQBASE_UPGRADE_RECEIPT=$RUNNER_TEMP/upgrade-$UPGRADE_EDGE.json" >> "$GITHUB_ENV"
       - uses: actions/checkout@v6
       - uses: pnpm/action-setup@v6
         with:

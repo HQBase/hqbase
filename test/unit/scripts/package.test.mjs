@@ -6,25 +6,18 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
 const releaseFiles = ["package.mjs", "notes.mjs", "version.mjs"];
-const recoveryUpdaterCommit = "7d67e4ae54fe4deafba41c0b5daab5a34cdfe4f9";
-const recoveryUpdaterSha256 = "4f6c7d5c4b57c7211e3db047fec3766792d946b99b1075628d286a6d8b43bffe";
-const recoveryUpdaterSize = 6928;
-const repositoryRoot = resolve(import.meta.dirname, "../../..");
 
 function git(cwd, ...args) {
   return execFileSync("git", args, { cwd, encoding: "utf8" }).trim();
 }
 
 describe("release package", () => {
-  it("pins the recovery release to the exact 1.3.3 updater commit", () => {
+  it("does not carry the 1.3.4 recovery updater override into a new release", () => {
     const packageJson = JSON.parse(
       readFileSync(new URL("../../../package.json", import.meta.url), "utf8")
     );
-    expect(packageJson.hqbaseRelease.updaterCommit).toBe(recoveryUpdaterCommit);
-    expect(packageJson.hqbaseRelease.updaterCommitVersion).toBe("1.3.4");
-    const currentUpdater = readFileSync(resolve(repositoryRoot, "scripts/release/bootstrap.mjs"));
-    expect(currentUpdater.length).toBe(recoveryUpdaterSize);
-    expect(createHash("sha256").update(currentUpdater).digest("hex")).toBe(recoveryUpdaterSha256);
+    expect(packageJson.hqbaseRelease.updaterCommit).toBeUndefined();
+    expect(packageJson.hqbaseRelease.updaterCommitVersion).toBeUndefined();
   });
 
   it("uses the committed updater override for signed source metadata", () => {
