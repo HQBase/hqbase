@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.4.1
+
+### Fixed
+
+- Find unpublished Nightly drafts before publication so the release workflow can publish the
+  verified archive.
+
 ## 1.4.0
 
 ### New
