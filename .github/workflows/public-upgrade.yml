@@ -90,6 +90,34 @@ jobs:
           HQBASE_RELEASE_MANIFEST_FILE="$GITHUB_WORKSPACE/release/source/manifest.json" \
           HQBASE_RELEASE_ARTIFACT_FILE="$GITHUB_WORKSPACE/release/source/archive.tar.gz" \
             node scripts/release/bootstrap.mjs --config ".hqbase/deployments/$DEPLOYMENT_NAME/wrangler.jsonc"
+      - name: Verify and record the source Worker deployment
+        run: |
+          healthy=false
+          source_deadline=$((SECONDS + 300))
+          for attempt in $(seq 1 150); do
+            if curl -fsS --connect-timeout 2 --max-time 5 \
+              -H "CF-Access-Client-Id: $HQBASE_STAGING_ACCESS_CLIENT_ID" \
+              -H "CF-Access-Client-Secret: $HQBASE_STAGING_ACCESS_CLIENT_SECRET" \
+              "$HQBASE_STAGING_URL/api/health?source=$SOURCE_VERSION&attempt=$attempt" \
+              | jq -e --arg version "$SOURCE_VERSION" '.ok == true and .version == $version' >/dev/null; then
+              healthy=true
+              break
+            fi
+            if test "$SECONDS" -ge "$source_deadline"; then break; fi
+            sleep 2
+          done
+          test "$healthy" = true || { echo "The source release did not become healthy."; exit 1; }
+          CONFIG_FILE="$GITHUB_WORKSPACE/.hqbase/deployments/$DEPLOYMENT_NAME/wrangler.jsonc" \
+          WORKER_NAME="$STAGING_WORKER_NAME" node --input-type=module -e '
+            import { recordWorkerDeployedForConfig } from "./scripts/hqbase/manifest.mjs";
+            const manifest = recordWorkerDeployedForConfig(
+              process.env.CONFIG_FILE,
+              process.env.WORKER_NAME
+            );
+            if (manifest?.worker?.deployed !== true) {
+              throw new Error("The source staging Worker was not recorded.");
+            }
+          '
       - name: Create persistent source-version data
         env:
           HQBASE_STAGING_MAIL_API_BASE_PATH: /api

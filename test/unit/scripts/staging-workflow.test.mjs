@@ -9,12 +9,41 @@ const releaseWorkflow = readFileSync(
   new URL("../../../.github/workflows/release.yml", import.meta.url),
   "utf8"
 );
+const publicUpgradeWorkflow = readFileSync(
+  new URL("../../../.github/workflows/public-upgrade.yml", import.meta.url),
+  "utf8"
+);
 const migrationCount = (directory) =>
   readdirSync(new URL(`../../../${directory}/`, import.meta.url)).filter((name) =>
     name.endsWith(".sql")
   ).length;
 
 describe("staging workflow lifecycle record", () => {
+  it("verifies and records older public source deployments before preparing their update", () => {
+    const install = publicUpgradeWorkflow.indexOf("      - name: Install the source release");
+    const record = publicUpgradeWorkflow.indexOf(
+      "      - name: Verify and record the source Worker deployment"
+    );
+    const seed = publicUpgradeWorkflow.indexOf(
+      "      - name: Create persistent source-version data"
+    );
+    const prepare = publicUpgradeWorkflow.indexOf(
+      "      - name: Prepare a public upgrade trigger and signed discovery fixture"
+    );
+    const checkpoint = publicUpgradeWorkflow.slice(record, seed);
+    expect(install).toBeGreaterThan(-1);
+    expect(record).toBeGreaterThan(install);
+    expect(seed).toBeGreaterThan(record);
+    expect(prepare).toBeGreaterThan(seed);
+    expect(checkpoint).toContain('jq -e --arg version "$SOURCE_VERSION"');
+    expect(checkpoint).toContain(".ok == true and .version == $version");
+    expect(checkpoint).toContain("--connect-timeout 2 --max-time 5");
+    expect(checkpoint).toContain("source_deadline=$((SECONDS + 300))");
+    expect(checkpoint).toContain('test "$SECONDS" -ge "$source_deadline"');
+    expect(checkpoint).toContain("recordWorkerDeployedForConfig");
+    expect(checkpoint).toContain("manifest?.worker?.deployed !== true");
+  });
+
   it("tests a populated two-phase SQL cutover around deployment", () => {
     const legacy = workflow.indexOf('set_migrations_dir "migrations-before-0014"');
     const current = workflow.indexOf('set_migrations_dir "../../../migrations"');
