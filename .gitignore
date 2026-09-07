@@ -5,7 +5,10 @@ dist
 .env
 *.local
 coverage
-/release/
+/release/*
+!/release/evidence/
+/release/evidence/*
+!/release/evidence/*.json
 playwright-report
 test-results
 .DS_Store
