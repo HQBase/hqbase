@@ -370,6 +370,24 @@ describe("staging workflow lifecycle record", () => {
     expect(step).toContain("DELETE FROM rate_limits WHERE scope IN ('auth.email', 'auth.ip')");
   });
 
+  it("builds the verified target archive before testing its PWA", () => {
+    const pwa = publicUpgradeWorkflow.indexOf(
+      "      - name: Verify candidate PWA from its signed archive"
+    );
+    const seal = publicUpgradeWorkflow.indexOf("      - name: Seal the successful upgrade receipt");
+    expect(pwa).toBeGreaterThan(-1);
+    expect(seal).toBeGreaterThan(pwa);
+    const step = publicUpgradeWorkflow.slice(pwa, seal);
+    expect(step).toContain(
+      'tar -xzf "$GITHUB_WORKSPACE/release/target/archive.tar.gz" -C "$target_source"'
+    );
+    expect(step).toContain('pnpm --dir "$target_source" install --frozen-lockfile');
+    expect(step.indexOf('pnpm --dir "$target_source" build')).toBeLessThan(
+      step.indexOf('pnpm --dir "$target_source" test:pwa')
+    );
+    expect(step).not.toContain("pnpm build");
+  });
+
   it("requires populated remote backup and restore before sealing public receipts", () => {
     const lifecycle = publicUpgradeWorkflow.indexOf(
       "      - name: Verify mail, lifecycle, backup, restore, and PWA after the update"

@@ -150,9 +150,15 @@ jobs:
           pnpm exec wrangler d1 execute "$database" --remote --config "$config" \
             --command "DELETE FROM rate_limits WHERE scope IN ('auth.email', 'auth.ip')"
       - name: Verify mail, lifecycle, backup, restore, and PWA after the update
+        run: pnpm test:e2e:staging
+      - name: Verify candidate PWA from its signed archive
         run: |
-          pnpm test:e2e:staging
-          pnpm test:pwa
+          target_source="$RUNNER_TEMP/hqbase-target-$UPGRADE_EDGE"
+          mkdir -p "$target_source"
+          tar -xzf "$GITHUB_WORKSPACE/release/target/archive.tar.gz" -C "$target_source"
+          pnpm --dir "$target_source" install --frozen-lockfile
+          pnpm --dir "$target_source" build
+          pnpm --dir "$target_source" test:pwa
       - name: Exercise populated remote backup and restore
         run: |
           config=".hqbase/deployments/$DEPLOYMENT_NAME/wrangler.jsonc"
