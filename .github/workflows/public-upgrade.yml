@@ -93,8 +93,9 @@ jobs:
       - name: Verify and record the source Worker deployment
         run: |
           healthy=false
+          source_deadline=$((SECONDS + 300))
           for attempt in $(seq 1 150); do
-            if curl -fsS \
+            if curl -fsS --connect-timeout 2 --max-time 5 \
               -H "CF-Access-Client-Id: $HQBASE_STAGING_ACCESS_CLIENT_ID" \
               -H "CF-Access-Client-Secret: $HQBASE_STAGING_ACCESS_CLIENT_SECRET" \
               "$HQBASE_STAGING_URL/api/health?source=$SOURCE_VERSION&attempt=$attempt" \
@@ -102,6 +103,7 @@ jobs:
               healthy=true
               break
             fi
+            if test "$SECONDS" -ge "$source_deadline"; then break; fi
             sleep 2
           done
           test "$healthy" = true || { echo "The source release did not become healthy."; exit 1; }

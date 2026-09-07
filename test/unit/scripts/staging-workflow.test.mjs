@@ -37,6 +37,9 @@ describe("staging workflow lifecycle record", () => {
     expect(prepare).toBeGreaterThan(seed);
     expect(checkpoint).toContain('jq -e --arg version "$SOURCE_VERSION"');
     expect(checkpoint).toContain(".ok == true and .version == $version");
+    expect(checkpoint).toContain("--connect-timeout 2 --max-time 5");
+    expect(checkpoint).toContain("source_deadline=$((SECONDS + 300))");
+    expect(checkpoint).toContain('test "$SECONDS" -ge "$source_deadline"');
     expect(checkpoint).toContain("recordWorkerDeployedForConfig");
     expect(checkpoint).toContain("manifest?.worker?.deployed !== true");
   });
