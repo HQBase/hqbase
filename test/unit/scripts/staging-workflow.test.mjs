@@ -349,6 +349,47 @@ describe("staging workflow lifecycle record", () => {
     );
   });
 
+  it("resets only disposable sign-in probes after public upgrade preservation checks", () => {
+    const probe = publicUpgradeWorkflow.indexOf(
+      "run: node scripts/release/staging-update-gate.mjs probe"
+    );
+    const reset = publicUpgradeWorkflow.indexOf(
+      "      - name: Reset disposable sign-in probes before final lifecycle"
+    );
+    const lifecycle = publicUpgradeWorkflow.indexOf(
+      "      - name: Verify mail, lifecycle, backup, restore, and PWA after the update"
+    );
+    expect(reset).toBeGreaterThan(probe);
+    expect(lifecycle).toBeGreaterThan(reset);
+    const step = publicUpgradeWorkflow.slice(reset, lifecycle);
+    expect(step).toContain(
+      '.accountId == $account and .d1.name == $database and .d1.ownership == "created"'
+    );
+    expect(step).toContain('database="hqbase-$DEPLOYMENT_NAME"');
+    expect(step).toContain('--remote --config "$config"');
+    expect(step).toContain("DELETE FROM rate_limits WHERE scope IN ('auth.email', 'auth.ip')");
+  });
+
+  it("requires populated remote backup and restore before sealing public receipts", () => {
+    const lifecycle = publicUpgradeWorkflow.indexOf(
+      "      - name: Verify mail, lifecycle, backup, restore, and PWA after the update"
+    );
+    const backup = publicUpgradeWorkflow.indexOf(
+      "      - name: Exercise populated remote backup and restore"
+    );
+    const seal = publicUpgradeWorkflow.indexOf("      - name: Seal the successful upgrade receipt");
+    expect(backup).toBeGreaterThan(lifecycle);
+    expect(seal).toBeGreaterThan(backup);
+    const step = publicUpgradeWorkflow.slice(backup, seal);
+    expect(step).toContain('pnpm hqbase backup --name "$DEPLOYMENT_NAME"');
+    expect(step).toContain('pnpm hqbase restore --name "$DEPLOYMENT_NAME"');
+    expect(step).toContain("UPDATE app_settings SET value_json");
+    expect(step).toContain(
+      "SELECT value_json FROM app_settings WHERE key = 'staging-restore-probe'"
+    );
+    expect(step).toContain("jq -e");
+  });
+
   it("keeps the customer source checkout unchanged", () => {
     expect(releaseWorkflow).toContain(
       "      - name: Verify the customer source checkout starts unchanged"
