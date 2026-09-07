@@ -139,10 +139,39 @@ jobs:
           '
       - name: Complete the customer update through Workers Builds
         run: node scripts/release/staging-update-gate.mjs probe
-      - name: Verify mail, lifecycle, backup, restore, and PWA after the update
+      - name: Reset disposable sign-in probes before final lifecycle
         run: |
-          pnpm test:e2e:staging
-          pnpm test:pwa
+          manifest=".hqbase/deployments/$DEPLOYMENT_NAME/manifest.json"
+          config=".hqbase/deployments/$DEPLOYMENT_NAME/wrangler.jsonc"
+          database="hqbase-$DEPLOYMENT_NAME"
+          jq -e --arg account "$CLOUDFLARE_ACCOUNT_ID" --arg database "$database" \
+            '.accountId == $account and .d1.name == $database and .d1.ownership == "created"' \
+            "$manifest" >/dev/null
+          pnpm exec wrangler d1 execute "$database" --remote --config "$config" \
+            --command "DELETE FROM rate_limits WHERE scope IN ('auth.email', 'auth.ip')"
+      - name: Verify mail, lifecycle, backup, restore, and PWA after the update
+        run: pnpm test:e2e:staging
+      - name: Verify candidate PWA from its signed archive
+        run: |
+          target_source="$RUNNER_TEMP/hqbase-target-$UPGRADE_EDGE"
+          mkdir -p "$target_source"
+          tar -xzf "$GITHUB_WORKSPACE/release/target/archive.tar.gz" -C "$target_source"
+          pnpm --dir "$target_source" install --frozen-lockfile
+          pnpm --dir "$target_source" build
+          pnpm --dir "$target_source" test:pwa
+      - name: Exercise populated remote backup and restore
+        run: |
+          config=".hqbase/deployments/$DEPLOYMENT_NAME/wrangler.jsonc"
+          database="hqbase-$DEPLOYMENT_NAME"
+          pnpm exec wrangler d1 execute "$database" --remote --config "$config" \
+            --command "INSERT INTO app_settings (key, value_json, created_at, updated_at) VALUES ('staging-restore-probe', '{\"state\":\"before\"}', datetime('now'), datetime('now'))"
+          pnpm hqbase backup --name "$DEPLOYMENT_NAME" --output /tmp/hqbase-backup.json
+          pnpm exec wrangler d1 execute "$database" --remote --config "$config" \
+            --command "UPDATE app_settings SET value_json = '{\"state\":\"after\"}', updated_at = datetime('now') WHERE key = 'staging-restore-probe'"
+          pnpm hqbase restore --name "$DEPLOYMENT_NAME" --backup /tmp/hqbase-backup.json --yes
+          result="$(pnpm exec wrangler d1 execute "$database" --remote --config "$config" --json \
+            --command "SELECT value_json FROM app_settings WHERE key = 'staging-restore-probe'")"
+          jq -e '.[0].results[0].value_json == "{\"state\":\"before\"}"' <<<"$result"
       - name: Seal the successful upgrade receipt
         run: |
           node --input-type=module -e '
