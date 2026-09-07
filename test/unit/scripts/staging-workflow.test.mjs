@@ -401,11 +401,17 @@ describe("staging workflow lifecycle record", () => {
     const step = publicUpgradeWorkflow.slice(backup, seal);
     expect(step).toContain('pnpm hqbase backup --name "$DEPLOYMENT_NAME"');
     expect(step).toContain('pnpm hqbase restore --name "$DEPLOYMENT_NAME"');
-    expect(step).toContain("UPDATE app_settings SET value_json");
+    expect(step).toContain("INSERT INTO app_settings (key, value_json, created_at, updated_at)");
+    expect(step).toContain(String.raw`'staging-restore-probe', '{\"state\":\"before\"}'`);
+    expect(step).toContain(
+      String.raw`UPDATE app_settings SET value_json = '{\"state\":\"after\"}'`
+    );
     expect(step).toContain(
       "SELECT value_json FROM app_settings WHERE key = 'staging-restore-probe'"
     );
-    expect(step).toContain("jq -e");
+    expect(step).toContain(
+      String.raw`jq -e '.[0].results[0].value_json == "{\"state\":\"before\"}"'`
+    );
   });
 
   it("keeps the customer source checkout unchanged", () => {
