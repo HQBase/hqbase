@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { assertCurrentManifest } from "../../../scripts/hqbase/lifecycle-manifest.mjs";
 import {
   configurePublicBuild,
   publicBuildConfiguration,
@@ -82,9 +83,14 @@ describe("public upgrade build configuration", () => {
     const f = fixture();
     f.gate.workersBuild.buildCommand = buildCommand;
     f.gate.workersBuild.buildUuid = "55555555-5555-4555-8555-555555555555";
-    const writeManifest = vi.fn();
+    f.gate.workersBuild.dispatchStartedAt = "2026-09-07T00:00:00Z";
+    const manifest = JSON.parse(JSON.stringify({ ...f.manifest, releaseGate: f.gate }));
+    expect(() => assertCurrentManifest(manifest)).not.toThrow();
+    const writeManifest = vi.fn((saved) =>
+      assertCurrentManifest(JSON.parse(JSON.stringify(saved)))
+    );
     await cancelRecordedBuild(
-      { releaseGate: f.gate },
+      manifest,
       { accountId: f.manifest.accountId, cleanupToken: "test-token" },
       {
         fetcher: async () =>
@@ -97,7 +103,8 @@ describe("public upgrade build configuration", () => {
       }
     );
     expect(writeManifest).toHaveBeenCalledOnce();
-    expect(f.gate.workersBuild.buildOutcome).toBe("fail");
+    expect(manifest.releaseGate.workersBuild.buildOutcome).toBe("fail");
+    expect(manifest.version).toBe(3);
   });
   it("writes only the recorded disposable bindings and discovery fixture", () => {
     const f = fixture();
@@ -149,6 +156,16 @@ describe("public upgrade build configuration", () => {
 
   it("passes only lifecycle configuration to the recorded trigger", async () => {
     const f = fixture();
+    for (const nested of [
+      f.manifest.worker,
+      f.manifest.d1,
+      f.manifest.r2,
+      f.manifest.queue.primary,
+      f.manifest.queue.deadLetter,
+      f.manifest.cloudflareOAuth
+    ]) {
+      nested.unexpectedCredential = "must-not-copy";
+    }
     const manifest = { ...f.manifest, releaseGate: f.gate, unrelatedPrivateField: "must-not-copy" };
     const serialized = publicBuildConfiguration(manifest);
     expect(serialized).not.toContain("must-not-copy");

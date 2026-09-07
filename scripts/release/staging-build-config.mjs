@@ -54,22 +54,25 @@ function assertPublicResources(manifest) {
 
 export function publicBuildConfiguration(manifest) {
   assertPublicResources(manifest);
-  const fields = [
-    "version",
-    "name",
-    "accountId",
-    "worker",
-    "d1",
-    "r2",
-    "queue",
-    "appDomain",
-    "authUrl",
-    "cloudflareOAuth"
-  ];
+  const pick = (value, fields) =>
+    Object.fromEntries(
+      fields.filter((key) => value[key] !== undefined).map((key) => [key, value[key]])
+    );
+  const resourceFields = ["id", "name", "ownership"];
   return JSON.stringify({
-    manifest: Object.fromEntries(
-      fields.filter((key) => manifest[key] !== undefined).map((key) => [key, manifest[key]])
-    ),
+    manifest: {
+      ...pick(manifest, ["version", "name", "accountId", "appDomain", "authUrl"]),
+      worker: pick(manifest.worker, ["name", "deployed"]),
+      d1: pick(manifest.d1, resourceFields),
+      r2: pick(manifest.r2, ["bucket", "ownership"]),
+      queue: {
+        primary: pick(manifest.queue.primary, resourceFields),
+        deadLetter: pick(manifest.queue.deadLetter, resourceFields)
+      },
+      ...(manifest.cloudflareOAuth
+        ? { cloudflareOAuth: pick(manifest.cloudflareOAuth, ["mode", "clientId"]) }
+        : {})
+    },
     workerTag: manifest.releaseGate.workersBuild.workerTag,
     manifestUrl: manifest.releaseGate.candidateManifest.url
   });
