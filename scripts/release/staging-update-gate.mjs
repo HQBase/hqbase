@@ -149,7 +149,18 @@ export async function probeStagingUpdateGate(options = {}) {
     status.compatible !== true ||
     status.repairRequired !== !context.publicUpgrade
   ) {
-    throw new Error("The deployed candidate did not report the expected same-version repair.");
+    const checks = {
+      installedVersion:
+        status.installedVersion ===
+        (context.publicUpgrade ? context.sourceVersion : context.candidateVersion),
+      candidateVersion: status.release?.version === context.candidateVersion,
+      available: status.available === true,
+      compatible: status.compatible === true,
+      repairRequired: status.repairRequired === !context.publicUpgrade
+    };
+    throw new Error(
+      `The deployed update status did not match the gate: ${JSON.stringify(checks)}.`
+    );
   }
 
   manifest.releaseGate.workersBuild.dispatchStartedAt = new Date().toISOString();

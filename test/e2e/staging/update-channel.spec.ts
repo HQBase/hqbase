@@ -9,9 +9,10 @@ test("owner can leave Nightly without changing the installed release", async ({ 
       email: process.env.HQBASE_STAGING_OWNER_EMAIL,
       password: process.env.HQBASE_STAGING_OWNER_PASSWORD,
       rememberMe: false
-    }
+    },
+    headers: { origin: new URL(process.env.HQBASE_STAGING_URL!).origin }
   });
-  expect(login.ok()).toBeTruthy();
+  expect(login.ok(), `Owner sign-in returned HTTP ${login.status()}.`).toBeTruthy();
   const before = await (await request.get("/api/health")).json();
   try {
     await page.goto("/settings/updates");
