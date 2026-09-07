@@ -1,0 +1,19 @@
+{
+  "version": "1.4.0",
+  "artifactSha256": "4495abaa496e7aee0f006cc63a25a9eb2493e27d2388ac165819ec49a7375673",
+  "sourceCommit": "9e1aedccd357875dd1fca56dadb81e27819b6fe0",
+  "successorVersion": "1.4.1",
+  "publicUpgradeRunId": "34145611385",
+  "reportUrl": "https://github.com/HQBase/hqbase/issues/122",
+  "startedAt": "2026-09-06T21:02:32Z",
+  "finishedAt": "2026-09-07T17:12:06Z",
+  "checks": {
+    "send": true,
+    "receive": true,
+    "attachments": true,
+    "search": true,
+    "backgroundJobs": true,
+    "backupRestore": true,
+    "noOpenBlockers": true
+  }
+}
