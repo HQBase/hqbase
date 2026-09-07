@@ -221,7 +221,11 @@ function assertReleaseGate(gate) {
       'Refusing to continue: a created release-gate trigger must record "releaseGate.workersBuild.triggerUuid".'
     );
   }
-  if (!["sleep 600", "pnpm install --frozen-lockfile"].includes(build?.buildCommand)) {
+  const publicBuildCommands = [
+    "pnpm install --frozen-lockfile",
+    "pnpm install --frozen-lockfile && node scripts/release/staging-build-config.mjs"
+  ];
+  if (!["sleep 600", ...publicBuildCommands].includes(build?.buildCommand)) {
     throw new Error("The release gate must use a fixed probe or public-upgrade build command.");
   }
   for (const [field, expected] of [
@@ -249,7 +253,7 @@ function assertReleaseGate(gate) {
     build.buildOutcome !== "cancelled" &&
     build.buildOutcome !== "terminated" &&
     !(
-      build.buildCommand === "pnpm install --frozen-lockfile" &&
+      publicBuildCommands.includes(build.buildCommand) &&
       ["success", "fail", "skipped"].includes(build.buildOutcome)
     )
   ) {

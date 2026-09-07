@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { configuredBuildRecord, publicConfigVariable } from "./staging-build-config.mjs";
 
 import {
   assertExactTrigger,
@@ -150,7 +151,12 @@ export async function verifyAcceptedBuild(manifest, release, context, dependenci
   ) {
     throw new Error("The accepted build did not keep the exact signed updater variables.");
   }
-  await waitForAcceptedBuildConfiguration(record, release, context, dependencies);
+  await waitForAcceptedBuildConfiguration(
+    configuredBuildRecord(manifest, context, variables),
+    release,
+    context,
+    dependencies
+  );
 }
 
 async function waitForAcceptedBuildConfiguration(record, release, context, dependencies) {
@@ -213,6 +219,13 @@ function acceptedBuildMismatches(build, record, release, context) {
     ...(metadata.environment_variables?.HQBASE_FORCE_SOURCE_DEPLOY === undefined
       ? []
       : ["HQBASE_FORCE_SOURCE_DEPLOY"]),
+    ...(!context.publicUpgrade ||
+    buildSnapshotVariableEquals(
+      metadata.environment_variables?.[publicConfigVariable],
+      record.publicBuildConfiguration
+    )
+      ? []
+      : [publicConfigVariable]),
     ...(metadata.build_token_uuid === expected.build_token_uuid ? [] : ["build_token_uuid"]),
     ...(metadata.root_directory === expected.root_directory ? [] : ["root_directory"])
   ];
@@ -278,7 +291,7 @@ export async function cancelRecordedBuild(manifest, context, dependencies) {
     build.status !== "stopped" ||
     !(
       terminalOutcomes.has(build.build_outcome) ||
-      (record.buildCommand === publicBuildCommand &&
+      ([publicBuildCommand, "pnpm install --frozen-lockfile"].includes(record.buildCommand) &&
         ["success", "fail", "skipped"].includes(build.build_outcome))
     ) ||
     !Number.isFinite(Date.parse(build.stopped_on ?? ""))

@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { assertCurrentManifest } from "../hqbase/lifecycle-manifest.mjs";
+import { configurePublicBuild } from "./staging-build-config.mjs";
 import { finishPublicUpgrade } from "./staging-public-upgrade.mjs";
 import {
   appErrorCode,
@@ -118,6 +119,7 @@ export async function prepareStagingUpdateGate(options = {}) {
   await ensureCandidateManifestWorker(manifest, candidate.raw, context, dependencies);
   writeCandidateManifestUrl(context.configFile, manifest.releaseGate.candidateManifest.url);
   await ensureBuildTrigger(manifest, context, dependencies);
+  await configurePublicBuild(manifest, context, dependencies);
   console.log("The deployed update-action release gate is ready.");
 }
 
