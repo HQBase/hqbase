@@ -1,5 +1,9 @@
 import { Hono } from "hono";
-import { mailApiBasePath, requireMailApiPrincipal } from "../../auth/mail-api";
+import {
+  includeMailApiLabels,
+  mailApiBasePath,
+  requireMailApiPrincipal
+} from "../../auth/mail-api";
 import { accessibleMessageScope } from "../../auth/mailbox-access";
 import type { HonoApp } from "../../lib/env";
 import { AppError } from "../../lib/errors";
@@ -70,7 +74,7 @@ messageRoutes.get("/", async (c) => {
     scope
   });
 
-  const messages = includeLabels(c.req.raw)
+  const messages = includeMailApiLabels(c.req.raw)
     ? await withMessageLabels(c.env.DB, page.messages)
     : page.messages;
   const response = c.json(messages);
@@ -96,7 +100,9 @@ messageRoutes.get("/:id/thread", async (c) => {
   const messages = (
     await listThreadMessages(c.env.DB, message.threadId, scope, c.env.MAIL_OBJECTS)
   ).map(publicMessage);
-  return c.json(includeLabels(c.req.raw) ? await withMessageLabels(c.env.DB, messages) : messages);
+  return c.json(
+    includeMailApiLabels(c.req.raw) ? await withMessageLabels(c.env.DB, messages) : messages
+  );
 });
 
 messageRoutes.get("/:id", async (c) => {
@@ -114,7 +120,9 @@ messageRoutes.get("/:id", async (c) => {
   }
   const publicDetail = publicMessage(message);
   return c.json(
-    includeLabels(c.req.raw) ? (await withMessageLabels(c.env.DB, [publicDetail]))[0] : publicDetail
+    includeMailApiLabels(c.req.raw)
+      ? (await withMessageLabels(c.env.DB, [publicDetail]))[0]
+      : publicDetail
   );
 });
 
@@ -224,7 +232,7 @@ for (const action of actions) {
       c.executionCtx.waitUntil(ignoreMailEventFailure(publishMessageMailEvent(c.env, [target])));
     }
     return c.json(
-      includeLabels(c.req.raw) ? (await withMessageLabels(c.env.DB, [message]))[0] : message
+      includeMailApiLabels(c.req.raw) ? (await withMessageLabels(c.env.DB, [message]))[0] : message
     );
   });
 }
@@ -312,7 +320,7 @@ function parseMessageLimit(value: string | undefined): number {
 function nextMessagePageUrl(requestUrl: string, cursor: string): string {
   const url = new URL(requestUrl);
   const preserved = new URLSearchParams();
-  for (const name of ["mailboxId", "folder", "labelId", "search", "limit"]) {
+  for (const name of ["mailboxId", "folder", "labelId", "search", "limit", "includeLabels"]) {
     const value = url.searchParams.get(name);
     if (value !== null) preserved.set(name, value);
   }
@@ -322,10 +330,6 @@ function nextMessagePageUrl(requestUrl: string, cursor: string): string {
   preserved.set("cursor", cursor);
   url.search = preserved.toString();
   return url.toString();
-}
-
-function includeLabels(request: Request): boolean {
-  return mailApiBasePath(request) !== "/api/v1";
 }
 
 async function requireLabelMessageAccess(

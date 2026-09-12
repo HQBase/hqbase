@@ -16,6 +16,7 @@ describe("local database reset", () => {
     );
   }, 60_000);
 
+  // A complete reset and migration needs the same CI budget as the setup above.
   it("removes current data and supports a fresh migration", async () => {
     await applyStatements(resetSql);
     await applyCurrentMigrations();
@@ -101,7 +102,7 @@ describe("local database reset", () => {
       "agents",
       "principals"
     ]);
-  });
+  }, 60_000);
 });
 
 async function applyStatements(source: string): Promise<void> {

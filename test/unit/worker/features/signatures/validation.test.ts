@@ -5,6 +5,7 @@ import {
 import {
   createSignatureSchema,
   MAX_SIGNATURE_HTML_INPUT_LENGTH,
+  signatureSelectionSchema,
   updateSignatureSchema
 } from "@worker/features/signatures/validation";
 import { describe, expect, it } from "vitest";
@@ -12,6 +13,18 @@ import { describe, expect, it } from "vitest";
 const scope = { type: "user" as const, id: "user-1" };
 
 describe("signature request validation", () => {
+  it("ignores saved content when accepting an existing signature selection", () => {
+    const snapshot = {
+      mode: "selected",
+      id: "sig_1",
+      name: "Saved name",
+      html: "<p>Untrusted saved content</p>",
+      text: "Untrusted saved content"
+    };
+    expect(signatureSelectionSchema.parse(snapshot)).toEqual({ mode: "selected", id: "sig_1" });
+    expect(signatureSelectionSchema.safeParse({ ...snapshot, id: null }).success).toBe(false);
+  });
+
   it("accepts valid signature HTML with 256 KiB of decoded inline image data", () => {
     const bytes = new Uint8Array(MAX_SIGNATURE_IMAGE_BYTES);
     bytes.set([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);

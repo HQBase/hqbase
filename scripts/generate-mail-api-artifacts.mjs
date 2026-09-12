@@ -118,6 +118,10 @@ function withAgentAuthentication(document) {
       );
       delete operation["x-hqbase-agent-capabilities"];
       if (route === "/api/v2/messages/{id}/remote-media/trust") continue;
+      if (
+        operation.security.some((requirement) => requirement.oauth2?.includes("signatures:manage"))
+      )
+        continue;
       const capabilities = operation.security.find((requirement) => requirement.oauth2)?.oauth2;
       if (!capabilities) continue;
       operation.security.push({ agentBearer: [] });

@@ -20,7 +20,7 @@ export type AgentPrincipal = {
 
 export type RequestPrincipal = HumanPrincipal | AgentPrincipal;
 
-export function humanPrincipal(auth: AuthContext): HumanPrincipal {
+export function humanPrincipal(auth: Pick<AuthContext, "user">): HumanPrincipal {
   return {
     id: auth.user.id,
     type: "user",

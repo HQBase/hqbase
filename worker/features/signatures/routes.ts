@@ -1,9 +1,8 @@
 import { Hono } from "hono";
 import type { z } from "zod";
 
-import { requireMailApiPrincipal } from "../../auth/mail-api";
+import { requireMailApiContext, requireMailApiPrincipal } from "../../auth/mail-api";
 import { humanPrincipal } from "../../auth/principal";
-import { requireAuthContext } from "../../auth/session";
 import type { HonoApp } from "../../lib/env";
 import { AppError } from "../../lib/errors";
 import { readJson } from "../../lib/json";
@@ -23,14 +22,15 @@ import { createSignatureSchema, updateSignatureSchema } from "./validation";
 
 export const signatureRoutes = new Hono<HonoApp>();
 export const mailSignatureRoutes = new Hono<HonoApp>();
+const signatureWriteRoutes = new Hono<HonoApp>();
 
 signatureRoutes.get("/", async (c) => {
-  const auth = await requireAuthContext(c.env, c.req.raw);
+  const auth = await requireMailApiContext(c.env, c.req.raw, "signatures:manage");
   return c.json(await listManageableSignatures(c.env.DB, humanPrincipal(auth)));
 });
 
-signatureRoutes.post("/", async (c) => {
-  const auth = await requireAuthContext(c.env, c.req.raw);
+signatureWriteRoutes.post("/", async (c) => {
+  const auth = await requireMailApiContext(c.env, c.req.raw, "signatures:manage");
   const actor = humanPrincipal(auth);
   const input = signatureInput(createSignatureSchema, await readJson(c.req.raw));
   try {
@@ -71,8 +71,8 @@ signatureRoutes.post("/", async (c) => {
   }
 });
 
-signatureRoutes.patch("/:id", async (c) => {
-  const auth = await requireAuthContext(c.env, c.req.raw);
+signatureWriteRoutes.patch("/:id", async (c) => {
+  const auth = await requireMailApiContext(c.env, c.req.raw, "signatures:manage");
   const actor = humanPrincipal(auth);
   const id = c.req.param("id");
   const input = signatureInput(updateSignatureSchema, await readJson(c.req.raw));
@@ -117,8 +117,8 @@ signatureRoutes.patch("/:id", async (c) => {
   }
 });
 
-signatureRoutes.delete("/:id", async (c) => {
-  const auth = await requireAuthContext(c.env, c.req.raw);
+signatureWriteRoutes.delete("/:id", async (c) => {
+  const auth = await requireMailApiContext(c.env, c.req.raw, "signatures:manage");
   const actor = humanPrincipal(auth);
   const id = c.req.param("id");
   const current = await findSignature(c.env.DB, id);
@@ -171,6 +171,13 @@ mailSignatureRoutes.get("/", async (c) => {
   }
   return c.json(await listUsableSignatures(c.env.DB, auth.principal, from.data));
 });
+
+mailSignatureRoutes.get("/manage", async (c) => {
+  const auth = await requireMailApiContext(c.env, c.req.raw, "signatures:manage");
+  return c.json(await listManageableSignatures(c.env.DB, humanPrincipal(auth)));
+});
+signatureRoutes.route("/", signatureWriteRoutes);
+mailSignatureRoutes.route("/", signatureWriteRoutes);
 
 function signatureInput<Schema extends z.ZodType>(schema: Schema, value: unknown): z.infer<Schema> {
   const result = schema.safeParse(value);

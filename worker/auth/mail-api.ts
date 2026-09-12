@@ -11,7 +11,7 @@ import { authenticateOAuthBearer, OAuthBearerError } from "./oauth-principal";
 import { type AgentPrincipal, type HumanPrincipal, humanPrincipal } from "./principal";
 import { type AuthContext, requireAuthContext } from "./session";
 
-const mailApiScopes = ["mail:read", "mail:write", "mail:send"] as const;
+const mailApiScopes = ["mail:read", "mail:write", "mail:send", "signatures:manage"] as const;
 export type MailApiScope = (typeof mailApiScopes)[number];
 const mailApiMetadataPrefix = "/.well-known/oauth-protected-resource";
 const agentSkillPath = "/skills/hqbase-mail/SKILL.md";
@@ -19,7 +19,7 @@ const agentSkillPath = "/skills/hqbase-mail/SKILL.md";
 export type MailApiPrincipal =
   | {
       principal: HumanPrincipal;
-      auth: AuthContext;
+      auth: Pick<AuthContext, "user">;
       authentication: "bearer" | "session";
       scopes: ReadonlySet<MailApiScope>;
     }
@@ -52,7 +52,7 @@ export async function requireMailApiContext(
   env: WorkerEnv,
   request: Request,
   requiredScope: MailApiScope
-): Promise<AuthContext> {
+): Promise<Pick<AuthContext, "user">> {
   const result = await requireMailApiPrincipal(env, request, requiredScope);
   if (result.auth) return result.auth;
   throw new MailApiAuthError(
@@ -152,7 +152,7 @@ export async function requireMailApiPrincipal(
         "insufficient_scope"
       );
     }
-    const auth = { session: principal.session, user: principal.user };
+    const auth = { user: principal.user };
     return {
       principal: humanPrincipal(auth),
       auth,
@@ -246,4 +246,11 @@ function mailApiResourceForRequest(env: WorkerEnv, request: Request): string {
   return mailApiBasePath(request) === "/api/v1"
     ? mailApiV1Resource(env, request)
     : mailApiResource(env, request);
+}
+
+export function includeMailApiLabels(request: Request): boolean {
+  return (
+    mailApiBasePath(request) !== "/api/v1" ||
+    new URL(request.url).searchParams.get("includeLabels") === "true"
+  );
 }

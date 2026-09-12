@@ -268,7 +268,7 @@ describe("HQBase Mail API", () => {
     await expect(metadata.json()).resolves.toMatchObject({
       resource: apiResource,
       authorization_servers: [`${origin}/api/auth`],
-      scopes_supported: scopes,
+      scopes_supported: [...scopes, "signatures:manage"],
       resource_name: "HQBase Mail API",
       resource_documentation: `${origin}/skills/hqbase-mail/SKILL.md`
     });
@@ -278,7 +278,7 @@ describe("HQBase Mail API", () => {
     await expect(v1Metadata.json()).resolves.toMatchObject({
       resource: v1ApiResource,
       authorization_servers: [`${origin}/api/auth`],
-      scopes_supported: scopes
+      scopes_supported: [...scopes, "signatures:manage"]
     });
 
     const rejected = await SELF.fetch(`${origin}/api/v2/messages`);
@@ -664,6 +664,75 @@ describe("HQBase Mail API", () => {
     const attachment = await apiFetch("/api/v2/attachments/att_api", readToken);
     expect(attachment.status).toBe(200);
     expect(await attachment.text()).toBe("hello");
+  });
+
+  it("opts v1 into v2 label payloads without changing default responses or change cursors", async () => {
+    const now = new Date().toISOString();
+    const labelId = "lbl_v1_opt_in";
+    await env.DB.prepare(
+      "INSERT INTO labels (id, name, color, created_by_user_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)"
+    )
+      .bind(labelId, "Opt in", "blue", userId, now, now)
+      .run();
+    const baseline = await apiFetch("/api/v1/changes", v1ReadToken);
+    const cursor = (await baseline.json<{ nextCursor: string }>()).nextCursor;
+    expect(
+      (await apiFetch(`/api/v2/messages/msg_api/labels/${labelId}`, writeToken, { method: "PUT" }))
+        .status
+    ).toBe(200);
+    for (const path of [
+      "/messages",
+      "/messages/msg_api",
+      "/messages/msg_api/thread",
+      "/conversations",
+      `/changes?cursor=${encodeURIComponent(cursor)}`
+    ]) {
+      const join = path.includes("?") ? "&" : "?";
+      const plain = await apiFetch(`/api/v1${path}`, v1ReadToken);
+      const opted = await apiFetch(`/api/v1${path}${join}includeLabels=true`, v1ReadToken);
+      const v2 = await apiFetch(`/api/v2${path}`, readToken);
+      expect(plain.status).toBe(200);
+      expect(opted.status).toBe(200);
+      expect(v2.status).toBe(200);
+      const plainBody = await plain.json();
+      const optedBody = await opted.json();
+      expect(optedBody).toEqual(await v2.json());
+      expect(JSON.stringify(plainBody)).not.toContain('"labels":');
+      expect(JSON.stringify(optedBody)).toContain(labelId);
+      for (const value of ["false", "1"]) {
+        const disabled = await apiFetch(`/api/v1${path}${join}includeLabels=${value}`, v1ReadToken);
+        expect(await disabled.json()).toEqual(plainBody);
+      }
+    }
+    const added = await apiFetch(
+      `/api/v1/changes?cursor=${encodeURIComponent(cursor)}&includeLabels=true`,
+      v1ReadToken
+    );
+    const next = (await added.json<{ nextCursor: string }>()).nextCursor;
+    expect(
+      (
+        await apiFetch(`/api/v2/messages/msg_api/labels/${labelId}`, writeToken, {
+          method: "DELETE"
+        })
+      ).status
+    ).toBe(200);
+    const removed = await apiFetch(
+      `/api/v1/changes?cursor=${encodeURIComponent(next)}&includeLabels=true`,
+      v1ReadToken
+    );
+    await expect(removed.json()).resolves.toMatchObject({
+      changes: [
+        expect.objectContaining({
+          type: "upsert",
+          message: expect.objectContaining({ id: "msg_api", labels: [] })
+        })
+      ]
+    });
+    const filtered = await apiFetch(
+      `/api/v1/changes?includeLabels=true&labelId=${labelId}`,
+      v1ReadToken
+    );
+    expect(filtered.status).toBe(400);
   });
 
   it("returns visible content before and after separately classified reply history", async () => {
@@ -1296,6 +1365,22 @@ describe("HQBase Mail API", () => {
       const second = await apiFetch(next.slice(origin.length), readToken);
       await expect(second.json()).resolves.toMatchObject([{ id: "msg_page_2" }]);
       expect(second.headers.get("link")).toBeNull();
+    });
+
+    it("keeps v1 label membership when following next-page links", async () => {
+      const first = await apiFetch(
+        "/api/v1/messages?mailboxId=mbx_page&includeLabels=true&limit=1",
+        v1ReadToken
+      );
+      expect(first.status).toBe(200);
+      const next = nextPageUrl(first);
+      if (!next) throw new Error("Expected a v1 next-page link.");
+      expect(new URL(next).searchParams.get("includeLabels")).toBe("true");
+      const second = await apiFetch(next.slice(origin.length), v1ReadToken);
+      expect(second.status).toBe(200);
+      const rows = await second.json<Array<{ labels?: unknown[] }>>();
+      expect(rows).toHaveLength(1);
+      expect(rows[0]?.labels).toEqual([]);
     });
 
     it("never lists an unreadable mailbox on any page", async () => {
