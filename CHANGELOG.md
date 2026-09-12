@@ -1,5 +1,23 @@
 # Changelog
 
+## 1.4.2
+
+### Fixed
+
+- Keep approved offline OAuth clients connected after browser sign-out or session expiry. Token
+  expiry, revoked access, account restrictions, and password reset still end their access.
+- Correct the draft response schema so clients can read saved signatures after the original
+  signature is deleted.
+- Update Tiptap, Hono, and Vitest dependencies to versions with security fixes.
+
+### New
+
+- Let human OAuth clients create, edit, and delete signatures with the separate
+  `signatures:manage` permission. Mailbox and domain access rules still apply.
+- Let v1 clients request label membership with `includeLabels=true` in messages, conversations,
+  and changes. Existing v1 responses stay unchanged unless the client opts in.
+
+
 ## 1.4.1
 
 ### Fixed
