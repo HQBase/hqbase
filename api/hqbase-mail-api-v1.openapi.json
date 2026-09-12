@@ -307,6 +307,16 @@
               "default": 100
             },
             "description": "Maximum number of journal entries read for this page."
+          },
+          {
+            "name": "includeLabels",
+            "in": "query",
+            "required": false,
+            "description": "Include label membership. Does not filter results or change the cursor.",
+            "schema": {
+              "type": "boolean",
+              "default": false
+            }
           }
         ]
       }
@@ -527,6 +537,16 @@
               "maxLength": 512
             },
             "description": "Opaque cursor from the previous page. Read it from the Link header and send it unchanged."
+          },
+          {
+            "name": "includeLabels",
+            "in": "query",
+            "required": false,
+            "description": "Include label membership. Does not filter results or change the cursor.",
+            "schema": {
+              "type": "boolean",
+              "default": false
+            }
           }
         ]
       }
@@ -615,6 +635,16 @@
               "type": "string",
               "minLength": 1,
               "maxLength": 100
+            }
+          },
+          {
+            "name": "includeLabels",
+            "in": "query",
+            "required": false,
+            "description": "Include label membership. Does not filter results or change the cursor.",
+            "schema": {
+              "type": "boolean",
+              "default": false
             }
           }
         ]
@@ -707,6 +737,16 @@
               "type": "string",
               "minLength": 1,
               "maxLength": 100
+            }
+          },
+          {
+            "name": "includeLabels",
+            "in": "query",
+            "required": false,
+            "description": "Include label membership. Does not filter results or change the cursor.",
+            "schema": {
+              "type": "boolean",
+              "default": false
             }
           }
         ]
@@ -1203,6 +1243,16 @@
                 "restore"
               ]
             }
+          },
+          {
+            "name": "includeLabels",
+            "in": "query",
+            "required": false,
+            "description": "Include label membership in the updated message.",
+            "schema": {
+              "type": "boolean",
+              "default": false
+            }
           }
         ]
       }
@@ -1482,6 +1532,16 @@
               "maxLength": 512
             },
             "description": "Opaque cursor from the previous page."
+          },
+          {
+            "name": "includeLabels",
+            "in": "query",
+            "required": false,
+            "description": "Include label membership. Does not filter results or change the cursor.",
+            "schema": {
+              "type": "boolean",
+              "default": false
+            }
           }
         ]
       }
@@ -3091,6 +3151,91 @@
             }
           }
         ]
+      },
+      "post": {
+        "summary": "Create a signature",
+        "operationId": "createSignature",
+        "tags": ["Signatures"],
+        "security": [
+          {
+            "oauth2": ["signatures:manage"]
+          },
+          {
+            "cookieSession": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Create a signature",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Signature"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid signature",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid authentication",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient scope or signature management access",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Signature or target not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Signature name already exists in this scope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateSignatureInput"
+              }
+            }
+          }
+        }
       }
     },
     "/api/v1/drafts/{id}/labels/{labelId}": {
@@ -3230,6 +3375,261 @@
           }
         ]
       }
+    },
+    "/api/v1/signatures/manage": {
+      "get": {
+        "summary": "List manageable signatures",
+        "operationId": "listManageableSignatures",
+        "tags": ["Signatures"],
+        "security": [
+          {
+            "oauth2": ["signatures:manage"]
+          },
+          {
+            "cookieSession": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List manageable signatures",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Signature"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid signature",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid authentication",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient scope or signature management access",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Signature or target not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Signature name already exists in this scope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/signatures/{id}": {
+      "patch": {
+        "summary": "Update a signature",
+        "operationId": "updateSignature",
+        "tags": ["Signatures"],
+        "security": [
+          {
+            "oauth2": ["signatures:manage"]
+          },
+          {
+            "cookieSession": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Update a signature",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Signature"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid signature",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid authentication",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient scope or signature management access",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Signature or target not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Signature name already exists in this scope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateSignatureInput"
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete a signature",
+        "operationId": "deleteSignature",
+        "tags": ["Signatures"],
+        "security": [
+          {
+            "oauth2": ["signatures:manage"]
+          },
+          {
+            "cookieSession": []
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Delete a signature"
+          },
+          "400": {
+            "description": "Invalid signature",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid authentication",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient scope or signature management access",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Signature or target not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Signature name already exists in this scope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
     }
   },
   "components": {
@@ -3246,7 +3646,8 @@
               "mail:read": "Read accessible mail",
               "mail:write": "Organize accessible mail",
               "mail:send": "Manage drafts and send mail",
-              "offline_access": "Request a refresh token"
+              "offline_access": "Request a refresh token",
+              "signatures:manage": "Manage signatures within the person's current access"
             }
           }
         }
@@ -3566,6 +3967,13 @@
           "createdAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "labels": {
+            "type": "array",
+            "description": "Included only when includeLabels=true.",
+            "items": {
+              "$ref": "#/components/schemas/Label"
+            }
           }
         }
       },
@@ -3940,96 +4348,24 @@
         }
       },
       "DraftInput": {
-        "type": "object",
-        "required": [
-          "mailboxId",
-          "replyToMessageId",
-          "forwardOfMessageId",
-          "from",
-          "to",
-          "cc",
-          "bcc",
-          "subject",
-          "text",
-          "html"
-        ],
-        "properties": {
-          "mailboxId": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/DraftFields"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "signature": {
+                "$ref": "#/components/schemas/SignatureSelection"
               }
-            ]
-          },
-          "replyToMessageId": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "forwardOfMessageId": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "from": {
-            "type": "string"
-          },
-          "to": {
-            "type": "array",
-            "items": {
-              "type": "string"
             }
-          },
-          "cc": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "bcc": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "subject": {
-            "type": "string",
-            "maxLength": 200
-          },
-          "text": {
-            "type": "string",
-            "maxLength": 100000
-          },
-          "html": {
-            "type": "string",
-            "maxLength": 200000
-          },
-          "version": {
-            "type": "integer",
-            "minimum": 1
-          },
-          "signature": {
-            "$ref": "#/components/schemas/SignatureSelection"
           }
-        }
+        ]
       },
       "Draft": {
         "allOf": [
           {
-            "$ref": "#/components/schemas/DraftInput"
+            "$ref": "#/components/schemas/DraftFields"
           },
           {
             "type": "object",
@@ -4372,7 +4708,15 @@
             "enum": ["automatic", "selected", "none"]
           },
           "id": {
-            "type": ["string", "null"]
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Null when no signature was selected or the selected signature was deleted. Saved snapshot content remains available."
           },
           "name": {
             "type": "string"
@@ -4440,13 +4784,166 @@
         "required": ["automaticSignatureId", "signatures"],
         "properties": {
           "automaticSignatureId": {
-            "type": ["string", "null"]
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "signatures": {
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/Signature"
             }
+          }
+        }
+      },
+      "CreateSignatureInput": {
+        "type": "object",
+        "required": ["name", "html", "scope"],
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "html": {
+            "type": "string",
+            "maxLength": 400000
+          },
+          "scope": {
+            "type": "object",
+            "required": ["type", "id"],
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": ["user", "mailbox", "domain"]
+              },
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 100
+              }
+            }
+          },
+          "isDefault": {
+            "type": "boolean",
+            "default": false
+          }
+        }
+      },
+      "UpdateSignatureInput": {
+        "type": "object",
+        "anyOf": [
+          {
+            "required": ["name"]
+          },
+          {
+            "required": ["html"]
+          },
+          {
+            "required": ["isDefault"]
+          }
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "html": {
+            "type": "string",
+            "maxLength": 400000
+          },
+          "isDefault": {
+            "type": "boolean"
+          }
+        }
+      },
+      "DraftFields": {
+        "type": "object",
+        "required": [
+          "mailboxId",
+          "replyToMessageId",
+          "forwardOfMessageId",
+          "from",
+          "to",
+          "cc",
+          "bcc",
+          "subject",
+          "text",
+          "html"
+        ],
+        "properties": {
+          "mailboxId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "replyToMessageId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "forwardOfMessageId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "from": {
+            "type": "string"
+          },
+          "to": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "cc": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "bcc": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "subject": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "text": {
+            "type": "string",
+            "maxLength": 100000
+          },
+          "html": {
+            "type": "string",
+            "maxLength": 200000
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1
           }
         }
       }

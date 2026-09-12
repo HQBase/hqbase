@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { z } from "zod";
-import { mailApiBasePath, requireMailApiPrincipal } from "../../auth/mail-api";
+import { includeMailApiLabels, requireMailApiPrincipal } from "../../auth/mail-api";
 import { accessibleMessageScope } from "../../auth/mailbox-access";
 import type { HonoApp } from "../../lib/env";
 import { AppError } from "../../lib/errors";
@@ -57,10 +57,9 @@ conversationRoutes.get("/", async (c) => {
   });
   return c.json({
     ...page,
-    conversations:
-      mailApiBasePath(c.req.raw) === "/api/v1"
-        ? page.conversations
-        : await withConversationLabels(c.env.DB, page.conversations, scope)
+    conversations: !includeMailApiLabels(c.req.raw)
+      ? page.conversations
+      : await withConversationLabels(c.env.DB, page.conversations, scope)
   });
 });
 

@@ -9,7 +9,21 @@ export function withSignatures(document, version) {
   result.components.schemas ??= {};
   Object.assign(result.components.schemas, signatureSchemas());
 
-  for (const name of ["DraftInput", "SendInput", "ReplyInput", "ForwardInput"]) {
+  const schemas = result.components.schemas;
+  const fields = structuredClone(schemas.DraftFields ?? schemas.DraftInput);
+  delete fields.properties.signature;
+  schemas.DraftFields = fields;
+  schemas.DraftInput = {
+    allOf: [
+      { $ref: "#/components/schemas/DraftFields" },
+      {
+        type: "object",
+        properties: { signature: { $ref: "#/components/schemas/SignatureSelection" } }
+      }
+    ]
+  };
+  schemas.Draft.allOf[0] = { $ref: "#/components/schemas/DraftFields" };
+  for (const name of ["SendInput", "ReplyInput", "ForwardInput"]) {
     result.components.schemas[name].properties.signature = {
       $ref: "#/components/schemas/SignatureSelection"
     };
@@ -51,6 +65,65 @@ export function withSignatures(document, version) {
       ]
     }
   };
+  const managementSecurity = [{ oauth2: ["signatures:manage"] }, { cookieSession: [] }];
+  result.components.securitySchemes.oauth2.flows.authorizationCode.scopes["signatures:manage"] =
+    "Manage signatures within the person's current access";
+  const managementOperation = (summary, operationId, schema, status = 200) => ({
+    summary,
+    operationId,
+    tags: ["Signatures"],
+    security: managementSecurity,
+    responses: {
+      [status]: {
+        description: summary,
+        ...(schema ? { content: { "application/json": { schema } } } : {})
+      },
+      400: errorResponse("Invalid signature"),
+      401: errorResponse("Missing or invalid authentication"),
+      403: errorResponse("Insufficient scope or signature management access"),
+      404: errorResponse("Signature or target not found"),
+      409: errorResponse("Signature name already exists in this scope")
+    }
+  });
+  result.paths[`${apiBasePath}/signatures/manage`] = {
+    get: managementOperation("List manageable signatures", "listManageableSignatures", {
+      type: "array",
+      items: { $ref: "#/components/schemas/Signature" }
+    })
+  };
+  result.paths[`${apiBasePath}/signatures`].post = {
+    ...managementOperation(
+      "Create a signature",
+      "createSignature",
+      { $ref: "#/components/schemas/Signature" },
+      201
+    ),
+    requestBody: {
+      required: true,
+      content: {
+        "application/json": { schema: { $ref: "#/components/schemas/CreateSignatureInput" } }
+      }
+    }
+  };
+  const idParameter = { name: "id", in: "path", required: true, schema: { type: "string" } };
+  result.paths[`${apiBasePath}/signatures/{id}`] = {
+    patch: {
+      ...managementOperation("Update a signature", "updateSignature", {
+        $ref: "#/components/schemas/Signature"
+      }),
+      parameters: [idParameter],
+      requestBody: {
+        required: true,
+        content: {
+          "application/json": { schema: { $ref: "#/components/schemas/UpdateSignatureInput" } }
+        }
+      }
+    },
+    delete: {
+      ...managementOperation("Delete a signature", "deleteSignature", null, 204),
+      parameters: [idParameter]
+    }
+  };
   return result;
 }
 
@@ -61,6 +134,32 @@ function signatureSchemas() {
     properties: { mode: { type: "string", const: value } }
   });
   return {
+    CreateSignatureInput: {
+      type: "object",
+      required: ["name", "html", "scope"],
+      properties: {
+        name: { type: "string", minLength: 1, maxLength: 200 },
+        html: { type: "string", maxLength: 400000 },
+        scope: {
+          type: "object",
+          required: ["type", "id"],
+          properties: {
+            type: { type: "string", enum: ["user", "mailbox", "domain"] },
+            id: { type: "string", minLength: 1, maxLength: 100 }
+          }
+        },
+        isDefault: { type: "boolean", default: false }
+      }
+    },
+    UpdateSignatureInput: {
+      type: "object",
+      anyOf: [{ required: ["name"] }, { required: ["html"] }, { required: ["isDefault"] }],
+      properties: {
+        name: { type: "string", minLength: 1, maxLength: 200 },
+        html: { type: "string", maxLength: 400000 },
+        isDefault: { type: "boolean" }
+      }
+    },
     SignatureSelection: {
       oneOf: [
         mode("automatic"),
@@ -80,7 +179,11 @@ function signatureSchemas() {
       required: ["mode", "id", "name", "html", "text"],
       properties: {
         mode: { type: "string", enum: ["automatic", "selected", "none"] },
-        id: { type: ["string", "null"] },
+        id: {
+          anyOf: [{ type: "string" }, { type: "null" }],
+          description:
+            "Null when no signature was selected or the selected signature was deleted. Saved snapshot content remains available."
+        },
         name: { type: "string" },
         html: { type: "string" },
         text: { type: "string" }
@@ -117,7 +220,7 @@ function signatureSchemas() {
       type: "object",
       required: ["automaticSignatureId", "signatures"],
       properties: {
-        automaticSignatureId: { type: ["string", "null"] },
+        automaticSignatureId: { anyOf: [{ type: "string" }, { type: "null" }] },
         signatures: {
           type: "array",
           items: { $ref: "#/components/schemas/Signature" }

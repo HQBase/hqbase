@@ -154,6 +154,7 @@ function buildMailApiGuide(apiBase: string, openApiUrl: string): string {
 - \`mail:read\` — List visible mailboxes, shared labels, and conversations; search and open messages; render message HTML; and download attachments.
 - \`mail:write\` — Mark mail read or unread, add or remove labels and stars, archive or unarchive mail, move mail to Trash, and restore mail. A mailbox agent cannot change a person's remote-image trust preferences.
 - \`mail:send\` — Create and manage drafts and attachments, send new messages, reply, and forward.
+- \`signatures:manage\` — Human OAuth only: manage personal and shared signatures within the person's current management access. Machine credentials cannot use this permission.
 
 Permissions do not override HQBase mailbox access. The caller must also have the necessary Read or Handle mail grant. Machine agents never inherit owner access or see unassigned catch-all mail. This API never grants Manager access.
 
@@ -186,7 +187,7 @@ JSON errors contain a stable \`error.code\` and human-readable \`error.message\`
 
 ## API boundary and stability
 
-The Mail API covers mailboxes, messages, conversations, labels, signatures, attachments, drafts, sending, replying, and forwarding. It does not manage people, mailbox grants, label definitions, signature definitions, domains, setup, updates, audits, sessions, notifications, app secrets, or Cloudflare credentials.
+The Mail API covers mailboxes, messages, conversations, labels, signatures, attachments, drafts, sending, replying, and forwarding. It does not manage people, mailbox grants, label definitions, domains, setup, updates, audits, sessions, notifications, app secrets, or Cloudflare credentials.
 
 \`/api/v2\` is HQBase's stable public Mail API. Additive fields and endpoints may appear, so ignore unknown response fields. Breaking changes use a new versioned base path such as \`/api/v3\`.
 `;

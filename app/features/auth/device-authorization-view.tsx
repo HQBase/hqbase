@@ -10,6 +10,8 @@ const scopeDescriptions: Record<string, string> = {
   "mail:write": "Change message and conversation state where you have Handle mail access",
   "mail:send":
     "Manage drafts and attachments, then send, reply, or forward where you have Handle mail access",
+  "signatures:manage":
+    "Manage personal signatures and shared signatures where you have management access",
   offline_access: "Stay connected until you revoke access"
 };
 

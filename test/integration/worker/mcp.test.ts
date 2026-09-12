@@ -259,7 +259,7 @@ describe("HQBase MCP server", () => {
     expect(registration.status).toBe(201);
     const registered = (await registration.json()) as { scope?: string };
     expect(registered.scope?.split(" ").sort()).toEqual(
-      ["mail:read", "mail:write", "mail:send", "offline_access"].sort()
+      ["mail:read", "mail:write", "mail:send", "offline_access", "signatures:manage"].sort()
     );
 
     const fullRegistration = await SELF.fetch(metadata.registration_endpoint ?? "", {
@@ -275,7 +275,7 @@ describe("HQBase MCP server", () => {
     expect(fullRegistration.status).toBe(201);
     const fullRegistered = (await fullRegistration.json()) as { scope?: string };
     expect(fullRegistered.scope?.split(" ").sort()).toEqual(
-      [...fullScopes, "offline_access"].sort()
+      [...fullScopes, "offline_access", "signatures:manage"].sort()
     );
   });
 
