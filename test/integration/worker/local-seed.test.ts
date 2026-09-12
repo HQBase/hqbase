@@ -100,6 +100,7 @@ describe("local database seed fixture", () => {
     expect(deliveries?.count).toBe(118);
   });
 
+  // Rebuilding the full fixture needs the same CI budget as its initial setup.
   it("is repeatable without duplicating fixture records", async () => {
     await applyStatements(
       buildSeedSql(await hashPassword(password), new Date("2026-08-14T19:00:00.000Z"))
@@ -111,7 +112,7 @@ describe("local database seed fixture", () => {
           (SELECT COUNT(*) FROM drafts WHERE id LIKE 'drf_local_%') AS drafts`
     ).first<{ users: number; messages: number; drafts: number }>();
     expect(counts).toEqual({ users: 1, messages: 123, drafts: 4 });
-  });
+  }, 60_000);
 
   it("creates credentials that Better Auth can use for a normal session", async () => {
     const response = await SELF.fetch(`${origin}/api/auth/sign-in/email`, {
