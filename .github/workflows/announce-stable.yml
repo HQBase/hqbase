@@ -1,0 +1,40 @@
+name: Announce verified Stable release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Published Stable version. Confirm its announcement was not already sent."
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hqbase-staging-resources
+  queue: max
+  cancel-in-progress: false
+
+jobs:
+  announce:
+    if: github.ref_name == 'main'
+    runs-on: ubuntu-latest
+    environment: release
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ github.token }}
+      HQBASE_RELEASE_VERSION: ${{ inputs.version }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+      - name: Verify published Stable without changing it
+        run: node scripts/release/verify-stable.mjs
+      - name: Announce verified Stable release
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_RELEASE_WEBHOOK_URL }}
+        run: |
+          gh release view "v${HQBASE_RELEASE_VERSION}" --json body --jq .body > "$RUNNER_TEMP/release-notes.md"
+          node scripts/release/notify-discord.mjs "$RUNNER_TEMP/release-notes.md"
