@@ -101,7 +101,15 @@ export function withSignatures(document, version) {
     requestBody: {
       required: true,
       content: {
-        "application/json": { schema: { $ref: "#/components/schemas/CreateSignatureInput" } }
+        "application/json": {
+          schema: { $ref: "#/components/schemas/CreateSignatureInput" },
+          example: {
+            name: "Personal",
+            html: "<p>Best regards</p>",
+            scope: { type: "user", id: "{{userId}}" },
+            isDefault: false
+          }
+        }
       }
     }
   };
@@ -115,7 +123,10 @@ export function withSignatures(document, version) {
       requestBody: {
         required: true,
         content: {
-          "application/json": { schema: { $ref: "#/components/schemas/UpdateSignatureInput" } }
+          "application/json": {
+            schema: { $ref: "#/components/schemas/UpdateSignatureInput" },
+            example: { html: "<p>Kind regards</p>" }
+          }
         }
       }
     },

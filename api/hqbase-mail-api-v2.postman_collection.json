@@ -1021,7 +1021,7 @@
             "description": "Create a signature",
             "body": {
               "mode": "raw",
-              "raw": "{}",
+              "raw": "{\n  \"name\": \"Personal\",\n  \"html\": \"<p>Best regards</p>\",\n  \"scope\": {\n    \"type\": \"user\",\n    \"id\": \"{{userId}}\"\n  },\n  \"isDefault\": false\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -1066,7 +1066,7 @@
             "description": "Update a signature",
             "body": {
               "mode": "raw",
-              "raw": "{}",
+              "raw": "{\n  \"html\": \"<p>Kind regards</p>\"\n}",
               "options": {
                 "raw": {
                   "language": "json"

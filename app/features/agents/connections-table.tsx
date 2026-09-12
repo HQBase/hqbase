@@ -325,7 +325,8 @@ function StatusBadge({ status }: { status: string }): React.ReactElement {
 export function oauthAccessLabel(scopes: readonly string[]): string {
   const handleMail = scopes.includes("mail:write") || scopes.includes("mail:send");
   if (scopes.includes("signatures:manage")) {
-    return handleMail ? "Handle mail, manage signatures" : "Manage signatures";
+    if (handleMail) return "Handle mail, manage signatures";
+    return scopes.includes("mail:read") ? "Read mail, manage signatures" : "Manage signatures";
   }
   return handleMail ? "Handle mail" : "Read only";
 }

@@ -143,6 +143,10 @@ describe("Mail API public artifacts", () => {
     };
     expect(compile("Draft")(draft).valid).toBe(true);
     expect(compile("DraftInput")(draft).valid).toBe(false);
+    // The server ignores unknown fields and resolves the selected ID itself.
+    expect(
+      compile("DraftInput")({ ...draft, signature: { ...draft.signature, id: "sig_1" } }).valid
+    ).toBe(true);
     for (const signature of [
       { mode: "automatic" },
       { mode: "selected", id: "sig_1" },
@@ -196,6 +200,22 @@ describe("Mail API public artifacts", () => {
     expect(document.paths[`/api/v${version}/signatures`].get.security).toContainEqual({
       oauth2: ["mail:send"]
     });
+    const collection = version === 1 ? v1Postman : postman;
+    for (const [method, schema] of [
+      ["POST", "CreateSignatureInput"],
+      ["PATCH", "UpdateSignatureInput"]
+    ]) {
+      const request = collection.item
+        .flatMap((folder) => folder.item)
+        .find(
+          (item) => item.request.method === method && item.request.url.raw.includes("/signatures")
+        ).request;
+      const validate = new AjvJsonSchemaValidator().getValidator({
+        $ref: `#/components/schemas/${schema}`,
+        components: document.components
+      });
+      expect(validate(JSON.parse(request.body.raw)).valid).toBe(true);
+    }
   });
 
   it("documents optional v1 label membership and keeps v2 membership required", () => {

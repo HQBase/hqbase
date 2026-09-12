@@ -3292,6 +3292,15 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/CreateSignatureInput"
+              },
+              "example": {
+                "name": "Personal",
+                "html": "<p>Best regards</p>",
+                "scope": {
+                  "type": "user",
+                  "id": "{{userId}}"
+                },
+                "isDefault": false
               }
             }
           }
@@ -3615,6 +3624,9 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/UpdateSignatureInput"
+              },
+              "example": {
+                "html": "<p>Kind regards</p>"
               }
             }
           }

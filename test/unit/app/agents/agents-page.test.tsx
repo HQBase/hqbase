@@ -79,6 +79,17 @@ afterEach(() => {
 });
 
 describe("Agents page", () => {
+  it("shows mail read access together with signature management", async () => {
+    vi.mocked(listOAuthConnections).mockResolvedValue([
+      { ...oauthConnection, scopes: ["mail:read", "signatures:manage"] }
+    ]);
+    vi.mocked(listAgents).mockResolvedValue([]);
+    const view = await renderPage();
+
+    expect(view.container.textContent).toContain("Read mail, manage signatures");
+    await view.unmount();
+  });
+
   it("shows delegated and machine connections in one status list", async () => {
     vi.mocked(listOAuthConnections).mockResolvedValue([oauthConnection]);
     vi.mocked(listAgents).mockResolvedValue([mailboxAgent, provisioner]);
