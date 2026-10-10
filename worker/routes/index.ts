@@ -7,6 +7,7 @@ import {
   handleDeviceTokenRequest
 } from "../auth/device-authorization";
 import { MailApiAuthError, mailApiChallenge } from "../auth/mail-api";
+import { withMcpOfflineAccess } from "../auth/mcp-offline-access";
 import { agentManagementRoutes } from "../features/agents/routes";
 import { auditRoutes } from "../features/audit/routes";
 import { contactRoutes } from "../features/contacts/routes";
@@ -177,8 +178,11 @@ apiRoutes.all("/api/auth/*", async (c) => {
     ]);
   }
 
+  const authRequest = await withMcpOfflineAccess(c.env, c.req.raw);
   const handleAuthRequest = () =>
-    createAuth(c.env, c.req.raw, (promise) => c.executionCtx.waitUntil(promise)).handler(c.req.raw);
+    createAuth(c.env, c.req.raw, (promise) => c.executionCtx.waitUntil(promise)).handler(
+      authRequest
+    );
   if (pathname === "/api/auth/oauth2/token" && c.req.method === "POST") {
     return handleDeviceTokenRequest(c.env, c.req.raw, handleAuthRequest);
   }
