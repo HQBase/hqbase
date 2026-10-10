@@ -65,6 +65,17 @@ describe("MCP offline access policy", () => {
     expect(await listTools(path, renewed.access_token)).toBe(200);
   });
 
+  it("issues a refresh token when an MCP request omits scope", async () => {
+    // Better Auth then requests the client's registered scopes, which include offline_access.
+    const resource = `${origin}/mcp/full`;
+    const grant = await authorize(refreshClientId, resource);
+    expect(grant.consentScopes).toContain("offline_access");
+
+    const token = await exchangeCode(refreshClientId, resource, grant);
+    expect(token.refresh_token).toMatch(/^hqb_refresh_/);
+    expect(await listTools("/mcp/full", token.access_token)).toBe(200);
+  });
+
   it("keeps requested scopes for clients without the refresh_token grant", async () => {
     const resource = `${origin}/mcp/full`;
     const grant = await authorize(codeOnlyClientId, resource, fullScopes);
@@ -107,7 +118,7 @@ describe("MCP offline access policy", () => {
   async function authorize(
     clientId: string,
     resource: string,
-    scope: string
+    scope?: string
   ): Promise<{ code: string; consentScopes: string[]; verifier: string }> {
     const verifier = `${crypto.randomUUID()}${crypto.randomUUID()}`;
     const query = new URLSearchParams({
@@ -117,9 +128,9 @@ describe("MCP offline access policy", () => {
       redirect_uri: redirectUri,
       resource,
       response_type: "code",
-      scope,
       state: crypto.randomUUID()
     });
+    if (scope) query.set("scope", scope);
     const authorization = await SELF.fetch(`${origin}/api/auth/oauth2/authorize?${query}`, {
       headers: { cookie },
       redirect: "manual"
