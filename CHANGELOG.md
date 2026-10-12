@@ -11,6 +11,9 @@
   clients now accept typed files, for example PNG or PDF.
 - Update ProseMirror, the MCP SDK, Hono, and other dependencies to versions with security fixes.
   This includes a fix for unsafe content pasted into the message editor.
+- Keep MCP connections from ChatGPT and other clients active after their access token expires.
+  HQBase now asks for `offline_access` when a client that supports refresh tokens connects to
+  `/mcp` or `/mcp/full`. The consent page shows this as "Stay connected until you revoke access".
 
 ### New
 
