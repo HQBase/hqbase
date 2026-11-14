@@ -17,6 +17,8 @@ import type {
 } from "@/features/messages/types";
 import { type MailFolderId, mailFolders } from "@/lib/routes";
 import { CatchAllPolicyNotice } from "./catch-all-policy-notice";
+import { SelectAllCheckbox, SelectionActions } from "./list-selection-controls";
+import { useListTrash } from "./use-list-trash";
 
 type InboxPageProps = {
   activeFolder: MailFolderId;
@@ -72,6 +74,15 @@ export function InboxPage({
     totalCount === null
       ? null
       : `${totalCount.toLocaleString()} ${totalCount === 1 ? "conversation" : "conversations"}`;
+  const listTrash = useListTrash({
+    activeFolder,
+    canOrganizeConversation,
+    conversations,
+    onConversationAction,
+    onRefresh
+  });
+  // The list reserves a selection lane only when the person can select at least one loaded row.
+  const canSelect = listTrash.selectableCount > 0;
   const [thread, setThread] = React.useState<MessageDetailType[]>([]);
   const [detailError, setDetailError] = React.useState<string | null>(null);
   const [detailLoading, setDetailLoading] = React.useState(false);
@@ -299,9 +310,21 @@ export function InboxPage({
   return (
     <div className="flex h-full flex-col bg-list" data-mobile-view="message-list">
       <MailListHeader
-        actions={<LabelFilter labels={labels} values={labelIds} onChange={onLabelChange} />}
+        actions={
+          listTrash.selectedCount > 0 ? (
+            <SelectionActions listTrash={listTrash} />
+          ) : (
+            <LabelFilter labels={labels} values={labelIds} onChange={onLabelChange} />
+          )
+        }
         countLabel={conversationCountLabel}
-        title={activeLabel}
+        leading={canSelect ? <SelectAllCheckbox listTrash={listTrash} /> : undefined}
+        selectable={canSelect}
+        title={
+          listTrash.selectedCount > 0
+            ? `${listTrash.selectedCount.toLocaleString()} selected`
+            : activeLabel
+        }
       />
       {activeFolder === "catchall" ? <CatchAllPolicyNotice /> : null}
       <div className="min-h-0 flex-1 overflow-hidden">
@@ -316,6 +339,9 @@ export function InboxPage({
           onRefresh={onRefresh}
           onSelect={(conversation) => onSelect(conversation.id)}
           onToggleStar={handleStarToggle}
+          onTrash={listTrash.enabled ? listTrash.trashConversation : undefined}
+          selectedThreadIds={canSelect ? listTrash.selectedThreadIds : undefined}
+          onSelectionChange={canSelect ? listTrash.setSelected : undefined}
           onToggleLabel={async (conversation, label, assigned) => {
             const result = await setConversationLabel(conversation.id, label.id, assigned);
             onConversationLabelsChange(result.threadId, result.labels);

@@ -1,7 +1,8 @@
 import type * as React from "react";
-import { PiChats, PiPaperclip, PiStar } from "react-icons/pi";
+import { PiChats, PiPaperclip, PiStar, PiTrash } from "react-icons/pi";
 
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Checkbox } from "@/components/ui/checkbox";
 import { LabelMenu, LabelStack } from "@/features/labels/label-controls";
 import type { MailLabel } from "@/features/labels/types";
 import { cn } from "@/lib/cn";
@@ -21,6 +22,12 @@ type MessageListItemProps = {
   onSelect: (conversation: ConversationSummary) => void;
   onToggleLabel?: (label: MailLabel, assigned: boolean) => Promise<void> | void;
   onToggleStar: (conversation: ConversationSummary) => void;
+  /** Moves the conversation to Trash with one click. The control shows when the pointer is on the row. */
+  onTrash?: ((conversation: ConversationSummary) => void) | undefined;
+  /** Adds a checkbox that selects the row for an action on several conversations. */
+  selection?: { checked: boolean; onChange: (checked: boolean) => void } | undefined;
+  /** Keeps the selection lane in a row without a checkbox, so that all rows of a list align. */
+  reserveSelectionLane?: boolean;
 };
 
 export function MessageListItem({
@@ -33,8 +40,12 @@ export function MessageListItem({
   onLabelsChanged,
   onSelect,
   onToggleLabel,
-  onToggleStar
+  onToggleStar,
+  onTrash,
+  selection,
+  reserveSelectionLane = false
 }: MessageListItemProps): React.ReactElement {
+  const hasSelectionLane = reserveSelectionLane || Boolean(selection);
   const isUnread = conversation.unreadCount > 0;
   const timestamp = formatConversationTimestamp(conversationActivityTimestamp(conversation));
   const correspondent = correspondentLabel(conversation);
@@ -49,9 +60,14 @@ export function MessageListItem({
 
   return (
     <a
-      className={mailListRowClassName(isActive)}
+      className={mailListRowClassName(isActive || selection?.checked === true, hasSelectionLane)}
       href={href}
       onClick={(event) => {
+        // The row is a link. A click on a row control must not open the conversation.
+        if (event.target instanceof Element && event.target.closest("[data-row-control]")) {
+          event.preventDefault();
+          return;
+        }
         if (
           event.button !== 0 ||
           event.metaKey ||
@@ -72,7 +88,22 @@ export function MessageListItem({
       >
         <AvatarFallback className="font-medium uppercase">{avatarInitial}</AvatarFallback>
       </Avatar>
-      <span className="col-start-3 row-start-2 flex shrink-0 self-end justify-self-end sm:col-start-1 sm:row-start-1 sm:self-center sm:justify-self-auto">
+      <span className="col-start-3 row-start-2 flex shrink-0 self-end justify-self-end sm:col-start-1 sm:row-start-1 sm:items-center sm:self-center sm:justify-self-auto">
+        {hasSelectionLane ? (
+          <span
+            className="hidden size-6 shrink-0 items-center justify-center sm:flex"
+            data-row-control={selection ? "" : undefined}
+          >
+            {selection ? (
+              <Checkbox
+                aria-label={`Select conversation: ${conversation.subject || "No subject"}`}
+                checked={selection.checked}
+                className="border-muted-foreground/60 shadow-none"
+                onCheckedChange={(checked) => selection.onChange(checked === true)}
+              />
+            ) : null}
+          </span>
+        ) : null}
         <button
           aria-label={conversation.isStarred ? "Unstar conversation" : "Star conversation"}
           aria-pressed={conversation.isStarred}
@@ -214,6 +245,22 @@ export function MessageListItem({
       >
         {timestamp}
       </time>
+      {onTrash ? (
+        <button
+          aria-label="Move conversation to Trash"
+          className="pointer-events-none z-10 col-start-3 row-start-1 hidden h-8 min-h-8 w-full items-center justify-end justify-self-stretch rounded-md bg-[hsl(var(--message-row-surface))] pr-2 text-muted-foreground opacity-0 focus-visible:pointer-events-auto focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:col-start-6 sm:flex [@media(hover:hover)]:hover:text-foreground [@media(hover:hover)]:group-hover:pointer-events-auto [@media(hover:hover)]:group-hover:opacity-100"
+          data-row-control
+          onClick={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            onTrash(conversation);
+          }}
+          title="Move to Trash"
+          type="button"
+        >
+          <PiTrash aria-hidden="true" className="pointer-events-none size-4" />
+        </button>
+      ) : null}
     </a>
   );
 }
