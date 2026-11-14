@@ -20,6 +20,11 @@ type MessageListProps = {
   onRefresh: () => Promise<void> | void;
   onSelect: (conversation: ConversationSummary) => void;
   onToggleStar: (conversation: ConversationSummary) => void;
+  /** One-click move to Trash on a row. Omit it where rows cannot go to Trash. */
+  onTrash?: ((conversation: ConversationSummary) => void) | undefined;
+  /** Thread IDs of the selected rows. Omit it, or `onSelectionChange`, to hide the checkboxes. */
+  selectedThreadIds?: ReadonlySet<string> | undefined;
+  onSelectionChange?: ((conversation: ConversationSummary, selected: boolean) => void) | undefined;
   labels?: MailLabel[];
   canCreateLabels?: boolean;
   canOrganizeConversation?: (mailboxId: string | null) => boolean;
@@ -42,6 +47,9 @@ export function MessageList({
   onRefresh,
   onSelect,
   onToggleStar,
+  onTrash,
+  selectedThreadIds,
+  onSelectionChange,
   labels = [],
   canCreateLabels = false,
   canOrganizeConversation = () => false,
@@ -89,27 +97,41 @@ export function MessageList({
                 {group.label}
               </h2>
               <div className="flex flex-col gap-0.5">
-                {group.conversations.map((conversation) => (
-                  <MessageListItem
-                    conversation={conversation}
-                    href={appRoutePath({
-                      kind: "mail",
-                      folder: activeFolder,
-                      messageId: conversation.id
-                    })}
-                    isActive={conversation.threadId === selectedThreadId}
-                    key={conversation.threadId}
-                    labels={labels}
-                    canCreateLabels={canCreateLabels}
-                    canOrganizeLabels={canOrganizeConversation(conversation.mailboxId)}
-                    onLabelsChanged={onLabelsChanged}
-                    onSelect={onSelect}
-                    onToggleLabel={(label, assigned) =>
-                      onToggleLabel(conversation, label, assigned)
-                    }
-                    onToggleStar={onToggleStar}
-                  />
-                ))}
+                {group.conversations.map((conversation) => {
+                  const canOrganize = canOrganizeConversation(conversation.mailboxId);
+                  const listSelects = Boolean(selectedThreadIds && onSelectionChange);
+                  return (
+                    <MessageListItem
+                      conversation={conversation}
+                      href={appRoutePath({
+                        kind: "mail",
+                        folder: activeFolder,
+                        messageId: conversation.id
+                      })}
+                      isActive={conversation.threadId === selectedThreadId}
+                      key={conversation.threadId}
+                      labels={labels}
+                      canCreateLabels={canCreateLabels}
+                      canOrganizeLabels={canOrganize}
+                      onLabelsChanged={onLabelsChanged}
+                      onSelect={onSelect}
+                      onToggleLabel={(label, assigned) =>
+                        onToggleLabel(conversation, label, assigned)
+                      }
+                      onToggleStar={onToggleStar}
+                      onTrash={canOrganize ? onTrash : undefined}
+                      reserveSelectionLane={listSelects}
+                      selection={
+                        canOrganize && selectedThreadIds && onSelectionChange
+                          ? {
+                              checked: selectedThreadIds.has(conversation.threadId),
+                              onChange: (selected) => onSelectionChange(conversation, selected)
+                            }
+                          : undefined
+                      }
+                    />
+                  );
+                })}
               </div>
             </section>
           ))}
